@@ -101,6 +101,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .terr-label span{display:inline-block;transform:translate(-50%,-50%);background:#ffffffee;border:3px solid var(--terr);color:var(--terr);font-weight:700;font-size:18px;border-radius:10px;padding:0 10px;white-space:nowrap;font-family:"BIZ UDPGothic",sans-serif}
 
 /* ===== 家の印（色＋文字で区別） ===== */
+#map .leaflet-marker-icon{transition:opacity .3s linear}
 .pin{position:relative;width:34px;height:34px;border-radius:50%;display:inline-grid;place-items:center;font-weight:700;font-size:16px;font-style:normal;border:3px solid #fff;box-shadow:0 1px 3px #0006;font-family:"BIZ UDPGothic",sans-serif;line-height:1}
 .pin.apt{border-radius:8px;width:38px;height:38px;background:#fff;color:var(--ink);border-color:var(--ink);position:relative}
 .pin.apt i{position:absolute;top:-11px;right:-13px;min-width:24px;height:22px;border-radius:99px;background:var(--away);color:#1F1A00;font-style:normal;font-size:13px;display:grid;place-items:center;padding:0 5px;border:2px solid #fff}
@@ -341,7 +342,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
         <button class="btn" id="btnLocate">現在地</button>
         <button class="btn" id="btnBase">写真</button>
       </div>
-      <div class="zoomhint" id="zoomHint" hidden>地図を拡大すると家の印が出ます</div>
+      <div class="zoomhint" id="zoomHint" hidden>地図を拡大すると家の印が出ます（区域が見えるくらいまで）</div>
       <div class="cardbar" id="cardBar" hidden></div>
       <div class="legend" id="legend" aria-label="印の見かた">
         <span><i class="pin st-new">未</i>未訪問</span>
@@ -1239,12 +1240,49 @@ function houseIcon(h, ff) {
 }
 function renderTerrs() {
   terrLayer.clearLayers();
-  const cur = $('#terrJump').value;
+  const cur = selTerrId();
   for (const t of D().territories) {
     const on = t.id === cur;
     L.polygon(t.polygon, { color: '#0E7C66', weight: on ? 5 : 3, fillColor: '#0E7C66', fillOpacity: on ? 0.07 : 0.02, interactive: false }).addTo(terrLayer);
     L.marker(center(t.polygon), { icon: L.divIcon({ className: 'terr-label', html: `<span>${esc(t.no)}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false }).addTo(terrLayer);
   }
+}
+/* 今えらんでいる区域（選んでいないときは null） */
+function selTerrId() {
+  const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
+  if (c) return c.terrId;
+  if (roundTerr) return roundTerr;
+  const v = $('#terrJump').value;
+  return v && terrById(v) ? v : null;
+}
+/* 画面上での区域の広さ（ピクセル） */
+function terrScreenArea(t) {
+  const p = t.polygon.map(v => map.latLngToContainerPoint(v));
+  let a = 0;
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) a += (p[j].x + p[i].x) * (p[j].y - p[i].y);
+  return Math.abs(a / 2);
+}
+/* 画面に何区域分入っているかで、印の濃さを決める（2〜3区域まで近づくと、だんだん現れる） */
+const FADE_FULL = 3, FADE_NONE = 12;          // 区域をえらんでいないとき
+const FADE_FULL_SEL = 6, FADE_NONE_SEL = 24; // えらんだ区域があるとき（少し早めに出す）
+function iconFade() {
+  const size = map.getSize(), b = map.getBounds();
+  const sel = selTerrId(), st = sel && terrById(sel);
+  let ref;
+  if (st) ref = terrScreenArea(st); // えらんでいる区域を基準にする
+  else {
+    const areas = D().territories
+      .filter(t => b.intersects(L.latLngBounds(t.polygon)))
+      .map(terrScreenArea).filter(a => a > 0);
+    if (!areas.length) return 1;
+    ref = areas.reduce((x, y) => x + y, 0) / areas.length; // 画面に入っている区域の平均の広さ
+  }
+  if (!ref) return 1;
+  const full = st ? FADE_FULL_SEL : FADE_FULL, none = st ? FADE_NONE_SEL : FADE_NONE;
+  const n = (size.x * size.y) / ref; // 画面に入る区域の数の目安
+  if (n <= full) return 1;
+  if (n >= none) return 0;
+  return (none - n) / (none - full);
 }
 function renderHouses() {
   if (!map) return;
@@ -1252,13 +1290,20 @@ function renderHouses() {
   const ff = focusFn();
   renderCardBar();
   if (mode === 'draw' && drawTap === 'line' && !drawShowHouses) { $('#zoomHint').hidden = true; return; } // 線引き中は写真が見えるように家の印を隠す
+  const fade = iconFade();
   const b = map.getBounds().pad(0.2);
-  const list = map.getZoom() >= 15.5 ? D().houses.filter(h => b.contains([h.lat, h.lng])) : null;
+  const sel = mode === 'normal' ? selTerrId() : null; // 区域をえらんでいるときは、その区域の家だけ
+  const list = fade > 0.05
+    ? D().houses.filter(h => (!sel || h.terrId === sel) && b.contains([h.lat, h.lng]))
+    : null;
   const show = !!list && list.length <= 800; // 印が多すぎると動きが重くなるので、拡大してから出す
   $('#zoomHint').hidden = show;
   if (!show) return;
   for (const h of list) {
-    const m = L.marker([h.lat, h.lng], { icon: houseIcon(h, ff), title: h.label || '', zIndexOffset: roundNums && roundNums.has(h.id) ? 1000 : 0 });
+    const m = L.marker([h.lat, h.lng], {
+      icon: houseIcon(h, ff), title: h.label || '', opacity: fade,
+      zIndexOffset: roundNums && roundNums.has(h.id) ? 1000 : 0
+    });
     m.on('click', () => onHouseTap(h.id));
     m.addTo(houseLayer);
   }
