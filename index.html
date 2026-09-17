@@ -1,0 +1,2532 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>区域マップ（試作版）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="config.js"></script><!-- GASのURLはこのファイルに書きます（無ければ試作モード） -->
+<style>
+/* ===== 基本の色と文字 ===== */
+:root{
+  --ink:#17324D; --ink2:#4A5F73; --bg:#EEF2F0; --paper:#fff; --line:#C8D2CD;
+  --terr:#0E7C66; --terr-soft:#E5F2EE;
+  --met:#1565C0; --away:#E8AE00; --ref:#C62828; --ref-bg:#FDECEC; --dnc:#3A3A3A;
+  --young:#7B3FA0; --follow:#AD1457; --draw:#C2410C; --warn-bg:#FFF4D6; --danger:#B3261E;
+  --r:14px; color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;font-size:18px;line-height:1.6;color:var(--ink);background:var(--bg);-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid #F59E0B;outline-offset:2px}
+h2,h3,p{margin:0}
+.muted{color:var(--ink2);font-size:16px}
+.hint{display:block;color:var(--ink2);font-size:15px;margin-top:4px}
+.wrap{max-width:760px;margin:0 auto}
+.sec{font-size:21px;margin:26px 0 10px;padding-left:10px;border-left:6px solid var(--terr)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.scroll{overflow-x:auto}
+
+/* ===== 画面の骨組み ===== */
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+header.top{display:flex;align-items:center;gap:10px;padding:8px 14px;padding-top:calc(8px + env(safe-area-inset-top));background:var(--ink);color:#fff}
+header.top h1{font-size:20px;margin:0;letter-spacing:.04em}
+.pill{font-size:13px;border:1px solid #ffffff80;border-radius:99px;padding:0 10px}
+.who{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:15px}
+.who select{min-height:42px;border-radius:10px;border:0;padding:0 8px;color:var(--ink);background:#fff;max-width:40vw}
+main{flex:1;min-height:0;position:relative}
+.view{position:absolute;inset:0;overflow:auto;padding:14px 16px 28px}
+#view-map{padding:0;overflow:hidden;background:#fff}
+nav.tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--paper);border-top:2px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs.three{grid-template-columns:repeat(3,1fr)}
+nav.tabs button{min-height:66px;border:0;border-top:4px solid transparent;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:15px;color:var(--ink2)}
+nav.tabs button{position:relative}
+.tabbadge{position:absolute;top:4px;left:calc(50% + 8px);min-width:24px;height:24px;border-radius:99px;background:var(--danger);color:#fff;font-size:14px;display:grid;place-items:center;padding:0 6px;border:2px solid #fff}
+nav.tabs svg{width:26px;height:26px}
+nav.tabs button[aria-current="page"]{color:var(--ink);font-weight:700;border-top-color:var(--terr);background:var(--terr-soft)}
+
+/* ===== ボタン ===== */
+.btn{min-height:52px;padding:0 18px;border-radius:12px;border:2px solid var(--ink);background:#fff;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;color:var(--ink);white-space:nowrap}
+.btn.primary{background:var(--ink);color:#fff}
+.btn.small{min-height:46px;padding:0 12px;font-size:16px}
+.btn.danger{border-color:var(--danger);color:var(--danger)}
+.btn.block{width:100%;margin-top:10px}
+.icon-btn{margin-left:auto;flex:none;width:52px;height:52px;border-radius:50%;border:2px solid var(--line);background:#fff;font-size:28px;line-height:1}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.actions label{display:flex;align-items:center;gap:6px;font-weight:700}
+
+/* ===== 区域番号（カードの札） ===== */
+.stamp{flex:none;display:inline-grid;place-items:center;align-content:center;width:66px;height:66px;border:3px solid var(--terr);border-radius:12px;color:var(--terr);font-size:30px;font-weight:700;background:#fff;line-height:1.05}
+.stamp small{display:block;font-size:12px;font-weight:400}
+.stamp.sm{width:50px;height:50px;font-size:22px}
+.stamp.xs{width:auto;min-width:36px;height:30px;font-size:16px;border-width:2px;border-radius:8px;padding:0 6px;vertical-align:middle}
+
+/* ===== 区域カード ===== */
+.today{background:var(--paper);border:2px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.today b{font-size:20px}
+.tcard{background:var(--paper);border:2px solid var(--line);border-radius:var(--r);padding:14px;display:grid;grid-template-columns:auto 1fr;gap:10px 14px;margin-bottom:14px}
+.tcard h3{font-size:20px}
+.tcard .actions{grid-column:1/-1;margin-top:0}
+.progress{height:14px;background:#E0E6E3;border-radius:99px;overflow:hidden;margin:6px 0 2px}
+.progress>i{display:block;height:100%;background:var(--terr)}
+details.all{margin-top:18px}
+details.all>summary,details.more>summary{min-height:52px;display:flex;align-items:center;font-weight:700;cursor:pointer;padding:0 6px}
+.empty{background:var(--paper);border:2px dashed var(--line);border-radius:var(--r);padding:18px;text-align:center}
+.notice{border-radius:12px;padding:10px 12px;margin:14px 0;font-size:16px}
+.notice.warn{background:var(--warn-bg);border:2px solid var(--away)}
+.notice.info{background:var(--terr-soft);border:2px solid var(--terr)}
+
+/* ===== 地図 ===== */
+#overlayImg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:0}
+#map{position:absolute;inset:0;z-index:1}
+#map.see-through{background:transparent!important}
+#map.crosshair{cursor:crosshair}
+.maptools{position:absolute;top:10px;left:10px;right:10px;z-index:500;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
+.maptools>*{pointer-events:auto;box-shadow:0 2px 6px #0003}
+.maptools select{min-height:52px;border-radius:12px;border:2px solid var(--ink);background:#fff;padding:0 8px;font-weight:700;max-width:44vw}
+.zoomhint{position:absolute;top:130px;left:50%;transform:translateX(-50%);z-index:500;background:var(--ink);color:#fff;border-radius:99px;padding:6px 16px;font-size:16px;white-space:nowrap}
+.legend{position:absolute;left:10px;bottom:22px;z-index:500;background:#ffffffee;border-radius:12px;padding:6px 10px;font-size:14px;display:flex;flex-wrap:wrap;gap:4px 12px;max-width:calc(100% - 70px);box-shadow:0 2px 6px #0003}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.legend .pin{width:24px;height:24px;font-size:12px;border-width:2px}
+.modebar{position:absolute;top:10px;left:10px;right:10px;z-index:600;background:var(--paper);border:3px solid var(--draw);border-radius:var(--r);padding:10px 12px;box-shadow:0 4px 12px #0004}
+.modebar .row{margin:8px 0 0}
+.modebar input[type=range]{width:150px;vertical-align:middle}
+.terr-label span{display:inline-block;transform:translate(-50%,-50%);background:#ffffffee;border:3px solid var(--terr);color:var(--terr);font-weight:700;font-size:18px;border-radius:10px;padding:0 10px;white-space:nowrap;font-family:"BIZ UDPGothic",sans-serif}
+
+/* ===== 家の印（色＋文字で区別） ===== */
+.pin{position:relative;width:34px;height:34px;border-radius:50%;display:inline-grid;place-items:center;font-weight:700;font-size:16px;font-style:normal;border:3px solid #fff;box-shadow:0 1px 3px #0006;font-family:"BIZ UDPGothic",sans-serif;line-height:1}
+.pin.apt{border-radius:8px;width:38px;height:38px;background:#fff;color:var(--ink);border-color:var(--ink);position:relative}
+.pin.apt i{position:absolute;top:-11px;right:-13px;min-width:24px;height:22px;border-radius:99px;background:var(--away);color:#1F1A00;font-style:normal;font-size:13px;display:grid;place-items:center;padding:0 5px;border:2px solid #fff}
+.unit{position:relative;min-height:66px;border-radius:12px;border:3px solid transparent;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.3}
+.unit small{font-size:13px;font-weight:400}
+.st-new{background:#fff;color:var(--ink);border-color:var(--ink)}
+.st-met{background:var(--met);color:#fff}
+.st-away{background:var(--away);color:#1F1A00}
+.st-refused{background:var(--ref);color:#fff}
+.st-dnc{background:var(--ref);color:#fff;box-shadow:0 0 0 2px #fff,0 0 0 5px var(--ref)}
+.st-temp{background:var(--draw);color:#fff}
+.pin em,.unit em{position:absolute;left:-10px;bottom:-9px;background:var(--follow);color:#fff;font-style:normal;font-size:12px;font-weight:700;border-radius:6px;padding:1px 4px;border:2px solid #fff;line-height:1.2}
+.unit em{left:4px;top:4px;bottom:auto}
+.units{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
+
+/* ===== 下から出る入力画面 ===== */
+#backdrop{position:fixed;inset:0;background:#00000066;z-index:2000}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:2001;background:var(--paper);border-radius:20px 20px 0 0;max-height:88vh;max-height:88dvh;overflow:auto;padding:14px 16px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px #0003}
+@media (min-width:760px){#sheet{left:calc(50% - 320px);right:auto;width:640px;bottom:16px;border-radius:20px}}
+.sheet-head{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.sheet-head h2{font-size:22px;outline:none}
+.q{font-size:20px;font-weight:700;margin:14px 0 8px}
+.choices{display:grid;gap:10px}
+.choices.three{grid-template-columns:repeat(3,1fr)}
+.choices.two{grid-template-columns:repeat(2,1fr)}
+.choice{min-height:88px;border-radius:14px;border:3px solid var(--line);background:#fff;font-size:19px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;line-height:1.3}
+.choice.wide{grid-column:1/-1;min-height:64px}
+.choice.on{border-color:var(--ink);background:var(--terr-soft)}
+.c-met{border-color:var(--met)} .c-away{border-color:var(--away)}
+.refbtn{width:100%;min-height:60px;margin-top:22px;flex-direction:row;gap:10px;border-color:var(--ref);color:var(--ref);background:var(--ref-bg)}
+.refhead{display:flex;align-items:center;gap:10px;background:var(--ref-bg);border:3px solid var(--ref);color:var(--ref);border-radius:12px;padding:10px 12px;margin-top:12px;font-size:20px}
+.c-refx{border-color:var(--ref)}
+.choice:active,.unit:active{transform:scale(.98)}
+.history{list-style:none;padding:0;margin:6px 0 0}
+.history li{padding:8px 0;border-bottom:1px solid var(--line);font-size:16px;display:flex;gap:10px;align-items:center}
+.history .pin{width:26px;height:26px;font-size:13px;border-width:2px;flex:none}
+.sub{font-size:18px;margin-top:20px}
+.field{display:block;margin:14px 0}
+.field>span{display:block;font-weight:700;margin-bottom:4px}
+.field input[type=text],.field input[type=number]{width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 12px;font-size:19px;background:#fff}
+.inline{display:flex;gap:8px}
+.inline input{flex:1}
+.stepper{display:flex;align-items:center;gap:12px}
+.stepper button{width:60px;height:54px;border-radius:12px;border:2px solid var(--ink);background:#fff;font-size:28px;font-weight:700}
+.stepper output{min-width:52px;text-align:center;font-size:26px;font-weight:700}
+
+/* ===== おすすめ ===== */
+.lead{font-size:19px;background:var(--paper);border-radius:12px;padding:10px 12px;border:2px solid var(--line)}
+.check{display:flex;align-items:center;gap:10px;min-height:52px;font-size:17px}
+.check input{width:26px;height:26px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}
+.chip{min-height:48px;border-radius:99px;border:2px solid var(--ink);background:#fff;padding:0 16px;font-weight:700;font-size:16px}
+.chip[aria-pressed="true"]{background:var(--ink);color:#fff}
+.ritem{background:#fff;border:2px solid var(--line);border-left:10px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center}
+.ritem .rt{font-weight:700;font-size:19px}
+.k-handoff{border-left-color:var(--follow)}
+.f-s0{border-left-color:var(--follow)}
+.f-s1{border-left-color:var(--away);background:#FFFBEF}
+.f-s2{border-left-color:var(--danger);background:#FFF3F2}
+.ritem .span{grid-column:1/-1;margin-top:4px}
+.k-interest{border-left-color:var(--met)} .k-away{border-left-color:var(--away)} .k-young{border-left-color:var(--young)} .k-new{border-left-color:var(--ink)}
+
+/* ===== 係の画面 ===== */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.tile{background:#fff;border:2px solid var(--line);border-radius:12px;padding:10px 12px}
+.tile b{display:block;font-size:30px;line-height:1.2}
+.tile.alert{border-color:var(--away);background:var(--warn-bg)}
+.slots{border-collapse:collapse;min-width:560px;width:100%;background:#fff}
+.slots th,.slots td{border:1px solid var(--line);padding:6px;text-align:center;font-size:15px}
+.slots td b{font-size:19px}
+.slots .bar{height:8px;background:#E0E6E3;border-radius:99px;margin-top:4px;overflow:hidden}
+.slots .bar i{display:block;height:100%;background:var(--met)}
+.slots td.best{background:#E3F0FC;outline:3px solid var(--met);outline-offset:-3px}
+.trow{background:#fff;border:2px solid var(--line);border-radius:12px;padding:12px;display:grid;grid-template-columns:auto 1fr;gap:8px 12px;margin-bottom:10px}
+.trow .actions{grid-column:1/-1;margin-top:0}
+.trow .meta{display:flex;flex-wrap:wrap;gap:2px 16px;font-size:16px;color:var(--ink2)}
+.trow select{min-height:48px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;background:#fff}
+.slots.narrow{min-width:0}
+.slots .warncell{background:var(--warn-bg);font-weight:700}
+.setrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;background:#fff;border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.stepper output.wide{min-width:110px;font-size:22px}
+.actions select{min-height:48px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;background:#fff;max-width:60vw}
+.notice .actions{margin-top:8px}
+.btn.block.wideadd{margin:0 0 14px;min-height:60px;border-style:dashed;border-color:var(--terr);color:var(--terr);background:#fff}
+.reqbox{background:#fff;border:2px dashed var(--terr);border-radius:var(--r);padding:12px 14px;margin-bottom:14px}
+.pick{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.pick p{margin:0}
+@media (max-width:420px){.pick{grid-template-columns:auto 1fr}.pick .btn{grid-column:2;justify-self:start}}
+.trow .check{min-height:48px;font-size:16px;font-weight:700}
+.tcard.away{border-color:#F0C4AC}
+.tcard.away .progress>i{background:var(--draw)}
+.stamp.away{border-color:var(--draw);color:var(--draw)}
+.pin.hl{box-shadow:0 0 0 4px var(--draw),0 1px 3px #0006}
+.pin.dim{opacity:.3}
+.pin.done,.unit.done,.uchip.donec{background-image:linear-gradient(rgba(255,255,255,.66),rgba(255,255,255,.66));color:#7a858c;border-color:#dfe5e2;box-shadow:none}
+.pin b.rj{position:absolute;right:-14px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:99px;background:var(--ref);color:#fff;font-size:11px;display:grid;place-items:center;border:2px solid #fff}
+.refnote{background:var(--ref-bg);border:2px solid var(--ref);color:#7f1d1d}
+.btn.refok{background:var(--ref);border-color:var(--ref);color:#fff}
+.pin.later{opacity:.6}
+.pin u,.unit u{position:absolute;left:-9px;top:-9px;width:20px;height:20px;border-radius:99px;background:var(--terr);color:#fff;text-decoration:none;font-size:12px;font-weight:700;display:grid;place-items:center;border:2px solid #fff;line-height:1}
+.unit u{left:auto;right:4px;top:4px}
+.unit.dim{opacity:.45}
+.unit.later{opacity:.65}
+.pin.mini{width:22px;height:22px;font-size:11px;border-width:2px;vertical-align:middle;box-shadow:none}
+.pin.mini.hl{box-shadow:0 0 0 3px var(--draw)}
+.pin.mini u{width:14px;height:14px;font-size:9px;left:-6px;top:-6px;border-width:1px}
+.cardbar .keys{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:15px;margin:6px 0}
+.cardbar .keys span{display:inline-flex;align-items:center;gap:5px}
+.keyhelp summary{min-height:40px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+.keyhelp p{font-size:14px;margin:2px 0}
+.pin s{position:absolute;right:-13px;top:-13px;min-width:24px;height:24px;border-radius:99px;background:var(--draw);color:#fff;text-decoration:none;font-size:14px;font-weight:700;display:grid;place-items:center;border:2px solid #fff;padding:0 4px;line-height:1}
+.pin.apt s{top:auto;bottom:-13px}
+.numbadge{display:inline-grid;place-items:center;min-width:30px;height:30px;border-radius:99px;background:var(--draw);color:#fff;font-weight:700;padding:0 6px;flex:none}
+.numbadge.sm{min-width:22px;height:22px;font-size:12px;padding:0 4px}
+.cardbar .progress{margin:6px 0 0}
+.cardbar .progress>i{background:var(--terr)}
+.progress.big{height:16px}
+.barhead{display:flex;align-items:center;gap:8px}
+.barhead p{flex:1}
+.foldbtn{flex:none;min-height:40px;border:2px solid var(--line);border-radius:10px;background:#fff;padding:0 12px;font-weight:700;font-size:15px}
+.cardbar.mini .fold{display:none}
+.cardbar .next{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}
+.okmsg{background:#E3F2EC;border-radius:10px;padding:6px 10px;margin-top:6px}
+.seg{display:inline-flex;border:2px solid var(--ink);border-radius:12px;overflow:hidden;margin:8px 0 2px}
+.seg button{min-height:46px;padding:0 16px;border:0;background:#fff;font-weight:700;font-size:16px}
+.seg button+button{border-left:2px solid var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+ol.plan{list-style:none;padding:0;margin:8px 0}
+ol.plan li{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+ol.plan p{margin:0}
+@media (max-width:420px){ol.plan li{grid-template-columns:auto 1fr}ol.plan .btn{grid-column:2;justify-self:start}}
+.unitstrip{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.uchip{position:relative;min-width:54px;min-height:42px;border-radius:8px;border:2px solid transparent;font-weight:700;font-size:15px}
+.uchip.cur{outline:4px solid var(--draw);outline-offset:2px}
+.uchip.donec::after{content:'✓';position:absolute;right:-7px;top:-9px;width:18px;height:18px;border-radius:99px;background:var(--terr);color:#fff;font-size:11px;display:grid;place-items:center;border:2px solid #fff}
+.seqroom{font-size:20px;margin:12px 0 0}
+.seqroom b{font-size:36px}
+.seqnav{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.choice small{font-size:13px;font-weight:400}
+#blocker{position:fixed;inset:0;z-index:5000;background:var(--bg);display:grid;place-items:center;padding:24px}
+.blockbox{max-width:520px;background:#fff;border:2px solid var(--line);border-radius:16px;padding:24px;font-size:19px}
+.blockbox h2{font-size:24px;margin-bottom:10px}
+.pill.sync{background:var(--away);color:#1F1A00;border-color:var(--away);font-weight:700}
+.hint-strong.ok{color:var(--terr)}
+.hint-strong{color:var(--draw);font-weight:700;font-size:16px;margin-top:4px}
+.unit.hl{outline:4px solid var(--draw);outline-offset:2px}
+.cardbar{position:absolute;left:10px;right:64px;bottom:22px;z-index:500;background:var(--paper);border:3px solid var(--draw);border-radius:var(--r);padding:8px 12px;box-shadow:0 4px 12px #0004}
+.cardbar p{margin:0}
+.nowtag{display:inline-block;background:var(--ink);color:#fff;border-radius:6px;padding:0 6px;font-size:14px;vertical-align:middle}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.slotpick{width:100%;border-collapse:collapse;text-align:center;margin:8px 0}
+.slotpick th{font-size:15px;padding:4px 2px;font-weight:700}
+.slotpick th small{font-weight:400;font-size:11px}
+.slotpick td{padding:3px}
+.slotbtn{width:100%;min-width:44px;height:54px;border-radius:10px;border:2px solid var(--ink2);background:#fff;font-size:24px;font-weight:700}
+.slotbtn[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.slots td.thin{background:var(--warn-bg);outline:3px solid var(--away);outline-offset:-3px}
+.tag-warn{background:var(--warn-bg);color:#6B4200;border-radius:8px;padding:0 8px;font-weight:700}
+
+/* ===== お知らせ ===== */
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--ink);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
+#toast button{min-height:46px;border-radius:10px;border:2px solid #fff;background:transparent;color:#fff;font-weight:700;padding:0 14px;flex:none}
+@media (max-width:420px){ body{font-size:17px} .choice{font-size:17px} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>区域マップ</h1><span class="pill" id="modePill">試作版</span><span class="pill sync" id="syncState" hidden></span>
+    <label class="who"><span id="whoLabel">使う人</span><select id="whoSel"></select><b id="whoName" hidden></b></label>
+  </header>
+
+  <main>
+    <!-- 区域カード -->
+    <section class="view" id="view-cards">
+      <div class="wrap">
+        <div id="todayBox"></div>
+        <div id="reqNotice"></div>
+        <div id="followAlert"></div>
+        <h2 class="sec">あなたの区域カード</h2>
+        <div id="myCards"></div>
+        <div id="reqArea"></div>
+        <div id="myAway"></div>
+        <h2 class="sec" id="followsHead">あなたの再訪問</h2>
+        <div id="myFollows"></div>
+        <details class="all"><summary>ほかの区域を見る</summary><div id="allCards"></div></details>
+        <div class="row" id="liveTools" hidden><button class="btn small" id="btnLogout">この端末から消す</button>
+          <span class="muted">端末を人に渡すときや、使わなくなったときに押してください。</span></div>
+        <div class="notice info">記録に残すのは「会えた・留守・年齢層・関心」だけです。住んでいる人の名前・電話番号・家族のこと・会話の内容は書かないでください。</div>
+      </div>
+    </section>
+
+    <!-- 地図 -->
+    <section class="view" id="view-map" hidden>
+      <img id="overlayImg" alt="" hidden>
+      <div id="map"></div>
+      <div class="maptools" id="mapTools">
+        <select id="terrJump" aria-label="区域をえらぶ"></select>
+        <button class="btn primary" id="btnAdd">＋ 家を追加</button>
+        <button class="btn" id="btnLocate">現在地</button>
+        <button class="btn" id="btnBase">写真</button>
+      </div>
+      <div class="zoomhint" id="zoomHint" hidden>地図を拡大すると家の印が出ます</div>
+      <div class="cardbar" id="cardBar" hidden></div>
+      <div class="legend" id="legend" aria-label="印の見かた">
+        <span><i class="pin st-new">未</i>未訪問</span>
+        <span><i class="pin st-met">会</i>会えた</span>
+        <span><i class="pin st-away">留</i>留守</span>
+        <span><i class="pin st-refused">拒</i>拒否</span>
+        <span><i class="pin st-met">会<em>再</em></i>再訪問の受け持ちあり</span>
+      </div>
+      <div class="modebar" id="addBar" hidden>
+        <p><b>家を追加：</b>追加したい場所を地図でタップしてください。</p>
+        <div class="row"><button class="btn" id="addCancel">やめる</button></div>
+      </div>
+      <div class="modebar" id="drawBar" hidden>
+        <p><b id="drawTitle">区域の線を引く</b>：区域の角を順番にタップ（<span id="drawCount">0</span>か所）</p>
+        <div class="row">
+          <button class="btn small" id="drawUndo">1つ戻す</button>
+          <button class="btn small primary" id="drawDone">完成</button>
+          <button class="btn small" id="drawCancel">やめる</button>
+        </div>
+        <div class="row">
+          <label class="btn small">古いカードの写真を重ねる<input type="file" accept="image/*" id="ovFile" hidden></label>
+          <span id="ovCtl" hidden>
+            <label>地図の濃さ <input type="range" id="ovRange" min="0" max="100" value="50"></label>
+            <button class="btn small" id="ovClear">写真を消す</button>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- おすすめ -->
+    <section class="view" id="view-reco" hidden>
+      <div class="wrap">
+        <h2 class="sec">今、訪問するとよい家</h2>
+        <p class="lead" id="recoNow"></p>
+        <div class="row"><button class="btn" id="recoLocate">現在地から近い順にする</button><button class="btn" id="slotEdit">行ける時間を登録する</button></div>
+        <h3 class="sub">留守宅カード</h3>
+        <p class="hint" id="awayHint"></p>
+        <div id="awayList"></div>
+        <h3 class="sub">再訪問のおすすめ</h3>
+        <label class="check"><input type="checkbox" id="recoMine" checked>自分の区域と、担当者のいない区域だけ表示</label>
+        <div class="chips" id="recoChips"></div>
+        <div id="recoList"></div>
+      </div>
+    </section>
+
+    <!-- 係の画面 -->
+    <section class="view" id="view-admin" hidden>
+      <div class="wrap">
+        <div id="adInbox"></div>
+        <h2 class="sec">全体の状況</h2>
+        <div class="tiles" id="adTiles"></div>
+        <h2 class="sec">時間帯ごとの「会えた」割合（直近180日）</h2>
+        <p class="hint">枠で囲んだ欄が、いちばん会えている時間帯です（10件以上の記録がある欄のみ）。</p>
+        <div class="scroll"><table class="slots" id="adSlots"></table></div>
+        <h2 class="sec">区域の一覧</h2>
+        <div class="row"><button class="btn primary" id="adNewTerr">＋ 新しい区域の線を引く</button></div>
+        <div id="adTakeSet"></div>
+        <div id="adTerrs"></div>
+        <h2 class="sec">留守宅の状況</h2>
+        <div id="adAwaySet"></div>
+        <h3 class="sub">まだ試していない家の数（時間帯ごと）</h3>
+        <p class="hint">枠で囲んだ時間帯がいちばん手薄です。集まりの時間を決める参考にしてください。</p>
+        <div class="scroll"><table class="slots" id="adAwaySlots"></table></div>
+        <h3 class="sub">区域ごと</h3>
+        <div class="scroll" id="adAwayTerrs"></div>
+        <h3 class="sub">なかなか会えない家（すべての時間帯で留守）</h3>
+        <p class="hint">手紙など、別の方法を検討してください。</p>
+        <div id="adHard"></div>
+        <h2 class="sec">再訪問の受け持ち</h2>
+        <div class="tiles" id="adFollowTiles"></div>
+        <h3 class="sub">知らせるまでの日数</h3>
+        <p class="hint">受け持った人が記録を付けると、日数は0から数え直します。</p>
+        <div id="adFollowSet"></div>
+        <h3 class="sub">人ごとの件数</h3>
+        <div class="scroll" id="adFollowUsers"></div>
+        <h3 class="sub">確認が必要な受け持ち</h3>
+        <p class="hint">本人に声をかけてから、延長・引き継ぎ・解除を選んでください。</p>
+        <div id="adFollowCheck"></div>
+        <h3 class="sub">取り残し（関心があるのに受け持ちがない家）</h3>
+        <div id="adLeft"></div>
+        <h3 class="sub">まとめて引き継ぎ</h3>
+        <p class="hint">奉仕が難しくなった人の受け持ちを、まとめて別の人に移します。</p>
+        <div class="actions" id="adBulk"></div>
+        <h2 class="sec">データ</h2>
+        <div class="row">
+          <button class="btn" id="adCsv">訪問記録をCSVで書き出す</button>
+          <button class="btn danger" id="adReset">試作データに戻す</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs" id="tabs" aria-label="画面の切りかえ">
+    <button data-view="cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h6M7 14h10"/></svg>区域カード</button>
+    <button data-view="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>地図</button>
+    <button data-view="reco"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>おすすめ</button>
+    <button data-view="admin" id="tabAdmin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 20h18M6 17v-6M11 17V6M16 17v-9"/></svg>係の画面<b class="tabbadge" id="tabBadge" hidden>0</b></button>
+  </nav>
+</div>
+
+<div id="backdrop" hidden></div>
+<section id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><div id="sheetBody"></div></section>
+<div id="toast" hidden role="status" aria-live="polite"></div>
+<div id="blocker" hidden><div class="blockbox" role="alert"><h2 id="blockTitle"></h2><p id="blockMsg"></p></div></div>
+
+<script>
+'use strict';
+/* =========================================================
+   区域マップ 試作版
+   - データはこの端末の中だけに保存（Store）。
+   - 本番では Store の load/save を GAS（Googleスプレッドシート）との
+     通信に差し替える予定。画面側の処理はそのまま使う。
+   ========================================================= */
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const DAY = 86400000;
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+const AGES = ['10〜20代', '30〜40代', '50〜60代', '70代以上', 'わからない'];
+const YOUNG = new Set(['10〜20代', '30〜40代']);
+const INTERESTS = ['関心あり', '少しあり', '関心なし'];
+const RESULT_LABEL = { met: '会えた', away: '留守', refused: '拒否' };
+const ST_LABEL = { new: '未訪問', met: '会えた', away: '留守', refused: '拒否', dnc: '拒否' };
+const ST_CHAR = { new: '未', met: '会', away: '留', refused: '拒', dnc: '拒' };
+
+/* 結果の選択：会えた／留守 */
+function resultChoicesHtml(awaySub) {
+  return `<div class="choices two">
+      <button class="choice c-met" data-res="met"><i class="pin st-met">会</i>会えた</button>
+      <button class="choice c-away" data-res="away"><i class="pin st-away">留</i>留守${awaySub ? `<small>${awaySub}</small>` : ''}</button>
+    </div>`;
+}
+/* 関心の選択：拒否は離して置き、色も分ける */
+function interestChoicesHtml() {
+  return `<p class="q">関心はありましたか？</p>
+    <div class="choices three">${INTERESTS.map(a => `<button class="choice" data-int="${a}">${a}</button>`).join('')}</div>
+    <button class="choice refbtn" data-int="拒否"><i class="pin st-dnc">拒</i>拒否<small>もう来ないでほしいと言われた</small></button>
+    <button class="btn block" data-back="age">← 年齢層の選択にもどる</button>`;
+}
+/* 拒否の確認：まちがえて押しても戻れるようにする */
+function refuseStepHtml(isUnit) {
+  return `<div class="refhead"><i class="pin st-dnc">拒</i><b>拒否として記録します</b></div>
+    <p>地図のこの${isUnit ? '部屋' : '家'}に赤い「拒」のマークが付き、次からおすすめやカードに出なくなります。</p>
+    <button class="btn block refok" data-refok>拒否として記録する</button>
+    <button class="btn block" data-back="interest">← まちがえた（関心の選択にもどる）</button>`;
+}
+const BANDS = ['朝', '昼', '午後', '夕方', '夜'];
+const BAND_HINT = { 朝: '〜11時', 昼: '11〜14時', 午後: '14〜17時', 夕方: '17〜19時', 夜: '19時〜' };
+const SLOTS = [];
+['平日', '土日'].forEach(dt => BANDS.forEach(b => SLOTS.push(dt + '・' + b)));
+const bySlot = (a, b) => SLOTS.indexOf(a) - SLOTS.indexOf(b);
+const HOME_VIEW = [26.1771, 127.6811]; // 区域がまだ無いときの表示位置（豊見城市役所付近）
+const TILE_PALE = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png';
+const TILE_PHOTO = 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg';
+const GSI_ATTR = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>';
+
+/* ---------- 時間帯 ---------- */
+function bandOf(d) { const h = d.getHours(); return h < 11 ? '朝' : h < 14 ? '昼' : h < 17 ? '午後' : h < 19 ? '夕方' : '夜'; }
+function dayTypeOf(d) { const w = d.getDay(); return (w === 0 || w === 6) ? '土日' : '平日'; }
+function slotOf(d) { return dayTypeOf(d) + '・' + bandOf(d); }
+const fmtTime = d => `${d.getHours()}:${pad(d.getMinutes())}`;
+function fmtDate(iso) {
+  const d = new Date(iso), y = d.getFullYear() !== new Date().getFullYear() ? d.getFullYear() + '/' : '';
+  return `${y}${d.getMonth() + 1}/${d.getDate()} ${fmtTime(d)}`;
+}
+const fmtDay = iso => {
+  const d = new Date(iso), y = d.getFullYear() !== new Date().getFullYear() ? `${d.getFullYear()}年` : '';
+  return `${y}${d.getMonth() + 1}月${d.getDate()}日`;
+};
+const daysSince = iso => Math.floor((Date.now() - Date.parse(iso)) / DAY);
+
+/* ---------- 試作データ ---------- */
+function rng(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function makeDemo() {
+  const r = rng(20260917), now = Date.now();
+  const iso = ms => new Date(ms).toISOString();
+  const users = [
+    { id: 'u1', name: '伝道者A', role: 'pub' },
+    { id: 'u2', name: '伝道者B', role: 'pub' },
+    { id: 'u3', name: '区域係C', role: 'admin' }
+  ];
+  const rect = (a, b, c, d) => [[a, c], [a, d], [b, d], [b, c]];
+  const territories = [
+    { id: 't1', no: 1, name: '試作区域 北西', polygon: rect(26.1600, 26.1640, 127.6720, 127.6765), holder: 'u1', lentAt: iso(now - 20 * DAY), completedAt: iso(now - 150 * DAY) },
+    { id: 't2', no: 2, name: '試作区域 北東', polygon: rect(26.1600, 26.1640, 127.6765, 127.6810), holder: 'u2', lentAt: iso(now - 130 * DAY), completedAt: iso(now - 300 * DAY) },
+    { id: 't3', no: 3, name: '試作区域 南', polygon: rect(26.1560, 26.1600, 127.6720, 127.6810), holder: null, lentAt: null, free: true, completedAt: iso(now - 200 * DAY) },
+    { id: 't4', no: 4, name: '試作区域 東', polygon: rect(26.1560, 26.1600, 127.6810, 127.6850), holder: null, lentAt: null, completedAt: iso(now - 60 * DAY) }
+  ];
+  const labels = ['青い門', '白い塀', '2階建て', '角の家', '駐車場あり', '赤瓦', '花壇あり', '平屋'];
+  const houses = [], visits = [];
+  const pick = arr => arr[Math.floor(r() * arr.length)];
+  territories.forEach(t => {
+    const la = t.polygon.map(p => p[0]), ln = t.polygon.map(p => p[1]);
+    const la0 = Math.min(...la), la1 = Math.max(...la), ln0 = Math.min(...ln), ln1 = Math.max(...ln);
+    const pos = () => [la0 + (la1 - la0) * (0.08 + 0.84 * r()), ln0 + (ln1 - ln0) * (0.08 + 0.84 * r())];
+    const n = t.no === 3 ? 30 : t.no === 4 ? 16 : 22;
+    for (let i = 0; i < n; i++) {
+      const [lat, lng] = pos();
+      houses.push({ id: `h${t.no}_${i}`, terrId: t.id, type: 'house', lat, lng, label: pick(labels), units: [], createdAt: iso(now - 400 * DAY) });
+    }
+    for (let k = 0; k < 2; k++) {
+      const [lat, lng] = pos(), units = [];
+      const fl = 2 + Math.floor(r() * 3), per = 3 + Math.floor(r() * 2);
+      for (let f = 1; f <= fl; f++) for (let u = 1; u <= per; u++) units.push(`${f}${pad(u)}`);
+      houses.push({ id: `a${t.no}_${k}`, terrId: t.id, type: 'apt', lat, lng, label: 'アパート' + 'AB'[k], units, createdAt: iso(now - 400 * DAY) });
+    }
+  });
+  houses.forEach(h => {
+    targets(h).forEach(unit => {
+      const cnt = Math.floor(r() * 4);
+      for (let j = 0; j < cnt; j++) {
+        const d = new Date(now - Math.floor(r() * 150 + 1) * DAY);
+        d.setHours(9 + Math.floor(r() * 11), Math.floor(r() * 60), 0, 0);
+        const x = r(), result = x < 0.35 ? 'met' : x < 0.97 ? 'away' : 'refused';
+        const v = { id: uid(), houseId: h.id, unit, result, at: d.toISOString(), by: r() < 0.5 ? 'u1' : 'u2' };
+        if (result === 'met') { v.age = pick(AGES); v.interest = pick(INTERESTS); }
+        if (result === 'refused') v.age = pick(AGES);
+        visits.push(v);
+      }
+    });
+  });
+  // すべての時間帯で留守の家（試作）
+  ['h3_0', 'h3_1'].forEach(hid => {
+    for (let i = visits.length - 1; i >= 0; i--) if (visits[i].houseId === hid) visits.splice(i, 1);
+    const hours = { 朝: 9, 昼: 12, 午後: 15, 夕方: 18, 夜: 20 };
+    let back = 20;
+    ['平日', '土日'].forEach(dt => BANDS.forEach(b => {
+      const d = new Date(now - back * DAY);
+      while (dayTypeOf(d) !== dt) d.setDate(d.getDate() - 1);
+      d.setHours(hours[b], 10, 0, 0);
+      visits.push({ id: uid(), houseId: hid, unit: '', result: 'away', at: d.toISOString(), by: 'u1' });
+      back += 6;
+    }));
+  });
+  users[1].slots = ['平日・夕方', '土日・朝'];
+  // 再訪問の受け持ち（試作）
+  const follows = {}, released = {};
+  const r2 = rng(777);
+  houses.forEach(h => targets(h).forEach(unit => {
+    const k = K(h.id, unit);
+    const m = visits.filter(v => v.houseId === h.id && v.unit === unit && v.result === 'met').sort((a, b) => (a.at < b.at ? 1 : -1))[0];
+    if (!m || m.interest === '関心なし') return;
+    const x = r2();
+    if (x < 0.6) {
+      const by = r2() < 0.6 ? 'u1' : 'u2';
+      const d = new Date(now - [4, 10, 25, 31, 48, 63][Math.floor(r2() * 6)] * DAY);
+      d.setHours(10 + Math.floor(r2() * 8), Math.floor(r2() * 60), 0, 0);
+      visits.push({ id: uid(), houseId: h.id, unit, result: 'met', at: d.toISOString(), by, age: m.age, interest: m.interest });
+      follows[k] = { by, since: iso(d.getTime() - 60 * DAY), touchedAt: d.toISOString() };
+    } else if (x < 0.8) {
+      released[k] = { at: iso(now - 9 * DAY), reason: 'handoff' };
+    }
+  }));
+  // 最後の結果が拒否の家には拒否マーク
+  const dnc = {};
+  houses.forEach(h => targets(h).forEach(unit => {
+    const last = visits.filter(v => v.houseId === h.id && v.unit === unit).sort((a, b) => (a.at < b.at ? 1 : -1))[0];
+    if (last && last.result === 'refused') { const k = K(h.id, unit); dnc[k] = true; delete follows[k]; delete released[k]; }
+  }));
+  const requests = [{ id: 'r1', by: 'u2', terrId: 't4', at: iso(now - 2 * DAY), status: 'pending' }];
+  return { version: 4, users, territories, houses, visits, dnc, follows, released, requests, awayCards: [], returns: [],
+    settings: { remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90 }, currentUser: 'u1' };
+}
+
+/* ---------- 保存 ----------
+   API_URL が空のとき：試作モード（この端末だけに保存）
+   API_URL を入れたとき：本番モード（Googleスプレッドシートに保存。
+   通信できないときは端末にためておき、つながったときに送る） */
+const API_URL = (function () {
+  const u = window.KUIKI_CONFIG && window.KUIKI_CONFIG.apiUrl;
+  return typeof u === 'string' && /^https:\/\/script\.google\.com\//.test(u.trim()) ? u.trim() : '';
+})(); // GAS の「ウェブアプリのURL」は config.js に書く
+const LIVE = !!API_URL;
+const TOKEN_KEY = 'kuiki_token', CACHE_KEY = 'kuiki_cache', QUEUE_KEY = 'kuiki_queue';
+const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'users'];
+const MAP_COLS = ['dnc', 'follows', 'released'];
+const clone = o => JSON.parse(JSON.stringify(o));
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
+const lsDel = k => { try { localStorage.removeItem(k); } catch (e) { /* 何もしない */ } };
+
+/* 前の状態 a と今の状態 b の違い（送る変更） */
+function diffState(a, b) {
+  const out = {};
+  ARR_COLS.forEach(c => {
+    const am = new Map((a[c] || []).map(x => [x.id, JSON.stringify(x)]));
+    const bm = new Map((b[c] || []).map(x => [x.id, x]));
+    const up = [], del = [];
+    bm.forEach((x, id) => { if (am.get(id) !== JSON.stringify(x)) up.push(clone(x)); });
+    am.forEach((_, id) => { if (!bm.has(id)) del.push(id); });
+    if (up.length || del.length) out[c] = { up, del };
+  });
+  MAP_COLS.forEach(c => {
+    const A = a[c] || {}, B = b[c] || {}, up = [], del = [];
+    Object.keys(B).forEach(id => { if (JSON.stringify(A[id]) !== JSON.stringify(B[id])) up.push({ id, value: clone(B[id]) }); });
+    Object.keys(A).forEach(id => { if (!(id in B)) del.push(id); });
+    if (up.length || del.length) out[c] = { up, del };
+  });
+  if (JSON.stringify(a.settings) !== JSON.stringify(b.settings)) out.settings = clone(b.settings);
+  return out;
+}
+/* まだ送っていない変更を、受け取った状態に重ねる */
+function applyDiff(st, ch) {
+  ARR_COLS.forEach(c => {
+    if (!ch[c]) return;
+    const m = new Map((st[c] || []).map(x => [x.id, x]));
+    ch[c].up.forEach(x => m.set(x.id, clone(x)));
+    ch[c].del.forEach(id => m.delete(id));
+    st[c] = [...m.values()];
+  });
+  MAP_COLS.forEach(c => {
+    if (!ch[c]) return;
+    st[c] = st[c] || {};
+    ch[c].up.forEach(x => { st[c][x.id] = clone(x.value); });
+    ch[c].del.forEach(id => { delete st[c][id]; });
+  });
+  if (ch.settings) st.settings = clone(ch.settings);
+}
+
+const Store = {
+  key: 'kuiki_demo_v5',
+  data: null,
+  base: null,   // 本番：サーバーの状態（＋送る予定の変更）
+  token: '',
+  queue: [],    // 本番：まだ送っていない変更
+  load() {
+    const s = lsGet(this.key);
+    if (s) { try { this.data = JSON.parse(s); this.migrate(); return; } catch (e) { /* 作り直す */ } }
+    this.data = makeDemo(); this.migrate(); this.save();
+  },
+  migrate() {
+    const d = this.data;
+    d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
+    d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || [];
+    d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90 }, d.settings || {});
+  },
+  save() {
+    if (!LIVE) {
+      if (!lsSet(this.key, JSON.stringify(this.data))) toast('この端末に保存できませんでした');
+      return;
+    }
+    const ch = diffState(this.base, this.data);
+    if (!Object.keys(ch).length) return;
+    this.queue.push(ch);
+    this.base = clone(this.data);
+    this.persistQueue();
+    flush();
+  },
+  persistQueue() {
+    if (!lsSet(QUEUE_KEY, JSON.stringify(this.queue))) toast('この端末に保存できませんでした。通信できる場所で開き直してください');
+    updateSyncBadge();
+  },
+  setServer(state) {
+    this.data = state; this.migrate();
+    this.queue.forEach(ch => applyDiff(this.data, ch));
+    this.base = clone(this.data);
+  },
+  async loadLive() {
+    this.token = readToken();
+    try { this.queue = JSON.parse(lsGet(QUEUE_KEY) || '[]'); } catch (e) { this.queue = []; }
+    if (!this.token) throw Object.assign(new Error('no token'), { code: 'auth' });
+    try {
+      const j = await api('load');
+      lsSet(CACHE_KEY, JSON.stringify(j.state));
+      lastRefresh = Date.now();
+      this.setServer(j.state);
+    } catch (e) {
+      const c = lsGet(CACHE_KEY);
+      if (e.code === 'auth' || !c) throw e;
+      this.setServer(JSON.parse(c));
+      setTimeout(() => toast('インターネットにつながっていません。前回の情報を表示しています'), 600);
+    }
+  }
+};
+
+/* ---------- 本番：通信 ---------- */
+function readToken() {
+  const u = new URL(location.href), t = u.searchParams.get('t');
+  if (t) {
+    if (lsGet(TOKEN_KEY) !== t) { lsDel(CACHE_KEY); lsDel(QUEUE_KEY); } // 別の人のリンク
+    lsSet(TOKEN_KEY, t);
+    u.searchParams.delete('t');
+    history.replaceState(null, '', u.pathname + u.search + u.hash); // 画面のURLからコードを消す
+    return t;
+  }
+  return lsGet(TOKEN_KEY) || '';
+}
+async function api(action, extra) {
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ action, token: Store.token }, extra || {}))
+  });
+  if (!res.ok) throw new Error('通信エラー ' + res.status);
+  const j = await res.json();
+  if (!j.ok) throw Object.assign(new Error(j.error || 'error'), { code: j.error });
+  return j;
+}
+let flushing = false, lastRefresh = 0;
+async function flush() {
+  if (!LIVE || flushing || !Store.queue.length) { updateSyncBadge(); return; }
+  flushing = true; updateSyncBadge();
+  let rejected = 0, ok = false;
+  try {
+    while (Store.queue.length) {
+      const j = await api('sync', { changes: Store.queue[0] });
+      rejected += (j.rejected || []).length;
+      Store.queue.shift();
+      Store.persistQueue();
+    }
+    ok = true;
+  } catch (e) {
+    if (e.code === 'auth') showBlocking('このリンクは使えなくなりました', '区域係から新しい招待リンクをもらってください。');
+    // 通信できないときは、あとで送り直す
+  } finally {
+    flushing = false; updateSyncBadge();
+  }
+  if (ok && rejected) {
+    toast('一部の変更は反映できませんでした。最新の情報に更新します');
+    refresh(true).catch(() => {});
+  } else if (ok && Date.now() - lastRefresh > 60000) {
+    refresh().catch(() => {});
+  }
+}
+/* 最新の情報を取り直す（入力中は待つ） */
+async function refresh(force) {
+  if (!LIVE || flushing || Store.queue.length) return;
+  const busy = () => !$('#sheet').hidden || mode !== 'normal';
+  if (!force && busy()) return;
+  const j = await api('load');
+  lastRefresh = Date.now();
+  if (flushing || Store.queue.length) return;
+  if (!force && busy()) return;
+  if (force) { closeSheet(); if (draw) endDraw(); else if (mode !== 'normal') setMode('normal'); }
+  lsSet(CACHE_KEY, JSON.stringify(j.state));
+  Store.setServer(j.state);
+  updateTabs();
+  renderAll();
+}
+function updateSyncBadge() {
+  const el = $('#syncState');
+  if (!el) return;
+  const n = Store.queue.length;
+  el.hidden = !LIVE || (!n && !flushing);
+  el.textContent = flushing ? '送信中…' : `未送信 ${n}件`;
+}
+function showBlocking(title, msg) {
+  $('#blockTitle').textContent = title;
+  $('#blockMsg').textContent = msg;
+  $('#blocker').hidden = false;
+}
+function hideBlocking() { $('#blocker').hidden = true; }
+function logout() {
+  const n = Store.queue.length;
+  const q = n
+    ? `まだ送っていない記録が${n}件あります。消すと送られません。それでもこの端末から消しますか？`
+    : 'この端末から、区域マップの情報と招待リンクを消します。よろしいですか？';
+  if (!confirm(q)) return;
+  [TOKEN_KEY, CACHE_KEY, QUEUE_KEY].forEach(lsDel);
+  showBlocking('この端末から消しました', 'もう一度使うときは、区域係からもらった招待リンクを開いてください。');
+}
+const D = () => Store.data;
+const terrById = id => D().territories.find(t => t.id === id);
+const houseById = id => D().houses.find(h => h.id === id);
+const userById = id => D().users.find(u => u.id === id);
+const uname = id => (userById(id) || { name: '不明' }).name;
+function userOptions(sel, noneLabel) {
+  return (noneLabel ? `<option value="">${noneLabel}</option>` : '') +
+    D().users.map(u => `<option value="${u.id}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
+}
+const me = () => userById(D().currentUser) || D().users[0];
+const isAdmin = () => me().role === 'admin';
+const targets = h => h.type === 'apt' ? h.units : [''];
+const K = (hid, unit) => hid + '|' + (unit || '');
+const canDelHouse = h => isAdmin() || h.createdBy === me().id;
+
+/* 変更 → 保存 → 再表示 → 「取り消す」付きのお知らせ */
+function commit(msg, fn) {
+  const snap = JSON.stringify(Store.data);
+  fn(); Store.save(); renderAll();
+  toast(msg, () => { closeSheet(); Store.data = JSON.parse(snap); Store.save(); renderAll(); toast('取り消しました'); });
+}
+
+/* ---------- 記録の索引 ---------- */
+let IDX = new Map();
+function buildIndex() {
+  IDX = new Map();
+  for (const v of D().visits) {
+    const k = K(v.houseId, v.unit);
+    if (!IDX.has(k)) IDX.set(k, []);
+    IDX.get(k).push(v);
+  }
+  for (const a of IDX.values()) a.sort((x, y) => (x.at < y.at ? 1 : -1)); // 新しい順
+}
+const visitsOf = k => IDX.get(k) || [];
+function statusOf(k) {
+  if (D().dnc[k]) return 'dnc';
+  const v = visitsOf(k)[0];
+  return v ? v.result : 'new';
+}
+/* 再訪問の受け持ち */
+const fol = k => D().follows[k] || null;
+const followIdle = f => daysSince(f.touchedAt);
+function followStage(f) { const d = followIdle(f), s = D().settings; return d >= s.escalateDays ? 2 : d >= s.remindDays ? 1 : 0; }
+function parseKey(k) { const i = k.indexOf('|'); return [k.slice(0, i), k.slice(i + 1)]; }
+function targetName(h, unit) { return h.type === 'apt' ? `${esc(h.label || '集合住宅')} ${esc(unit)}号室` : esc(h.label || '家'); }
+function lastInterest(k) { const m = visitsOf(k).find(v => v.result === 'met'); return m && (m.interest === '関心あり' || m.interest === '少しあり') ? m : null; }
+function bestSlot(k) {
+  const c = {}; let best = null;
+  for (const v of visitsOf(k)) {
+    if (v.result !== 'met') continue;
+    const s = slotOf(new Date(v.at)); c[s] = (c[s] || 0) + 1;
+    if (!best || c[s] > c[best]) best = s;
+  }
+  return best;
+}
+const hasFollowIn = h => targets(h).some(u => fol(K(h.id, u)));
+function aptLeft(h) { return h.units.filter(u => { const s = statusOf(K(h.id, u)); return s === 'new' || s === 'away'; }).length; }
+
+/* ---------- 区域の判定 ---------- */
+function inPoly(lat, lng, poly) {
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [yi, xi] = poly[i], [yj, xj] = poly[j];
+    if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) c = !c;
+  }
+  return c;
+}
+function terrOf(lat, lng) { const t = D().territories.find(t => inPoly(lat, lng, t.polygon)); return t ? t.id : null; }
+function reassign() { D().houses.forEach(h => { h.terrId = terrOf(h.lat, h.lng); }); }
+function center(poly) { return [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length]; }
+function distM(a, b) {
+  const R = 6371000, toR = x => x * Math.PI / 180;
+  const dLa = toR(b[0] - a[0]), dLn = toR(b[1] - a[1]);
+  const s = Math.sin(dLa / 2) ** 2 + Math.cos(toR(a[0])) * Math.cos(toR(b[0])) * Math.sin(dLn / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+const fmtDist = m => m < 1000 ? `${Math.round(m / 10) * 10}m` : `${(m / 1000).toFixed(1)}km`;
+
+function terrStats(t, sinceMs) {
+  const now = Date.now(); let n = 0, visited = 0, met = 0, last = null;
+  for (const h of D().houses) {
+    if (h.terrId !== t.id) continue;
+    for (const u of targets(h)) {
+      n++;
+      const vs = visitsOf(K(h.id, u));
+      if (vs[0]) {
+        if (!last || vs[0].at > last) last = vs[0].at;
+        if (Date.parse(vs[0].at) >= sinceMs) visited++;
+      }
+      if (vs.some(v => v.result === 'met' && now - Date.parse(v.at) <= 90 * DAY)) met++;
+    }
+  }
+  return { n, visited, met, last };
+}
+
+/* ---------- お知らせ ---------- */
+let toastTimer = null;
+function toast(msg, undoFn) {
+  const el = $('#toast');
+  el.innerHTML = `<span>${esc(msg)}</span>` + (undoFn ? '<button type="button">取り消す</button>' : '');
+  el.hidden = false;
+  if (undoFn) el.querySelector('button').onclick = () => { el.hidden = true; undoFn(); };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, undoFn ? 7000 : 3500);
+}
+
+/* ---------- 下から出る画面 ---------- */
+function setSheet(html) {
+  const s = $('#sheet');
+  $('#sheetBody').innerHTML = html;
+  s.hidden = false; $('#backdrop').hidden = false; s.scrollTop = 0;
+  $$('[data-close]', s).forEach(b => { b.onclick = closeSheet; });
+  const h = s.querySelector('h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+}
+function closeSheet() {
+  $('#sheet').hidden = true; $('#backdrop').hidden = true;
+  if (tmpMarker && map) { map.removeLayer(tmpMarker); tmpMarker = null; }
+}
+const headHtml = (t, title, sub) => `<div class="sheet-head">${t ? `<span class="stamp sm">${t.no}</span>` : ''}<div><h2 id="sheetTitle">${title}</h2>${sub ? `<p class="muted">${sub}</p>` : ''}</div><button class="icon-btn" data-close aria-label="閉じる">×</button></div>`;
+const navLink = h => `<a class="btn block" href="https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}" target="_blank" rel="noopener">Googleマップで道順を見る</a>`;
+
+/* ---------- 地図 ---------- */
+let map, terrLayer, houseLayer, baseLayers, baseName = 'pale', mode = 'normal';
+let tmpMarker = null, draw = null, myPos = null, posMarker = null, firstMapShow = true;
+
+function initMap() {
+  map = L.map('map', { zoomControl: false }).setView(HOME_VIEW, 17);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  const opt = { maxZoom: 20, maxNativeZoom: 18, attribution: GSI_ATTR };
+  baseLayers = { pale: L.tileLayer(TILE_PALE, opt), photo: L.tileLayer(TILE_PHOTO, opt) };
+  baseLayers.pale.addTo(map);
+  terrLayer = L.layerGroup().addTo(map);
+  houseLayer = L.layerGroup().addTo(map);
+  map.on('click', e => { if (mode === 'draw') drawClick(e.latlng); else if (mode === 'add') addAt(e.latlng); });
+  map.on('moveend', renderHouses);
+}
+function houseIcon(h, ff) {
+  if (h.type === 'apt') {
+    const left = aptLeft(h), fo = hasFollowIn(h) ? '<em>再</em>' : '';
+    let st = null;
+    if (ff) {
+      const arr = targets(h).map(u => ff(K(h.id, u))).sort((a, b) => FOCUS_RANK.indexOf(a) - FOCUS_RANK.indexOf(b));
+      st = arr.length ? arr[0] : 'dim';
+    }
+    const nb = roundNums && roundNums.has(h.id) ? `<s>${roundNums.get(h.id)}</s>` : '';
+    const rj = targets(h).some(u => D().dnc[K(h.id, u)]) ? '<b class="rj">拒</b>' : '';
+    return L.divIcon({ className: '', html: `<div class="pin apt${ff ? focusCls(st) : ''}">集${left && !nb ? `<i>${left}</i>` : ''}${fo}${ff ? doneMark(st) : ''}${nb}${rj}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
+  }
+  const k = K(h.id, ''), s = statusOf(k), fo = fol(k) ? '<em>再</em>' : '';
+  const st = ff ? ff(k) : null;
+  const nb = roundNums && roundNums.has(h.id) ? `<s>${roundNums.get(h.id)}</s>` : '';
+  return L.divIcon({ className: '', html: `<div class="pin st-${s}${ff ? focusCls(st) : ''}">${ST_CHAR[s]}${fo}${ff ? doneMark(st) : ''}${nb}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
+}
+function renderTerrs() {
+  terrLayer.clearLayers();
+  const cur = $('#terrJump').value;
+  for (const t of D().territories) {
+    const on = t.id === cur;
+    L.polygon(t.polygon, { color: '#0E7C66', weight: on ? 5 : 3, fillColor: '#0E7C66', fillOpacity: on ? 0.07 : 0.02, interactive: false }).addTo(terrLayer);
+    L.marker(center(t.polygon), { icon: L.divIcon({ className: 'terr-label', html: `<span>${t.no}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false }).addTo(terrLayer);
+  }
+}
+function renderHouses() {
+  if (!map) return;
+  houseLayer.clearLayers();
+  const ff = focusFn();
+  renderCardBar();
+  const show = map.getZoom() >= 15;
+  $('#zoomHint').hidden = show;
+  if (!show) return;
+  const b = map.getBounds().pad(0.2);
+  for (const h of D().houses) {
+    if (!b.contains([h.lat, h.lng])) continue;
+    const m = L.marker([h.lat, h.lng], { icon: houseIcon(h, ff), title: h.label || '', zIndexOffset: roundNums && roundNums.has(h.id) ? 1000 : 0 });
+    m.on('click', () => onHouseTap(h.id));
+    m.addTo(houseLayer);
+  }
+}
+function fillTerrJump() {
+  const sel = $('#terrJump'), cur = sel.value;
+  const ts = D().territories.slice().sort((a, b) => a.no - b.no);
+  sel.innerHTML = '<option value="">区域をえらぶ</option>' + ts.map(t => `<option value="${t.id}">区域 ${t.no}</option>`).join('');
+  if (ts.some(t => t.id === cur)) sel.value = cur;
+}
+function fitTerr(id) {
+  const t = terrById(id); if (!t) return;
+  map.fitBounds(L.latLngBounds(t.polygon), { padding: [40, 40] });
+}
+function fitAll() {
+  const pts = D().territories.flatMap(t => t.polygon);
+  if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [30, 30] });
+}
+function onHouseTap(id) {
+  const h = houseById(id); if (!h) return;
+  if (mode === 'draw') { drawClick(L.latLng(h.lat, h.lng)); return; }
+  if (mode === 'add') { toast('そこには印があります。少しずらしてタップしてください'); return; }
+  if (h.type === 'apt') { if (h.units.length) openAptSeq(id); else openBuilding(id); }
+  else openTarget(id, '', false);
+}
+function setMode(m) {
+  mode = m;
+  $('#addBar').hidden = m !== 'add';
+  $('#drawBar').hidden = m !== 'draw';
+  $('#mapTools').hidden = m !== 'normal';
+  $('#map').classList.toggle('crosshair', m !== 'normal');
+  if (m !== 'draw') clearOverlay();
+}
+
+/* ---------- 家・部屋の記録 ---------- */
+function openTarget(hid, unit, fromBuilding) {
+  const h = houseById(hid); if (!h) return;
+  const t = terrById(h.terrId), k = K(hid, unit);
+  const st = { step: 'result', age: null, interest: null, override: false };
+  const title = targetName(h, unit);
+  const sub = t ? `区域${t.no}　${esc(t.name)}` : '区域の線の外';
+
+  const paint = () => {
+    const vs = visitsOf(k), dnc = D().dnc[k];
+    const f = fol(k), rel = D().released[k];
+    const mine = !!f && f.by === me().id, other = !!f && !mine;
+    const blocked = (dnc && !isAdmin()) || (other && !isAdmin() && !st.override);
+    let b = headHtml(t, title, sub);
+    if (fromBuilding) b += `<button class="btn small" id="backBld">← 部屋の一覧にもどる</button>`;
+    if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
+
+    // 再訪問の受け持ちの表示（伝道者には「だれが」は見せない）
+    if (f && isAdmin()) {
+      b += `<div class="notice info"><b>再訪問の受け持ち：${esc(uname(f.by))}さん</b>（最後の記録から${followIdle(f)}日）
+        <span class="actions"><label>変更 <select id="shAssign">${userOptions(f.by)}</select></label>
+        <button class="btn small" id="shRelease">解除する</button></span></div>`;
+    } else if (mine) {
+      b += `<div class="notice info"><b>あなたが再訪問を受け持っています。</b>記録を付けると、期限が自動で延びます。
+        <span class="actions"><button class="btn small" id="shStop">受け持ちをやめる</button></span></div>`;
+    } else if (other) {
+      b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。
+        ${st.override ? '' : '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>'}</div>`;
+    } else if (rel && !dnc) {
+      b += `<div class="notice warn"><b>引き継ぎを待っている家です。</b>再訪問を受け持てる方はお願いします。
+        <span class="actions"><button class="btn small primary" id="shTake">私が受け持つ</button></span></div>`;
+    } else if (lastInterest(k) && !dnc) {
+      b += `<div class="notice info">以前、関心のある方に会えています。
+        <span class="actions"><button class="btn small" id="shTake">私が再訪問を受け持つ</button></span></div>`;
+    }
+
+    if (!blocked) {
+      if (st.step === 'result') {
+        b += `<p class="q">訪問の結果を選んでください</p>` + resultChoicesHtml('');
+      } else if (st.step === 'age') {
+        b += `<p class="q">会えた方の年齢層（だいたいで大丈夫です）</p>
+        <div class="choices two">${AGES.map((a, i) => `<button class="choice${i === AGES.length - 1 ? ' wide' : ''}" data-age="${a}">${a}</button>`).join('')}</div>
+        <button class="btn block" data-back="result">← 結果の選択にもどる</button>`;
+      } else if (st.step === 'interest') {
+        b += interestChoicesHtml();
+      } else if (st.step === 'follow') {
+        b += `<p class="q">この方の再訪問はどうしますか？</p>
+        <div class="choices two">
+          <button class="choice" data-fol="1">私が再訪問します<small>ほかの人は訪問を控えます</small></button>
+          <button class="choice" data-fol="0">今回は記録だけ</button>
+        </div>
+        <button class="btn block" data-back="interest">← 関心の選択にもどる</button>`;
+      } else if (st.step === 'dnc') {
+        b += refuseStepHtml(!!unit);
+      }
+    }
+
+    if (isUnmet(k)) b += `<div class="notice info">これまで留守だった時間帯：${[...triedSlots(k)].sort(bySlot).map(slotShort).join('、')}<br>ほかの時間帯に訪ねてみてください。</div>`;
+    b += `<h3 class="sub">これまでの記録</h3>`;
+    b += vs.length
+      ? `<ul class="history">${vs.slice(0, 5).map(v => {
+          const d = new Date(v.at);
+          const extra = v.result === 'met' ? `（${esc(v.age || '')}・${esc(v.interest || '')}）` : (v.result === 'refused' && v.age ? `（${esc(v.age)}）` : '');
+          return `<li><i class="pin st-${v.result}">${ST_CHAR[v.result]}</i><span>${fmtDate(v.at)}　${slotOf(d)}<br>${RESULT_LABEL[v.result]}${extra}</span></li>`;
+        }).join('')}</ul>${vs.length > 5 ? `<p class="muted">ほか ${vs.length - 5}件</p>` : ''}`
+      : '<p class="muted">まだ記録はありません。</p>';
+
+    b += navLink(h);
+    if (!unit) {
+      b += `<details class="more"><summary>この家の編集</summary>
+        <label class="field"><span>目印を変える</span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="${esc(h.label)}"><button class="btn small" id="fLabelSave">保存</button></span>
+        <small class="hint">住んでいる人の名前は書かないでください。</small></label>
+        ${canDelHouse(h) ? '<button class="btn small danger" id="fDel">この家を削除する</button>' : ''}</details>`;
+    }
+    setSheet(b);
+
+    const S = $('#sheet');
+    $$('[data-res]', S).forEach(x => x.onclick = () => {
+      const r = x.dataset.res;
+      if (r === 'met') { st.step = 'age'; paint(); }
+      else if (r === 'refused') { st.step = 'dnc'; paint(); }
+      else saveVisit(hid, unit, 'away', {});
+    });
+    $$('[data-age]', S).forEach(x => x.onclick = () => { st.age = x.dataset.age; st.step = 'interest'; paint(); });
+    $$('[data-int]', S).forEach(x => x.onclick = () => {
+      const it = x.dataset.int;
+      if (it === '拒否') { st.step = 'dnc'; paint(); }
+      else if (it !== '関心なし' && !fol(k)) { st.interest = it; st.step = 'follow'; paint(); }
+      else saveVisit(hid, unit, 'met', { age: st.age, interest: it });
+    });
+    $$('[data-fol]', S).forEach(x => x.onclick = () =>
+      saveVisit(hid, unit, 'met', { age: st.age, interest: st.interest, follow: x.dataset.fol === '1' }));
+    $$('[data-refok]', S).forEach(x => x.onclick = () => saveVisit(hid, unit, 'refused', { age: st.age, dnc: true }));
+    $$('[data-back]', S).forEach(x => x.onclick = () => { st.step = x.dataset.back; paint(); });
+    const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
+    on('backBld', () => openBuilding(hid));
+    on('unDnc', () => { commit('拒否マークを外しました', () => { delete D().dnc[k]; }); paint(); });
+    on('shRelease', () => { followAction('release', k); paint(); });
+    on('shStop', () => openReleaseSheet(k, false));
+    on('shOverride', () => { st.override = true; paint(); });
+    on('shTake', () => { followAction('take', k); paint(); });
+    if ($('#shAssign')) $('#shAssign').onchange = e => {
+      const v = e.target.value;
+      if (!v || v === f.by) return;
+      commit(`受け持ちを${uname(v)}さんに変えました`, () => startFollow(k, v));
+      paint();
+    };
+    on('fLabelSave', () => {
+      const v = $('#fLabel').value.trim();
+      commit('目印を変えました', () => { h.label = v; });
+      closeSheet();
+    });
+    on('fDel', () => {
+      if (!confirm('この家と、その記録をすべて削除します。よろしいですか？')) return;
+      closeSheet(); deleteHouse(hid);
+    });
+  };
+  paint();
+}
+function saveVisit(hid, unit, result, extra, keepOpen) {
+  if (!keepOpen) closeSheet();
+  const k = K(hid, unit), cur = fol(k);
+  let msg = `${unit ? `${unit}号室を` : ''}「${RESULT_LABEL[result]}」で記録しました`;
+  let follow = !!extra.follow;
+  if (follow && cur) { follow = false; if (cur.by !== me().id) msg += '（再訪問はすでに受け持ちがあります）'; }
+  else if (follow) msg += '。再訪問を受け持ちます';
+  if (extra.dnc && cur) msg += '。受け持ちも解除しました';
+  commit(msg, () => {
+    const now = new Date().toISOString();
+    const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id };
+    if (result === 'met') { v.age = extra.age; v.interest = extra.interest; }
+    else if (result === 'refused' && extra.age) v.age = extra.age;
+    D().visits.push(v);
+    const f = D().follows[k];
+    if (f && f.by === me().id) f.touchedAt = now; // 受け持ち本人の記録で期限を延ばす
+    if (follow) startFollow(k, me().id);
+    if (extra.dnc) { D().dnc[k] = true; delete D().follows[k]; delete D().released[k]; }
+  });
+}
+function deleteHouse(hid) {
+  commit('削除しました', () => {
+    const h = houseById(hid);
+    D().houses = D().houses.filter(x => x.id !== hid);
+    D().visits = D().visits.filter(v => v.houseId !== hid);
+    if (h) targets(h).forEach(u => { const k = K(hid, u); delete D().dnc[k]; delete D().follows[k]; delete D().released[k]; });
+  });
+}
+
+/* ---------- 再訪問の受け持ちの操作 ---------- */
+const RELEASE_MSG = { handoff: '引き継ぎを待つ家にしました', lost: '受け持ちをやめました', gone: '受け持ちをやめました', admin: '受け持ちを解除しました' };
+function startFollow(k, by) {
+  const now = new Date().toISOString();
+  D().follows[k] = { by, since: now, touchedAt: now };
+  delete D().released[k];
+}
+function releaseFollow(k, reason) {
+  delete D().follows[k];
+  if (reason === 'handoff') D().released[k] = { at: new Date().toISOString(), reason };
+  else delete D().released[k];
+}
+function followAction(act, k) {
+  switch (act) {
+    case 'continue':
+      if (!fol(k)) return;
+      commit('受け持ちを続けます。期限を延ばしました', () => { D().follows[k].touchedAt = new Date().toISOString(); });
+      break;
+    case 'handoff':
+      if (!confirm('この再訪問をほかの人に引き継ぎます。よろしいですか？')) return;
+      commit(RELEASE_MSG.handoff, () => releaseFollow(k, 'handoff'));
+      break;
+    case 'stop':
+      openReleaseSheet(k, true);
+      break;
+    case 'release':
+      if (!confirm('この受け持ちを解除します。よろしいですか？')) return;
+      commit(RELEASE_MSG.admin, () => releaseFollow(k, 'admin'));
+      break;
+    case 'take':
+      if (fol(k)) { toast('すでに受け持ちがあります'); return; }
+      commit('再訪問を受け持ちます', () => startFollow(k, me().id));
+      break;
+  }
+}
+function openReleaseSheet(k, onlyStop) {
+  const [hid, unit] = parseKey(k);
+  const h = houseById(hid); if (!h) return;
+  setSheet(headHtml(terrById(h.terrId), '再訪問をやめる理由', targetName(h, unit)) + `
+    <div class="choices two">
+      ${onlyStop ? '' : '<button class="choice wide" data-rel="handoff">ほかの人に引き継ぐ</button>'}
+      <button class="choice" data-rel="lost">関心がなくなった</button>
+      <button class="choice" data-rel="gone">転居・会えなくなった</button>
+    </div>
+    ${onlyStop ? '' : '<p class="hint">「ほかの人に引き継ぐ」を選ぶと、「引き継ぎを待っている家」として一覧に出ます。</p>'}
+    <button class="btn block" data-close>もどる</button>`);
+  $$('[data-rel]', $('#sheet')).forEach(x => x.onclick = () => {
+    const rel = x.dataset.rel;
+    closeSheet();
+    commit(RELEASE_MSG[rel], () => releaseFollow(k, rel));
+  });
+}
+function followItem(k, f, mode) {
+  const [hid, unit] = parseKey(k);
+  const h = houseById(hid); if (!h) return '';
+  const t = terrById(h.terrId), stg = followStage(f), d = followIdle(f), m = lastInterest(k), bs = bestSlot(k);
+  const state = stg === 2 ? '（確認が必要）' : stg === 1 ? '（しばらく訪問なし）' : '';
+  const A = (act, label, cls) => `<button class="btn small ${cls || ''}" data-fact="${act}" data-key="${esc(k)}">${label}</button>`;
+  let acts = '';
+  if (mode === 'mine') {
+    if (stg >= 1) acts += A('continue', '続ける', 'primary');
+    if (stg === 2) acts += A('handoff', 'ほかの人に引き継ぐ') + A('stop', 'やめる');
+  } else {
+    acts = A('continue', '延長する') + A('handoff', '引き継ぎ待ちにする') + A('release', '解除する', 'danger') +
+      `<label>変更 <select data-reassign="${esc(k)}">${userOptions(f.by)}</select></label>`;
+  }
+  return `<article class="ritem f-s${stg}"><div>
+      <p class="rt"><span class="stamp xs">${t ? t.no : '-'}</span> ${targetName(h, unit)}</p>
+      <p class="muted">${mode === 'admin' ? `受け持ち：${esc(uname(f.by))}さん　` : ''}最後の記録から ${d}日${state}</p>
+      ${m ? `<p class="muted">${esc(m.interest)}・${esc(m.age || '')}${bs ? `　会えた時間帯：${bs}` : ''}</p>` : ''}
+    </div><button class="btn small" data-go="${hid}" data-unit="${esc(unit)}">地図で見る</button>
+    ${acts ? `<div class="actions span">${acts}</div>` : ''}</article>`;
+}
+
+/* ---------- 集合住宅 ---------- */
+function openBuilding(hid) {
+  const h = houseById(hid); if (!h) return;
+  const t = terrById(h.terrId), ff = focusFn(), since = unitDoneSince(h);
+  const cells = h.units.map(u => {
+    const s = statusOf(K(h.id, u));
+    const fo = fol(K(h.id, u)) ? '<em>再</em>' : '';
+    const k2 = K(h.id, u);
+    const fs = ff ? ff(k2) : (!D().dnc[k2] && visitedSince(k2, since) ? 'done' : null), hl = focusCls(fs);
+    return `<button class="unit st-${s}${hl}" data-unit="${esc(u)}">${fo}${doneMark(fs)}<b>${esc(u)}</b><small>${ST_LABEL[s]}</small></button>`;
+  }).join('');
+  setSheet(headHtml(t, esc(h.label || '集合住宅'), `区域${t ? t.no : '-'}　${h.units.length}部屋　まだ会えていない部屋 ${aptLeft(h)}`) + `
+    ${h.units.length ? `<button class="btn primary block" id="seqStart">続けて入力にもどる</button>` : ''}
+    <p class="q">部屋の一覧</p>
+    <p class="hint">部屋をタップすると、その部屋の記録をくわしく見られます。</p>
+    <div class="units">${cells || '<p class="muted">部屋がありません。下の「建物の編集」から追加してください。</p>'}</div>
+    ${navLink(h)}
+    <details class="more"><summary>建物の編集</summary>
+      <label class="field"><span>部屋を追加</span><span class="inline"><input type="text" id="fUnit" maxlength="10" placeholder="例：305"><button class="btn small" id="fUnitAdd">追加</button></span></label>
+      <label class="field"><span>建物名・目印を変える</span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="${esc(h.label)}"><button class="btn small" id="fLabelSave">保存</button></span></label>
+      ${canDelHouse(h) ? '<button class="btn small danger" id="fDel">この建物を削除する</button>' : ''}
+    </details>`);
+  $$('[data-unit]', $('#sheet')).forEach(x => x.onclick = () => openTarget(hid, x.dataset.unit, true));
+  if ($('#seqStart')) $('#seqStart').onclick = () => openAptSeq(hid);
+  $('#fUnitAdd').onclick = () => {
+    const u = $('#fUnit').value.trim();
+    if (!u) { toast('部屋番号を入力してください'); return; }
+    if (h.units.includes(u)) { toast(`${u}号室はすでにあります`); return; }
+    commit(`${u}号室を追加しました`, () => { h.units.push(u); });
+    openBuilding(hid);
+  };
+  $('#fLabelSave').onclick = () => { const v = $('#fLabel').value.trim(); commit('建物名を変えました', () => { h.label = v; }); openBuilding(hid); };
+  if ($('#fDel')) $('#fDel').onclick = () => {
+    if (!confirm(`「${h.label || '集合住宅'}」と、すべての部屋の記録を削除します。よろしいですか？`)) return;
+    closeSheet(); deleteHouse(hid);
+  };
+}
+
+/* ---------- 集合住宅：続けて入力 ---------- */
+function seqStepsHtml(st) {
+  if (st.step === 'result') return resultChoicesHtml('押すと次の部屋へ');
+  if (st.step === 'age') return `<p class="q">年齢層（だいたいで大丈夫です）</p>
+      <div class="choices two">${AGES.map((a, i) => `<button class="choice${i === AGES.length - 1 ? ' wide' : ''}" data-age="${a}">${a}</button>`).join('')}</div>
+      <button class="btn block" data-back="result">← 結果の選択にもどる</button>`;
+  if (st.step === 'interest') return interestChoicesHtml();
+  if (st.step === 'follow') return `<p class="q">この方の再訪問はどうしますか？</p>
+      <div class="choices two">
+        <button class="choice" data-fol="1">私が再訪問します<small>ほかの人は訪問を控えます</small></button>
+        <button class="choice" data-fol="0">今回は記録だけ</button></div>
+      <button class="btn block" data-back="interest">← 関心の選択にもどる</button>`;
+  if (st.step === 'dnc') return refuseStepHtml(true);
+  return '';
+}
+function openAptSeq(hid, startUnit) {
+  const h0 = houseById(hid); if (!h0 || !h0.units.length) return;
+  const t = terrById(h0.terrId);
+  const since = unitDoneSince(h0), inRound = since !== todayIso();
+  const isRef = u => !!D().dnc[K(hid, u)];
+  const doneToday = u => !isRef(u) && visitedSince(K(hid, u), since); // 緑のチェックが付く部屋
+  let idx = startUnit ? Math.max(0, h0.units.indexOf(startUnit)) : h0.units.findIndex(u => !doneToday(u) && !isRef(u));
+  if (idx < 0) idx = h0.units.length; // すべて入力済み
+  const st = { step: 'result', age: null, interest: null, override: false, finished: idx >= h0.units.length };
+  const go = i => {
+    const n = (houseById(hid) || h0).units.length;
+    idx = Math.max(0, i);
+    Object.assign(st, { step: 'result', age: null, interest: null, override: false, finished: idx >= n });
+    paint();
+  };
+  // 次に入力する部屋：まだ緑のチェックがなく、拒否でもない部屋
+  const nextIdx = from => {
+    const us = (houseById(hid) || h0).units;
+    for (let i = from; i < us.length; i++) if (!doneToday(us[i]) && !isRef(us[i])) return i;
+    return us.length;
+  };
+  const save = (result, extra) => { saveVisit(hid, houseById(hid).units[idx], result, extra, true); go(nextIdx(idx + 1)); };
+
+  const paint = () => {
+    const h = houseById(hid); if (!h) { closeSheet(); return; }
+    const n = h.units.length, cnt = h.units.filter(doneToday).length, need = h.units.filter(u => !isRef(u)).length;
+    let b = headHtml(t, `${esc(h.label || '集合住宅')}　続けて入力`, `${inRound ? '受け取ってから訪ねた部屋' : '今日入力した部屋'} ${cnt} / ${need}`);
+    b += `<div class="unitstrip">${h.units.map((u, i) => {
+      const s = statusOf(K(hid, u));
+      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(u)}号室へ">${esc(u)}</button>`;
+    }).join('')}</div>`;
+    if (st.finished) {
+      b += `<div class="okmsg"><b>${cnt === need ? 'すべての部屋に緑のチェックがつきました。' : '最後の部屋まで進みました。'}</b>部屋番号をタップすると、その部屋を入力できます。</div>
+        <button class="btn primary block" data-close>閉じる</button>
+        <button class="btn block" id="seqBack">部屋の一覧・建物の編集</button>`;
+    } else {
+      const u = h.units[idx], k = K(hid, u), f = fol(k), last = visitsOf(k)[0];
+      const other = !!f && f.by !== me().id;
+      b += `<p class="seqroom"><b>${esc(u)}</b>号室 <span class="muted">（${idx + 1} / ${n}）</span></p>`;
+      b += `<p class="muted">${last ? `前回：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}` : 'はじめて訪ねる部屋'}</p>`;
+      if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の部屋です。</b>訪問しないで、次の部屋へ進んでください。</div>`;
+      else if (other && !isAdmin() && !st.override) b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="seqOverride">それでも記録する</button></span></div>`;
+      else b += seqStepsHtml(st);
+      b += `<div class="seqnav">
+          <button class="btn" id="seqPrev"${idx === 0 ? ' disabled' : ''}>← 前の部屋</button>
+          <button class="btn" id="seqNext">とばして次へ →</button></div>
+        ${navLink(h)}
+        <button class="btn block" id="seqBack">部屋の一覧・建物の編集</button>`;
+    }
+    setSheet(b);
+
+    const S = $('#sheet'), k = st.finished ? null : K(hid, h.units[idx]);
+    $$('[data-jump]', S).forEach(x => x.onclick = () => go(Number(x.dataset.jump)));
+    $$('[data-res]', S).forEach(x => x.onclick = () => {
+      const r = x.dataset.res;
+      if (r === 'met') { st.step = 'age'; paint(); }
+      else if (r === 'refused') { st.step = 'dnc'; paint(); }
+      else save('away', {});
+    });
+    $$('[data-age]', S).forEach(x => x.onclick = () => { st.age = x.dataset.age; st.step = 'interest'; paint(); });
+    $$('[data-int]', S).forEach(x => x.onclick = () => {
+      const it = x.dataset.int;
+      if (it === '拒否') { st.step = 'dnc'; paint(); }
+      else if (it !== '関心なし' && !fol(k)) { st.interest = it; st.step = 'follow'; paint(); }
+      else save('met', { age: st.age, interest: it });
+    });
+    $$('[data-fol]', S).forEach(x => x.onclick = () => save('met', { age: st.age, interest: st.interest, follow: x.dataset.fol === '1' }));
+    $$('[data-refok]', S).forEach(x => x.onclick = () => save('refused', { age: st.age, dnc: true }));
+    $$('[data-back]', S).forEach(x => x.onclick = () => { st.step = x.dataset.back; paint(); });
+    const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
+    on('seqOverride', () => { st.override = true; paint(); });
+    on('seqPrev', () => go(idx - 1));
+    on('seqNext', () => go(nextIdx(idx + 1)));
+    on('seqBack', () => openBuilding(hid));
+  };
+  paint();
+}
+
+/* ---------- 家を追加 ---------- */
+function addAt(ll) {
+  const tid = terrOf(ll.lat, ll.lng);
+  if (!tid) { toast('区域の線の外です。区域の中をタップしてください'); return; }
+  if (tmpMarker) map.removeLayer(tmpMarker);
+  tmpMarker = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="pin st-temp">＋</div>', iconSize: [34, 34], iconAnchor: [17, 17] }), interactive: false }).addTo(map);
+  openAddForm(ll, tid);
+}
+function openAddForm(ll, tid) {
+  const t = terrById(tid);
+  const f = { type: 'house', label: '', floors: 2, per: 4 };
+  const stepper = (id, label) => `<div class="field"><span>${label}</span><div class="stepper">
+      <button type="button" data-step="${id}" data-d="-1" aria-label="${label}を減らす">−</button><output>${f[id]}</output>
+      <button type="button" data-step="${id}" data-d="1" aria-label="${label}を増やす">＋</button></div></div>`;
+  const paint = () => {
+    const apt = f.type === 'apt';
+    setSheet(headHtml(t, 'ここに追加します', `区域${t.no}　${esc(t.name)}`) + `
+      <p class="q">建物の種類</p>
+      <div class="choices two">
+        <button class="choice${!apt ? ' on' : ''}" data-type="house" aria-pressed="${!apt}"><i class="pin st-new">家</i>一戸建て</button>
+        <button class="choice${apt ? ' on' : ''}" data-type="apt" aria-pressed="${apt}"><i class="pin apt">集</i>アパート・マンション</button>
+      </div>
+      <label class="field"><span>${apt ? '建物名' : '目印（見た目など）'}</span>
+        <input type="text" id="fLabel" maxlength="30" value="${esc(f.label)}" placeholder="${apt ? '例：〇〇ハイツ' : '例：青い門・2階建て'}">
+        <small class="hint">住んでいる人の名前は書かないでください。</small></label>
+      ${apt ? stepper('floors', '階の数') + stepper('per', '1つの階の部屋の数') +
+        `<p class="hint">部屋番号は 101 〜 ${f.floors}${pad(f.per)} のように自動で付きます。あとから追加もできます。</p>` : ''}
+      <button class="btn primary block" id="fSave">この場所に追加する</button>
+      <button class="btn block" data-close>やめる</button>`);
+    const S = $('#sheet');
+    $$('[data-type]', S).forEach(x => x.onclick = () => { f.label = $('#fLabel').value; f.type = x.dataset.type; paint(); });
+    $$('[data-step]', S).forEach(x => x.onclick = () => {
+      f.label = $('#fLabel').value;
+      f[x.dataset.step] = Math.min(30, Math.max(1, f[x.dataset.step] + Number(x.dataset.d)));
+      paint();
+    });
+    $('#fSave').onclick = () => {
+      const label = $('#fLabel').value.trim();
+      const units = [];
+      if (f.type === 'apt') for (let a = 1; a <= f.floors; a++) for (let b = 1; b <= f.per; b++) units.push(`${a}${pad(b)}`);
+      closeSheet(); setMode('normal');
+      commit(f.type === 'apt' ? '集合住宅を追加しました' : '家を追加しました', () => {
+        D().houses.push({ id: 'h' + uid(), terrId: tid, type: f.type, lat: ll.lat, lng: ll.lng, label, units, createdAt: new Date().toISOString(), createdBy: me().id });
+      });
+    };
+  };
+  paint();
+}
+
+/* ---------- 区域の線引き ---------- */
+function startDraw(targetId) {
+  showView('map');
+  setMode('draw');
+  draw = {
+    points: [], targetId,
+    line: L.polyline([], { color: '#C2410C', weight: 4, dashArray: '8 6', interactive: false }).addTo(map),
+    dots: L.layerGroup().addTo(map)
+  };
+  $('#drawTitle').textContent = targetId ? `区域${terrById(targetId).no}の線を引き直す` : '新しい区域の線を引く';
+  if (targetId) setTimeout(() => fitTerr(targetId), 60);
+  redrawDraw();
+}
+function drawClick(ll) { draw.points.push([ll.lat, ll.lng]); redrawDraw(); }
+function redrawDraw() {
+  const p = draw.points;
+  draw.line.setLatLngs(p.length > 2 ? [...p, p[0]] : p);
+  draw.dots.clearLayers();
+  p.forEach((pt, i) => L.circleMarker(pt, { radius: i === 0 ? 10 : 7, color: '#C2410C', weight: 3, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(draw.dots));
+  $('#drawCount').textContent = p.length;
+}
+function endDraw() {
+  if (draw) { map.removeLayer(draw.line); map.removeLayer(draw.dots); }
+  draw = null; setMode('normal');
+}
+function finishDraw() {
+  if (draw.points.length < 3) { toast('角を3か所以上タップしてください'); return; }
+  const pts = draw.points.slice();
+  if (draw.targetId) {
+    const t = terrById(draw.targetId);
+    endDraw();
+    commit(`区域${t.no}の線を引き直しました`, () => { t.polygon = pts; reassign(); });
+  } else {
+    openTerrForm({ pts });
+  }
+}
+function openTerrForm({ pts = null, terr = null }) {
+  const nextNo = Math.max(0, ...D().territories.map(t => t.no)) + 1;
+  setSheet(headHtml(null, terr ? '区域の番号と名前' : '新しい区域', '') + `
+    <label class="field"><span>区域番号</span><input type="number" id="fNo" inputmode="numeric" min="1" value="${terr ? terr.no : nextNo}"></label>
+    <label class="field"><span>区域の名前（目印になる地名など）</span><input type="text" id="fName" maxlength="30" value="${terr ? esc(terr.name) : ''}" placeholder="例：〇〇公園の北側"></label>
+    <button class="btn primary block" id="fSave">保存する</button>
+    <button class="btn block" data-close>もどる</button>`);
+  $('#fSave').onclick = () => {
+    const no = parseInt($('#fNo').value, 10), name = $('#fName').value.trim();
+    if (!no || no < 1) { toast('区域番号を入力してください'); return; }
+    if (D().territories.some(t => t.no === no && t !== terr)) { toast(`区域${no}はすでにあります`); return; }
+    closeSheet();
+    if (terr) {
+      commit('区域の番号と名前を変えました', () => { terr.no = no; terr.name = name || `区域${no}`; });
+    } else {
+      endDraw();
+      commit(`区域${no}を作りました`, () => {
+        D().territories.push({ id: 't' + uid(), no, name: name || `区域${no}`, polygon: pts, holder: null, lentAt: null });
+        reassign();
+      });
+    }
+  };
+}
+
+/* 古いカードの写真を下に敷き、地図を半透明にして位置を合わせる */
+function applyOv() { map.getPane('tilePane').style.opacity = $('#ovRange').value / 100; }
+function clearOverlay() {
+  const img = $('#overlayImg');
+  if (img.dataset.url) { URL.revokeObjectURL(img.dataset.url); delete img.dataset.url; }
+  img.removeAttribute('src'); img.hidden = true;
+  $('#ovCtl').hidden = true;
+  $('#map').classList.remove('see-through');
+  if (map) map.getPane('tilePane').style.opacity = '';
+}
+
+/* ---------- 区域カード画面 ---------- */
+function renderToday() {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const mine = D().visits.filter(v => v.by === me().id && Date.parse(v.at) >= start.getTime()).sort((a, b) => (a.at < b.at ? -1 : 1));
+  let html = `<b>${esc(me().name)}さん</b>　`;
+  if (!mine.length) html += '今日の記録はまだありません。';
+  else {
+    const f = new Date(mine[0].at), l = new Date(mine[mine.length - 1].at);
+    const min = Math.round((l - f) / 60000);
+    html += `今日の記録 <b>${mine.length}件</b>（会えた ${mine.filter(v => v.result === 'met').length}件）<br>
+      <span class="muted">記録した時間 ${fmtTime(f)}〜${fmtTime(l)}（約${Math.floor(min / 60)}時間${min % 60}分）</span>`;
+  }
+  $('#todayBox').innerHTML = `<div class="today">${html}</div>`;
+}
+function cardHtml(t, own) {
+  const since = t.lentAt ? Date.parse(t.lentAt) : Date.now() - 90 * DAY;
+  const s = terrStats(t, since);
+  const pct = s.n ? Math.round(s.visited / s.n * 100) : 0;
+  const holder = t.holder ? userById(t.holder) : null;
+  const who = own ? `受け取ってから ${daysSince(t.lentAt)}日` : (holder ? `担当：${esc(holder.name)}さん` : '担当者なし');
+  return `<article class="tcard">
+    <span class="stamp"><small>区域</small>${t.no}</span>
+    <div><h3>${esc(t.name)}</h3><p class="muted">${who}</p>
+      <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪問の進み具合"><i style="width:${pct}%"></i></div>
+      <p class="muted">${t.lentAt ? '受け取ってから' : 'この90日で'}訪問した家・部屋 ${s.visited} / ${s.n}</p>${own ? roundHint(t) : ''}</div>
+    <div class="actions"><button class="btn primary" data-open="${t.id}">地図をひらく</button>${own ? `<button class="btn" data-return="${t.id}">返却する</button>` : ''}</div>
+  </article>`;
+}
+function renderCards() {
+  renderToday();
+  const ts = D().territories.slice().sort((a, b) => a.no - b.no);
+  const mine = ts.filter(t => t.holder === me().id);
+  $('#myCards').innerHTML = mine.length ? mine.map(t => cardHtml(t, true)).join('')
+    : '<div class="empty">受け取っている区域カードはありません。<br>下のボタンから申し込めます。</div>';
+  renderRequestArea();
+  renderMyAwayCards();
+  $('#allCards').innerHTML = ts.filter(t => t.holder !== me().id).map(t => cardHtml(t, false)).join('');
+
+  const myF = Object.entries(D().follows)
+    .filter(([k, f]) => f.by === me().id && houseById(parseKey(k)[0]))
+    .sort((a, b) => followIdle(b[1]) - followIdle(a[1]));
+  const need = myF.filter(([, f]) => followStage(f) > 0).length;
+  $('#followAlert').innerHTML = need
+    ? `<div class="notice warn">しばらく訪問していない再訪問が <b>${need}件</b> あります。<span class="actions"><button class="btn small" data-scroll="followsHead">確認する</button></span></div>`
+    : '';
+  $('#myFollows').innerHTML = myF.length ? myF.map(([k, f]) => followItem(k, f, 'mine')).join('')
+    : '<div class="empty">受け持っている再訪問はありません。<br>関心のある方に会えたら、記録のときに「私が再訪問します」を選べます。</div>';
+}
+
+/* ---------- 区域カードの申し込み・受け取り ---------- */
+const myPending = () => D().requests.find(r => r.by === me().id && r.status === 'pending');
+const freeTerrs = () => D().territories.filter(t => !t.holder);
+const heldCount = uid => D().territories.filter(t => t.holder === uid).length;
+const agoLabel = iso => { const d = daysSince(iso); return d === 0 ? '今日' : `${d}日前`; };
+const byLongest = (a, b) => ((a.last || '') < (b.last || '') ? -1 : 1); // 長く回っていない順（記録なしが先）
+
+function renderRequestArea() {
+  const p = myPending();
+  if (p) {
+    const t = p.terrId ? terrById(p.terrId) : null;
+    $('#reqArea').innerHTML = `<div class="reqbox">
+      <p><b>区域カードを申し込み中です</b></p>
+      <p class="muted">希望：${t ? `区域${t.no}` : 'どこでもよい'}　${fmtDay(p.at)}に申し込み</p>
+      <p class="muted">係が決めると、上の「あなたの区域カード」に加わります。</p>
+      <div class="actions"><button class="btn small" data-reqcancel="${p.id}">申し込みを取り消す</button></div></div>`;
+  } else {
+    $('#reqArea').innerHTML = `<button class="btn block wideadd" data-reqopen>＋ 区域カードをもう1枚ほしい</button>`;
+  }
+  const done = D().requests.filter(r => r.by === me().id && (r.status === 'approved' || r.status === 'declined') && !r.seen);
+  $('#reqNotice').innerHTML = done.map(r => {
+    const t = terrById(r.terrId);
+    return r.status === 'approved'
+      ? `<div class="notice info"><b>係から区域${t ? t.no : ''}のカードが届きました。</b>「あなたの区域カード」から地図をひらけます。<span class="actions"><button class="btn small" data-reqseen="${r.id}">わかりました</button></span></div>`
+      : `<div class="notice warn"><b>申し込みは今回見送りになりました。</b>くわしくは区域係に相談してください。<span class="actions"><button class="btn small" data-reqseen="${r.id}">わかりました</button></span></div>`;
+  }).join('');
+}
+
+function openRequestSheet() {
+  const max = D().settings.selfTakeMax, held = heldCount(me().id), canTake = held < max;
+  const list = freeTerrs().map(t => {
+    return { t, last: t.completedAt, n: terrStats(t, 0).n, dist: myPos ? distM(myPos, center(t.polygon)) : null };
+  });
+  list.sort(myPos ? (a, b) => a.dist - b.dist : byLongest);
+  const rows = list.map(({ t, last, n, dist }) => `<article class="pick">
+      <span class="stamp sm">${t.no}</span>
+      <div><b>${esc(t.name)}</b>
+        <p class="muted">${n}軒・部屋　${last ? `前回回り終えた日 ${fmtDay(last)}` : '回り終えた記録なし'}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p></div>
+      ${t.free && canTake
+        ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
+        : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
+    </article>`).join('');
+  setSheet(headHtml(null, '区域カードをもう1枚', '') + `
+    <p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。</p>
+    ${!canTake && list.some(x => x.t.free) ? `<div class="notice warn">自分で受け取れるのは${max}枚までです（今 ${held}枚）。係に頼むことはできます。</div>` : ''}
+    <div class="row"><button class="btn small" id="reqNear">${myPos ? '現在地を更新する' : '現在地から近い順にする'}</button>
+      <span class="muted">${myPos ? '近い順' : '長く回っていない順'}に並んでいます</span></div>
+    ${rows || '<div class="empty">今、空いている区域はありません。</div>'}
+    <button class="btn block primary" data-ask="">どこでもよいので係に頼む</button>
+    <button class="btn block" data-close>もどる</button>`);
+  const S = $('#sheet');
+  $('#reqNear').onclick = () => locate(openRequestSheet);
+  $$('[data-take]', S).forEach(x => x.onclick = () => takeTerr(x.dataset.take));
+  $$('[data-ask]', S).forEach(x => x.onclick = () => askTerr(x.dataset.ask || null));
+}
+function takeTerr(id) {
+  const t = terrById(id);
+  if (!t || t.holder) { toast('この区域はすでに貸し出されています'); return; }
+  if (!t.free || heldCount(me().id) >= D().settings.selfTakeMax) { toast('この区域は係に頼んでください'); return; }
+  if (!confirm(`区域${t.no}を受け取ります。よろしいですか？`)) return;
+  closeSheet();
+  commit(`区域${t.no}を受け取りました`, () => {
+    const now = new Date().toISOString();
+    t.holder = me().id; t.lentAt = now; t.selfTakenAt = now; t.selfSeen = false;
+    D().requests = D().requests.filter(r => !(r.status === 'pending' && r.by === me().id && r.terrId === id));
+  });
+}
+function askTerr(id) {
+  if (myPending()) { toast('すでに申し込み中です'); return; }
+  const t = id ? terrById(id) : null;
+  closeSheet();
+  commit(t ? `区域${t.no}を係に申し込みました` : '区域カードを係に申し込みました', () => {
+    D().requests.push({ id: 'r' + uid(), by: me().id, terrId: id || null, at: new Date().toISOString(), status: 'pending' });
+  });
+}
+
+/* 係：申し込みと、自分で受け取られた区域（用件があるときだけ表示） */
+function renderInbox() {
+  const reqs = D().requests.filter(r => r.status === 'pending').sort((a, b) => (a.at < b.at ? -1 : 1));
+  const taken = D().territories.filter(t => t.holder && t.selfTakenAt && t.selfSeen === false);
+  const free = freeTerrs().map(t => ({ t, last: t.completedAt })).sort(byLongest);
+  let html = '';
+  if (reqs.length) {
+    html += `<h2 class="sec">区域カードの申し込み（${reqs.length}件）</h2>
+      <p class="hint">貸し出す区域は、希望の区域か、長く回っていない区域が先に選ばれています。</p>` + reqs.map(r => {
+      const want = r.terrId ? terrById(r.terrId) : null;
+      const wantFree = !!want && !want.holder;
+      const held = D().territories.filter(t => t.holder === r.by);
+      const over = held.filter(t => t.lentAt && daysSince(t.lentAt) > 120).length;
+      const def = wantFree ? want.id : (free[0] ? free[0].t.id : '');
+      const opts = free.map(({ t, last }) =>
+        `<option value="${t.id}"${t.id === def ? ' selected' : ''}>区域${t.no}（${last ? `前回 ${fmtDay(last)}` : '回り終えた記録なし'}）</option>`).join('');
+      return `<article class="ritem k-new"><div>
+          <p class="rt">${esc(uname(r.by))}さん</p>
+          <p class="muted">希望：${want ? `区域${want.no}${wantFree ? '' : '（すでに貸出中）'}` : 'どこでもよい'}　${fmtDay(r.at)}</p>
+          <p class="muted">今持っているカード ${held.length}枚${over ? `<span class="tag-warn">4か月超 ${over}枚</span>` : ''}</p>
+        </div><span></span>
+        <div class="actions span">
+          ${free.length
+            ? `<label>貸し出す区域 <select data-reqterr="${r.id}">${opts}</select></label><button class="btn small primary" data-reqok="${r.id}">貸し出す</button>`
+            : '<span class="muted">空いている区域がありません。</span>'}
+          <button class="btn small" data-reqno="${r.id}">見送る</button>
+        </div></article>`;
+    }).join('');
+  }
+  if (taken.length) {
+    html += `<h2 class="sec">自分で受け取られた区域（${taken.length}件）</h2>` + taken.map(t =>
+      `<article class="ritem k-away"><div>
+        <p class="rt"><span class="stamp xs">${t.no}</span> ${esc(t.name)}</p>
+        <p class="muted">${esc(uname(t.holder))}さん　${fmtDay(t.selfTakenAt)}に受け取り（今 ${heldCount(t.holder)}枚）</p>
+      </div><button class="btn small" data-takenseen="${t.id}">確認した</button></article>`).join('');
+  }
+  $('#adInbox').innerHTML = html;
+  const n = reqs.length + taken.length;
+  $('#tabBadge').textContent = n;
+  $('#tabBadge').hidden = !n;
+
+  const st = D().settings;
+  $('#adTakeSet').innerHTML = `<div class="setrow">
+    <span>「自由に受け取ってよい」区域を、1人が自分で受け取れる枚数<br><small class="hint">すでに持っているカードも数えます</small></span>
+    <div class="stepper"><button type="button" data-takemax="-1" aria-label="枚数を減らす">−</button><output class="wide">${st.selfTakeMax}枚まで</output>
+    <button type="button" data-takemax="1" aria-label="枚数を増やす">＋</button></div></div>
+    <div class="setrow">
+    <span>区域カードを「完了」にできる目安<br><small class="hint">訪ねた家の割合。目安に届くと、本人の画面に「返却して完了にできます」と出ます</small></span>
+    <div class="stepper"><button type="button" data-donepct="-5" aria-label="目安を下げる">−</button><output class="wide">${st.donePct}%</output>
+    <button type="button" data-donepct="5" aria-label="目安を上げる">＋</button></div></div>`;
+}
+function approveReq(id) {
+  const r = D().requests.find(x => x.id === id); if (!r) return;
+  const sel = $(`[data-reqterr="${id}"]`), t = sel ? terrById(sel.value) : null;
+  if (!t || t.holder) { toast('その区域は貸し出せません'); return; }
+  commit(`区域${t.no}を${uname(r.by)}さんに貸し出しました`, () => {
+    const now = new Date().toISOString();
+    t.holder = r.by; t.lentAt = now;
+    Object.assign(r, { status: 'approved', terrId: t.id, decidedAt: now, seen: false });
+  });
+}
+function declineReq(id) {
+  const r = D().requests.find(x => x.id === id); if (!r) return;
+  if (!confirm(`${uname(r.by)}さんの申し込みを見送ります。よろしいですか？`)) return;
+  commit('申し込みを見送りました', () => {
+    Object.assign(r, { status: 'declined', decidedAt: new Date().toISOString(), seen: false });
+  });
+}
+
+/* ---------- 区域の返却（回り終えた日の記録） ---------- */
+function openReturnSheet(tid) {
+  const t = terrById(tid); if (!t || !t.holder) return;
+  const r = roundInfo(tid, true), th = D().settings.donePct;
+  const total = r.c.todo + r.c.done, reached = r.pct >= th;
+  const sub = `${esc(uname(t.holder))}さん${t.lentAt ? `　受け取ってから ${daysSince(t.lentAt)}日` : ''}`;
+  setSheet(headHtml(t, `区域${t.no}を返却します`, sub) + `
+    <div class="progress big" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${r.pct}%"></i></div>
+    <p class="muted">受け取ってから訪ねた家 ${r.c.done} / ${total}（${r.pct}%）${r.c.todo ? `　残り ${r.c.todo}軒` : ''}</p>
+    <p class="q">区域を回り終えましたか？</p>
+    <div class="choices two">
+      <button class="choice${reached ? ' on' : ''}" data-ret="1">回り終えました<small>完了として記録します</small></button>
+      <button class="choice${reached ? '' : ' on'}" data-ret="0">途中までです</button>
+    </div>
+    <p class="hint">${reached
+      ? `完了の目安（${th}%）をこえています。`
+      : `完了の目安は${th}%です。事情があるときは「回り終えました」を選べます。`}
+      残りの家は、次に回る人のおすすめに出ます。会えなかった家は、時間帯を変えて訪ねる「留守宅カード」になります。</p>
+    <button class="btn block" data-close>もどる</button>`);
+  $$('[data-ret]', $('#sheet')).forEach(x => x.onclick = () => returnTerr(tid, x.dataset.ret === '1'));
+}
+function returnTerr(tid, completed) {
+  const t = terrById(tid); if (!t) return;
+  const r = roundInfo(tid, true), pct = r ? r.pct : null;
+  closeSheet();
+  if (roundTerr === tid) roundTerr = null;
+  commit(`区域${t.no}を返却しました${completed ? `（完了・${pct}%）` : ''}`, () => {
+    const now = new Date().toISOString();
+    D().returns.push({ id: 'x' + uid(), terrId: tid, by: t.holder, lentAt: t.lentAt, at: now, completed, pct });
+    if (completed) { t.completedAt = now; t.completedPct = pct; }
+    t.holder = null; t.lentAt = null; t.returnedAt = now;
+  });
+}
+
+/* ---------- 留守宅カード ---------- */
+let focusCard = null, roundTerr = null, roundNums = null, barMini = false;
+const slotText = s => { const [dt, b] = s.split('・'); return `${dt}の${b}（${BAND_HINT[b]}）`; };
+const slotShort = s => s.replace('・', 'の');
+const activeCards = () => { const now = Date.now(); return D().awayCards.filter(c => !c.endedAt && Date.parse(c.expiresAt) > now); };
+const isUnmet = k => { const vs = visitsOf(k); return vs.length > 0 && vs.every(v => v.result === 'away'); };
+const triedSlots = k => new Set(visitsOf(k).map(v => slotOf(new Date(v.at))));
+// 担当者のいる区域は担当者だけ。空いている区域は、回り終えた記録があるものだけ。
+const awayEligibleTerr = (t, uid) => (t.holder ? t.holder === uid : !!t.completedAt);
+
+/* 区域ごとの「まだ会えていない家」 */
+function unmetIndex() {
+  const m = new Map(), now = Date.now();
+  for (const h of D().houses) {
+    if (!h.terrId) continue;
+    for (const u of targets(h)) {
+      const k = K(h.id, u);
+      if (D().dnc[k] || D().follows[k] || D().released[k] || !isUnmet(k)) continue;
+      const tried = triedSlots(k);
+      if (!m.has(h.terrId)) m.set(h.terrId, []);
+      m.get(h.terrId).push({ k, h, u, tried, recent: now - Date.parse(visitsOf(k)[0].at) < 3 * DAY, hard: tried.size >= SLOTS.length });
+    }
+  }
+  return m;
+}
+function lockedKeys() { const s = new Set(); activeCards().forEach(c => c.keys.forEach(k => s.add(k))); return s; }
+function cardKeys(items, slot, locked) {
+  return items.filter(x => !x.hard && !x.recent && !x.tried.has(slot) && !locked.has(x.k)).map(x => x.k);
+}
+function awaySuggestions(uid, slots) {
+  const idx = unmetIndex(), locked = lockedKeys(), res = [];
+  for (const t of D().territories) {
+    if (!awayEligibleTerr(t, uid) || !idx.has(t.id)) continue;
+    for (const slot of slots) {
+      const keys = cardKeys(idx.get(t.id), slot, locked);
+      if (keys.length) res.push({ t, slot, keys, dist: myPos ? distM(myPos, center(t.polygon)) : null });
+    }
+  }
+  res.sort(myPos ? (a, b) => a.dist - b.dist || b.keys.length - a.keys.length : (a, b) => b.keys.length - a.keys.length);
+  return res;
+}
+function cardProgress(c) {
+  const keys = c.keys.filter(k => houseById(parseKey(k)[0]));
+  return { total: keys.length, done: keys.filter(k => visitsOf(k).some(v => v.at >= c.at)).length };
+}
+function takeAwayCard(tid, slot) {
+  const max = D().settings.awayMax;
+  if (activeCards().filter(c => c.by === me().id).length >= max) {
+    toast(`留守宅カードは${max}枚まで持てます。終えてから受け取ってください`); return;
+  }
+  const t = terrById(tid);
+  if (!t || !awayEligibleTerr(t, me().id)) { toast('このカードは受け取れません'); return; }
+  const keys = cardKeys(unmetIndex().get(tid) || [], slot, lockedKeys());
+  if (!keys.length) { toast('このカードの家は、今はありません'); renderAll(); return; }
+  const now = new Date();
+  const card = { id: 'c' + uid(), terrId: tid, slot, by: me().id, at: now.toISOString(),
+    expiresAt: new Date(now.getTime() + D().settings.awayDays * DAY).toISOString(), keys };
+  commit(`留守宅カード（区域${t.no}・${slotShort(slot)}）を受け取りました`, () => { D().awayCards.push(card); });
+  openAwayCard(card.id);
+}
+function endAwayCard(id) {
+  const c = D().awayCards.find(x => x.id === id); if (!c) return;
+  if (!confirm('この留守宅カードを終えます。訪ねていない家は、ほかの人のカードに戻ります。よろしいですか？')) return;
+  if (focusCard === id) focusCard = null;
+  commit('留守宅カードを終えました', () => { c.endedAt = new Date().toISOString(); });
+}
+function openAwayCard(id) {
+  const c = D().awayCards.find(x => x.id === id); if (!c) return;
+  focusCard = id; roundTerr = null; firstMapShow = false;
+  $('#terrJump').value = c.terrId;
+  showView('map'); renderTerrs();
+  const pts = c.keys.map(k => houseById(parseKey(k)[0])).filter(Boolean).map(h => [h.lat, h.lng]);
+  setTimeout(() => {
+    if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [70, 70], maxZoom: 18 }); else fitTerr(c.terrId);
+    renderHouses();
+  }, 60);
+}
+/* 地図の目立たせ方（留守宅カード／自分の区域カードを回るとき） */
+const visitedSince = (k, iso) => visitsOf(k).some(v => v.at >= iso);
+const FOCUS_RANK = ['hl', '', 'later', 'done', 'dim', 'refuse'];
+const todayIso = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); };
+/* 緑のチェックの基準：自分の区域なら受け取ってから、それ以外は今日 */
+function unitDoneSince(h) {
+  const t = terrById(h.terrId);
+  return t && t.holder === me().id && t.lentAt ? t.lentAt : todayIso();
+}
+const focusCls = st => (st ? ' ' + st : '');
+const doneMark = st => (st === 'done' ? '<u>✓</u>' : '');
+const PLAN_SIZE = 10;
+const roundMode = () => me().roundMode || 'reco';
+
+/* 家（部屋）ごとの「今訪ねる価値」と理由 */
+function scoreTarget(k, cur) {
+  const vs = visitsOf(k), reasons = [];
+  let sc = 10;
+  const metS = new Set(), awayS = new Set();
+  vs.forEach(v => {
+    const s = slotOf(new Date(v.at));
+    if (v.result === 'met') metS.add(s); else if (v.result === 'away') awayS.add(s);
+  });
+  const m = vs.find(v => v.result === 'met');
+  if (!vs.length) { sc += 15; reasons.push('はじめて訪ねる家'); }
+  if (m && m.interest === '関心あり') { sc += 40; reasons.push('関心あり'); }
+  else if (m && m.interest === '少しあり') { sc += 25; reasons.push('少し関心あり'); }
+  if (m && YOUNG.has(m.age)) { sc += 10; reasons.push(`${m.age}の方`); }
+  if (metS.has(cur)) { sc += 15; reasons.push('この時間に会えたことがある'); }
+  else if (awayS.has(cur)) { sc -= 30; reasons.push('この時間は留守だった'); }
+  else if (vs.length && !m) {
+    sc += 30;
+    reasons.push(`留守${awayS.size ? vs.filter(v => v.result === 'away').length + '回' : ''}・この時間はまだ訪ねていない`);
+  }
+  return { sc, reasons };
+}
+
+/* 自分の区域カード：受け取ってからの状況 */
+function roundInfo(tid, anyHolder) {
+  const t = terrById(tid);
+  if (!t || !t.holder || (!anyHolder && t.holder !== me().id)) return null;
+  const since = t.lentAt || '', cur = slotOf(new Date());
+  const map = new Map(), items = [], c = { todo: 0, done: 0 };
+  for (const h of D().houses) {
+    if (h.terrId !== tid) continue;
+    for (const u of targets(h)) {
+      const k = K(h.id, u), f = fol(k);
+      let st;
+      if (D().dnc[k]) st = 'refuse';
+      else if (f && f.by !== t.holder) st = 'skip';
+      else if (since && visitedSince(k, since)) st = 'done';
+      else { st = 'todo'; items.push(Object.assign({ k, h, u }, scoreTarget(k, cur))); }
+      map.set(k, st);
+      if (st === 'todo' || st === 'done') c[st]++;
+    }
+  }
+  const total = c.todo + c.done;
+  return { t, cur, map, c, items, pct: total ? Math.round(c.done / total * 100) : 100 };
+}
+/* おすすめの回り方：点数の高い家から選び、近い順につなぐ（集合住宅は1か所にまとめる） */
+function roundPlan(r) {
+  const g = new Map();
+  r.items.forEach(x => {
+    const s = g.get(x.h.id) || { h: x.h, units: [], sc: -Infinity, reasons: [] };
+    s.units.push(x.u);
+    if (x.sc > s.sc) s.sc = x.sc;
+    x.reasons.forEach(y => { if (!s.reasons.includes(y)) s.reasons.push(y); });
+    g.set(x.h.id, s);
+  });
+  const pool = [...g.values()].filter(s => s.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, PLAN_SIZE);
+  const out = [];
+  let at = myPos || (pool[0] ? [pool[0].h.lat, pool[0].h.lng] : null);
+  while (pool.length) {
+    let bi = 0, bd = Infinity;
+    pool.forEach((s, i) => { const d = distM(at, [s.h.lat, s.h.lng]); if (d < bd) { bd = d; bi = i; } });
+    const s = pool.splice(bi, 1)[0];
+    s.dist = bd; out.push(s); at = [s.h.lat, s.h.lng];
+  }
+  return out;
+}
+const stopLabel = s => (s.h.type === 'apt' ? `${esc(s.h.label || '集合住宅')}（${s.units.length}部屋）` : esc(s.h.label || '家'));
+function roundHint(t) {
+  const r = roundInfo(t.id);
+  if (!r) return '';
+  if (!r.c.todo) return `<p class="hint-strong ok">すべての家に緑のチェックがつきました。返却のときに「回り終えました」を選んでください。</p>`;
+  const near = r.pct >= D().settings.donePct
+    ? `<p class="hint-strong ok">ほぼ回り終えました（${r.pct}%）。返却して完了にできます。</p>` : '';
+  const plan = roundPlan(r);
+  if (!plan.length) return near;
+  const intr = plan.filter(s => s.reasons.some(y => y.includes('関心'))).length;
+  return near + `<p class="hint-strong">今（${slotShort(r.cur)}）のおすすめ ${plan.length}か所${intr ? `（関心のある家 ${intr}か所）` : ''}。「地図をひらく」で番号順に回れます。</p>`;
+}
+/* 家ごとの表示を返す関数（目立たせていないときは null） */
+function focusFn() {
+  roundNums = null;
+  const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
+  if (focusCard && !c) focusCard = null;
+  if (c) {
+    const set = new Set(c.keys);
+    return k => (set.has(k) ? (visitedSince(k, c.at) ? 'done' : 'hl') : (D().dnc[k] ? 'refuse' : 'dim'));
+  }
+  const r = roundTerr ? roundInfo(roundTerr) : null;
+  if (roundTerr && !r) roundTerr = null;
+  if (!r) return null;
+  if (roundMode() === 'progress') {
+    return k => { const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? '' : s === 'refuse' ? 'refuse' : 'dim'; };
+  }
+  const plan = roundPlan(r);
+  roundNums = new Map(plan.map((s, i) => [s.h.id, i + 1]));
+  const inPlan = new Set();
+  plan.forEach(s => s.units.forEach(u => inPlan.add(K(s.h.id, u))));
+  return k => { const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? (inPlan.has(k) ? 'hl' : 'later') : s === 'refuse' ? 'refuse' : 'dim'; };
+}
+function openPlanSheet() {
+  const r = roundTerr ? roundInfo(roundTerr) : null; if (!r) return;
+  const plan = roundPlan(r);
+  setSheet(headHtml(r.t, 'おすすめの回り方', `今は${slotShort(r.cur)}　まだ訪ねていない家 ${r.c.todo}`) + `
+    <p class="hint">今の時間帯・関心・これまでの記録から${PLAN_SIZE}か所まで選び、近い順につないでいます。訪ねると一覧から外れ、次の家が加わります。</p>
+    <div class="row"><button class="btn small" id="planNear">${myPos ? '現在地を更新して並べ直す' : '現在地から並べ直す'}</button></div>
+    ${plan.length ? `<ol class="plan">${plan.map((s, i) => `<li>
+        <span class="numbadge">${i + 1}</span>
+        <div><b>${stopLabel(s)}</b><p class="muted">${s.reasons.slice(0, 3).join('・')}</p>
+          <p class="muted">${i === 0 ? (myPos ? `現在地から約${fmtDist(s.dist)}` : 'ここから始めます') : `前の家から約${fmtDist(s.dist)}`}</p></div>
+        <button class="btn small" data-plan="${s.h.id}">地図で見る</button></li>`).join('')}</ol>`
+      : '<div class="empty">今の時間帯のおすすめはありません。<br>「進み具合」に切りかえて、残りの家を回ってください。</div>'}
+    <button class="btn block" data-close>もどる</button>`);
+  $('#planNear').onclick = () => locate(openPlanSheet);
+  $$('[data-plan]', $('#sheet')).forEach(x => x.onclick = () => {
+    const h = houseById(x.dataset.plan);
+    closeSheet();
+    map.setView([h.lat, h.lng], 19);
+    setTimeout(() => (h.type === 'apt' ? openAptSeq(h.id) : openTarget(h.id, '', false)), 250);
+  });
+}
+function renderCardBar() {
+  const bar = $('#cardBar');
+  const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
+  const r = !c && roundTerr ? roundInfo(roundTerr) : null;
+  $('#legend').hidden = !!(c || r);
+  if (!c && !r) { bar.hidden = true; return; }
+  bar.hidden = false;
+  const key = (cls, mark, label) => `<span><i class="pin mini st-new${cls}">${mark}</i>${label}</span>`;
+  const closeBtn = `<button class="btn small" id="cardBarClose">ふつうの表示に戻す</button>`;
+  if (c) {
+    const t = terrById(c.terrId), p = cardProgress(c);
+    bar.classList.remove('mini');
+    bar.innerHTML = `<p><b>留守宅カード　区域${t ? t.no : '-'}</b>　${slotText(c.slot)}に訪ねてください</p>
+      <p class="keys">${key(' hl', '', `まだ訪ねていない家 ${p.total - p.done}`)}${key(' done', '<u>✓</u>', `訪ねた家 ${p.done}`)}</p>
+      ${p.total && p.done === p.total ? '<p class="okmsg"><b>すべて訪ねました。</b>「区域カード」画面で「終える」を押してください。</p>' : ''}
+      <div class="row">${closeBtn}</div>`;
+  } else {
+    const n = r.c, total = n.todo + n.done, pct = total ? Math.round(n.done / total * 100) : 0, mode = roundMode();
+    let body = '', extra = '';
+    if (!n.todo) {
+      body = `<p class="okmsg"><b>すべての家に緑のチェックがつきました。</b>区域を回り終えました。</p>`;
+      extra = `<button class="btn small primary" id="barReturn">返却する</button>`;
+    } else if (mode === 'progress') {
+      body = `<p class="keys">${key('', '', `まだ ${n.todo}`)}${key(' done', '<u>✓</u>', `済み ${n.done}`)}</p>
+        <p class="muted">緑のチェックが全部の家につくと完了です。</p>`;
+    } else {
+      const plan = roundPlan(r), first = plan[0];
+      const planUnits = plan.reduce((a, s) => a + s.units.length, 0);
+      body = (first
+          ? `<p class="next"><span class="numbadge">1</span> <b>${stopLabel(first)}</b>　${first.reasons.slice(0, 2).join('・')}</p>`
+          : '<p class="muted">今の時間帯のおすすめはありません。「進み具合」で残りの家を確認してください。</p>') +
+        `<p class="keys"><span><span class="numbadge sm">1</span>おすすめ ${plan.length}か所</span>${key(' later', '', `ほかの家 ${n.todo - planUnits}`)}${key(' done', '<u>✓</u>', `済み ${n.done}`)}</p>`;
+      if (first) extra = `<button class="btn small primary" id="barList">おすすめ順の一覧</button>`;
+    }
+    if (n.todo && r.pct >= D().settings.donePct) {
+      body = `<p class="okmsg"><b>ほぼ回り終えました（${pct}%）。</b>返却して完了にできます。残りの家は、次に回る人のおすすめに出ます。</p>` + body;
+      extra = `<button class="btn small primary" id="barReturn">返却する</button>` + extra.replace(' primary', '');
+    }
+    bar.classList.toggle('mini', barMini);
+    bar.innerHTML = `<div class="barhead"><p><b>区域${r.t.no}を回っています</b>　今は${slotShort(r.cur)}</p>
+        <button class="foldbtn" id="barFold" aria-expanded="${!barMini}">${barMini ? 'ひらく' : 'たたむ'}</button></div>
+      <div class="progress big" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${pct}%"></i></div>
+      <p class="muted">訪ねた家 ${n.done} / ${total}（${pct}%）</p>
+      <div class="fold">
+        <div class="seg" role="group" aria-label="表示の切りかえ">
+          <button data-rmode="reco" aria-pressed="${mode === 'reco'}">おすすめ順</button>
+          <button data-rmode="progress" aria-pressed="${mode === 'progress'}">進み具合</button>
+        </div>
+        ${body}
+        <div class="row">${extra}${closeBtn}</div>
+      </div>`;
+    $('#barFold').onclick = () => { barMini = !barMini; renderCardBar(); };
+    $$('[data-rmode]', bar).forEach(x => x.onclick = () => { me().roundMode = x.dataset.rmode; Store.save(); renderHouses(); });
+    if ($('#barList')) $('#barList').onclick = openPlanSheet;
+    if ($('#barReturn')) $('#barReturn').onclick = () => openReturnSheet(r.t.id);
+  }
+  $('#cardBarClose').onclick = () => { focusCard = null; roundTerr = null; renderHouses(); };
+}
+function awayCardHtml(c) {
+  const t = terrById(c.terrId), p = cardProgress(c);
+  const pct = p.total ? Math.round(p.done / p.total * 100) : 0;
+  const left = Math.max(0, Math.ceil((Date.parse(c.expiresAt) - Date.now()) / DAY));
+  return `<article class="tcard away">
+    <span class="stamp away"><small>留守宅</small>${t ? t.no : '-'}</span>
+    <div><h3>${slotText(c.slot)}</h3><p class="muted">区域${t ? t.no : '-'}　${t ? esc(t.name) : ''}</p>
+      <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪ねた割合"><i style="width:${pct}%"></i></div>
+      <p class="muted">訪ねた家 ${p.done} / ${p.total}　あと${left}日で自動的に終わります</p>
+      ${p.total && p.done === p.total ? '<p><b>すべて訪ねました。「終える」を押してください。</b></p>' : ''}</div>
+    <div class="actions"><button class="btn primary" data-awayopen="${c.id}">地図をひらく</button><button class="btn" data-awayend="${c.id}">終える</button></div>
+  </article>`;
+}
+function renderMyAwayCards() {
+  const mine = activeCards().filter(c => c.by === me().id);
+  $('#myAway').innerHTML = mine.length ? `<h2 class="sec">留守宅カード</h2>` + mine.map(awayCardHtml).join('') : '';
+}
+function renderAwaySuggest() {
+  const u = me(), reg = !!(u.slots && u.slots.length), cur = slotOf(new Date());
+  const slots = reg ? u.slots.slice().sort(bySlot) : [cur];
+  const st = D().settings, mine = activeCards().filter(c => c.by === u.id).length, full = mine >= st.awayMax;
+  $('#slotEdit').textContent = reg ? '行ける時間を変える' : '行ける時間を登録する';
+  $('#awayHint').innerHTML = (reg
+      ? `あなたの行ける時間（${slots.map(slotShort).join('、')}）に合うカードです。`
+      : `今の時間帯（${slotShort(cur)}）に合うカードです。`) +
+    `受け取ると${st.awayDays}日間使えます。返却はいりません。` +
+    (mine ? `<br><b>受け取り中 ${mine}枚</b>（${st.awayMax}枚まで）。「区域カード」画面にあります。` : '');
+  const list = awaySuggestions(u.id, slots).slice(0, 10);
+  $('#awayList').innerHTML = list.length ? list.map(x => `<article class="ritem k-away"><div>
+      <p class="rt"><span class="stamp xs">${x.t.no}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}</p>
+      <p class="muted">まだ会えていない家 ${x.keys.length}軒${x.dist != null ? `　ここから約${fmtDist(x.dist)}` : ''}${x.t.holder ? '　あなたの区域' : ''}</p>
+    </div><button class="btn small primary" data-awaytake="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`).join('') +
+    (full ? `<p class="hint">持てる枚数に達しています。受け取り中のカードを終えると、受け取れます。</p>` : '')
+    : `<div class="empty">今、合う留守宅カードはありません。${reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`;
+}
+function openSlotSheet() {
+  const sel = new Set(me().slots || []);
+  const paint = () => {
+    setSheet(headHtml(null, '行ける時間', '') + `
+      <p class="hint">よく奉仕に行ける時間をタップしてください（いくつでも選べます）。</p>
+      <table class="slotpick"><tr><th></th>${BANDS.map(b => `<th>${b}<br><small>${BAND_HINT[b]}</small></th>`).join('')}</tr>
+      ${['平日', '土日'].map(dt => `<tr><th>${dt}</th>${BANDS.map(b => {
+        const s = dt + '・' + b;
+        return `<td><button class="slotbtn" data-s="${s}" aria-pressed="${sel.has(s)}" aria-label="${dt}の${b}">${sel.has(s) ? '✓' : ''}</button></td>`;
+      }).join('')}</tr>`).join('')}</table>
+      <button class="btn primary block" id="slotSave">保存する</button>
+      <button class="btn block" data-close>もどる</button>`);
+    $$('[data-s]', $('#sheet')).forEach(x => x.onclick = () => {
+      const s = x.dataset.s; if (sel.has(s)) sel.delete(s); else sel.add(s); paint();
+    });
+    $('#slotSave').onclick = () => {
+      me().slots = [...sel].sort(bySlot);
+      Store.save(); closeSheet(); renderAll();
+      toast(sel.size ? '行ける時間を保存しました' : '行ける時間を空にしました（今の時間帯で探します）');
+    };
+  };
+  paint();
+}
+
+/* 係：留守宅の状況 */
+function renderAwayAdmin() {
+  const st = D().settings, idx = unmetIndex(), act = activeCards();
+  const step = (key, label, unit, d) => `<div class="setrow"><span>${label}</span><div class="stepper">
+    <button type="button" data-aset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${st[key]}${unit}</output>
+    <button type="button" data-aset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div></div>`;
+  $('#adAwaySet').innerHTML = step('awayDays', '留守宅カードが自動で終わるまで', '日', 1) + step('awayMax', '1人が同時に持てる留守宅カード', '枚まで', 1);
+
+  const all = [...idx.values()].flat();
+  const cnt = {};
+  all.forEach(x => { if (!x.hard) SLOTS.forEach(s => { if (!x.tried.has(s)) cnt[s] = (cnt[s] || 0) + 1; }); });
+  const maxN = Math.max(0, ...Object.values(cnt));
+  $('#adAwaySlots').innerHTML = `<tr><th></th>${BANDS.map(b => `<th>${b}<br><small>${BAND_HINT[b]}</small></th>`).join('')}</tr>` +
+    ['平日', '土日'].map(dt => `<tr><th>${dt}</th>${BANDS.map(b => {
+      const n = cnt[dt + '・' + b] || 0;
+      return `<td class="${n && n === maxN ? 'thin' : ''}"><b>${n}</b>軒</td>`;
+    }).join('')}</tr>`).join('');
+
+  const rows = D().territories.slice().sort((a, b) => a.no - b.no).map(t => {
+    const items = idx.get(t.id) || [];
+    if (!items.length) return '';
+    const avg = (items.reduce((s, x) => s + x.tried.size, 0) / items.length).toFixed(1);
+    const using = act.filter(c => c.terrId === t.id).length;
+    return `<tr><th>区域${t.no}</th><td>${items.length}軒</td><td>${avg} / ${SLOTS.length}</td><td>${using ? `${using}枚` : '—'}</td>
+      <td>${t.holder ? `${esc(uname(t.holder))}さん` : (t.completedAt ? 'だれでも' : '<span class="muted">回り終えた記録なし</span>')}</td></tr>`;
+  }).join('');
+  $('#adAwayTerrs').innerHTML = rows
+    ? `<table class="slots narrow"><tr><th>区域</th><th>会えていない家</th><th>試した時間帯（平均）</th><th>使用中のカード</th><th>留守宅カードを使える人</th></tr>${rows}</table>`
+    : '<p class="muted">会えていない家はありません。</p>';
+
+  const hard = all.filter(x => x.hard);
+  $('#adHard').innerHTML = hard.length ? hard.slice(0, 30).map(x => {
+    const t = terrById(x.h.terrId);
+    return `<article class="ritem k-new"><div>
+      <p class="rt"><span class="stamp xs">${t ? t.no : '-'}</span> ${targetName(x.h, x.u)}</p>
+      <p class="muted">留守 ${visitsOf(x.k).length}回　すべての時間帯で会えていません</p>
+    </div><button class="btn small" data-go="${x.h.id}" data-unit="${esc(x.u)}">地図で見る</button></article>`;
+  }).join('') + (hard.length > 30 ? `<p class="muted">ほか ${hard.length - 30}件</p>` : '')
+    : '<div class="empty">今はありません。</div>';
+}
+
+/* ---------- おすすめ画面 ---------- */
+let recoFilter = 'all';
+const RECO_KINDS = [
+  ['all', 'すべて'], ['handoff', '引き継ぎを待っている家'], ['interest', '関心のある家'], ['young', '若い世代']
+];
+function computeReco() {
+  const now = new Date(), slot = slotOf(now), onlyMine = $('#recoMine').checked;
+  const items = [];
+  for (const h of D().houses) {
+    const t = terrById(h.terrId); if (!t) continue;
+    const othersTerr = onlyMine && t.holder && t.holder !== me().id;
+    for (const unit of targets(h)) {
+      const k = K(h.id, unit);
+      if (D().dnc[k] || D().follows[k]) continue; // 受け持ち中の家は出さない
+      const rel = D().released[k];
+      if (othersTerr && !rel) continue;            // 引き継ぎ待ちはだれにでも見せる
+      const vs = visitsOf(k), last = vs[0];
+      const idle = last ? Math.floor((now - Date.parse(last.at)) / DAY) : Infinity;
+      const met = vs.find(v => v.result === 'met'); // いちばん新しい「会えた」
+      let kind = null, reason = '', score = 0;
+      if (rel) {
+        const bs = bestSlot(k);
+        kind = 'handoff'; score = 100;
+        reason = '再訪問の引き継ぎを待っています' + (met && met.interest ? `（${met.interest}・${met.age || ''}）` : '') + (bs ? `。会えた時間帯：${bs}` : '');
+      }
+      if (!kind && met) {
+        if ((met.interest === '関心あり' || met.interest === '少しあり') && idle >= 30) {
+          kind = 'interest'; score = 90; reason = `${met.interest}・${met.age}（${idle}日間 訪問なし）`;
+        } else if (YOUNG.has(met.age) && idle >= 60) {
+          kind = 'young'; score = 60; reason = `${met.age}の方に会えた家（${idle}日間 訪問なし）`;
+        }
+      }
+      if (kind) items.push({ h, unit, t, kind, reason, score, dist: myPos ? distM(myPos, [h.lat, h.lng]) : null });
+    }
+  }
+  return { items, slot, band: bandOf(now) };
+}
+function renderReco() {
+  renderAwaySuggest();
+  const { items, slot, band } = computeReco();
+  $('#recoNow').textContent = `今は「${slot}」（${BAND_HINT[band]}）です。${myPos ? '現在地から近い順に並べています。' : ''}`;
+  const count = k => k === 'all' ? items.length : items.filter(i => i.kind === k).length;
+  $('#recoChips').innerHTML = RECO_KINDS.map(([k, l]) => `<button class="chip" data-kind="${k}" aria-pressed="${recoFilter === k}">${l}（${count(k)}）</button>`).join('');
+  let list = recoFilter === 'all' ? items : items.filter(i => i.kind === recoFilter);
+  list.sort(myPos ? (a, b) => a.dist - b.dist : (a, b) => b.score - a.score || a.t.no - b.t.no);
+  const MAX = 40, more = list.length - MAX;
+  list = list.slice(0, MAX);
+  $('#recoList').innerHTML = list.length ? list.map(i => {
+    const name = i.h.type === 'apt' ? `${esc(i.h.label || '集合住宅')} ${esc(i.unit)}号室` : esc(i.h.label || '家');
+    return `<article class="ritem k-${i.kind}"><div>
+        <p class="rt"><span class="stamp xs">${i.t.no}</span> ${name}</p>
+        <p class="muted">${esc(i.reason)}</p>
+        ${i.dist != null ? `<p class="muted">ここから約 ${fmtDist(i.dist)}</p>` : ''}
+      </div><button class="btn small primary" data-go="${i.h.id}" data-unit="${esc(i.unit)}">地図で見る</button></article>`;
+  }).join('') + (more > 0 ? `<p class="muted">ほか ${more}件。上の分類で絞りこめます。</p>` : '')
+    : '<div class="empty">今の条件に合う家はありません。</div>';
+}
+function goTo(hid, unit) {
+  const h = houseById(hid); if (!h) return;
+  showView('map');
+  setTimeout(() => {
+    map.setView([h.lat, h.lng], 19);
+    if (h.type === 'apt' && h.units.length) openAptSeq(hid, unit || null);
+    else if (h.type === 'apt') openBuilding(hid);
+    else openTarget(hid, '', false);
+  }, 80);
+}
+function locate(after) {
+  if (!navigator.geolocation) { toast('この端末では現在地を使えません'); return; }
+  toast('現在地を調べています…');
+  navigator.geolocation.getCurrentPosition(p => {
+    myPos = [p.coords.latitude, p.coords.longitude];
+    if (map) {
+      if (posMarker) map.removeLayer(posMarker);
+      posMarker = L.circleMarker(myPos, { radius: 10, color: '#fff', weight: 3, fillColor: '#1565C0', fillOpacity: 1, interactive: false }).addTo(map);
+    }
+    after && after();
+    toast('現在地がわかりました');
+  }, () => toast('現在地を取得できませんでした。端末の位置情報の設定を確認してください'), { enableHighAccuracy: true, timeout: 10000 });
+}
+
+/* ---------- 係の画面 ---------- */
+function renderAdmin() {
+  renderInbox();
+  renderAwayAdmin();
+  renderFollowAdmin();
+  const now = Date.now();
+  const ts = D().territories.slice().sort((a, b) => a.no - b.no);
+  let targetsN = 0, met90 = 0;
+  const stats = new Map();
+  ts.forEach(t => { const s = terrStats(t, now - 90 * DAY); stats.set(t.id, s); targetsN += s.n; met90 += s.met; });
+  const outside = D().houses.filter(h => !h.terrId).length;
+  const lent = ts.filter(t => t.holder).length;
+  const over = ts.filter(t => t.holder && t.lentAt && daysSince(t.lentAt) > 120).length;
+  const dncN = Object.keys(D().dnc).length;
+  $('#adTiles').innerHTML = `
+    <div class="tile"><b>${ts.length}</b>区域（貸出中 ${lent}）</div>
+    <div class="tile${over ? ' alert' : ''}"><b>${over}</b>4か月をこえた貸出</div>
+    <div class="tile"><b>${targetsN}</b>家・部屋${outside ? `（区域外 ${outside}）` : ''}</div>
+    <div class="tile"><b>${targetsN ? Math.round(met90 / targetsN * 100) : 0}%</b>この90日で会えた家・部屋</div>
+    <div class="tile"><b>${dncN}</b>拒否の家・部屋</div>`;
+
+  // 時間帯ごとの会えた割合
+  const cell = {};
+  for (const v of D().visits) {
+    if (now - Date.parse(v.at) > 180 * DAY) continue;
+    const d = new Date(v.at), key = dayTypeOf(d) + bandOf(d);
+    cell[key] = cell[key] || { n: 0, m: 0 };
+    cell[key].n++; if (v.result === 'met') cell[key].m++;
+  }
+  let best = null, bestP = -1;
+  for (const [k, c] of Object.entries(cell)) { if (c.n >= 10 && c.m / c.n > bestP) { bestP = c.m / c.n; best = k; } }
+  $('#adSlots').innerHTML = `<tr><th></th>${BANDS.map(b => `<th>${b}<br><small>${BAND_HINT[b]}</small></th>`).join('')}</tr>` +
+    ['平日', '土日'].map(dt => `<tr><th>${dt}</th>${BANDS.map(b => {
+      const c = cell[dt + b];
+      if (!c) return '<td class="muted">記録なし</td>';
+      const p = Math.round(c.m / c.n * 100);
+      return `<td class="${best === dt + b ? 'best' : ''}"><b>${p}%</b><br><small>${c.n}件</small><div class="bar"><i style="width:${p}%"></i></div></td>`;
+    }).join('')}</tr>`).join('');
+
+  // 区域一覧
+  const userOpts = sel => `<option value="">（だれも持っていない）</option>` +
+    D().users.map(u => `<option value="${u.id}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
+  $('#adTerrs').innerHTML = ts.map(t => {
+    const s = stats.get(t.id), d = t.lentAt ? daysSince(t.lentAt) : 0;
+    return `<article class="trow"><span class="stamp sm">${t.no}</span>
+      <div><b>${esc(t.name)}</b><div class="meta">
+        <span>家・部屋 ${s.n}</span><span>90日以内に訪問 ${s.visited}</span>
+        <span>前回回り終えた日 ${t.completedAt ? fmtDay(t.completedAt) + (t.completedPct != null && t.completedPct < 100 ? `（${t.completedPct}%）` : '') : '記録なし'}</span>
+        <span>最終記録 ${s.last ? fmtDate(s.last) : 'なし'}</span>
+        ${t.holder ? `<span class="${d > 120 ? 'tag-warn' : ''}">貸出 ${d}日${d > 120 ? '（4か月超）' : ''}</span>` : ''}
+      </div></div>
+      <div class="actions">
+        <label>担当 <select data-holder="${t.id}">${userOpts(t.holder)}</select></label>
+        <button class="btn small" data-open="${t.id}">地図</button>
+        <button class="btn small" data-redraw="${t.id}">線を引き直す</button>
+        <button class="btn small" data-rename="${t.id}">番号・名前</button>
+        <label class="check"><input type="checkbox" data-free="${t.id}"${t.free ? ' checked' : ''}>自由に受け取ってよい</label>
+      </div></article>`;
+  }).join('');
+}
+/* 取り残し：関心があるのに受け持ちがなく、しばらく訪問がない家（引き継ぎ待ちを先に） */
+function leftItems() {
+  const s = D().settings, out = [];
+  for (const h of D().houses) {
+    for (const unit of targets(h)) {
+      const k = K(h.id, unit);
+      if (D().follows[k] || D().dnc[k]) continue;
+      const m = lastInterest(k); if (!m) continue;
+      const idle = daysSince(visitsOf(k)[0].at), rel = D().released[k];
+      if (!rel && idle < s.remindDays) continue;
+      out.push({ k, h, unit, m, idle, rel });
+    }
+  }
+  return out.sort((a, b) => (b.rel ? 1 : 0) - (a.rel ? 1 : 0) || b.idle - a.idle);
+}
+function renderFollowAdmin() {
+  const s = D().settings;
+  const entries = Object.entries(D().follows).filter(([k]) => houseById(parseKey(k)[0]));
+  const check = entries.filter(([, f]) => followStage(f) === 2).sort((a, b) => followIdle(b[1]) - followIdle(a[1]));
+  const left = leftItems();
+  $('#adFollowTiles').innerHTML = `
+    <div class="tile"><b>${entries.length}</b>受け持ち中の再訪問</div>
+    <div class="tile${check.length ? ' alert' : ''}"><b>${check.length}</b>確認が必要な受け持ち</div>
+    <div class="tile${left.length ? ' alert' : ''}"><b>${left.length}</b>取り残し（受け持ちなし）</div>`;
+
+  const wk = d => `${d / 7}週間`;
+  const stepper = (key, label) => `<div class="setrow"><span>${label}</span><div class="stepper">
+      <button type="button" data-set="${key}" data-d="-7" aria-label="${label}を短くする">−</button><output class="wide">${wk(s[key])}</output>
+      <button type="button" data-set="${key}" data-d="7" aria-label="${label}を長くする">＋</button></div></div>`;
+  $('#adFollowSet').innerHTML = stepper('remindDays', '「しばらく訪問なし」として本人に知らせるまで') +
+    stepper('escalateDays', '「確認が必要」として係に知らせるまで');
+
+  const by = {};
+  entries.forEach(([, f]) => {
+    const o = by[f.by] = by[f.by] || { n: 0, s1: 0, s2: 0 };
+    o.n++; const g = followStage(f); if (g === 1) o.s1++; if (g === 2) o.s2++;
+  });
+  const ids = Object.keys(by);
+  $('#adFollowUsers').innerHTML = ids.length
+    ? `<table class="slots narrow"><tr><th>名前</th><th>受け持ち</th><th>しばらく訪問なし</th><th>確認が必要</th></tr>${ids.map(id =>
+        `<tr><th>${esc(uname(id))}</th><td>${by[id].n}</td><td>${by[id].s1}</td><td class="${by[id].s2 ? 'warncell' : ''}">${by[id].s2}</td></tr>`).join('')}</table>`
+    : '<p class="muted">受け持ちはまだありません。</p>';
+
+  $('#adFollowCheck').innerHTML = check.length ? check.map(([k, f]) => followItem(k, f, 'admin')).join('')
+    : '<div class="empty">確認が必要な受け持ちはありません。</div>';
+
+  $('#adLeft').innerHTML = left.length ? left.slice(0, 30).map(i => {
+    const t = terrById(i.h.terrId), bs = bestSlot(i.k);
+    return `<article class="ritem ${i.rel ? 'k-handoff' : 'k-interest'}"><div>
+      <p class="rt"><span class="stamp xs">${t ? t.no : '-'}</span> ${targetName(i.h, i.unit)}</p>
+      <p class="muted">${i.rel ? '<b>引き継ぎ待ち</b>　' : ''}${esc(i.m.interest)}・${esc(i.m.age || '')}　最後の記録から ${i.idle}日${bs ? `　会えた時間帯：${bs}` : ''}</p>
+    </div><button class="btn small" data-go="${i.h.id}" data-unit="${esc(i.unit)}">地図で見る</button>
+    <div class="actions span"><label>受け持つ人 <select data-assign="${esc(i.k)}">${userOptions('', '選んでください')}</select></label></div></article>`;
+  }).join('') + (left.length > 30 ? `<p class="muted">ほか ${left.length - 30}件</p>` : '')
+    : '<div class="empty">取り残されている家はありません。</div>';
+
+  $('#adBulk').innerHTML = `
+    <label>だれから <select id="bkFrom"><option value="">選んでください</option>${ids.map(id => `<option value="${id}">${esc(uname(id))}（${by[id].n}件）</option>`).join('')}</select></label>
+    <label>だれへ <select id="bkTo">${userOptions('', '引き継ぎ待ちにする')}</select></label>
+    <button class="btn" id="bkGo">まとめて移す</button>`;
+}
+function changeSetting(key, d) {
+  const s = D().settings;
+  if (key === 'remindDays') {
+    s.remindDays = Math.min(84, Math.max(7, s.remindDays + d));
+    if (s.escalateDays < s.remindDays + 7) s.escalateDays = s.remindDays + 7;
+  } else {
+    s.escalateDays = Math.min(140, Math.max(s.remindDays + 7, s.escalateDays + d));
+  }
+  Store.save(); renderAll(); toast('日数を変えました');
+}
+function bulkMove() {
+  const from = $('#bkFrom').value, to = $('#bkTo').value;
+  if (!from) { toast('「だれから」を選んでください'); return; }
+  if (from === to) { toast('同じ人は選べません'); return; }
+  const keys = Object.keys(D().follows).filter(k => D().follows[k].by === from);
+  const toLabel = to ? `${uname(to)}さん` : '引き継ぎ待ち';
+  if (!confirm(`${uname(from)}さんの受け持ち ${keys.length}件を「${toLabel}」に移します。よろしいですか？`)) return;
+  commit(`${keys.length}件を${toLabel}に移しました`, () => {
+    keys.forEach(k => { if (to) startFollow(k, to); else releaseFollow(k, 'handoff'); });
+  });
+}
+function exportCsv() {
+  const rows = [['区域番号', '家ID', '種類', '部屋', '結果', '年齢層', '関心', '日時', '曜日区分', '時間帯']];
+  for (const v of D().visits) {
+    const h = houseById(v.houseId), t = h && terrById(h.terrId), d = new Date(v.at);
+    rows.push([t ? t.no : '', v.houseId, h ? (h.type === 'apt' ? '集合住宅' : '一戸建て') : '', v.unit || '',
+      RESULT_LABEL[v.result], v.age || '', v.interest || '',
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
+      dayTypeOf(d), bandOf(d)]);
+  }
+  const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  const n = new Date();
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `訪問記録_${n.getFullYear()}${pad(n.getMonth() + 1)}${pad(n.getDate())}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+/* ---------- 画面の切りかえ ---------- */
+let currentView = 'cards';
+function showView(name) {
+  if (name === 'admin' && !isAdmin()) name = 'cards';
+  if (currentView === 'map' && name !== 'map' && mode !== 'normal') { if (draw) endDraw(); else setMode('normal'); }
+  currentView = name;
+  $$('.view').forEach(v => { v.hidden = v.id !== 'view-' + name; });
+  $$('#tabs button').forEach(b => { if (b.dataset.view === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  if (name === 'map') {
+    setTimeout(() => {
+      map.invalidateSize();
+      if (firstMapShow) { firstMapShow = false; if (!$('#terrJump').value) fitAll(); }
+      renderHouses();
+    }, 30);
+  }
+  if (name === 'reco') renderReco();
+}
+function updateTabs() {
+  $('#tabAdmin').hidden = !isAdmin();
+  $('#tabs').classList.toggle('three', !isAdmin());
+}
+function fillWho() {
+  $('#whoSel').innerHTML = D().users.map(u => `<option value="${u.id}"${u.id === D().currentUser ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
+}
+function renderAll() {
+  buildIndex();
+  renderCards();
+  fillTerrJump();
+  if (map) { renderTerrs(); renderHouses(); }
+  if (currentView === 'reco') renderReco();
+  if (isAdmin()) renderAdmin();
+}
+function openTerr(id) {
+  const t = terrById(id);
+  focusCard = null;
+  roundTerr = t && t.holder === me().id ? id : null; // 自分の区域なら「回る表示」にする
+  $('#terrJump').value = id;
+  firstMapShow = false;
+  showView('map');
+  renderTerrs();
+  setTimeout(() => fitTerr(id), 60);
+}
+
+/* ---------- ボタンの動き ---------- */
+function bindStatic() {
+  $$('#tabs button').forEach(b => b.onclick = () => showView(b.dataset.view));
+  $('#whoSel').onchange = e => {
+    D().currentUser = e.target.value; Store.save();
+    updateTabs(); renderAll();
+    if (currentView === 'admin' && !isAdmin()) showView('cards');
+  };
+  $('#backdrop').onclick = closeSheet;
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!$('#sheet').hidden) closeSheet();
+    else if (draw) endDraw();
+    else if (mode !== 'normal') setMode('normal');
+  });
+
+  // 区域カード・自分の再訪問
+  $('#view-cards').addEventListener('click', e => {
+    const q = sel => e.target.closest(sel);
+    let x;
+    if ((x = q('[data-open]'))) openTerr(x.dataset.open);
+    else if ((x = q('[data-go]'))) goTo(x.dataset.go, x.dataset.unit);
+    else if ((x = q('[data-fact]'))) followAction(x.dataset.fact, x.dataset.key);
+    else if ((x = q('[data-scroll]'))) $('#' + x.dataset.scroll).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else if (q('[data-reqopen]')) openRequestSheet();
+    else if ((x = q('[data-reqcancel]'))) {
+      const id = x.dataset.reqcancel;
+      if (!confirm('申し込みを取り消します。よろしいですか？')) return;
+      commit('申し込みを取り消しました', () => { D().requests = D().requests.filter(r => r.id !== id); });
+    }
+    else if ((x = q('[data-reqseen]'))) {
+      const r = D().requests.find(r => r.id === x.dataset.reqseen);
+      if (r) { r.seen = true; Store.save(); renderAll(); }
+    }
+    else if ((x = q('[data-return]'))) openReturnSheet(x.dataset.return);
+    else if ((x = q('[data-awayopen]'))) openAwayCard(x.dataset.awayopen);
+    else if ((x = q('[data-awayend]'))) endAwayCard(x.dataset.awayend);
+  });
+
+  // 地図
+  $('#terrJump').onchange = e => {
+    const v = e.target.value, t = terrById(v);
+    focusCard = null;
+    roundTerr = t && t.holder === me().id ? v : null;
+    renderTerrs(); renderHouses();
+    if (v) fitTerr(v);
+  };
+  $('#btnAdd').onclick = () => { setMode('add'); if (map.getZoom() < 17) toast('場所がわかるまで地図を拡大してからタップしてください'); };
+  $('#addCancel').onclick = () => { closeSheet(); setMode('normal'); };
+  $('#btnLocate').onclick = () => locate(() => map.setView(myPos, 18));
+  $('#btnBase').onclick = () => {
+    map.removeLayer(baseLayers[baseName]);
+    baseName = baseName === 'pale' ? 'photo' : 'pale';
+    baseLayers[baseName].addTo(map);
+    $('#btnBase').textContent = baseName === 'pale' ? '写真' : '地図';
+  };
+  $('#drawUndo').onclick = () => { draw.points.pop(); redrawDraw(); };
+  $('#drawDone').onclick = finishDraw;
+  $('#drawCancel').onclick = () => { closeSheet(); endDraw(); };
+  $('#ovFile').onchange = e => {
+    const file = e.target.files[0]; if (!file) return;
+    const img = $('#overlayImg');
+    if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+    const url = URL.createObjectURL(file);
+    img.src = url; img.dataset.url = url; img.hidden = false;
+    $('#ovCtl').hidden = false;
+    $('#map').classList.add('see-through');
+    applyOv();
+    toast('地図を動かして、写真の道と重なる位置に合わせてください');
+    e.target.value = '';
+  };
+  $('#ovRange').oninput = applyOv;
+  $('#ovClear').onclick = clearOverlay;
+
+  // おすすめ
+  $('#recoChips').addEventListener('click', e => { const c = e.target.closest('[data-kind]'); if (c) { recoFilter = c.dataset.kind; renderReco(); } });
+  $('#recoMine').onchange = renderReco;
+  $('#recoLocate').onclick = () => locate(renderReco);
+  $('#slotEdit').onclick = openSlotSheet;
+  $('#awayList').addEventListener('click', e => {
+    const x = e.target.closest('[data-awaytake]');
+    if (x && !x.disabled) takeAwayCard(x.dataset.awaytake, x.dataset.slot);
+  });
+  $('#recoList').addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) goTo(g.dataset.go, g.dataset.unit); });
+
+  // 係の画面
+  $('#adNewTerr').onclick = () => startDraw(null);
+  $('#adCsv').onclick = exportCsv;
+  $('#adReset').onclick = () => {
+    if (!confirm('この端末の試作データを最初の状態に戻します。よろしいですか？')) return;
+    const cu = D().currentUser;
+    Store.data = makeDemo(); Store.data.currentUser = cu; Store.save();
+    fillWho(); updateTabs(); renderAll(); toast('試作データに戻しました');
+  };
+  $('#view-admin').addEventListener('click', e => {
+    const q = sel => e.target.closest(sel);
+    let x;
+    if ((x = q('[data-open]'))) openTerr(x.dataset.open);
+    else if ((x = q('[data-redraw]'))) startDraw(x.dataset.redraw);
+    else if ((x = q('[data-rename]'))) openTerrForm({ terr: terrById(x.dataset.rename) });
+    else if ((x = q('[data-go]'))) goTo(x.dataset.go, x.dataset.unit);
+    else if ((x = q('[data-fact]'))) followAction(x.dataset.fact, x.dataset.key);
+    else if ((x = q('[data-set]'))) changeSetting(x.dataset.set, Number(x.dataset.d));
+    else if (q('#bkGo')) bulkMove();
+    else if ((x = q('[data-donepct]'))) {
+      const st = D().settings;
+      st.donePct = Math.min(100, Math.max(50, st.donePct + Number(x.dataset.donepct)));
+      Store.save(); renderAll(); toast('完了の目安を変えました');
+    }
+    else if ((x = q('[data-aset]'))) {
+      const st = D().settings, key = x.dataset.aset;
+      const lim = key === 'awayDays' ? [3, 14] : [1, 5];
+      st[key] = Math.min(lim[1], Math.max(lim[0], st[key] + Number(x.dataset.d)));
+      Store.save(); renderAll(); toast('設定を変えました');
+    }
+    else if ((x = q('[data-reqok]'))) approveReq(x.dataset.reqok);
+    else if ((x = q('[data-reqno]'))) declineReq(x.dataset.reqno);
+    else if ((x = q('[data-takenseen]'))) { const t = terrById(x.dataset.takenseen); if (t) { t.selfSeen = true; Store.save(); renderAll(); } }
+    else if ((x = q('[data-takemax]'))) {
+      const st = D().settings;
+      st.selfTakeMax = Math.min(5, Math.max(1, st.selfTakeMax + Number(x.dataset.takemax)));
+      Store.save(); renderAll(); toast('枚数を変えました');
+    }
+  });
+  $('#view-admin').addEventListener('change', e => {
+    const s = e.target, k = s.dataset.assign || s.dataset.reassign;
+    if (!k || !s.value) return;
+    const cur = fol(k);
+    if (cur && cur.by === s.value) return;
+    const v = s.value;
+    commit(`${uname(v)}さんが再訪問を受け持ちます`, () => startFollow(k, v));
+  });
+  $('#adTerrs').addEventListener('change', e => {
+    const fr = e.target.closest('[data-free]');
+    if (fr) {
+      const t = terrById(fr.dataset.free);
+      t.free = fr.checked; Store.save(); renderAll();
+      toast(t.free ? `区域${t.no}を自由に受け取れるようにしました` : `区域${t.no}は係が決める区域にしました`);
+      return;
+    }
+    const s = e.target.closest('[data-holder]'); if (!s) return;
+    const t = terrById(s.dataset.holder), val = s.value;
+    if (!val) { renderAll(); openReturnSheet(t.id); return; } // 返却は「全部回ったか」を確認する
+    commit(`区域${t.no}を${uname(val)}さんに貸し出しました`, () => {
+      t.holder = val;
+      t.lentAt = new Date().toISOString();
+    });
+  });
+}
+
+async function init() {
+  if (!window.L) {
+    document.body.innerHTML = '<p style="padding:24px;font-size:20px">地図の部品を読み込めませんでした。インターネットにつながっているか確認して、もう一度開いてください。</p>';
+    return;
+  }
+  if (LIVE) {
+    showBlocking('読み込んでいます…', 'しばらくお待ちください。');
+    try {
+      await Store.loadLive();
+    } catch (e) {
+      if (e.code === 'auth') showBlocking('このリンクでは開けません', '区域係からもらった招待リンクを開いてください。');
+      else showBlocking('読み込めませんでした', 'インターネットにつながっているか確認して、もう一度開いてください。');
+      return;
+    }
+    hideBlocking();
+  } else {
+    Store.load();
+  }
+  initMap();
+  bindStatic();
+  fillWho();
+  updateTabs();
+  renderAll();
+  showView('cards');
+  if (LIVE) {
+    $('#modePill').hidden = true;
+    $('#whoSel').hidden = true; $('#whoLabel').hidden = true;
+    $('#whoName').hidden = false; $('#whoName').textContent = `${me().name}さん`;
+    $('#liveTools').hidden = false;
+    $('#adReset').hidden = true;
+    $('#btnLogout').onclick = logout;
+    const again = () => { if (document.hidden) return; if (Store.queue.length) flush(); else refresh().catch(() => {}); };
+    setInterval(again, 90000);
+    window.addEventListener('online', flush);
+    document.addEventListener('visibilitychange', again);
+    flush();
+  }
+}
+init();
+</script>
+</body>
+</html>
