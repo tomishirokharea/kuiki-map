@@ -264,6 +264,23 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .seg.small{display:flex;width:100%;margin:6px 0 0}
 .seg.small button{flex:1;min-height:44px;padding:0 6px;font-size:15px}
 #map.drawing .pin{transform:scale(.78);opacity:.9}
+.cardbar{font-size:15px;padding:8px 10px;max-height:48vh;overflow:auto}
+.cardbar .btn.small{min-height:42px;font-size:15px;padding:0 12px}
+.cardbar .seg{margin:6px 0 0}
+.cardbar .seg button{min-height:40px;padding:0 14px;font-size:15px}
+.cardbar .keys{font-size:13px;gap:2px 10px;margin:4px 0}
+.cardbar .next{font-size:15px;margin-top:4px;line-height:1.4}
+.cardbar .next .numbadge{min-width:26px;height:26px}
+.cardbar .okmsg{font-size:14px;padding:4px 8px}
+.cardbar .row{margin:6px 0 0;gap:8px}
+.cardbar .progress.big{height:12px;margin:4px 0 0}
+.cardbar .barhead p{font-size:15px;line-height:1.35}
+.cardbar.mini .progress{margin-bottom:0}
+.dv{width:26px;height:26px;border-radius:50%;background:#fff;border:4px solid var(--draw);box-shadow:0 1px 3px #0006}
+.dv.first{width:26px;height:26px;border-width:6px}
+.dv.snapped{border-color:var(--terr);background:#DDF1EA}
+.dv.sel{background:var(--draw);border-color:#fff;box-shadow:0 0 0 4px var(--draw),0 1px 3px #0006}
+.dmid{width:22px;height:22px;border-radius:50%;background:#ffffffd9;border:2px dashed var(--draw);color:var(--draw);font-size:13px;font-weight:700;display:grid;place-items:center;line-height:1}
 .hint-strong.ok{color:var(--terr)}
 .hint-strong{color:var(--draw);font-weight:700;font-size:16px;margin-top:4px}
 .unit.hl{outline:4px solid var(--draw);outline-offset:2px}
@@ -350,6 +367,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
         </div>
         <div class="row">
           <button class="btn small" id="drawUndo">1つ戻す</button>
+          <button class="btn small danger" id="drawDelPt" hidden>選んだ点を消す</button>
           <button class="btn small primary" id="drawDone">完成</button>
           <button class="btn small" id="drawCancel">やめる</button>
         </div>
@@ -358,6 +376,8 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
           <div class="row">
             <label class="btn small">古いカードの写真を重ねる<input type="file" accept="image/*" id="ovFile" hidden></label>
             <label class="check"><input type="checkbox" id="drawHouses">家の印を表示</label>
+            <label class="check"><input type="checkbox" id="drawSnap" checked>隣の区域の点・線にくっつける</label>
+            <button class="btn small" id="drawRestart" hidden>最初から引き直す</button>
           </div>
           <div id="ovCtl" hidden>
             <div class="row"><label>地図の濃さ <input type="range" class="wide" id="ovRange" min="0" max="100" value="50"></label></div>
@@ -1051,13 +1071,14 @@ function terrStats(t, sinceMs) {
 
 /* ---------- お知らせ ---------- */
 let toastTimer = null;
-function toast(msg, undoFn) {
+function toast(msg, undoFn, action) {
   const el = $('#toast');
-  el.innerHTML = `<span>${esc(msg)}</span>` + (undoFn ? '<button type="button">取り消す</button>' : '');
+  const act = action || (undoFn ? { label: '取り消す', fn: undoFn } : null);
+  el.innerHTML = `<span>${esc(msg)}</span>` + (act ? `<button type="button">${esc(act.label)}</button>` : '');
   el.hidden = false;
-  if (undoFn) el.querySelector('button').onclick = () => { el.hidden = true; undoFn(); };
+  if (act) el.querySelector('button').onclick = () => { el.hidden = true; act.fn(); };
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, undoFn ? 7000 : 3500);
+  toastTimer = setTimeout(() => { el.hidden = true; }, act ? 7000 : 3500);
 }
 
 /* ---------- 下から出る画面 ---------- */
@@ -1149,7 +1170,11 @@ function fillTerrJump() {
 }
 function fitTerr(id) {
   const t = terrById(id); if (!t) return;
-  map.fitBounds(L.latLngBounds(t.polygon), { padding: [40, 40] });
+  // 上の操作ボタンと下の案内に隠れないように余白をとる
+  const bar = $('#cardBar'), tools = $('#mapTools');
+  const top = tools && !tools.hidden ? tools.offsetHeight + 20 : 40;
+  const bottom = bar && !bar.hidden ? bar.offsetHeight + 30 : 40;
+  map.fitBounds(L.latLngBounds(t.polygon), { paddingTopLeft: [30, top], paddingBottomRight: [30, bottom] });
 }
 function fitAll() {
   const pts = D().territories.flatMap(t => t.polygon);
@@ -1685,47 +1710,249 @@ function openAddForm(ll, tid) {
   paint();
 }
 
-/* ---------- 区域の線引き ---------- */
+/* ---------- 区域の線引き ----------
+   ・点はドラッグで動かせる。タップで選んで消せる
+   ・線の途中の小さな○で点を増やせる（引き直しでは、地図をタップすると近くの線に点が入る）
+   ・隣の区域の点・線の近くをタップすると、そこにくっつく
+   ・隣の区域の点から点へつなぐと、その間の点もたどって入れる */
+const SNAP_PX = 22, EDGE_PX = 16;
+let drawSnapOn = true;
 function startDraw(targetId) {
   showView('map');
   focusCard = null; roundTerr = null;
   drawShowHouses = false; $('#drawHouses').checked = false;
   addCount = 0; updateAddBar();
   setDrawFold(false);
+  const t = targetId ? terrById(targetId) : null;
+  draw = {
+    points: t ? t.polygon.map(p => [p[0], p[1]]) : [],
+    snaps: t ? t.polygon.map(v => sharedSnap(v, t.id)) : [],
+    origs: t ? t.polygon.map(v => v.slice()) : [], // 直す前の位置（隣の区域の同じ点も動かすため）
+    edit: !!t, targetId, sel: -1, hist: [],
+    line: L.polyline([], { color: '#C2410C', weight: 4, dashArray: '8 6', interactive: false }).addTo(map),
+    hints: L.layerGroup().addTo(map),
+    handles: L.layerGroup().addTo(map)
+  };
   setMode('draw');
   setDrawTap('line');
-  draw = {
-    points: [], targetId,
-    line: L.polyline([], { color: '#C2410C', weight: 4, dashArray: '8 6', interactive: false }).addTo(map),
-    dots: L.layerGroup().addTo(map)
-  };
-  $('#drawTitle').textContent = targetId ? `区域${terrById(targetId).no}の線を引き直す` : '新しい区域の線を引く';
-  if (targetId) setTimeout(() => fitTerr(targetId), 60);
+  $('#drawTitle').textContent = t ? `区域${t.no}の線を直す` : '新しい区域の線を引く';
+  $('#drawSnap').checked = drawSnapOn;
+  if (t) setTimeout(() => fitTerr(targetId), 60);
+  drawHints();
   redrawDraw();
 }
-function drawClick(ll) { draw.points.push([ll.lat, ll.lng]); redrawDraw(); }
+const samePt = (a, b) => Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9;
+/* 隣の区域と同じ位置にある点（共有している点） */
+function sharedSnap(v, selfId) {
+  for (const t of D().territories) {
+    if (t.id === selfId) continue;
+    const i = t.polygon.findIndex(w => samePt(w, v));
+    if (i >= 0) return { ll: v.slice(), tid: t.id, idx: i };
+  }
+  return null;
+}
+/* 隣の区域の点（くっつく場所）を小さく表示する */
+function drawHints() {
+  draw.hints.clearLayers();
+  if (!drawSnapOn) return;
+  D().territories.forEach(t => {
+    if (t.id === draw.targetId) return;
+    t.polygon.forEach(v => L.circleMarker(v, { radius: 4, color: '#0E7C66', weight: 2, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(draw.hints));
+  });
+}
+const cpt = ll => map.latLngToContainerPoint(ll);
+/* 近くの隣の区域の点、なければ線の上の点を探す */
+function snapPoint(ll) {
+  if (!drawSnapOn) return null;
+  const p = cpt(ll);
+  let best = null, bd = SNAP_PX;
+  D().territories.forEach(t => {
+    if (t.id === draw.targetId) return;
+    t.polygon.forEach((v, i) => { const d = p.distanceTo(cpt(v)); if (d < bd) { bd = d; best = { ll: [v[0], v[1]], tid: t.id, idx: i }; } });
+  });
+  if (best) return best;
+  let ed = EDGE_PX;
+  D().territories.forEach(t => {
+    if (t.id === draw.targetId) return;
+    const n = t.polygon.length;
+    for (let i = 0; i < n; i++) {
+      const a = cpt(t.polygon[i]), b = cpt(t.polygon[(i + 1) % n]);
+      const q = L.LineUtil.closestPointOnSegment(p, a, b), d = p.distanceTo(q);
+      if (d < ed) { ed = d; const g = map.containerPointToLatLng(q); best = { ll: [g.lat, g.lng], tid: t.id, edge: i }; }
+    }
+  });
+  return best;
+}
+function pushHist() {
+  draw.hist.push({ points: draw.points.map(p => p.slice()), snaps: draw.snaps.slice(), origs: draw.origs.slice() });
+  if (draw.hist.length > 60) draw.hist.shift();
+}
+function drawUndo() {
+  const h = draw.hist.pop();
+  if (!h) { toast('戻せる操作はありません'); return; }
+  draw.points = h.points; draw.snaps = h.snaps; draw.origs = h.origs; draw.sel = -1;
+  redrawDraw();
+}
+/* 隣の区域の点から点へ：その区域の線をたどる点の並び（近い回りと、反対回り） */
+function borderPaths(a, b) {
+  if (!a || !b || a.tid !== b.tid || a.idx == null || b.idx == null || a.idx === b.idx) return null;
+  const poly = terrById(a.tid).polygon, n = poly.length, fwd = [], back = [];
+  for (let k = (a.idx + 1) % n; k !== b.idx; k = (k + 1) % n) fwd.push(k);
+  for (let k = (a.idx - 1 + n) % n; k !== b.idx; k = (k - 1 + n) % n) back.push(k);
+  const len = ks => {
+    const seq = [a.idx, ...ks, b.idx];
+    let s = 0;
+    for (let i = 1; i < seq.length; i++) s += map.distance(poly[seq[i - 1]], poly[seq[i]]);
+    return s;
+  };
+  const toPts = ks => ks.map(k => ({ ll: [poly[k][0], poly[k][1]], snap: { tid: a.tid, idx: k } }));
+  const short = len(fwd) <= len(back) ? fwd : back, other = short === fwd ? back : fwd;
+  return { short: toPts(short), other: toPts(other) };
+}
+function drawClick(ll) {
+  const s = snapPoint(ll);
+  const pt = s ? s.ll : [ll.lat, ll.lng];
+  pushHist();
+  draw.sel = -1;
+  if (draw.edit && draw.points.length >= 3) {
+    // 引き直し：いちばん近い線の途中に点を入れる
+    const p = cpt(L.latLng(pt));
+    let at = 0, bd = Infinity;
+    const n = draw.points.length;
+    for (let i = 0; i < n; i++) {
+      const a = cpt(draw.points[i]), b = cpt(draw.points[(i + 1) % n]);
+      const d = p.distanceTo(L.LineUtil.closestPointOnSegment(p, a, b));
+      if (d < bd) { bd = d; at = i + 1; }
+    }
+    draw.points.splice(at, 0, pt); draw.snaps.splice(at, 0, s); draw.origs.splice(at, 0, null);
+    redrawDraw();
+    if (s) toast(s.idx != null ? '隣の区域の点にくっつけました' : '隣の区域の線にくっつけました');
+    return;
+  }
+  // 新しく引く：順番に足す。隣の区域の点から点なら、間の点もたどる
+  const prev = draw.snaps[draw.snaps.length - 1];
+  const paths = borderPaths(prev, s);
+  const startLen = draw.points.length;
+  const add = list => { list.forEach(x => { draw.points.push(x.ll); draw.snaps.push(x.snap); draw.origs.push(null); }); };
+  if (paths && paths.short.length) add(paths.short);
+  draw.points.push(pt); draw.snaps.push(s); draw.origs.push(null);
+  redrawDraw();
+  if (paths && (paths.short.length || paths.other.length)) {
+    const swap = () => {
+      // 反対回りに入れ直す
+      draw.points.splice(startLen); draw.snaps.splice(startLen); draw.origs.splice(startLen);
+      const cur = paths.short; paths.short = paths.other; paths.other = cur;
+      add(paths.short); draw.points.push(pt); draw.snaps.push(s); draw.origs.push(null);
+      redrawDraw();
+      toast(`隣の区域の線を、反対回りでたどりました（${paths.short.length}点）`, null, { label: '元に戻す', fn: swap });
+    };
+    toast(paths.short.length ? `隣の区域の線に沿って、${paths.short.length}点を加えました` : '隣の区域の点にくっつけました',
+      null, { label: '反対回りにする', fn: swap });
+  } else if (s) {
+    toast(s.idx != null ? '隣の区域の点にくっつけました' : '隣の区域の線にくっつけました');
+  }
+}
+function vertexIcon(i, sel, snapped) {
+  const cls = ['dv', i === 0 ? 'first' : '', sel ? 'sel' : '', snapped ? 'snapped' : ''].join(' ');
+  return L.divIcon({ className: '', html: `<div class="${cls}"></div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
+}
+const midIcon = L.divIcon({ className: '', html: '<div class="dmid">＋</div>', iconSize: [22, 22], iconAnchor: [11, 11] });
 function redrawDraw() {
-  const p = draw.points;
-  draw.line.setLatLngs(p.length > 2 ? [...p, p[0]] : p);
-  draw.dots.clearLayers();
-  p.forEach((pt, i) => L.circleMarker(pt, { radius: i === 0 ? 10 : 7, color: '#C2410C', weight: 3, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(draw.dots));
-  $('#drawCount').textContent = p.length;
+  const p = draw.points, n = p.length;
+  draw.line.setLatLngs(n > 2 ? [...p, p[0]] : p);
+  draw.handles.clearLayers();
+  p.forEach((pt, i) => {
+    const m = L.marker(pt, { icon: vertexIcon(i, i === draw.sel, !!draw.snaps[i]), draggable: true, zIndexOffset: 2000, keyboard: false });
+    m.on('click', () => { draw.sel = draw.sel === i ? -1 : i; redrawDraw(); });
+    m.on('dragstart', () => { pushHist(); draw.sel = -1; });
+    m.on('drag', e => { draw.points[i] = [e.latlng.lat, e.latlng.lng]; draw.line.setLatLngs(draw.points.length > 2 ? [...draw.points, draw.points[0]] : draw.points); });
+    m.on('dragend', () => {
+      const s = snapPoint(m.getLatLng());
+      draw.snaps[i] = s;
+      if (s) draw.points[i] = s.ll;
+      redrawDraw();
+    });
+    m.addTo(draw.handles);
+  });
+  // 線の途中の○：タップかドラッグで点を増やす
+  const segs = n >= 3 ? n : n - 1;
+  for (let i = 0; i < segs; i++) {
+    const a = p[i], b = p[(i + 1) % n];
+    const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const m = L.marker(mid, { icon: midIcon, draggable: true, zIndexOffset: 1500, keyboard: false });
+    let inserted = false;
+    const insert = () => { if (inserted) return; inserted = true; pushHist(); draw.points.splice(i + 1, 0, mid.slice()); draw.snaps.splice(i + 1, 0, null); draw.origs.splice(i + 1, 0, null); draw.sel = -1; };
+    m.on('click', () => { insert(); redrawDraw(); });
+    m.on('dragstart', insert);
+    m.on('drag', e => { draw.points[i + 1] = [e.latlng.lat, e.latlng.lng]; draw.line.setLatLngs([...draw.points, draw.points[0]]); });
+    m.on('dragend', () => {
+      const s = snapPoint(m.getLatLng());
+      draw.snaps[i + 1] = s;
+      if (s) draw.points[i + 1] = s.ll;
+      redrawDraw();
+    });
+    m.addTo(draw.handles);
+  }
+  $('#drawCount').textContent = n;
+  $('#drawDelPt').hidden = draw.sel < 0;
+  $('#drawRestart').hidden = !n;
+  $('#drawHelp').textContent = drawTap === 'line' ? (draw.edit ? DRAW_HELP.edit : DRAW_HELP.line) : DRAW_HELP[drawTap];
+}
+function deleteSelectedPoint() {
+  if (!draw || draw.sel < 0) return;
+  pushHist();
+  draw.points.splice(draw.sel, 1); draw.snaps.splice(draw.sel, 1); draw.origs.splice(draw.sel, 1);
+  draw.sel = -1;
+  if (draw.points.length < 3) draw.edit = false;
+  redrawDraw();
+  toast('点を消しました', null, { label: '戻す', fn: drawUndo });
+}
+function restartDraw() {
+  if (!confirm('今の線を消して、最初から引き直します。よろしいですか？')) return;
+  pushHist();
+  draw.points = []; draw.snaps = []; draw.origs = []; draw.sel = -1; draw.edit = false;
+  redrawDraw();
+  toast('線を消しました。角を順番にタップしてください', null, { label: '戻す', fn: () => { drawUndo(); draw.edit = !!draw.targetId && draw.points.length >= 3; redrawDraw(); } });
 }
 function endDraw() {
-  if (draw) { map.removeLayer(draw.line); map.removeLayer(draw.dots); }
+  if (draw) { map.removeLayer(draw.line); map.removeLayer(draw.hints); map.removeLayer(draw.handles); }
   draw = null; setMode('normal');
 }
 function finishDraw() {
-  if (draw.points.length < 3) { toast('角を3か所以上タップしてください'); return; }
-  const pts = draw.points.slice();
+  if (draw.points.length < 3) { toast('角を3か所以上にしてください'); return; }
+  const pts = draw.points.map(p => p.slice());
   if (draw.targetId) {
     const t = terrById(draw.targetId);
+    // 隣の区域と共有していた点を動かしたとき、隣の同じ点も動かすか
+    const affected = new Map();
+    draw.points.forEach((p, i) => {
+      const o = draw.origs[i];
+      if (!o || samePt(o, p)) return;
+      D().territories.forEach(tt => {
+        if (tt.id === t.id) return;
+        tt.polygon.forEach((v, vi) => {
+          if (!samePt(v, o)) return;
+          if (!affected.has(tt.id)) affected.set(tt.id, []);
+          affected.get(tt.id).push([vi, p.slice()]);
+        });
+      });
+    });
+    let alsoMove = false;
+    if (affected.size) {
+      const names = [...affected.keys()].map(id => `区域${terrById(id).no}`).join('・');
+      alsoMove = confirm(`隣の区域（${names}）と共有している点を動かしました。\n隣の区域の同じ点も一緒に動かしますか？\n\n「OK」…隣の区域も一緒に直す（すき間ができません）\n「キャンセル」…この区域だけを直す`);
+    }
     endDraw();
-    commit(`区域${t.no}の線を引き直しました`, () => { t.polygon = pts; reassign(); });
+    commit(`区域${t.no}の線を直しました${alsoMove ? '（隣の区域も一緒に）' : ''}`, () => {
+      t.polygon = pts;
+      if (alsoMove) affected.forEach((list, id) => { const tt = terrById(id); list.forEach(([vi, p]) => { tt.polygon[vi] = p; }); });
+      reassign();
+    });
   } else {
     openTerrForm({ pts });
   }
 }
+
 function openTerrForm({ pts = null, terr = null }) {
   const maxNo = Math.max(0, ...D().territories.map(t => parseInt(normNo(t.no), 10) || 0));
   setSheet(headHtml(null, terr ? '区域の番号と名前' : '新しい区域', '') + `
@@ -1758,7 +1985,8 @@ function openTerrForm({ pts = null, terr = null }) {
 let ovState = null; // { url, pinned, rot, center, refZoom, w, h, el }
 let drawShowHouses = false, drawTap = 'line';
 const DRAW_HELP = {
-  line: '区域の角を順番にタップします。',
+  line: '区域の角を順番にタップします。隣の区域の点（緑の○）の近くをタップすると、その点にくっつきます。点はドラッグで動かせ、タップで選ぶと消せます。',
+  edit: '点をドラッグして動かします。点をタップして選ぶと「選んだ点を消す」で消せます。線の途中の＋や、線の近くをタップすると点が増えます。',
   house: '家の場所（屋根の真ん中）をタップすると、一戸建てが追加されます。まちがえたときは、お知らせの「取り消す」を押します。',
   apt: 'アパートの場所をタップすると、部屋の数を入れる画面が開きます。'
 };
@@ -1766,7 +1994,10 @@ function setDrawTap(v) {
   drawTap = v;
   $$('#drawBar [data-drawtap]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.drawtap === v)));
   $('#drawUndo').hidden = v !== 'line';
-  $('#drawHelp').textContent = DRAW_HELP[v];
+  if (draw) { draw.sel = -1; redrawDraw(); } else $('#drawHelp').textContent = DRAW_HELP[v];
+  $('#drawDelPt').hidden = true;
+  $('#drawRestart').hidden = v !== 'line' || !draw || !draw.points.length;
+  if (draw) draw.handles[v === 'line' ? 'addTo' : 'remove'](map);
   $('#drawHouses').parentNode.hidden = v !== 'line';
   closeSheet();
   renderHouses();
@@ -2305,7 +2536,7 @@ function renderCardBar() {
   if (!c && !r) { bar.hidden = true; return; }
   bar.hidden = false;
   const key = (cls, mark, label) => `<span><i class="pin mini st-new${cls}">${mark}</i>${label}</span>`;
-  const closeBtn = `<button class="btn small" id="cardBarClose">ふつうの表示に戻す</button>`;
+  const closeBtn = `<button class="btn small" id="cardBarClose">表示を戻す</button>`;
   if (c) {
     const t = terrById(c.terrId), p = cardProgress(c);
     bar.classList.remove('mini');
@@ -2326,20 +2557,19 @@ function renderCardBar() {
       const plan = roundPlan(r), first = plan[0];
       const planUnits = plan.reduce((a, s) => a + s.units.length, 0);
       body = (first
-          ? `<p class="next"><span class="numbadge">1</span> <b>${stopLabel(first)}</b>　${first.reasons.slice(0, 2).join('・')}</p>`
+          ? `<p class="next"><span class="numbadge">1</span> 次は <b>${stopLabel(first)}</b><br><span class="muted">${first.reasons.slice(0, 2).join('・')}</span></p>`
           : '<p class="muted">今の時間帯のおすすめはありません。「進み具合」で残りの家を確認してください。</p>') +
         `<p class="keys"><span><span class="numbadge sm">1</span>おすすめ ${plan.length}か所</span>${key(' later', '', `ほかの家 ${n.todo - planUnits}`)}${key(' done', '<u>✓</u>', `済み ${n.done}`)}</p>`;
-      if (first) extra = `<button class="btn small primary" id="barList">おすすめ順の一覧</button>`;
+      if (first) extra = `<button class="btn small primary" id="barList">一覧を見る</button>`;
     }
     if (n.todo && r.pct >= D().settings.donePct) {
       body = `<p class="okmsg"><b>ほぼ回り終えました（${pct}%）。</b>返却して完了にできます。残りの家は、次に回る人のおすすめに出ます。</p>` + body;
       extra = `<button class="btn small primary" id="barReturn">返却する</button>` + extra.replace(' primary', '');
     }
     bar.classList.toggle('mini', barMini);
-    bar.innerHTML = `<div class="barhead"><p><b>区域${r.t.no}を回っています</b>　今は${slotShort(r.cur)}</p>
+    bar.innerHTML = `<div class="barhead"><p><b>区域${esc(r.t.no)}</b>　今は${slotShort(r.cur)}<br>訪ねた家 <b>${n.done} / ${total}</b>（${pct}%）</p>
         <button class="foldbtn" id="barFold" aria-expanded="${!barMini}">${barMini ? 'ひらく' : 'たたむ'}</button></div>
       <div class="progress big" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${pct}%"></i></div>
-      <p class="muted">訪ねた家 ${n.done} / ${total}（${pct}%）</p>
       <div class="fold">
         <div class="seg" role="group" aria-label="表示の切りかえ">
           <button data-rmode="reco" aria-pressed="${mode === 'reco'}">おすすめ順</button>
@@ -2592,7 +2822,7 @@ function renderAdmin() {
       <div class="actions">
         <label>担当 <select data-holder="${t.id}">${userOpts(t.holder)}</select></label>
         <button class="btn small" data-open="${t.id}">地図</button>
-        <button class="btn small" data-redraw="${t.id}">線を引き直す</button>
+        <button class="btn small" data-redraw="${t.id}">線を直す</button>
         <button class="btn small" data-rename="${t.id}">番号・名前</button>
         <label class="check"><input type="checkbox" data-free="${t.id}"${t.free ? ' checked' : ''}>自由に受け取ってよい</label>
       </div></article>`;
@@ -2813,7 +3043,10 @@ function bindStatic() {
     baseLayers[baseName].addTo(map);
     $('#btnBase').textContent = baseName === 'pale' ? '写真' : '地図';
   };
-  $('#drawUndo').onclick = () => { draw.points.pop(); redrawDraw(); };
+  $('#drawUndo').onclick = drawUndo;
+  $('#drawDelPt').onclick = deleteSelectedPoint;
+  $('#drawRestart').onclick = restartDraw;
+  $('#drawSnap').onchange = e => { drawSnapOn = e.target.checked; if (draw) drawHints(); };
   $('#drawDone').onclick = finishDraw;
   $('#drawCancel').onclick = () => { closeSheet(); endDraw(); };
   $('#ovFile').onchange = e => {
