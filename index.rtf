@@ -1,0 +1,2539 @@
+{\rtf1\ansi\ansicpg932\cocoartf2709
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset128 HiraMinProN-W3;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;}
+{\*\expandedcolortbl;;\cssrgb\c0\c0\c0;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 <!DOCTYPE html>\
+<html lang="ja">\
+<head>\
+<meta charset="utf-8">\
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\
+<title>\uc0\u21306 \u22495 \u12510 \u12483 \u12503 \u65288 \u35430 \u20316 \u29256 \u65289 </title>\
+<link rel="preconnect" href="https://fonts.googleapis.com">\
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">\
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">\
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>\
+<style>\
+/* ===== \uc0\u22522 \u26412 \u12398 \u33394 \u12392 \u25991 \u23383  ===== */\
+:root\{\
+  --ink:#17324D; --ink2:#4A5F73; --bg:#EEF2F0; --paper:#fff; --line:#C8D2CD;\
+  --terr:#0E7C66; --terr-soft:#E5F2EE;\
+  --met:#1565C0; --away:#E8AE00; --ref:#C62828; --ref-bg:#FDECEC; --dnc:#3A3A3A;\
+  --young:#7B3FA0; --follow:#AD1457; --draw:#C2410C; --warn-bg:#FFF4D6; --danger:#B3261E;\
+  --r:14px; color-scheme:light;\
+\}\
+*\{box-sizing:border-box\}\
+[hidden]\{display:none!important\}\
+html,body\{margin:0;height:100%\}\
+body\{font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;font-size:18px;line-height:1.6;color:var(--ink);background:var(--bg);-webkit-text-size-adjust:100%\}\
+button,input,select\{font:inherit;color:inherit\}\
+button\{cursor:pointer\}\
+:focus-visible\{outline:3px solid #F59E0B;outline-offset:2px\}\
+h2,h3,p\{margin:0\}\
+.muted\{color:var(--ink2);font-size:16px\}\
+.hint\{display:block;color:var(--ink2);font-size:15px;margin-top:4px\}\
+.wrap\{max-width:760px;margin:0 auto\}\
+.sec\{font-size:21px;margin:26px 0 10px;padding-left:10px;border-left:6px solid var(--terr)\}\
+.row\{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0\}\
+.scroll\{overflow-x:auto\}\
+\
+/* ===== \uc0\u30011 \u38754 \u12398 \u39592 \u32068 \u12415  ===== */\
+.app\{display:flex;flex-direction:column;height:100vh;height:100dvh\}\
+header.top\{display:flex;align-items:center;gap:10px;padding:8px 14px;padding-top:calc(8px + env(safe-area-inset-top));background:var(--ink);color:#fff\}\
+header.top h1\{font-size:20px;margin:0;letter-spacing:.04em\}\
+.pill\{font-size:13px;border:1px solid #ffffff80;border-radius:99px;padding:0 10px\}\
+.who\{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:15px\}\
+.who select\{min-height:42px;border-radius:10px;border:0;padding:0 8px;color:var(--ink);background:#fff;max-width:40vw\}\
+main\{flex:1;min-height:0;position:relative\}\
+.view\{position:absolute;inset:0;overflow:auto;padding:14px 16px 28px\}\
+#view-map\{padding:0;overflow:hidden;background:#fff\}\
+nav.tabs\{display:grid;grid-template-columns:repeat(4,1fr);background:var(--paper);border-top:2px solid var(--line);padding-bottom:env(safe-area-inset-bottom)\}\
+nav.tabs.three\{grid-template-columns:repeat(3,1fr)\}\
+nav.tabs button\{min-height:66px;border:0;border-top:4px solid transparent;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:15px;color:var(--ink2)\}\
+nav.tabs button\{position:relative\}\
+.tabbadge\{position:absolute;top:4px;left:calc(50% + 8px);min-width:24px;height:24px;border-radius:99px;background:var(--danger);color:#fff;font-size:14px;display:grid;place-items:center;padding:0 6px;border:2px solid #fff\}\
+nav.tabs svg\{width:26px;height:26px\}\
+nav.tabs button[aria-current="page"]\{color:var(--ink);font-weight:700;border-top-color:var(--terr);background:var(--terr-soft)\}\
+\
+/* ===== \uc0\u12508 \u12479 \u12531  ===== */\
+.btn\{min-height:52px;padding:0 18px;border-radius:12px;border:2px solid var(--ink);background:#fff;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;color:var(--ink);white-space:nowrap\}\
+.btn.primary\{background:var(--ink);color:#fff\}\
+.btn.small\{min-height:46px;padding:0 12px;font-size:16px\}\
+.btn.danger\{border-color:var(--danger);color:var(--danger)\}\
+.btn.block\{width:100%;margin-top:10px\}\
+.icon-btn\{margin-left:auto;flex:none;width:52px;height:52px;border-radius:50%;border:2px solid var(--line);background:#fff;font-size:28px;line-height:1\}\
+.actions\{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px\}\
+.actions label\{display:flex;align-items:center;gap:6px;font-weight:700\}\
+\
+/* ===== \uc0\u21306 \u22495 \u30058 \u21495 \u65288 \u12459 \u12540 \u12489 \u12398 \u26413 \u65289  ===== */\
+.stamp\{flex:none;display:inline-grid;place-items:center;align-content:center;width:66px;height:66px;border:3px solid var(--terr);border-radius:12px;color:var(--terr);font-size:30px;font-weight:700;background:#fff;line-height:1.05\}\
+.stamp small\{display:block;font-size:12px;font-weight:400\}\
+.stamp.sm\{width:50px;height:50px;font-size:22px\}\
+.stamp.xs\{width:auto;min-width:36px;height:30px;font-size:16px;border-width:2px;border-radius:8px;padding:0 6px;vertical-align:middle\}\
+\
+/* ===== \uc0\u21306 \u22495 \u12459 \u12540 \u12489  ===== */\
+.today\{background:var(--paper);border:2px solid var(--line);border-radius:var(--r);padding:12px 14px\}\
+.today b\{font-size:20px\}\
+.tcard\{background:var(--paper);border:2px solid var(--line);border-radius:var(--r);padding:14px;display:grid;grid-template-columns:auto 1fr;gap:10px 14px;margin-bottom:14px\}\
+.tcard h3\{font-size:20px\}\
+.tcard .actions\{grid-column:1/-1;margin-top:0\}\
+.progress\{height:14px;background:#E0E6E3;border-radius:99px;overflow:hidden;margin:6px 0 2px\}\
+.progress>i\{display:block;height:100%;background:var(--terr)\}\
+details.all\{margin-top:18px\}\
+details.all>summary,details.more>summary\{min-height:52px;display:flex;align-items:center;font-weight:700;cursor:pointer;padding:0 6px\}\
+.empty\{background:var(--paper);border:2px dashed var(--line);border-radius:var(--r);padding:18px;text-align:center\}\
+.notice\{border-radius:12px;padding:10px 12px;margin:14px 0;font-size:16px\}\
+.notice.warn\{background:var(--warn-bg);border:2px solid var(--away)\}\
+.notice.info\{background:var(--terr-soft);border:2px solid var(--terr)\}\
+\
+/* ===== \uc0\u22320 \u22259  ===== */\
+#overlayImg\{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:0\}\
+#map\{position:absolute;inset:0;z-index:1\}\
+#map.see-through\{background:transparent!important\}\
+#map.crosshair\{cursor:crosshair\}\
+.maptools\{position:absolute;top:10px;left:10px;right:10px;z-index:500;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none\}\
+.maptools>*\{pointer-events:auto;box-shadow:0 2px 6px #0003\}\
+.maptools select\{min-height:52px;border-radius:12px;border:2px solid var(--ink);background:#fff;padding:0 8px;font-weight:700;max-width:44vw\}\
+.zoomhint\{position:absolute;top:130px;left:50%;transform:translateX(-50%);z-index:500;background:var(--ink);color:#fff;border-radius:99px;padding:6px 16px;font-size:16px;white-space:nowrap\}\
+.legend\{position:absolute;left:10px;bottom:22px;z-index:500;background:#ffffffee;border-radius:12px;padding:6px 10px;font-size:14px;display:flex;flex-wrap:wrap;gap:4px 12px;max-width:calc(100% - 70px);box-shadow:0 2px 6px #0003\}\
+.legend span\{display:inline-flex;align-items:center;gap:4px\}\
+.legend .pin\{width:24px;height:24px;font-size:12px;border-width:2px\}\
+.modebar\{position:absolute;top:10px;left:10px;right:10px;z-index:600;background:var(--paper);border:3px solid var(--draw);border-radius:var(--r);padding:10px 12px;box-shadow:0 4px 12px #0004\}\
+.modebar .row\{margin:8px 0 0\}\
+.modebar input[type=range]\{width:150px;vertical-align:middle\}\
+.terr-label span\{display:inline-block;transform:translate(-50%,-50%);background:#ffffffee;border:3px solid var(--terr);color:var(--terr);font-weight:700;font-size:18px;border-radius:10px;padding:0 10px;white-space:nowrap;font-family:"BIZ UDPGothic",sans-serif\}\
+\
+/* ===== \uc0\u23478 \u12398 \u21360 \u65288 \u33394 \u65291 \u25991 \u23383 \u12391 \u21306 \u21029 \u65289  ===== */\
+.pin\{position:relative;width:34px;height:34px;border-radius:50%;display:inline-grid;place-items:center;font-weight:700;font-size:16px;font-style:normal;border:3px solid #fff;box-shadow:0 1px 3px #0006;font-family:"BIZ UDPGothic",sans-serif;line-height:1\}\
+.pin.apt\{border-radius:8px;width:38px;height:38px;background:#fff;color:var(--ink);border-color:var(--ink);position:relative\}\
+.pin.apt i\{position:absolute;top:-11px;right:-13px;min-width:24px;height:22px;border-radius:99px;background:var(--away);color:#1F1A00;font-style:normal;font-size:13px;display:grid;place-items:center;padding:0 5px;border:2px solid #fff\}\
+.unit\{position:relative;min-height:66px;border-radius:12px;border:3px solid transparent;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.3\}\
+.unit small\{font-size:13px;font-weight:400\}\
+.st-new\{background:#fff;color:var(--ink);border-color:var(--ink)\}\
+.st-met\{background:var(--met);color:#fff\}\
+.st-away\{background:var(--away);color:#1F1A00\}\
+.st-refused\{background:var(--ref);color:#fff\}\
+.st-dnc\{background:var(--ref);color:#fff;box-shadow:0 0 0 2px #fff,0 0 0 5px var(--ref)\}\
+.st-temp\{background:var(--draw);color:#fff\}\
+.pin em,.unit em\{position:absolute;left:-10px;bottom:-9px;background:var(--follow);color:#fff;font-style:normal;font-size:12px;font-weight:700;border-radius:6px;padding:1px 4px;border:2px solid #fff;line-height:1.2\}\
+.unit em\{left:4px;top:4px;bottom:auto\}\
+.units\{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px\}\
+\
+/* ===== \uc0\u19979 \u12363 \u12425 \u20986 \u12427 \u20837 \u21147 \u30011 \u38754  ===== */\
+#backdrop\{position:fixed;inset:0;background:#00000066;z-index:2000\}\
+#sheet\{position:fixed;left:0;right:0;bottom:0;z-index:2001;background:var(--paper);border-radius:20px 20px 0 0;max-height:88vh;max-height:88dvh;overflow:auto;padding:14px 16px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px #0003\}\
+@media (min-width:760px)\{#sheet\{left:calc(50% - 320px);right:auto;width:640px;bottom:16px;border-radius:20px\}\}\
+.sheet-head\{display:flex;align-items:center;gap:12px;margin-bottom:8px\}\
+.sheet-head h2\{font-size:22px;outline:none\}\
+.q\{font-size:20px;font-weight:700;margin:14px 0 8px\}\
+.choices\{display:grid;gap:10px\}\
+.choices.three\{grid-template-columns:repeat(3,1fr)\}\
+.choices.two\{grid-template-columns:repeat(2,1fr)\}\
+.choice\{min-height:88px;border-radius:14px;border:3px solid var(--line);background:#fff;font-size:19px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;line-height:1.3\}\
+.choice.wide\{grid-column:1/-1;min-height:64px\}\
+.choice.on\{border-color:var(--ink);background:var(--terr-soft)\}\
+.c-met\{border-color:var(--met)\} .c-away\{border-color:var(--away)\}\
+.refbtn\{width:100%;min-height:60px;margin-top:22px;flex-direction:row;gap:10px;border-color:var(--ref);color:var(--ref);background:var(--ref-bg)\}\
+.refhead\{display:flex;align-items:center;gap:10px;background:var(--ref-bg);border:3px solid var(--ref);color:var(--ref);border-radius:12px;padding:10px 12px;margin-top:12px;font-size:20px\}\
+.c-refx\{border-color:var(--ref)\}\
+.choice:active,.unit:active\{transform:scale(.98)\}\
+.history\{list-style:none;padding:0;margin:6px 0 0\}\
+.history li\{padding:8px 0;border-bottom:1px solid var(--line);font-size:16px;display:flex;gap:10px;align-items:center\}\
+.history .pin\{width:26px;height:26px;font-size:13px;border-width:2px;flex:none\}\
+.sub\{font-size:18px;margin-top:20px\}\
+.field\{display:block;margin:14px 0\}\
+.field>span\{display:block;font-weight:700;margin-bottom:4px\}\
+.field input[type=text],.field input[type=number]\{width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 12px;font-size:19px;background:#fff\}\
+.inline\{display:flex;gap:8px\}\
+.inline input\{flex:1\}\
+.stepper\{display:flex;align-items:center;gap:12px\}\
+.stepper button\{width:60px;height:54px;border-radius:12px;border:2px solid var(--ink);background:#fff;font-size:28px;font-weight:700\}\
+.stepper output\{min-width:52px;text-align:center;font-size:26px;font-weight:700\}\
+\
+/* ===== \uc0\u12362 \u12377 \u12377 \u12417  ===== */\
+.lead\{font-size:19px;background:var(--paper);border-radius:12px;padding:10px 12px;border:2px solid var(--line)\}\
+.check\{display:flex;align-items:center;gap:10px;min-height:52px;font-size:17px\}\
+.check input\{width:26px;height:26px\}\
+.chips\{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px\}\
+.chip\{min-height:48px;border-radius:99px;border:2px solid var(--ink);background:#fff;padding:0 16px;font-weight:700;font-size:16px\}\
+.chip[aria-pressed="true"]\{background:var(--ink);color:#fff\}\
+.ritem\{background:#fff;border:2px solid var(--line);border-left:10px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center\}\
+.ritem .rt\{font-weight:700;font-size:19px\}\
+.k-handoff\{border-left-color:var(--follow)\}\
+.f-s0\{border-left-color:var(--follow)\}\
+.f-s1\{border-left-color:var(--away);background:#FFFBEF\}\
+.f-s2\{border-left-color:var(--danger);background:#FFF3F2\}\
+.ritem .span\{grid-column:1/-1;margin-top:4px\}\
+.k-interest\{border-left-color:var(--met)\} .k-away\{border-left-color:var(--away)\} .k-young\{border-left-color:var(--young)\} .k-new\{border-left-color:var(--ink)\}\
+\
+/* ===== \uc0\u20418 \u12398 \u30011 \u38754  ===== */\
+.tiles\{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px\}\
+.tile\{background:#fff;border:2px solid var(--line);border-radius:12px;padding:10px 12px\}\
+.tile b\{display:block;font-size:30px;line-height:1.2\}\
+.tile.alert\{border-color:var(--away);background:var(--warn-bg)\}\
+.slots\{border-collapse:collapse;min-width:560px;width:100%;background:#fff\}\
+.slots th,.slots td\{border:1px solid var(--line);padding:6px;text-align:center;font-size:15px\}\
+.slots td b\{font-size:19px\}\
+.slots .bar\{height:8px;background:#E0E6E3;border-radius:99px;margin-top:4px;overflow:hidden\}\
+.slots .bar i\{display:block;height:100%;background:var(--met)\}\
+.slots td.best\{background:#E3F0FC;outline:3px solid var(--met);outline-offset:-3px\}\
+.trow\{background:#fff;border:2px solid var(--line);border-radius:12px;padding:12px;display:grid;grid-template-columns:auto 1fr;gap:8px 12px;margin-bottom:10px\}\
+.trow .actions\{grid-column:1/-1;margin-top:0\}\
+.trow .meta\{display:flex;flex-wrap:wrap;gap:2px 16px;font-size:16px;color:var(--ink2)\}\
+.trow select\{min-height:48px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;background:#fff\}\
+.slots.narrow\{min-width:0\}\
+.slots .warncell\{background:var(--warn-bg);font-weight:700\}\
+.setrow\{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;background:#fff;border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px\}\
+.stepper output.wide\{min-width:110px;font-size:22px\}\
+.actions select\{min-height:48px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;background:#fff;max-width:60vw\}\
+.notice .actions\{margin-top:8px\}\
+.btn.block.wideadd\{margin:0 0 14px;min-height:60px;border-style:dashed;border-color:var(--terr);color:var(--terr);background:#fff\}\
+.reqbox\{background:#fff;border:2px dashed var(--terr);border-radius:var(--r);padding:12px 14px;margin-bottom:14px\}\
+.pick\{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)\}\
+.pick p\{margin:0\}\
+@media (max-width:420px)\{.pick\{grid-template-columns:auto 1fr\}.pick .btn\{grid-column:2;justify-self:start\}\}\
+.trow .check\{min-height:48px;font-size:16px;font-weight:700\}\
+.tcard.away\{border-color:#F0C4AC\}\
+.tcard.away .progress>i\{background:var(--draw)\}\
+.stamp.away\{border-color:var(--draw);color:var(--draw)\}\
+.pin.hl\{box-shadow:0 0 0 4px var(--draw),0 1px 3px #0006\}\
+.pin.dim\{opacity:.3\}\
+.pin.done,.unit.done,.uchip.donec\{background-image:linear-gradient(rgba(255,255,255,.66),rgba(255,255,255,.66));color:#7a858c;border-color:#dfe5e2;box-shadow:none\}\
+.pin b.rj\{position:absolute;right:-14px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:99px;background:var(--ref);color:#fff;font-size:11px;display:grid;place-items:center;border:2px solid #fff\}\
+.refnote\{background:var(--ref-bg);border:2px solid var(--ref);color:#7f1d1d\}\
+.btn.refok\{background:var(--ref);border-color:var(--ref);color:#fff\}\
+.pin.later\{opacity:.6\}\
+.pin u,.unit u\{position:absolute;left:-9px;top:-9px;width:20px;height:20px;border-radius:99px;background:var(--terr);color:#fff;text-decoration:none;font-size:12px;font-weight:700;display:grid;place-items:center;border:2px solid #fff;line-height:1\}\
+.unit u\{left:auto;right:4px;top:4px\}\
+.unit.dim\{opacity:.45\}\
+.unit.later\{opacity:.65\}\
+.pin.mini\{width:22px;height:22px;font-size:11px;border-width:2px;vertical-align:middle;box-shadow:none\}\
+.pin.mini.hl\{box-shadow:0 0 0 3px var(--draw)\}\
+.pin.mini u\{width:14px;height:14px;font-size:9px;left:-6px;top:-6px;border-width:1px\}\
+.cardbar .keys\{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:15px;margin:6px 0\}\
+.cardbar .keys span\{display:inline-flex;align-items:center;gap:5px\}\
+.keyhelp summary\{min-height:40px;display:flex;align-items:center;font-weight:700;cursor:pointer\}\
+.keyhelp p\{font-size:14px;margin:2px 0\}\
+.pin s\{position:absolute;right:-13px;top:-13px;min-width:24px;height:24px;border-radius:99px;background:var(--draw);color:#fff;text-decoration:none;font-size:14px;font-weight:700;display:grid;place-items:center;border:2px solid #fff;padding:0 4px;line-height:1\}\
+.pin.apt s\{top:auto;bottom:-13px\}\
+.numbadge\{display:inline-grid;place-items:center;min-width:30px;height:30px;border-radius:99px;background:var(--draw);color:#fff;font-weight:700;padding:0 6px;flex:none\}\
+.numbadge.sm\{min-width:22px;height:22px;font-size:12px;padding:0 4px\}\
+.cardbar .progress\{margin:6px 0 0\}\
+.cardbar .progress>i\{background:var(--terr)\}\
+.progress.big\{height:16px\}\
+.barhead\{display:flex;align-items:center;gap:8px\}\
+.barhead p\{flex:1\}\
+.foldbtn\{flex:none;min-height:40px;border:2px solid var(--line);border-radius:10px;background:#fff;padding:0 12px;font-weight:700;font-size:15px\}\
+.cardbar.mini .fold\{display:none\}\
+.cardbar .next\{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px\}\
+.okmsg\{background:#E3F2EC;border-radius:10px;padding:6px 10px;margin-top:6px\}\
+.seg\{display:inline-flex;border:2px solid var(--ink);border-radius:12px;overflow:hidden;margin:8px 0 2px\}\
+.seg button\{min-height:46px;padding:0 16px;border:0;background:#fff;font-weight:700;font-size:16px\}\
+.seg button+button\{border-left:2px solid var(--ink)\}\
+.seg button[aria-pressed="true"]\{background:var(--ink);color:#fff\}\
+ol.plan\{list-style:none;padding:0;margin:8px 0\}\
+ol.plan li\{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)\}\
+ol.plan p\{margin:0\}\
+@media (max-width:420px)\{ol.plan li\{grid-template-columns:auto 1fr\}ol.plan .btn\{grid-column:2;justify-self:start\}\}\
+.unitstrip\{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0\}\
+.uchip\{position:relative;min-width:54px;min-height:42px;border-radius:8px;border:2px solid transparent;font-weight:700;font-size:15px\}\
+.uchip.cur\{outline:4px solid var(--draw);outline-offset:2px\}\
+.uchip.donec::after\{content:'\uc0\u10003 ';position:absolute;right:-7px;top:-9px;width:18px;height:18px;border-radius:99px;background:var(--terr);color:#fff;font-size:11px;display:grid;place-items:center;border:2px solid #fff\}\
+.seqroom\{font-size:20px;margin:12px 0 0\}\
+.seqroom b\{font-size:36px\}\
+.seqnav\{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px\}\
+.choice small\{font-size:13px;font-weight:400\}\
+#blocker\{position:fixed;inset:0;z-index:5000;background:var(--bg);display:grid;place-items:center;padding:24px\}\
+.blockbox\{max-width:520px;background:#fff;border:2px solid var(--line);border-radius:16px;padding:24px;font-size:19px\}\
+.blockbox h2\{font-size:24px;margin-bottom:10px\}\
+.pill.sync\{background:var(--away);color:#1F1A00;border-color:var(--away);font-weight:700\}\
+.hint-strong.ok\{color:var(--terr)\}\
+.hint-strong\{color:var(--draw);font-weight:700;font-size:16px;margin-top:4px\}\
+.unit.hl\{outline:4px solid var(--draw);outline-offset:2px\}\
+.cardbar\{position:absolute;left:10px;right:64px;bottom:22px;z-index:500;background:var(--paper);border:3px solid var(--draw);border-radius:var(--r);padding:8px 12px;box-shadow:0 4px 12px #0004\}\
+.cardbar p\{margin:0\}\
+.nowtag\{display:inline-block;background:var(--ink);color:#fff;border-radius:6px;padding:0 6px;font-size:14px;vertical-align:middle\}\
+.btn:disabled\{opacity:.45;cursor:not-allowed\}\
+.slotpick\{width:100%;border-collapse:collapse;text-align:center;margin:8px 0\}\
+.slotpick th\{font-size:15px;padding:4px 2px;font-weight:700\}\
+.slotpick th small\{font-weight:400;font-size:11px\}\
+.slotpick td\{padding:3px\}\
+.slotbtn\{width:100%;min-width:44px;height:54px;border-radius:10px;border:2px solid var(--ink2);background:#fff;font-size:24px;font-weight:700\}\
+.slotbtn[aria-pressed="true"]\{background:var(--ink);color:#fff;border-color:var(--ink)\}\
+.slots td.thin\{background:var(--warn-bg);outline:3px solid var(--away);outline-offset:-3px\}\
+.tag-warn\{background:var(--warn-bg);color:#6B4200;border-radius:8px;padding:0 8px;font-weight:700\}\
+\
+/* ===== \uc0\u12362 \u30693 \u12425 \u12379  ===== */\
+#toast\{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--ink);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px\}\
+#toast button\{min-height:46px;border-radius:10px;border:2px solid #fff;background:transparent;color:#fff;font-weight:700;padding:0 14px;flex:none\}\
+@media (max-width:420px)\{ body\{font-size:17px\} .choice\{font-size:17px\} \}\
+</style>\
+</head>\
+<body>\
+<div class="app">\
+  <header class="top">\
+    <h1>\uc0\u21306 \u22495 \u12510 \u12483 \u12503 </h1><span class="pill" id="modePill">\u35430 \u20316 \u29256 </span><span class="pill sync" id="syncState" hidden></span>\
+    <label class="who"><span id="whoLabel">\uc0\u20351 \u12358 \u20154 </span><select id="whoSel"></select><b id="whoName" hidden></b></label>\
+  </header>\
+\
+  <main>\
+    <!-- \uc0\u21306 \u22495 \u12459 \u12540 \u12489  -->\
+    <section class="view" id="view-cards">\
+      <div class="wrap">\
+        <div id="todayBox"></div>\
+        <div id="reqNotice"></div>\
+        <div id="followAlert"></div>\
+        <h2 class="sec">\uc0\u12354 \u12394 \u12383 \u12398 \u21306 \u22495 \u12459 \u12540 \u12489 </h2>\
+        <div id="myCards"></div>\
+        <div id="reqArea"></div>\
+        <div id="myAway"></div>\
+        <h2 class="sec" id="followsHead">\uc0\u12354 \u12394 \u12383 \u12398 \u20877 \u35370 \u21839 </h2>\
+        <div id="myFollows"></div>\
+        <details class="all"><summary>\uc0\u12411 \u12363 \u12398 \u21306 \u22495 \u12434 \u35211 \u12427 </summary><div id="allCards"></div></details>\
+        <div class="row" id="liveTools" hidden><button class="btn small" id="btnLogout">\uc0\u12371 \u12398 \u31471 \u26411 \u12363 \u12425 \u28040 \u12377 </button>\
+          <span class="muted">\uc0\u31471 \u26411 \u12434 \u20154 \u12395 \u28193 \u12377 \u12392 \u12365 \u12420 \u12289 \u20351 \u12431 \u12394 \u12367 \u12394 \u12387 \u12383 \u12392 \u12365 \u12395 \u25276 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 </span></div>\
+        <div class="notice info">\uc0\u35352 \u37682 \u12395 \u27531 \u12377 \u12398 \u12399 \u12300 \u20250 \u12360 \u12383 \u12539 \u30041 \u23432 \u12539 \u24180 \u40802 \u23652 \u12539 \u38306 \u24515 \u12301 \u12384 \u12369 \u12391 \u12377 \u12290 \u20303 \u12435 \u12391 \u12356 \u12427 \u20154 \u12398 \u21517 \u21069 \u12539 \u38651 \u35441 \u30058 \u21495 \u12539 \u23478 \u26063 \u12398 \u12371 \u12392 \u12539 \u20250 \u35441 \u12398 \u20869 \u23481 \u12399 \u26360 \u12363 \u12394 \u12356 \u12391 \u12367 \u12384 \u12373 \u12356 \u12290 </div>\
+      </div>\
+    </section>\
+\
+    <!-- \uc0\u22320 \u22259  -->\
+    <section class="view" id="view-map" hidden>\
+      <img id="overlayImg" alt="" hidden>\
+      <div id="map"></div>\
+      <div class="maptools" id="mapTools">\
+        <select id="terrJump" aria-label="\uc0\u21306 \u22495 \u12434 \u12360 \u12425 \u12406 "></select>\
+        <button class="btn primary" id="btnAdd">\uc0\u65291  \u23478 \u12434 \u36861 \u21152 </button>\
+        <button class="btn" id="btnLocate">\uc0\u29694 \u22312 \u22320 </button>\
+        <button class="btn" id="btnBase">\uc0\u20889 \u30495 </button>\
+      </div>\
+      <div class="zoomhint" id="zoomHint" hidden>\uc0\u22320 \u22259 \u12434 \u25313 \u22823 \u12377 \u12427 \u12392 \u23478 \u12398 \u21360 \u12364 \u20986 \u12414 \u12377 </div>\
+      <div class="cardbar" id="cardBar" hidden></div>\
+      <div class="legend" id="legend" aria-label="\uc0\u21360 \u12398 \u35211 \u12363 \u12383 ">\
+        <span><i class="pin st-new">\uc0\u26410 </i>\u26410 \u35370 \u21839 </span>\
+        <span><i class="pin st-met">\uc0\u20250 </i>\u20250 \u12360 \u12383 </span>\
+        <span><i class="pin st-away">\uc0\u30041 </i>\u30041 \u23432 </span>\
+        <span><i class="pin st-refused">\uc0\u25298 </i>\u25298 \u21542 </span>\
+        <span><i class="pin st-met">\uc0\u20250 <em>\u20877 </em></i>\u20877 \u35370 \u21839 \u12398 \u21463 \u12369 \u25345 \u12385 \u12354 \u12426 </span>\
+      </div>\
+      <div class="modebar" id="addBar" hidden>\
+        <p><b>\uc0\u23478 \u12434 \u36861 \u21152 \u65306 </b>\u36861 \u21152 \u12375 \u12383 \u12356 \u22580 \u25152 \u12434 \u22320 \u22259 \u12391 \u12479 \u12483 \u12503 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 </p>\
+        <div class="row"><button class="btn" id="addCancel">\uc0\u12420 \u12417 \u12427 </button></div>\
+      </div>\
+      <div class="modebar" id="drawBar" hidden>\
+        <p><b id="drawTitle">\uc0\u21306 \u22495 \u12398 \u32218 \u12434 \u24341 \u12367 </b>\u65306 \u21306 \u22495 \u12398 \u35282 \u12434 \u38918 \u30058 \u12395 \u12479 \u12483 \u12503 \u65288 <span id="drawCount">0</span>\u12363 \u25152 \u65289 </p>\
+        <div class="row">\
+          <button class="btn small" id="drawUndo">1\uc0\u12388 \u25147 \u12377 </button>\
+          <button class="btn small primary" id="drawDone">\uc0\u23436 \u25104 </button>\
+          <button class="btn small" id="drawCancel">\uc0\u12420 \u12417 \u12427 </button>\
+        </div>\
+        <div class="row">\
+          <label class="btn small">\uc0\u21476 \u12356 \u12459 \u12540 \u12489 \u12398 \u20889 \u30495 \u12434 \u37325 \u12397 \u12427 <input type="file" accept="image/*" id="ovFile" hidden></label>\
+          <span id="ovCtl" hidden>\
+            <label>\uc0\u22320 \u22259 \u12398 \u28611 \u12373  <input type="range" id="ovRange" min="0" max="100" value="50"></label>\
+            <button class="btn small" id="ovClear">\uc0\u20889 \u30495 \u12434 \u28040 \u12377 </button>\
+          </span>\
+        </div>\
+      </div>\
+    </section>\
+\
+    <!-- \uc0\u12362 \u12377 \u12377 \u12417  -->\
+    <section class="view" id="view-reco" hidden>\
+      <div class="wrap">\
+        <h2 class="sec">\uc0\u20170 \u12289 \u35370 \u21839 \u12377 \u12427 \u12392 \u12424 \u12356 \u23478 </h2>\
+        <p class="lead" id="recoNow"></p>\
+        <div class="row"><button class="btn" id="recoLocate">\uc0\u29694 \u22312 \u22320 \u12363 \u12425 \u36817 \u12356 \u38918 \u12395 \u12377 \u12427 </button><button class="btn" id="slotEdit">\u34892 \u12369 \u12427 \u26178 \u38291 \u12434 \u30331 \u37682 \u12377 \u12427 </button></div>\
+        <h3 class="sub">\uc0\u30041 \u23432 \u23429 \u12459 \u12540 \u12489 </h3>\
+        <p class="hint" id="awayHint"></p>\
+        <div id="awayList"></div>\
+        <h3 class="sub">\uc0\u20877 \u35370 \u21839 \u12398 \u12362 \u12377 \u12377 \u12417 </h3>\
+        <label class="check"><input type="checkbox" id="recoMine" checked>\uc0\u33258 \u20998 \u12398 \u21306 \u22495 \u12392 \u12289 \u25285 \u24403 \u32773 \u12398 \u12356 \u12394 \u12356 \u21306 \u22495 \u12384 \u12369 \u34920 \u31034 </label>\
+        <div class="chips" id="recoChips"></div>\
+        <div id="recoList"></div>\
+      </div>\
+    </section>\
+\
+    <!-- \uc0\u20418 \u12398 \u30011 \u38754  -->\
+    <section class="view" id="view-admin" hidden>\
+      <div class="wrap">\
+        <div id="adInbox"></div>\
+        <h2 class="sec">\uc0\u20840 \u20307 \u12398 \u29366 \u27841 </h2>\
+        <div class="tiles" id="adTiles"></div>\
+        <h2 class="sec">\uc0\u26178 \u38291 \u24111 \u12372 \u12392 \u12398 \u12300 \u20250 \u12360 \u12383 \u12301 \u21106 \u21512 \u65288 \u30452 \u36817 180\u26085 \u65289 </h2>\
+        <p class="hint">\uc0\u26528 \u12391 \u22258 \u12435 \u12384 \u27396 \u12364 \u12289 \u12356 \u12385 \u12400 \u12435 \u20250 \u12360 \u12390 \u12356 \u12427 \u26178 \u38291 \u24111 \u12391 \u12377 \u65288 10\u20214 \u20197 \u19978 \u12398 \u35352 \u37682 \u12364 \u12354 \u12427 \u27396 \u12398 \u12415 \u65289 \u12290 </p>\
+        <div class="scroll"><table class="slots" id="adSlots"></table></div>\
+        <h2 class="sec">\uc0\u21306 \u22495 \u12398 \u19968 \u35239 </h2>\
+        <div class="row"><button class="btn primary" id="adNewTerr">\uc0\u65291  \u26032 \u12375 \u12356 \u21306 \u22495 \u12398 \u32218 \u12434 \u24341 \u12367 </button></div>\
+        <div id="adTakeSet"></div>\
+        <div id="adTerrs"></div>\
+        <h2 class="sec">\uc0\u30041 \u23432 \u23429 \u12398 \u29366 \u27841 </h2>\
+        <div id="adAwaySet"></div>\
+        <h3 class="sub">\uc0\u12414 \u12384 \u35430 \u12375 \u12390 \u12356 \u12394 \u12356 \u23478 \u12398 \u25968 \u65288 \u26178 \u38291 \u24111 \u12372 \u12392 \u65289 </h3>\
+        <p class="hint">\uc0\u26528 \u12391 \u22258 \u12435 \u12384 \u26178 \u38291 \u24111 \u12364 \u12356 \u12385 \u12400 \u12435 \u25163 \u34180 \u12391 \u12377 \u12290 \u38598 \u12414 \u12426 \u12398 \u26178 \u38291 \u12434 \u27770 \u12417 \u12427 \u21442 \u32771 \u12395 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 </p>\
+        <div class="scroll"><table class="slots" id="adAwaySlots"></table></div>\
+        <h3 class="sub">\uc0\u21306 \u22495 \u12372 \u12392 </h3>\
+        <div class="scroll" id="adAwayTerrs"></div>\
+        <h3 class="sub">\uc0\u12394 \u12363 \u12394 \u12363 \u20250 \u12360 \u12394 \u12356 \u23478 \u65288 \u12377 \u12409 \u12390 \u12398 \u26178 \u38291 \u24111 \u12391 \u30041 \u23432 \u65289 </h3>\
+        <p class="hint">\uc0\u25163 \u32025 \u12394 \u12393 \u12289 \u21029 \u12398 \u26041 \u27861 \u12434 \u26908 \u35342 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 </p>\
+        <div id="adHard"></div>\
+        <h2 class="sec">\uc0\u20877 \u35370 \u21839 \u12398 \u21463 \u12369 \u25345 \u12385 </h2>\
+        <div class="tiles" id="adFollowTiles"></div>\
+        <h3 class="sub">\uc0\u30693 \u12425 \u12379 \u12427 \u12414 \u12391 \u12398 \u26085 \u25968 </h3>\
+        <p class="hint">\uc0\u21463 \u12369 \u25345 \u12387 \u12383 \u20154 \u12364 \u35352 \u37682 \u12434 \u20184 \u12369 \u12427 \u12392 \u12289 \u26085 \u25968 \u12399 0\u12363 \u12425 \u25968 \u12360 \u30452 \u12375 \u12414 \u12377 \u12290 </p>\
+        <div id="adFollowSet"></div>\
+        <h3 class="sub">\uc0\u20154 \u12372 \u12392 \u12398 \u20214 \u25968 </h3>\
+        <div class="scroll" id="adFollowUsers"></div>\
+        <h3 class="sub">\uc0\u30906 \u35469 \u12364 \u24517 \u35201 \u12394 \u21463 \u12369 \u25345 \u12385 </h3>\
+        <p class="hint">\uc0\u26412 \u20154 \u12395 \u22768 \u12434 \u12363 \u12369 \u12390 \u12363 \u12425 \u12289 \u24310 \u38263 \u12539 \u24341 \u12365 \u32153 \u12366 \u12539 \u35299 \u38500 \u12434 \u36984 \u12435 \u12391 \u12367 \u12384 \u12373 \u12356 \u12290 </p>\
+        <div id="adFollowCheck"></div>\
+        <h3 class="sub">\uc0\u21462 \u12426 \u27531 \u12375 \u65288 \u38306 \u24515 \u12364 \u12354 \u12427 \u12398 \u12395 \u21463 \u12369 \u25345 \u12385 \u12364 \u12394 \u12356 \u23478 \u65289 </h3>\
+        <div id="adLeft"></div>\
+        <h3 class="sub">\uc0\u12414 \u12392 \u12417 \u12390 \u24341 \u12365 \u32153 \u12366 </h3>\
+        <p class="hint">\uc0\u22857 \u20181 \u12364 \u38627 \u12375 \u12367 \u12394 \u12387 \u12383 \u20154 \u12398 \u21463 \u12369 \u25345 \u12385 \u12434 \u12289 \u12414 \u12392 \u12417 \u12390 \u21029 \u12398 \u20154 \u12395 \u31227 \u12375 \u12414 \u12377 \u12290 </p>\
+        <div class="actions" id="adBulk"></div>\
+        <h2 class="sec">\uc0\u12487 \u12540 \u12479 </h2>\
+        <div class="row">\
+          <button class="btn" id="adCsv">\uc0\u35370 \u21839 \u35352 \u37682 \u12434 CSV\u12391 \u26360 \u12365 \u20986 \u12377 </button>\
+          <button class="btn danger" id="adReset">\uc0\u35430 \u20316 \u12487 \u12540 \u12479 \u12395 \u25147 \u12377 </button>\
+        </div>\
+      </div>\
+    </section>\
+  </main>\
+\
+  <nav class="tabs" id="tabs" aria-label="\uc0\u30011 \u38754 \u12398 \u20999 \u12426 \u12363 \u12360 ">\
+    <button data-view="cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h6M7 14h10"/></svg>\uc0\u21306 \u22495 \u12459 \u12540 \u12489 </button>\
+    <button data-view="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>\uc0\u22320 \u22259 </button>\
+    <button data-view="reco"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>\uc0\u12362 \u12377 \u12377 \u12417 </button>\
+    <button data-view="admin" id="tabAdmin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 20h18M6 17v-6M11 17V6M16 17v-9"/></svg>\uc0\u20418 \u12398 \u30011 \u38754 <b class="tabbadge" id="tabBadge" hidden>0</b></button>\
+  </nav>\
+</div>\
+\
+<div id="backdrop" hidden></div>\
+<section id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><div id="sheetBody"></div></section>\
+<div id="toast" hidden role="status" aria-live="polite"></div>\
+<div id="blocker" hidden><div class="blockbox" role="alert"><h2 id="blockTitle"></h2><p id="blockMsg"></p></div></div>\
+\
+<script>\
+'use strict';\
+/* =========================================================\
+   \uc0\u21306 \u22495 \u12510 \u12483 \u12503  \u35430 \u20316 \u29256 \
+   - \uc0\u12487 \u12540 \u12479 \u12399 \u12371 \u12398 \u31471 \u26411 \u12398 \u20013 \u12384 \u12369 \u12395 \u20445 \u23384 \u65288 Store\u65289 \u12290 \
+   - \uc0\u26412 \u30058 \u12391 \u12399  Store \u12398  load/save \u12434  GAS\u65288 Google\u12473 \u12503 \u12524 \u12483 \u12489 \u12471 \u12540 \u12488 \u65289 \u12392 \u12398 \
+     \uc0\u36890 \u20449 \u12395 \u24046 \u12375 \u26367 \u12360 \u12427 \u20104 \u23450 \u12290 \u30011 \u38754 \u20596 \u12398 \u20966 \u29702 \u12399 \u12381 \u12398 \u12414 \u12414 \u20351 \u12358 \u12290 \
+   ========================================================= */\
+\
+const $ = (s, r = document) => r.querySelector(s);\
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));\
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => (\{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'\}[c]));\
+const pad = n => String(n).padStart(2, '0');\
+const DAY = 86400000;\
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);\
+\
+const AGES = ['10\uc0\u12316 20\u20195 ', '30\u12316 40\u20195 ', '50\u12316 60\u20195 ', '70\u20195 \u20197 \u19978 ', '\u12431 \u12363 \u12425 \u12394 \u12356 '];\
+const YOUNG = new Set(['10\uc0\u12316 20\u20195 ', '30\u12316 40\u20195 ']);\
+const INTERESTS = ['\uc0\u38306 \u24515 \u12354 \u12426 ', '\u23569 \u12375 \u12354 \u12426 ', '\u38306 \u24515 \u12394 \u12375 '];\
+const RESULT_LABEL = \{ met: '\uc0\u20250 \u12360 \u12383 ', away: '\u30041 \u23432 ', refused: '\u25298 \u21542 ' \};\
+const ST_LABEL = \{ new: '\uc0\u26410 \u35370 \u21839 ', met: '\u20250 \u12360 \u12383 ', away: '\u30041 \u23432 ', refused: '\u25298 \u21542 ', dnc: '\u25298 \u21542 ' \};\
+const ST_CHAR = \{ new: '\uc0\u26410 ', met: '\u20250 ', away: '\u30041 ', refused: '\u25298 ', dnc: '\u25298 ' \};\
+\
+/* \uc0\u32080 \u26524 \u12398 \u36984 \u25246 \u65306 \u20250 \u12360 \u12383 \u65295 \u30041 \u23432  */\
+function resultChoicesHtml(awaySub) \{\
+  return `<div class="choices two">\
+      <button class="choice c-met" data-res="met"><i class="pin st-met">\uc0\u20250 </i>\u20250 \u12360 \u12383 </button>\
+      <button class="choice c-away" data-res="away"><i class="pin st-away">\uc0\u30041 </i>\u30041 \u23432 $\{awaySub ? `<small>$\{awaySub\}</small>` : ''\}</button>\
+    </div>`;\
+\}\
+/* \uc0\u38306 \u24515 \u12398 \u36984 \u25246 \u65306 \u25298 \u21542 \u12399 \u38626 \u12375 \u12390 \u32622 \u12365 \u12289 \u33394 \u12418 \u20998 \u12369 \u12427  */\
+function interestChoicesHtml() \{\
+  return `<p class="q">\uc0\u38306 \u24515 \u12399 \u12354 \u12426 \u12414 \u12375 \u12383 \u12363 \u65311 </p>\
+    <div class="choices three">$\{INTERESTS.map(a => `<button class="choice" data-int="$\{a\}">$\{a\}</button>`).join('')\}</div>\
+    <button class="choice refbtn" data-int="\uc0\u25298 \u21542 "><i class="pin st-dnc">\u25298 </i>\u25298 \u21542 <small>\u12418 \u12358 \u26469 \u12394 \u12356 \u12391 \u12411 \u12375 \u12356 \u12392 \u35328 \u12431 \u12428 \u12383 </small></button>\
+    <button class="btn block" data-back="age">\uc0\u8592  \u24180 \u40802 \u23652 \u12398 \u36984 \u25246 \u12395 \u12418 \u12393 \u12427 </button>`;\
+\}\
+/* \uc0\u25298 \u21542 \u12398 \u30906 \u35469 \u65306 \u12414 \u12385 \u12364 \u12360 \u12390 \u25276 \u12375 \u12390 \u12418 \u25147 \u12428 \u12427 \u12424 \u12358 \u12395 \u12377 \u12427  */\
+function refuseStepHtml(isUnit) \{\
+  return `<div class="refhead"><i class="pin st-dnc">\uc0\u25298 </i><b>\u25298 \u21542 \u12392 \u12375 \u12390 \u35352 \u37682 \u12375 \u12414 \u12377 </b></div>\
+    <p>\uc0\u22320 \u22259 \u12398 \u12371 \u12398 $\{isUnit ? '\u37096 \u23627 ' : '\u23478 '\}\u12395 \u36196 \u12356 \u12300 \u25298 \u12301 \u12398 \u12510 \u12540 \u12463 \u12364 \u20184 \u12365 \u12289 \u27425 \u12363 \u12425 \u12362 \u12377 \u12377 \u12417 \u12420 \u12459 \u12540 \u12489 \u12395 \u20986 \u12394 \u12367 \u12394 \u12426 \u12414 \u12377 \u12290 </p>\
+    <button class="btn block refok" data-refok>\uc0\u25298 \u21542 \u12392 \u12375 \u12390 \u35352 \u37682 \u12377 \u12427 </button>\
+    <button class="btn block" data-back="interest">\uc0\u8592  \u12414 \u12385 \u12364 \u12360 \u12383 \u65288 \u38306 \u24515 \u12398 \u36984 \u25246 \u12395 \u12418 \u12393 \u12427 \u65289 </button>`;\
+\}\
+const BANDS = ['\uc0\u26397 ', '\u26172 ', '\u21320 \u24460 ', '\u22805 \u26041 ', '\u22812 '];\
+const BAND_HINT = \{ \uc0\u26397 : '\u12316 11\u26178 ', \u26172 : '11\u12316 14\u26178 ', \u21320 \u24460 : '14\u12316 17\u26178 ', \u22805 \u26041 : '17\u12316 19\u26178 ', \u22812 : '19\u26178 \u12316 ' \};\
+const SLOTS = [];\
+['\uc0\u24179 \u26085 ', '\u22303 \u26085 '].forEach(dt => BANDS.forEach(b => SLOTS.push(dt + '\u12539 ' + b)));\
+const bySlot = (a, b) => SLOTS.indexOf(a) - SLOTS.indexOf(b);\
+const TILE_PALE = 'https://cyberjapandata.gsi.go.jp/xyz/pale/\{z\}/\{x\}/\{y\}.png';\
+const TILE_PHOTO = 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/\{z\}/\{x\}/\{y\}.jpg';\
+const GSI_ATTR = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">\uc0\u22320 \u29702 \u38498 \u12479 \u12452 \u12523 </a>';\
+\
+/* ---------- \uc0\u26178 \u38291 \u24111  ---------- */\
+function bandOf(d) \{ const h = d.getHours(); return h < 11 ? '\uc0\u26397 ' : h < 14 ? '\u26172 ' : h < 17 ? '\u21320 \u24460 ' : h < 19 ? '\u22805 \u26041 ' : '\u22812 '; \}\
+function dayTypeOf(d) \{ const w = d.getDay(); return (w === 0 || w === 6) ? '\uc0\u22303 \u26085 ' : '\u24179 \u26085 '; \}\
+function slotOf(d) \{ return dayTypeOf(d) + '\uc0\u12539 ' + bandOf(d); \}\
+const fmtTime = d => `$\{d.getHours()\}:$\{pad(d.getMinutes())\}`;\
+function fmtDate(iso) \{\
+  const d = new Date(iso), y = d.getFullYear() !== new Date().getFullYear() ? d.getFullYear() + '/' : '';\
+  return `$\{y\}$\{d.getMonth() + 1\}/$\{d.getDate()\} $\{fmtTime(d)\}`;\
+\}\
+const fmtDay = iso => \{\
+  const d = new Date(iso), y = d.getFullYear() !== new Date().getFullYear() ? `$\{d.getFullYear()\}\uc0\u24180 ` : '';\
+  return `$\{y\}$\{d.getMonth() + 1\}\uc0\u26376 $\{d.getDate()\}\u26085 `;\
+\};\
+const daysSince = iso => Math.floor((Date.now() - Date.parse(iso)) / DAY);\
+\
+/* ---------- \uc0\u35430 \u20316 \u12487 \u12540 \u12479  ---------- */\
+function rng(seed) \{\
+  return function () \{\
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;\
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);\
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;\
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;\
+  \};\
+\}\
+function makeDemo() \{\
+  const r = rng(20260917), now = Date.now();\
+  const iso = ms => new Date(ms).toISOString();\
+  const users = [\
+    \{ id: 'u1', name: '\uc0\u20253 \u36947 \u32773 A', role: 'pub' \},\
+    \{ id: 'u2', name: '\uc0\u20253 \u36947 \u32773 B', role: 'pub' \},\
+    \{ id: 'u3', name: '\uc0\u21306 \u22495 \u20418 C', role: 'admin' \}\
+  ];\
+  const rect = (a, b, c, d) => [[a, c], [a, d], [b, d], [b, c]];\
+  const territories = [\
+    \{ id: 't1', no: 1, name: '\uc0\u35430 \u20316 \u21306 \u22495  \u21271 \u35199 ', polygon: rect(26.1600, 26.1640, 127.6720, 127.6765), holder: 'u1', lentAt: iso(now - 20 * DAY), completedAt: iso(now - 150 * DAY) \},\
+    \{ id: 't2', no: 2, name: '\uc0\u35430 \u20316 \u21306 \u22495  \u21271 \u26481 ', polygon: rect(26.1600, 26.1640, 127.6765, 127.6810), holder: 'u2', lentAt: iso(now - 130 * DAY), completedAt: iso(now - 300 * DAY) \},\
+    \{ id: 't3', no: 3, name: '\uc0\u35430 \u20316 \u21306 \u22495  \u21335 ', polygon: rect(26.1560, 26.1600, 127.6720, 127.6810), holder: null, lentAt: null, free: true, completedAt: iso(now - 200 * DAY) \},\
+    \{ id: 't4', no: 4, name: '\uc0\u35430 \u20316 \u21306 \u22495  \u26481 ', polygon: rect(26.1560, 26.1600, 127.6810, 127.6850), holder: null, lentAt: null, completedAt: iso(now - 60 * DAY) \}\
+  ];\
+  const labels = ['\uc0\u38738 \u12356 \u38272 ', '\u30333 \u12356 \u22592 ', '2\u38542 \u24314 \u12390 ', '\u35282 \u12398 \u23478 ', '\u39376 \u36554 \u22580 \u12354 \u12426 ', '\u36196 \u29926 ', '\u33457 \u22727 \u12354 \u12426 ', '\u24179 \u23627 '];\
+  const houses = [], visits = [];\
+  const pick = arr => arr[Math.floor(r() * arr.length)];\
+  territories.forEach(t => \{\
+    const la = t.polygon.map(p => p[0]), ln = t.polygon.map(p => p[1]);\
+    const la0 = Math.min(...la), la1 = Math.max(...la), ln0 = Math.min(...ln), ln1 = Math.max(...ln);\
+    const pos = () => [la0 + (la1 - la0) * (0.08 + 0.84 * r()), ln0 + (ln1 - ln0) * (0.08 + 0.84 * r())];\
+    const n = t.no === 3 ? 30 : t.no === 4 ? 16 : 22;\
+    for (let i = 0; i < n; i++) \{\
+      const [lat, lng] = pos();\
+      houses.push(\{ id: `h$\{t.no\}_$\{i\}`, terrId: t.id, type: 'house', lat, lng, label: pick(labels), units: [], createdAt: iso(now - 400 * DAY) \});\
+    \}\
+    for (let k = 0; k < 2; k++) \{\
+      const [lat, lng] = pos(), units = [];\
+      const fl = 2 + Math.floor(r() * 3), per = 3 + Math.floor(r() * 2);\
+      for (let f = 1; f <= fl; f++) for (let u = 1; u <= per; u++) units.push(`$\{f\}$\{pad(u)\}`);\
+      houses.push(\{ id: `a$\{t.no\}_$\{k\}`, terrId: t.id, type: 'apt', lat, lng, label: '\uc0\u12450 \u12497 \u12540 \u12488 ' + 'AB'[k], units, createdAt: iso(now - 400 * DAY) \});\
+    \}\
+  \});\
+  houses.forEach(h => \{\
+    targets(h).forEach(unit => \{\
+      const cnt = Math.floor(r() * 4);\
+      for (let j = 0; j < cnt; j++) \{\
+        const d = new Date(now - Math.floor(r() * 150 + 1) * DAY);\
+        d.setHours(9 + Math.floor(r() * 11), Math.floor(r() * 60), 0, 0);\
+        const x = r(), result = x < 0.35 ? 'met' : x < 0.97 ? 'away' : 'refused';\
+        const v = \{ id: uid(), houseId: h.id, unit, result, at: d.toISOString(), by: r() < 0.5 ? 'u1' : 'u2' \};\
+        if (result === 'met') \{ v.age = pick(AGES); v.interest = pick(INTERESTS); \}\
+        if (result === 'refused') v.age = pick(AGES);\
+        visits.push(v);\
+      \}\
+    \});\
+  \});\
+  // \uc0\u12377 \u12409 \u12390 \u12398 \u26178 \u38291 \u24111 \u12391 \u30041 \u23432 \u12398 \u23478 \u65288 \u35430 \u20316 \u65289 \
+  ['h3_0', 'h3_1'].forEach(hid => \{\
+    for (let i = visits.length - 1; i >= 0; i--) if (visits[i].houseId === hid) visits.splice(i, 1);\
+    const hours = \{ \uc0\u26397 : 9, \u26172 : 12, \u21320 \u24460 : 15, \u22805 \u26041 : 18, \u22812 : 20 \};\
+    let back = 20;\
+    ['\uc0\u24179 \u26085 ', '\u22303 \u26085 '].forEach(dt => BANDS.forEach(b => \{\
+      const d = new Date(now - back * DAY);\
+      while (dayTypeOf(d) !== dt) d.setDate(d.getDate() - 1);\
+      d.setHours(hours[b], 10, 0, 0);\
+      visits.push(\{ id: uid(), houseId: hid, unit: '', result: 'away', at: d.toISOString(), by: 'u1' \});\
+      back += 6;\
+    \}));\
+  \});\
+  users[1].slots = ['\uc0\u24179 \u26085 \u12539 \u22805 \u26041 ', '\u22303 \u26085 \u12539 \u26397 '];\
+  // \uc0\u20877 \u35370 \u21839 \u12398 \u21463 \u12369 \u25345 \u12385 \u65288 \u35430 \u20316 \u65289 \
+  const follows = \{\}, released = \{\};\
+  const r2 = rng(777);\
+  houses.forEach(h => targets(h).forEach(unit => \{\
+    const k = K(h.id, unit);\
+    const m = visits.filter(v => v.houseId === h.id && v.unit === unit && v.result === 'met').sort((a, b) => (a.at < b.at ? 1 : -1))[0];\
+    if (!m || m.interest === '\uc0\u38306 \u24515 \u12394 \u12375 ') return;\
+    const x = r2();\
+    if (x < 0.6) \{\
+      const by = r2() < 0.6 ? 'u1' : 'u2';\
+      const d = new Date(now - [4, 10, 25, 31, 48, 63][Math.floor(r2() * 6)] * DAY);\
+      d.setHours(10 + Math.floor(r2() * 8), Math.floor(r2() * 60), 0, 0);\
+      visits.push(\{ id: uid(), houseId: h.id, unit, result: 'met', at: d.toISOString(), by, age: m.age, interest: m.interest \});\
+      follows[k] = \{ by, since: iso(d.getTime() - 60 * DAY), touchedAt: d.toISOString() \};\
+    \} else if (x < 0.8) \{\
+      released[k] = \{ at: iso(now - 9 * DAY), reason: 'handoff' \};\
+    \}\
+  \}));\
+  // \uc0\u26368 \u24460 \u12398 \u32080 \u26524 \u12364 \u25298 \u21542 \u12398 \u23478 \u12395 \u12399 \u25298 \u21542 \u12510 \u12540 \u12463 \
+  const dnc = \{\};\
+  houses.forEach(h => targets(h).forEach(unit => \{\
+    const last = visits.filter(v => v.houseId === h.id && v.unit === unit).sort((a, b) => (a.at < b.at ? 1 : -1))[0];\
+    if (last && last.result === 'refused') \{ const k = K(h.id, unit); dnc[k] = true; delete follows[k]; delete released[k]; \}\
+  \}));\
+  const requests = [\{ id: 'r1', by: 'u2', terrId: 't4', at: iso(now - 2 * DAY), status: 'pending' \}];\
+  return \{ version: 4, users, territories, houses, visits, dnc, follows, released, requests, awayCards: [], returns: [],\
+    settings: \{ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90 \}, currentUser: 'u1' \};\
+\}\
+\
+/* ---------- \uc0\u20445 \u23384  ----------\
+   API_URL \uc0\u12364 \u31354 \u12398 \u12392 \u12365 \u65306 \u35430 \u20316 \u12514 \u12540 \u12489 \u65288 \u12371 \u12398 \u31471 \u26411 \u12384 \u12369 \u12395 \u20445 \u23384 \u65289 \
+   API_URL \uc0\u12434 \u20837 \u12428 \u12383 \u12392 \u12365 \u65306 \u26412 \u30058 \u12514 \u12540 \u12489 \u65288 Google\u12473 \u12503 \u12524 \u12483 \u12489 \u12471 \u12540 \u12488 \u12395 \u20445 \u23384 \u12290 \
+   \uc0\u36890 \u20449 \u12391 \u12365 \u12394 \u12356 \u12392 \u12365 \u12399 \u31471 \u26411 \u12395 \u12383 \u12417 \u12390 \u12362 \u12365 \u12289 \u12388 \u12394 \u12364 \u12387 \u12383 \u12392 \u12365 \u12395 \u36865 \u12427 \u65289  */\
+const API_URL = '
+\fs26\fsmilli13333 \cf2 \expnd0\expndtw0\kerning0
+https://script.google.com/macros/s/AKfycbxMThstsm7d2fe-lOMBtJmkGBXTKiGTc-lntyMRTlN7nSMkftRhESHqY0cafqT7IsNT/exec
+\f1\fs28 \
+
+\f0\fs24 \cf0 \kerning1\expnd0\expndtw0 '; // \uc0\u8592  GAS \u12398 \u12300 \u12454 \u12455 \u12502 \u12450 \u12503 \u12522 \u12398 URL\u12301 \u12434 \u12371 \u12371 \u12395 \u36028 \u12427 \
+const LIVE = !!API_URL;\
+const TOKEN_KEY = 'kuiki_token', CACHE_KEY = 'kuiki_cache', QUEUE_KEY = 'kuiki_queue';\
+const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'users'];\
+const MAP_COLS = ['dnc', 'follows', 'released'];\
+const clone = o => JSON.parse(JSON.stringify(o));\
+const lsGet = k => \{ try \{ return localStorage.getItem(k); \} catch (e) \{ return null; \} \};\
+const lsSet = (k, v) => \{ try \{ localStorage.setItem(k, v); return true; \} catch (e) \{ return false; \} \};\
+const lsDel = k => \{ try \{ localStorage.removeItem(k); \} catch (e) \{ /* \uc0\u20309 \u12418 \u12375 \u12394 \u12356  */ \} \};\
+\
+/* \uc0\u21069 \u12398 \u29366 \u24907  a \u12392 \u20170 \u12398 \u29366 \u24907  b \u12398 \u36949 \u12356 \u65288 \u36865 \u12427 \u22793 \u26356 \u65289  */\
+function diffState(a, b) \{\
+  const out = \{\};\
+  ARR_COLS.forEach(c => \{\
+    const am = new Map((a[c] || []).map(x => [x.id, JSON.stringify(x)]));\
+    const bm = new Map((b[c] || []).map(x => [x.id, x]));\
+    const up = [], del = [];\
+    bm.forEach((x, id) => \{ if (am.get(id) !== JSON.stringify(x)) up.push(clone(x)); \});\
+    am.forEach((_, id) => \{ if (!bm.has(id)) del.push(id); \});\
+    if (up.length || del.length) out[c] = \{ up, del \};\
+  \});\
+  MAP_COLS.forEach(c => \{\
+    const A = a[c] || \{\}, B = b[c] || \{\}, up = [], del = [];\
+    Object.keys(B).forEach(id => \{ if (JSON.stringify(A[id]) !== JSON.stringify(B[id])) up.push(\{ id, value: clone(B[id]) \}); \});\
+    Object.keys(A).forEach(id => \{ if (!(id in B)) del.push(id); \});\
+    if (up.length || del.length) out[c] = \{ up, del \};\
+  \});\
+  if (JSON.stringify(a.settings) !== JSON.stringify(b.settings)) out.settings = clone(b.settings);\
+  return out;\
+\}\
+/* \uc0\u12414 \u12384 \u36865 \u12387 \u12390 \u12356 \u12394 \u12356 \u22793 \u26356 \u12434 \u12289 \u21463 \u12369 \u21462 \u12387 \u12383 \u29366 \u24907 \u12395 \u37325 \u12397 \u12427  */\
+function applyDiff(st, ch) \{\
+  ARR_COLS.forEach(c => \{\
+    if (!ch[c]) return;\
+    const m = new Map((st[c] || []).map(x => [x.id, x]));\
+    ch[c].up.forEach(x => m.set(x.id, clone(x)));\
+    ch[c].del.forEach(id => m.delete(id));\
+    st[c] = [...m.values()];\
+  \});\
+  MAP_COLS.forEach(c => \{\
+    if (!ch[c]) return;\
+    st[c] = st[c] || \{\};\
+    ch[c].up.forEach(x => \{ st[c][x.id] = clone(x.value); \});\
+    ch[c].del.forEach(id => \{ delete st[c][id]; \});\
+  \});\
+  if (ch.settings) st.settings = clone(ch.settings);\
+\}\
+\
+const Store = \{\
+  key: 'kuiki_demo_v5',\
+  data: null,\
+  base: null,   // \uc0\u26412 \u30058 \u65306 \u12469 \u12540 \u12496 \u12540 \u12398 \u29366 \u24907 \u65288 \u65291 \u36865 \u12427 \u20104 \u23450 \u12398 \u22793 \u26356 \u65289 \
+  token: '',\
+  queue: [],    // \uc0\u26412 \u30058 \u65306 \u12414 \u12384 \u36865 \u12387 \u12390 \u12356 \u12394 \u12356 \u22793 \u26356 \
+  load() \{\
+    const s = lsGet(this.key);\
+    if (s) \{ try \{ this.data = JSON.parse(s); this.migrate(); return; \} catch (e) \{ /* \uc0\u20316 \u12426 \u30452 \u12377  */ \} \}\
+    this.data = makeDemo(); this.migrate(); this.save();\
+  \},\
+  migrate() \{\
+    const d = this.data;\
+    d.dnc = d.dnc || \{\}; d.follows = d.follows || \{\}; d.released = d.released || \{\};\
+    d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || [];\
+    d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];\
+    d.settings = Object.assign(\{ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90 \}, d.settings || \{\});\
+  \},\
+  save() \{\
+    if (!LIVE) \{\
+      if (!lsSet(this.key, JSON.stringify(this.data))) toast('\uc0\u12371 \u12398 \u31471 \u26411 \u12395 \u20445 \u23384 \u12391 \u12365 \u12414 \u12379 \u12435 \u12391 \u12375 \u12383 ');\
+      return;\
+    \}\
+    const ch = diffState(this.base, this.data);\
+    if (!Object.keys(ch).length) return;\
+    this.queue.push(ch);\
+    this.base = clone(this.data);\
+    this.persistQueue();\
+    flush();\
+  \},\
+  persistQueue() \{\
+    if (!lsSet(QUEUE_KEY, JSON.stringify(this.queue))) toast('\uc0\u12371 \u12398 \u31471 \u26411 \u12395 \u20445 \u23384 \u12391 \u12365 \u12414 \u12379 \u12435 \u12391 \u12375 \u12383 \u12290 \u36890 \u20449 \u12391 \u12365 \u12427 \u22580 \u25152 \u12391 \u38283 \u12365 \u30452 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 ');\
+    updateSyncBadge();\
+  \},\
+  setServer(state) \{\
+    this.data = state; this.migrate();\
+    this.queue.forEach(ch => applyDiff(this.data, ch));\
+    this.base = clone(this.data);\
+  \},\
+  async loadLive() \{\
+    this.token = readToken();\
+    try \{ this.queue = JSON.parse(lsGet(QUEUE_KEY) || '[]'); \} catch (e) \{ this.queue = []; \}\
+    if (!this.token) throw Object.assign(new Error('no token'), \{ code: 'auth' \});\
+    try \{\
+      const j = await api('load');\
+      lsSet(CACHE_KEY, JSON.stringify(j.state));\
+      lastRefresh = Date.now();\
+      this.setServer(j.state);\
+    \} catch (e) \{\
+      const c = lsGet(CACHE_KEY);\
+      if (e.code === 'auth' || !c) throw e;\
+      this.setServer(JSON.parse(c));\
+      setTimeout(() => toast('\uc0\u12452 \u12531 \u12479 \u12540 \u12493 \u12483 \u12488 \u12395 \u12388 \u12394 \u12364 \u12387 \u12390 \u12356 \u12414 \u12379 \u12435 \u12290 \u21069 \u22238 \u12398 \u24773 \u22577 \u12434 \u34920 \u31034 \u12375 \u12390 \u12356 \u12414 \u12377 '), 600);\
+    \}\
+  \}\
+\};\
+\
+/* ---------- \uc0\u26412 \u30058 \u65306 \u36890 \u20449  ---------- */\
+function readToken() \{\
+  const u = new URL(location.href), t = u.searchParams.get('t');\
+  if (t) \{\
+    if (lsGet(TOKEN_KEY) !== t) \{ lsDel(CACHE_KEY); lsDel(QUEUE_KEY); \} // \uc0\u21029 \u12398 \u20154 \u12398 \u12522 \u12531 \u12463 \
+    lsSet(TOKEN_KEY, t);\
+    u.searchParams.delete('t');\
+    history.replaceState(null, '', u.pathname + u.search + u.hash); // \uc0\u30011 \u38754 \u12398 URL\u12363 \u12425 \u12467 \u12540 \u12489 \u12434 \u28040 \u12377 \
+    return t;\
+  \}\
+  return lsGet(TOKEN_KEY) || '';\
+\}\
+async function api(action, extra) \{\
+  const res = await fetch(API_URL, \{\
+    method: 'POST',\
+    headers: \{ 'Content-Type': 'text/plain;charset=utf-8' \},\
+    body: JSON.stringify(Object.assign(\{ action, token: Store.token \}, extra || \{\}))\
+  \});\
+  if (!res.ok) throw new Error('\uc0\u36890 \u20449 \u12456 \u12521 \u12540  ' + res.status);\
+  const j = await res.json();\
+  if (!j.ok) throw Object.assign(new Error(j.error || 'error'), \{ code: j.error \});\
+  return j;\
+\}\
+let flushing = false, lastRefresh = 0;\
+async function flush() \{\
+  if (!LIVE || flushing || !Store.queue.length) \{ updateSyncBadge(); return; \}\
+  flushing = true; updateSyncBadge();\
+  let rejected = 0, ok = false;\
+  try \{\
+    while (Store.queue.length) \{\
+      const j = await api('sync', \{ changes: Store.queue[0] \});\
+      rejected += (j.rejected || []).length;\
+      Store.queue.shift();\
+      Store.persistQueue();\
+    \}\
+    ok = true;\
+  \} catch (e) \{\
+    if (e.code === 'auth') showBlocking('\uc0\u12371 \u12398 \u12522 \u12531 \u12463 \u12399 \u20351 \u12360 \u12394 \u12367 \u12394 \u12426 \u12414 \u12375 \u12383 ', '\u21306 \u22495 \u20418 \u12363 \u12425 \u26032 \u12375 \u12356 \u25307 \u24453 \u12522 \u12531 \u12463 \u12434 \u12418 \u12425 \u12387 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 ');\
+    // \uc0\u36890 \u20449 \u12391 \u12365 \u12394 \u12356 \u12392 \u12365 \u12399 \u12289 \u12354 \u12392 \u12391 \u36865 \u12426 \u30452 \u12377 \
+  \} finally \{\
+    flushing = false; updateSyncBadge();\
+  \}\
+  if (ok && rejected) \{\
+    toast('\uc0\u19968 \u37096 \u12398 \u22793 \u26356 \u12399 \u21453 \u26144 \u12391 \u12365 \u12414 \u12379 \u12435 \u12391 \u12375 \u12383 \u12290 \u26368 \u26032 \u12398 \u24773 \u22577 \u12395 \u26356 \u26032 \u12375 \u12414 \u12377 ');\
+    refresh(true).catch(() => \{\});\
+  \} else if (ok && Date.now() - lastRefresh > 60000) \{\
+    refresh().catch(() => \{\});\
+  \}\
+\}\
+/* \uc0\u26368 \u26032 \u12398 \u24773 \u22577 \u12434 \u21462 \u12426 \u30452 \u12377 \u65288 \u20837 \u21147 \u20013 \u12399 \u24453 \u12388 \u65289  */\
+async function refresh(force) \{\
+  if (!LIVE || flushing || Store.queue.length) return;\
+  const busy = () => !$('#sheet').hidden || mode !== 'normal';\
+  if (!force && busy()) return;\
+  const j = await api('load');\
+  lastRefresh = Date.now();\
+  if (flushing || Store.queue.length) return;\
+  if (!force && busy()) return;\
+  if (force) \{ closeSheet(); if (draw) endDraw(); else if (mode !== 'normal') setMode('normal'); \}\
+  lsSet(CACHE_KEY, JSON.stringify(j.state));\
+  Store.setServer(j.state);\
+  updateTabs();\
+  renderAll();\
+\}\
+function updateSyncBadge() \{\
+  const el = $('#syncState');\
+  if (!el) return;\
+  const n = Store.queue.length;\
+  el.hidden = !LIVE || (!n && !flushing);\
+  el.textContent = flushing ? '\uc0\u36865 \u20449 \u20013 \'85' : `\u26410 \u36865 \u20449  $\{n\}\u20214 `;\
+\}\
+function showBlocking(title, msg) \{\
+  $('#blockTitle').textContent = title;\
+  $('#blockMsg').textContent = msg;\
+  $('#blocker').hidden = false;\
+\}\
+function hideBlocking() \{ $('#blocker').hidden = true; \}\
+function logout() \{\
+  const n = Store.queue.length;\
+  const q = n\
+    ? `\uc0\u12414 \u12384 \u36865 \u12387 \u12390 \u12356 \u12394 \u12356 \u35352 \u37682 \u12364 $\{n\}\u20214 \u12354 \u12426 \u12414 \u12377 \u12290 \u28040 \u12377 \u12392 \u36865 \u12425 \u12428 \u12414 \u12379 \u12435 \u12290 \u12381 \u12428 \u12391 \u12418 \u12371 \u12398 \u31471 \u26411 \u12363 \u12425 \u28040 \u12375 \u12414 \u12377 \u12363 \u65311 `\
+    : '\uc0\u12371 \u12398 \u31471 \u26411 \u12363 \u12425 \u12289 \u21306 \u22495 \u12510 \u12483 \u12503 \u12398 \u24773 \u22577 \u12392 \u25307 \u24453 \u12522 \u12531 \u12463 \u12434 \u28040 \u12375 \u12414 \u12377 \u12290 \u12424 \u12429 \u12375 \u12356 \u12391 \u12377 \u12363 \u65311 ';\
+  if (!confirm(q)) return;\
+  [TOKEN_KEY, CACHE_KEY, QUEUE_KEY].forEach(lsDel);\
+  showBlocking('\uc0\u12371 \u12398 \u31471 \u26411 \u12363 \u12425 \u28040 \u12375 \u12414 \u12375 \u12383 ', '\u12418 \u12358 \u19968 \u24230 \u20351 \u12358 \u12392 \u12365 \u12399 \u12289 \u21306 \u22495 \u20418 \u12363 \u12425 \u12418 \u12425 \u12387 \u12383 \u25307 \u24453 \u12522 \u12531 \u12463 \u12434 \u38283 \u12356 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 ');\
+\}\
+const D = () => Store.data;\
+const terrById = id => D().territories.find(t => t.id === id);\
+const houseById = id => D().houses.find(h => h.id === id);\
+const userById = id => D().users.find(u => u.id === id);\
+const uname = id => (userById(id) || \{ name: '\uc0\u19981 \u26126 ' \}).name;\
+function userOptions(sel, noneLabel) \{\
+  return (noneLabel ? `<option value="">$\{noneLabel\}</option>` : '') +\
+    D().users.map(u => `<option value="$\{u.id\}"$\{u.id === sel ? ' selected' : ''\}>$\{esc(u.name)\}</option>`).join('');\
+\}\
+const me = () => userById(D().currentUser) || D().users[0];\
+const isAdmin = () => me().role === 'admin';\
+const targets = h => h.type === 'apt' ? h.units : [''];\
+const K = (hid, unit) => hid + '|' + (unit || '');\
+const canDelHouse = h => isAdmin() || h.createdBy === me().id;\
+\
+/* \uc0\u22793 \u26356  \u8594  \u20445 \u23384  \u8594  \u20877 \u34920 \u31034  \u8594  \u12300 \u21462 \u12426 \u28040 \u12377 \u12301 \u20184 \u12365 \u12398 \u12362 \u30693 \u12425 \u12379  */\
+function commit(msg, fn) \{\
+  const snap = JSON.stringify(Store.data);\
+  fn(); Store.save(); renderAll();\
+  toast(msg, () => \{ closeSheet(); Store.data = JSON.parse(snap); Store.save(); renderAll(); toast('\uc0\u21462 \u12426 \u28040 \u12375 \u12414 \u12375 \u12383 '); \});\
+\}\
+\
+/* ---------- \uc0\u35352 \u37682 \u12398 \u32034 \u24341  ---------- */\
+let IDX = new Map();\
+function buildIndex() \{\
+  IDX = new Map();\
+  for (const v of D().visits) \{\
+    const k = K(v.houseId, v.unit);\
+    if (!IDX.has(k)) IDX.set(k, []);\
+    IDX.get(k).push(v);\
+  \}\
+  for (const a of IDX.values()) a.sort((x, y) => (x.at < y.at ? 1 : -1)); // \uc0\u26032 \u12375 \u12356 \u38918 \
+\}\
+const visitsOf = k => IDX.get(k) || [];\
+function statusOf(k) \{\
+  if (D().dnc[k]) return 'dnc';\
+  const v = visitsOf(k)[0];\
+  return v ? v.result : 'new';\
+\}\
+/* \uc0\u20877 \u35370 \u21839 \u12398 \u21463 \u12369 \u25345 \u12385  */\
+const fol = k => D().follows[k] || null;\
+const followIdle = f => daysSince(f.touchedAt);\
+function followStage(f) \{ const d = followIdle(f), s = D().settings; return d >= s.escalateDays ? 2 : d >= s.remindDays ? 1 : 0; \}\
+function parseKey(k) \{ const i = k.indexOf('|'); return [k.slice(0, i), k.slice(i + 1)]; \}\
+function targetName(h, unit) \{ return h.type === 'apt' ? `$\{esc(h.label || '\uc0\u38598 \u21512 \u20303 \u23429 ')\} $\{esc(unit)\}\u21495 \u23460 ` : esc(h.label || '\u23478 '); \}\
+function lastInterest(k) \{ const m = visitsOf(k).find(v => v.result === 'met'); return m && (m.interest === '\uc0\u38306 \u24515 \u12354 \u12426 ' || m.interest === '\u23569 \u12375 \u12354 \u12426 ') ? m : null; \}\
+function bestSlot(k) \{\
+  const c = \{\}; let best = null;\
+  for (const v of visitsOf(k)) \{\
+    if (v.result !== 'met') continue;\
+    const s = slotOf(new Date(v.at)); c[s] = (c[s] || 0) + 1;\
+    if (!best || c[s] > c[best]) best = s;\
+  \}\
+  return best;\
+\}\
+const hasFollowIn = h => targets(h).some(u => fol(K(h.id, u)));\
+function aptLeft(h) \{ return h.units.filter(u => \{ const s = statusOf(K(h.id, u)); return s === 'new' || s === 'away'; \}).length; \}\
+\
+/* ---------- \uc0\u21306 \u22495 \u12398 \u21028 \u23450  ---------- */\
+function inPoly(lat, lng, poly) \{\
+  let c = false;\
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) \{\
+    const [yi, xi] = poly[i], [yj, xj] = poly[j];\
+    if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) c = !c;\
+  \}\
+  return c;\
+\}\
+function terrOf(lat, lng) \{ const t = D().territories.find(t => inPoly(lat, lng, t.polygon)); return t ? t.id : null; \}\
+function reassign() \{ D().houses.forEach(h => \{ h.terrId = terrOf(h.lat, h.lng); \}); \}\
+function center(poly) \{ return [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length]; \}\
+function distM(a, b) \{\
+  const R = 6371000, toR = x => x * Math.PI / 180;\
+  const dLa = toR(b[0] - a[0]), dLn = toR(b[1] - a[1]);\
+  const s = Math.sin(dLa / 2) ** 2 + Math.cos(toR(a[0])) * Math.cos(toR(b[0])) * Math.sin(dLn / 2) ** 2;\
+  return 2 * R * Math.asin(Math.sqrt(s));\
+\}\
+const fmtDist = m => m < 1000 ? `$\{Math.round(m / 10) * 10\}m` : `$\{(m / 1000).toFixed(1)\}km`;\
+\
+function terrStats(t, sinceMs) \{\
+  const now = Date.now(); let n = 0, visited = 0, met = 0, last = null;\
+  for (const h of D().houses) \{\
+    if (h.terrId !== t.id) continue;\
+    for (const u of targets(h)) \{\
+      n++;\
+      const vs = visitsOf(K(h.id, u));\
+      if (vs[0]) \{\
+        if (!last || vs[0].at > last) last = vs[0].at;\
+        if (Date.parse(vs[0].at) >= sinceMs) visited++;\
+      \}\
+      if (vs.some(v => v.result === 'met' && now - Date.parse(v.at) <= 90 * DAY)) met++;\
+    \}\
+  \}\
+  return \{ n, visited, met, last \};\
+\}\
+\
+/* ---------- \uc0\u12362 \u30693 \u12425 \u12379  ---------- */\
+let toastTimer = null;\
+function toast(msg, undoFn) \{\
+  const el = $('#toast');\
+  el.innerHTML = `<span>$\{esc(msg)\}</span>` + (undoFn ? '<button type="button">\uc0\u21462 \u12426 \u28040 \u12377 </button>' : '');\
+  el.hidden = false;\
+  if (undoFn) el.querySelector('button').onclick = () => \{ el.hidden = true; undoFn(); \};\
+  clearTimeout(toastTimer);\
+  toastTimer = setTimeout(() => \{ el.hidden = true; \}, undoFn ? 7000 : 3500);\
+\}\
+\
+/* ---------- \uc0\u19979 \u12363 \u12425 \u20986 \u12427 \u30011 \u38754  ---------- */\
+function setSheet(html) \{\
+  const s = $('#sheet');\
+  $('#sheetBody').innerHTML = html;\
+  s.hidden = false; $('#backdrop').hidden = false; s.scrollTop = 0;\
+  $$('[data-close]', s).forEach(b => \{ b.onclick = closeSheet; \});\
+  const h = s.querySelector('h2'); if (h) \{ h.tabIndex = -1; h.focus(\{ preventScroll: true \}); \}\
+\}\
+function closeSheet() \{\
+  $('#sheet').hidden = true; $('#backdrop').hidden = true;\
+  if (tmpMarker && map) \{ map.removeLayer(tmpMarker); tmpMarker = null; \}\
+\}\
+const headHtml = (t, title, sub) => `<div class="sheet-head">$\{t ? `<span class="stamp sm">$\{t.no\}</span>` : ''\}<div><h2 id="sheetTitle">$\{title\}</h2>$\{sub ? `<p class="muted">$\{sub\}</p>` : ''\}</div><button class="icon-btn" data-close aria-label="\uc0\u38281 \u12376 \u12427 ">\'d7</button></div>`;\
+const navLink = h => `<a class="btn block" href="https://www.google.com/maps/dir/?api=1&destination=$\{h.lat\},$\{h.lng\}" target="_blank" rel="noopener">Google\uc0\u12510 \u12483 \u12503 \u12391 \u36947 \u38918 \u12434 \u35211 \u12427 </a>`;\
+\
+/* ---------- \uc0\u22320 \u22259  ---------- */\
+let map, terrLayer, houseLayer, baseLayers, baseName = 'pale', mode = 'normal';\
+let tmpMarker = null, draw = null, myPos = null, posMarker = null, firstMapShow = true;\
+\
+function initMap() \{\
+  map = L.map('map', \{ zoomControl: false \}).setView([26.160, 127.676], 16);\
+  L.control.zoom(\{ position: 'bottomright' \}).addTo(map);\
+  const opt = \{ maxZoom: 20, maxNativeZoom: 18, attribution: GSI_ATTR \};\
+  baseLayers = \{ pale: L.tileLayer(TILE_PALE, opt), photo: L.tileLayer(TILE_PHOTO, opt) \};\
+  baseLayers.pale.addTo(map);\
+  terrLayer = L.layerGroup().addTo(map);\
+  houseLayer = L.layerGroup().addTo(map);\
+  map.on('click', e => \{ if (mode === 'draw') drawClick(e.latlng); else if (mode === 'add') addAt(e.latlng); \});\
+  map.on('moveend', renderHouses);\
+\}\
+function houseIcon(h, ff) \{\
+  if (h.type === 'apt') \{\
+    const left = aptLeft(h), fo = hasFollowIn(h) ? '<em>\uc0\u20877 </em>' : '';\
+    let st = null;\
+    if (ff) \{\
+      const arr = targets(h).map(u => ff(K(h.id, u))).sort((a, b) => FOCUS_RANK.indexOf(a) - FOCUS_RANK.indexOf(b));\
+      st = arr.length ? arr[0] : 'dim';\
+    \}\
+    const nb = roundNums && roundNums.has(h.id) ? `<s>$\{roundNums.get(h.id)\}</s>` : '';\
+    const rj = targets(h).some(u => D().dnc[K(h.id, u)]) ? '<b class="rj">\uc0\u25298 </b>' : '';\
+    return L.divIcon(\{ className: '', html: `<div class="pin apt$\{ff ? focusCls(st) : ''\}">\uc0\u38598 $\{left && !nb ? `<i>$\{left\}</i>` : ''\}$\{fo\}$\{ff ? doneMark(st) : ''\}$\{nb\}$\{rj\}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] \});\
+  \}\
+  const k = K(h.id, ''), s = statusOf(k), fo = fol(k) ? '<em>\uc0\u20877 </em>' : '';\
+  const st = ff ? ff(k) : null;\
+  const nb = roundNums && roundNums.has(h.id) ? `<s>$\{roundNums.get(h.id)\}</s>` : '';\
+  return L.divIcon(\{ className: '', html: `<div class="pin st-$\{s\}$\{ff ? focusCls(st) : ''\}">$\{ST_CHAR[s]\}$\{fo\}$\{ff ? doneMark(st) : ''\}$\{nb\}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] \});\
+\}\
+function renderTerrs() \{\
+  terrLayer.clearLayers();\
+  const cur = $('#terrJump').value;\
+  for (const t of D().territories) \{\
+    const on = t.id === cur;\
+    L.polygon(t.polygon, \{ color: '#0E7C66', weight: on ? 5 : 3, fillColor: '#0E7C66', fillOpacity: on ? 0.07 : 0.02, interactive: false \}).addTo(terrLayer);\
+    L.marker(center(t.polygon), \{ icon: L.divIcon(\{ className: 'terr-label', html: `<span>$\{t.no\}</span>`, iconSize: [0, 0] \}), interactive: false, keyboard: false \}).addTo(terrLayer);\
+  \}\
+\}\
+function renderHouses() \{\
+  if (!map) return;\
+  houseLayer.clearLayers();\
+  const ff = focusFn();\
+  renderCardBar();\
+  const show = map.getZoom() >= 15;\
+  $('#zoomHint').hidden = show;\
+  if (!show) return;\
+  const b = map.getBounds().pad(0.2);\
+  for (const h of D().houses) \{\
+    if (!b.contains([h.lat, h.lng])) continue;\
+    const m = L.marker([h.lat, h.lng], \{ icon: houseIcon(h, ff), title: h.label || '', zIndexOffset: roundNums && roundNums.has(h.id) ? 1000 : 0 \});\
+    m.on('click', () => onHouseTap(h.id));\
+    m.addTo(houseLayer);\
+  \}\
+\}\
+function fillTerrJump() \{\
+  const sel = $('#terrJump'), cur = sel.value;\
+  const ts = D().territories.slice().sort((a, b) => a.no - b.no);\
+  sel.innerHTML = '<option value="">\uc0\u21306 \u22495 \u12434 \u12360 \u12425 \u12406 </option>' + ts.map(t => `<option value="$\{t.id\}">\u21306 \u22495  $\{t.no\}</option>`).join('');\
+  if (ts.some(t => t.id === cur)) sel.value = cur;\
+\}\
+function fitTerr(id) \{\
+  const t = terrById(id); if (!t) return;\
+  map.fitBounds(L.latLngBounds(t.polygon), \{ padding: [40, 40] \});\
+\}\
+function fitAll() \{\
+  const pts = D().territories.flatMap(t => t.polygon);\
+  if (pts.length) map.fitBounds(L.latLngBounds(pts), \{ padding: [30, 30] \});\
+\}\
+function onHouseTap(id) \{\
+  const h = houseById(id); if (!h) return;\
+  if (mode === 'draw') \{ drawClick(L.latLng(h.lat, h.lng)); return; \}\
+  if (mode === 'add') \{ toast('\uc0\u12381 \u12371 \u12395 \u12399 \u21360 \u12364 \u12354 \u12426 \u12414 \u12377 \u12290 \u23569 \u12375 \u12378 \u12425 \u12375 \u12390 \u12479 \u12483 \u12503 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 '); return; \}\
+  if (h.type === 'apt') \{ if (h.units.length) openAptSeq(id); else openBuilding(id); \}\
+  else openTarget(id, '', false);\
+\}\
+function setMode(m) \{\
+  mode = m;\
+  $('#addBar').hidden = m !== 'add';\
+  $('#drawBar').hidden = m !== 'draw';\
+  $('#mapTools').hidden = m !== 'normal';\
+  $('#map').classList.toggle('crosshair', m !== 'normal');\
+  if (m !== 'draw') clearOverlay();\
+\}\
+\
+/* ---------- \uc0\u23478 \u12539 \u37096 \u23627 \u12398 \u35352 \u37682  ---------- */\
+function openTarget(hid, unit, fromBuilding) \{\
+  const h = houseById(hid); if (!h) return;\
+  const t = terrById(h.terrId), k = K(hid, unit);\
+  const st = \{ step: 'result', age: null, interest: null, override: false \};\
+  const title = targetName(h, unit);\
+  const sub = t ? `\uc0\u21306 \u22495 $\{t.no\}\u12288 $\{esc(t.name)\}` : '\u21306 \u22495 \u12398 \u32218 \u12398 \u22806 ';\
+\
+  const paint = () => \{\
+    const vs = visitsOf(k), dnc = D().dnc[k];\
+    const f = fol(k), rel = D().released[k];\
+    const mine = !!f && f.by === me().id, other = !!f && !mine;\
+    const blocked = (dnc && !isAdmin()) || (other && !isAdmin() && !st.override);\
+    let b = headHtml(t, title, sub);\
+    if (fromBuilding) b += `<button class="btn small" id="backBld">\uc0\u8592  \u37096 \u23627 \u12398 \u19968 \u35239 \u12395 \u12418 \u12393 \u12427 </button>`;\
+    if (dnc) b += `<div class="notice refnote"><b>\uc0\u25298 \u21542 \u12398 $\{unit ? '\u37096 \u23627 ' : '\u23478 '\}\u12391 \u12377 \u12290 </b>\u35370 \u21839 \u12375 \u12394 \u12356 \u12391 \u12367 \u12384 \u12373 \u12356 \u12290 $\{isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">\u25298 \u21542 \u12510 \u12540 \u12463 \u12434 \u22806 \u12377 </button></span>' : '<br>\u12414 \u12385 \u12364 \u12356 \u12398 \u12392 \u12365 \u12399 \u21306 \u22495 \u20418 \u12395 \u30456 \u35527 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 '\}</div>`;\
+\
+    // \uc0\u20877 \u35370 \u21839 \u12398 \u21463 \u12369 \u25345 \u12385 \u12398 \u34920 \u31034 \u65288 \u20253 \u36947 \u32773 \u12395 \u12399 \u12300 \u12384 \u12428 \u12364 \u12301 \u12399 \u35211 \u12379 \u12394 \u12356 \u65289 \
+    if (f && isAdmin()) \{\
+      b += `<div class="notice info"><b>\uc0\u20877 \u35370 \u21839 \u12398 \u21463 \u12369 \u25345 \u12385 \u65306 $\{esc(uname(f.by))\}\u12373 \u12435 </b>\u65288 \u26368 \u24460 \u12398 \u35352 \u37682 \u12363 \u12425 $\{followIdle(f)\}\u26085 \u65289 \
+        <span class="actions"><label>\uc0\u22793 \u26356  <select id="shAssign">$\{userOptions(f.by)\}</select></label>\
+        <button class="btn small" id="shRelease">\uc0\u35299 \u38500 \u12377 \u12427 </button></span></div>`;\
+    \} else if (mine) \{\
+      b += `<div class="notice info"><b>\uc0\u12354 \u12394 \u12383 \u12364 \u20877 \u35370 \u21839 \u12434 \u21463 \u12369 \u25345 \u12387 \u12390 \u12356 \u12414 \u12377 \u12290 </b>\u35352 \u37682 \u12434 \u20184 \u12369 \u12427 \u12392 \u12289 \u26399 \u38480 \u12364 \u33258 \u21205 \u12391 \u24310 \u12403 \u12414 \u12377 \u12290 \
+        <span class="actions"><button class="btn small" id="shStop">\uc0\u21463 \u12369 \u25345 \u12385 \u12434 \u12420 \u12417 \u12427 </button></span></div>`;\
+    \} else if (other) \{\
+      b += `<div class="notice warn"><b>\uc0\u20877 \u35370 \u21839 \u12434 \u21463 \u12369 \u25345 \u12387 \u12390 \u12356 \u12427 \u20154 \u12364 \u12356 \u12414 \u12377 \u12290 </b>\u35370 \u21839 \u12399 \u25511 \u12360 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 \
+        $\{st.override ? '' : '<span class="actions"><button class="btn small" id="shOverride">\uc0\u12381 \u12428 \u12391 \u12418 \u35352 \u37682 \u12377 \u12427 </button></span>'\}</div>`;\
+    \} else if (rel && !dnc) \{\
+      b += `<div class="notice warn"><b>\uc0\u24341 \u12365 \u32153 \u12366 \u12434 \u24453 \u12387 \u12390 \u12356 \u12427 \u23478 \u12391 \u12377 \u12290 </b>\u20877 \u35370 \u21839 \u12434 \u21463 \u12369 \u25345 \u12390 \u12427 \u26041 \u12399 \u12362 \u39000 \u12356 \u12375 \u12414 \u12377 \u12290 \
+        <span class="actions"><button class="btn small primary" id="shTake">\uc0\u31169 \u12364 \u21463 \u12369 \u25345 \u12388 </button></span></div>`;\
+    \} else if (lastInterest(k) && !dnc) \{\
+      b += `<div class="notice info">\uc0\u20197 \u21069 \u12289 \u38306 \u24515 \u12398 \u12354 \u12427 \u26041 \u12395 \u20250 \u12360 \u12390 \u12356 \u12414 \u12377 \u12290 \
+        <span class="actions"><button class="btn small" id="shTake">\uc0\u31169 \u12364 \u20877 \u35370 \u21839 \u12434 \u21463 \u12369 \u25345 \u12388 </button></span></div>`;\
+    \}\
+\
+    if (!blocked) \{\
+      if (st.step === 'result') \{\
+        b += `<p class="q">\uc0\u35370 \u21839 \u12398 \u32080 \u26524 \u12434 \u36984 \u12435 \u12391 \u12367 \u12384 \u12373 \u12356 </p>` + resultChoicesHtml('');\
+      \} else if (st.step === 'age') \{\
+        b += `<p class="q">\uc0\u20250 \u12360 \u12383 \u26041 \u12398 \u24180 \u40802 \u23652 \u65288 \u12384 \u12356 \u12383 \u12356 \u12391 \u22823 \u19976 \u22827 \u12391 \u12377 \u65289 </p>\
+        <div class="choices two">$\{AGES.map((a, i) => `<button class="choice$\{i === AGES.length - 1 ? ' wide' : ''\}" data-age="$\{a\}">$\{a\}</button>`).join('')\}</div>\
+        <button class="btn block" data-back="result">\uc0\u8592  \u32080 \u26524 \u12398 \u36984 \u25246 \u12395 \u12418 \u12393 \u12427 </button>`;\
+      \} else if (st.step === 'interest') \{\
+        b += interestChoicesHtml();\
+      \} else if (st.step === 'follow') \{\
+        b += `<p class="q">\uc0\u12371 \u12398 \u26041 \u12398 \u20877 \u35370 \u21839 \u12399 \u12393 \u12358 \u12375 \u12414 \u12377 \u12363 \u65311 </p>\
+        <div class="choices two">\
+          <button class="choice" data-fol="1">\uc0\u31169 \u12364 \u20877 \u35370 \u21839 \u12375 \u12414 \u12377 <small>\u12411 \u12363 \u12398 \u20154 \u12399 \u35370 \u21839 \u12434 \u25511 \u12360 \u12414 \u12377 </small></button>\
+          <button class="choice" data-fol="0">\uc0\u20170 \u22238 \u12399 \u35352 \u37682 \u12384 \u12369 </button>\
+        </div>\
+        <button class="btn block" data-back="interest">\uc0\u8592  \u38306 \u24515 \u12398 \u36984 \u25246 \u12395 \u12418 \u12393 \u12427 </button>`;\
+      \} else if (st.step === 'dnc') \{\
+        b += refuseStepHtml(!!unit);\
+      \}\
+    \}\
+\
+    if (isUnmet(k)) b += `<div class="notice info">\uc0\u12371 \u12428 \u12414 \u12391 \u30041 \u23432 \u12384 \u12387 \u12383 \u26178 \u38291 \u24111 \u65306 $\{[...triedSlots(k)].sort(bySlot).map(slotShort).join('\u12289 ')\}<br>\u12411 \u12363 \u12398 \u26178 \u38291 \u24111 \u12395 \u35370 \u12397 \u12390 \u12415 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 </div>`;\
+    b += `<h3 class="sub">\uc0\u12371 \u12428 \u12414 \u12391 \u12398 \u35352 \u37682 </h3>`;\
+    b += vs.length\
+      ? `<ul class="history">$\{vs.slice(0, 5).map(v => \{\
+          const d = new Date(v.at);\
+          const extra = v.result === 'met' ? `\uc0\u65288 $\{esc(v.age || '')\}\u12539 $\{esc(v.interest || '')\}\u65289 ` : (v.result === 'refused' && v.age ? `\u65288 $\{esc(v.age)\}\u65289 ` : '');\
+          return `<li><i class="pin st-$\{v.result\}">$\{ST_CHAR[v.result]\}</i><span>$\{fmtDate(v.at)\}\uc0\u12288 $\{slotOf(d)\}<br>$\{RESULT_LABEL[v.result]\}$\{extra\}</span></li>`;\
+        \}).join('')\}</ul>$\{vs.length > 5 ? `<p class="muted">\uc0\u12411 \u12363  $\{vs.length - 5\}\u20214 </p>` : ''\}`\
+      : '<p class="muted">\uc0\u12414 \u12384 \u35352 \u37682 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 </p>';\
+\
+    b += navLink(h);\
+    if (!unit) \{\
+      b += `<details class="more"><summary>\uc0\u12371 \u12398 \u23478 \u12398 \u32232 \u38598 </summary>\
+        <label class="field"><span>\uc0\u30446 \u21360 \u12434 \u22793 \u12360 \u12427 </span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="$\{esc(h.label)\}"><button class="btn small" id="fLabelSave">\u20445 \u23384 </button></span>\
+        <small class="hint">\uc0\u20303 \u12435 \u12391 \u12356 \u12427 \u20154 \u12398 \u21517 \u21069 \u12399 \u26360 \u12363 \u12394 \u12356 \u12391 \u12367 \u12384 \u12373 \u12356 \u12290 </small></label>\
+        $\{canDelHouse(h) ? '<button class="btn small danger" id="fDel">\uc0\u12371 \u12398 \u23478 \u12434 \u21066 \u38500 \u12377 \u12427 </button>' : ''\}</details>`;\
+    \}\
+    setSheet(b);\
+\
+    const S = $('#sheet');\
+    $$('[data-res]', S).forEach(x => x.onclick = () => \{\
+      const r = x.dataset.res;\
+      if (r === 'met') \{ st.step = 'age'; paint(); \}\
+      else if (r === 'refused') \{ st.step = 'dnc'; paint(); \}\
+      else saveVisit(hid, unit, 'away', \{\});\
+    \});\
+    $$('[data-age]', S).forEach(x => x.onclick = () => \{ st.age = x.dataset.age; st.step = 'interest'; paint(); \});\
+    $$('[data-int]', S).forEach(x => x.onclick = () => \{\
+      const it = x.dataset.int;\
+      if (it === '\uc0\u25298 \u21542 ') \{ st.step = 'dnc'; paint(); \}\
+      else if (it !== '\uc0\u38306 \u24515 \u12394 \u12375 ' && !fol(k)) \{ st.interest = it; st.step = 'follow'; paint(); \}\
+      else saveVisit(hid, unit, 'met', \{ age: st.age, interest: it \});\
+    \});\
+    $$('[data-fol]', S).forEach(x => x.onclick = () =>\
+      saveVisit(hid, unit, 'met', \{ age: st.age, interest: st.interest, follow: x.dataset.fol === '1' \}));\
+    $$('[data-refok]', S).forEach(x => x.onclick = () => saveVisit(hid, unit, 'refused', \{ age: st.age, dnc: true \}));\
+    $$('[data-back]', S).forEach(x => x.onclick = () => \{ st.step = x.dataset.back; paint(); \});\
+    const on = (id, fn) => \{ const el = $('#' + id); if (el) el.onclick = fn; \};\
+    on('backBld', () => openBuilding(hid));\
+    on('unDnc', () => \{ commit('\uc0\u25298 \u21542 \u12510 \u12540 \u12463 \u12434 \u22806 \u12375 \u12414 \u12375 \u12383 ', () => \{ delete D().dnc[k]; \}); paint(); \});\
+    on('shRelease', () => \{ followAction('release', k); paint(); \});\
+    on('shStop', () => openReleaseSheet(k, false));\
+    on('shOverride', () => \{ st.override = true; paint(); \});\
+    on('shTake', () => \{ followAction('take', k); paint(); \});\
+    if ($('#shAssign')) $('#shAssign').onchange = e => \{\
+      const v = e.target.value;\
+      if (!v || v === f.by) return;\
+      commit(`\uc0\u21463 \u12369 \u25345 \u12385 \u12434 $\{uname(v)\}\u12373 \u12435 \u12395 \u22793 \u12360 \u12414 \u12375 \u12383 `, () => startFollow(k, v));\
+      paint();\
+    \};\
+    on('fLabelSave', () => \{\
+      const v = $('#fLabel').value.trim();\
+      commit('\uc0\u30446 \u21360 \u12434 \u22793 \u12360 \u12414 \u12375 \u12383 ', () => \{ h.label = v; \});\
+      closeSheet();\
+    \});\
+    on('fDel', () => \{\
+      if (!confirm('\uc0\u12371 \u12398 \u23478 \u12392 \u12289 \u12381 \u12398 \u35352 \u37682 \u12434 \u12377 \u12409 \u12390 \u21066 \u38500 \u12375 \u12414 \u12377 \u12290 \u12424 \u12429 \u12375 \u12356 \u12391 \u12377 \u12363 \u65311 ')) return;\
+      closeSheet(); deleteHouse(hid);\
+    \});\
+  \};\
+  paint();\
+\}\
+function saveVisit(hid, unit, result, extra, keepOpen) \{\
+  if (!keepOpen) closeSheet();\
+  const k = K(hid, unit), cur = fol(k);\
+  let msg = `$\{unit ? `$\{unit\}\uc0\u21495 \u23460 \u12434 ` : ''\}\u12300 $\{RESULT_LABEL[result]\}\u12301 \u12391 \u35352 \u37682 \u12375 \u12414 \u12375 \u12383 `;\
+  let follow = !!extra.follow;\
+  if (follow && cur) \{ follow = false; if (cur.by !== me().id) msg += '\uc0\u65288 \u20877 \u35370 \u21839 \u12399 \u12377 \u12391 \u12395 \u21463 \u12369 \u25345 \u12385 \u12364 \u12354 \u12426 \u12414 \u12377 \u65289 '; \}\
+  else if (follow) msg += '\uc0\u12290 \u20877 \u35370 \u21839 \u12434 \u21463 \u12369 \u25345 \u12385 \u12414 \u12377 ';\
+  if (extra.dnc && cur) msg += '\uc0\u12290 \u21463 \u12369 \u25345 \u12385 \u12418 \u35299 \u38500 \u12375 \u12414 \u12375 \u12383 ';\
+  commit(msg, () => \{\
+    const now = new Date().toISOString();\
+    const v = \{ id: uid(), houseId: hid, unit, result, at: now, by: me().id \};\
+    if (result === 'met') \{ v.age = extra.age; v.interest = extra.interest; \}\
+    else if (result === 'refused' && extra.age) v.age = extra.age;\
+    D().visits.push(v);\
+    const f = D().follows[k];\
+    if (f && f.by === me().id) f.touchedAt = now; // \uc0\u21463 \u12369 \u25345 \u12385 \u26412 \u20154 \u12398 \u35352 \u37682 \u12391 \u26399 \u38480 \u12434 \u24310 \u12400 \u12377 \
+    if (follow) startFollow(k, me().id);\
+    if (extra.dnc) \{ D().dnc[k] = true; delete D().follows[k]; delete D().released[k]; \}\
+  \});\
+\}\
+function deleteHouse(hid) \{\
+  commit('\uc0\u21066 \u38500 \u12375 \u12414 \u12375 \u12383 ', () => \{\
+    const h = houseById(hid);\
+    D().houses = D().houses.filter(x => x.id !== hid);\
+    D().visits = D().visits.filter(v => v.houseId !== hid);\
+    if (h) targets(h).forEach(u => \{ const k = K(hid, u); delete D().dnc[k]; delete D().follows[k]; delete D().released[k]; \});\
+  \});\
+\}\
+\
+/* ---------- \uc0\u20877 \u35370 \u21839 \u12398 \u21463 \u12369 \u25345 \u12385 \u12398 \u25805 \u20316  ---------- */\
+const RELEASE_MSG = \{ handoff: '\uc0\u24341 \u12365 \u32153 \u12366 \u12434 \u24453 \u12388 \u23478 \u12395 \u12375 \u12414 \u12375 \u12383 ', lost: '\u21463 \u12369 \u25345 \u12385 \u12434 \u12420 \u12417 \u12414 \u12375 \u12383 ', gone: '\u21463 \u12369 \u25345 \u12385 \u12434 \u12420 \u12417 \u12414 \u12375 \u12383 ', admin: '\u21463 \u12369 \u25345 \u12385 \u12434 \u35299 \u38500 \u12375 \u12414 \u12375 \u12383 ' \};\
+function startFollow(k, by) \{\
+  const now = new Date().toISOString();\
+  D().follows[k] = \{ by, since: now, touchedAt: now \};\
+  delete D().released[k];\
+\}\
+function releaseFollow(k, reason) \{\
+  delete D().follows[k];\
+  if (reason === 'handoff') D().released[k] = \{ at: new Date().toISOString(), reason \};\
+  else delete D().released[k];\
+\}\
+function followAction(act, k) \{\
+  switch (act) \{\
+    case 'continue':\
+      if (!fol(k)) return;\
+      commit('\uc0\u21463 \u12369 \u25345 \u12385 \u12434 \u32154 \u12369 \u12414 \u12377 \u12290 \u26399 \u38480 \u12434 \u24310 \u12400 \u12375 \u12414 \u12375 \u12383 ', () => \{ D().follows[k].touchedAt = new Date().toISOString(); \});\
+      break;\
+    case 'handoff':\
+      if (!confirm('\uc0\u12371 \u12398 \u20877 \u35370 \u21839 \u12434 \u12411 \u12363 \u12398 \u20154 \u12395 \u24341 \u12365 \u32153 \u12366 \u12414 \u12377 \u12290 \u12424 \u12429 \u12375 \u12356 \u12391 \u12377 \u12363 \u65311 ')) return;\
+      commit(RELEASE_MSG.handoff, () => releaseFollow(k, 'handoff'));\
+      break;\
+    case 'stop':\
+      openReleaseSheet(k, true);\
+      break;\
+    case 'release':\
+      if (!confirm('\uc0\u12371 \u12398 \u21463 \u12369 \u25345 \u12385 \u12434 \u35299 \u38500 \u12375 \u12414 \u12377 \u12290 \u12424 \u12429 \u12375 \u12356 \u12391 \u12377 \u12363 \u65311 ')) return;\
+      commit(RELEASE_MSG.admin, () => releaseFollow(k, 'admin'));\
+      break;\
+    case 'take':\
+      if (fol(k)) \{ toast('\uc0\u12377 \u12391 \u12395 \u21463 \u12369 \u25345 \u12385 \u12364 \u12354 \u12426 \u12414 \u12377 '); return; \}\
+      commit('\uc0\u20877 \u35370 \u21839 \u12434 \u21463 \u12369 \u25345 \u12385 \u12414 \u12377 ', () => startFollow(k, me().id));\
+      break;\
+  \}\
+\}\
+function openReleaseSheet(k, onlyStop) \{\
+  const [hid, unit] = parseKey(k);\
+  const h = houseById(hid); if (!h) return;\
+  setSheet(headHtml(terrById(h.terrId), '\uc0\u20877 \u35370 \u21839 \u12434 \u12420 \u12417 \u12427 \u29702 \u30001 ', targetName(h, unit)) + `\
+    <div class="choices two">\
+      $\{onlyStop ? '' : '<button class="choice wide" data-rel="handoff">\uc0\u12411 \u12363 \u12398 \u20154 \u12395 \u24341 \u12365 \u32153 \u12368 </button>'\}\
+      <button class="choice" data-rel="lost">\uc0\u38306 \u24515 \u12364 \u12394 \u12367 \u12394 \u12387 \u12383 </button>\
+      <button class="choice" data-rel="gone">\uc0\u36578 \u23621 \u12539 \u20250 \u12360 \u12394 \u12367 \u12394 \u12387 \u12383 </button>\
+    </div>\
+    $\{onlyStop ? '' : '<p class="hint">\uc0\u12300 \u12411 \u12363 \u12398 \u20154 \u12395 \u24341 \u12365 \u32153 \u12368 \u12301 \u12434 \u36984 \u12406 \u12392 \u12289 \u12300 \u24341 \u12365 \u32153 \u12366 \u12434 \u24453 \u12387 \u12390 \u12356 \u12427 \u23478 \u12301 \u12392 \u12375 \u12390 \u19968 \u35239 \u12395 \u20986 \u12414 \u12377 \u12290 </p>'\}\
+    <button class="btn block" data-close>\uc0\u12418 \u12393 \u12427 </button>`);\
+  $$('[data-rel]', $('#sheet')).forEach(x => x.onclick = () => \{\
+    const rel = x.dataset.rel;\
+    closeSheet();\
+    commit(RELEASE_MSG[rel], () => releaseFollow(k, rel));\
+  \});\
+\}\
+function followItem(k, f, mode) \{\
+  const [hid, unit] = parseKey(k);\
+  const h = houseById(hid); if (!h) return '';\
+  const t = terrById(h.terrId), stg = followStage(f), d = followIdle(f), m = lastInterest(k), bs = bestSlot(k);\
+  const state = stg === 2 ? '\uc0\u65288 \u30906 \u35469 \u12364 \u24517 \u35201 \u65289 ' : stg === 1 ? '\u65288 \u12375 \u12400 \u12425 \u12367 \u35370 \u21839 \u12394 \u12375 \u65289 ' : '';\
+  const A = (act, label, cls) => `<button class="btn small $\{cls || ''\}" data-fact="$\{act\}" data-key="$\{esc(k)\}">$\{label\}</button>`;\
+  let acts = '';\
+  if (mode === 'mine') \{\
+    if (stg >= 1) acts += A('continue', '\uc0\u32154 \u12369 \u12427 ', 'primary');\
+    if (stg === 2) acts += A('handoff', '\uc0\u12411 \u12363 \u12398 \u20154 \u12395 \u24341 \u12365 \u32153 \u12368 ') + A('stop', '\u12420 \u12417 \u12427 ');\
+  \} else \{\
+    acts = A('continue', '\uc0\u24310 \u38263 \u12377 \u12427 ') + A('handoff', '\u24341 \u12365 \u32153 \u12366 \u24453 \u12385 \u12395 \u12377 \u12427 ') + A('release', '\u35299 \u38500 \u12377 \u12427 ', 'danger') +\
+      `<label>\uc0\u22793 \u26356  <select data-reassign="$\{esc(k)\}">$\{userOptions(f.by)\}</select></label>`;\
+  \}\
+  return `<article class="ritem f-s$\{stg\}"><div>\
+      <p class="rt"><span class="stamp xs">$\{t ? t.no : '-'\}</span> $\{targetName(h, unit)\}</p>\
+      <p class="muted">$\{mode === 'admin' ? `\uc0\u21463 \u12369 \u25345 \u12385 \u65306 $\{esc(uname(f.by))\}\u12373 \u12435 \u12288 ` : ''\}\u26368 \u24460 \u12398 \u35352 \u37682 \u12363 \u12425  $\{d\}\u26085 $\{state\}</p>\
+      $\{m ? `<p class="muted">$\{esc(m.interest)\}\uc0\u12539 $\{esc(m.age || '')\}$\{bs ? `\u12288 \u20250 \u12360 \u12383 \u26178 \u38291 \u24111 \u65306 $\{bs\}` : ''\}</p>` : ''\}\
+    </div><button class="btn small" data-go="$\{hid\}" data-unit="$\{esc(unit)\}">\uc0\u22320 \u22259 \u12391 \u35211 \u12427 </button>\
+    $\{acts ? `<div class="actions span">$\{acts\}</div>` : ''\}</article>`;\
+\}\
+\
+/* ---------- \uc0\u38598 \u21512 \u20303 \u23429  ---------- */\
+function openBuilding(hid) \{\
+  const h = houseById(hid); if (!h) return;\
+  const t = terrById(h.terrId), ff = focusFn(), since = unitDoneSince(h);\
+  const cells = h.units.map(u => \{\
+    const s = statusOf(K(h.id, u));\
+    const fo = fol(K(h.id, u)) ? '<em>\uc0\u20877 </em>' : '';\
+    const k2 = K(h.id, u);\
+    const fs = ff ? ff(k2) : (!D().dnc[k2] && visitedSince(k2, since) ? 'done' : null), hl = focusCls(fs);\
+    return `<button class="unit st-$\{s\}$\{hl\}" data-unit="$\{esc(u)\}">$\{fo\}$\{doneMark(fs)\}<b>$\{esc(u)\}</b><small>$\{ST_LABEL[s]\}</small></button>`;\
+  \}).join('');\
+  setSheet(headHtml(t, esc(h.label || '\uc0\u38598 \u21512 \u20303 \u23429 '), `\u21306 \u22495 $\{t ? t.no : '-'\}\u12288 $\{h.units.length\}\u37096 \u23627 \u12288 \u12414 \u12384 \u20250 \u12360 \u12390 \u12356 \u12394 \u12356 \u37096 \u23627  $\{aptLeft(h)\}`) + `\
+    $\{h.units.length ? `<button class="btn primary block" id="seqStart">\uc0\u32154 \u12369 \u12390 \u20837 \u21147 \u12395 \u12418 \u12393 \u12427 </button>` : ''\}\
+    <p class="q">\uc0\u37096 \u23627 \u12398 \u19968 \u35239 </p>\
+    <p class="hint">\uc0\u37096 \u23627 \u12434 \u12479 \u12483 \u12503 \u12377 \u12427 \u12392 \u12289 \u12381 \u12398 \u37096 \u23627 \u12398 \u35352 \u37682 \u12434 \u12367 \u12431 \u12375 \u12367 \u35211 \u12425 \u12428 \u12414 \u12377 \u12290 </p>\
+    <div class="units">$\{cells || '<p class="muted">\uc0\u37096 \u23627 \u12364 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 \u19979 \u12398 \u12300 \u24314 \u29289 \u12398 \u32232 \u38598 \u12301 \u12363 \u12425 \u36861 \u21152 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 </p>'\}</div>\
+    $\{navLink(h)\}\
+    <details class="more"><summary>\uc0\u24314 \u29289 \u12398 \u32232 \u38598 </summary>\
+      <label class="field"><span>\uc0\u37096 \u23627 \u12434 \u36861 \u21152 </span><span class="inline"><input type="text" id="fUnit" maxlength="10" placeholder="\u20363 \u65306 305"><button class="btn small" id="fUnitAdd">\u36861 \u21152 </button></span></label>\
+      <label class="field"><span>\uc0\u24314 \u29289 \u21517 \u12539 \u30446 \u21360 \u12434 \u22793 \u12360 \u12427 </span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="$\{esc(h.label)\}"><button class="btn small" id="fLabelSave">\u20445 \u23384 </button></span></label>\
+      $\{canDelHouse(h) ? '<button class="btn small danger" id="fDel">\uc0\u12371 \u12398 \u24314 \u29289 \u12434 \u21066 \u38500 \u12377 \u12427 </button>' : ''\}\
+    </details>`);\
+  $$('[data-unit]', $('#sheet')).forEach(x => x.onclick = () => openTarget(hid, x.dataset.unit, true));\
+  if ($('#seqStart')) $('#seqStart').onclick = () => openAptSeq(hid);\
+  $('#fUnitAdd').onclick = () => \{\
+    const u = $('#fUnit').value.trim();\
+    if (!u) \{ toast('\uc0\u37096 \u23627 \u30058 \u21495 \u12434 \u20837 \u21147 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 '); return; \}\
+    if (h.units.includes(u)) \{ toast(`$\{u\}\uc0\u21495 \u23460 \u12399 \u12377 \u12391 \u12395 \u12354 \u12426 \u12414 \u12377 `); return; \}\
+    commit(`$\{u\}\uc0\u21495 \u23460 \u12434 \u36861 \u21152 \u12375 \u12414 \u12375 \u12383 `, () => \{ h.units.push(u); \});\
+    openBuilding(hid);\
+  \};\
+  $('#fLabelSave').onclick = () => \{ const v = $('#fLabel').value.trim(); commit('\uc0\u24314 \u29289 \u21517 \u12434 \u22793 \u12360 \u12414 \u12375 \u12383 ', () => \{ h.label = v; \}); openBuilding(hid); \};\
+  if ($('#fDel')) $('#fDel').onclick = () => \{\
+    if (!confirm(`\uc0\u12300 $\{h.label || '\u38598 \u21512 \u20303 \u23429 '\}\u12301 \u12392 \u12289 \u12377 \u12409 \u12390 \u12398 \u37096 \u23627 \u12398 \u35352 \u37682 \u12434 \u21066 \u38500 \u12375 \u12414 \u12377 \u12290 \u12424 \u12429 \u12375 \u12356 \u12391 \u12377 \u12363 \u65311 `)) return;\
+    closeSheet(); deleteHouse(hid);\
+  \};\
+\}\
+\
+/* ---------- \uc0\u38598 \u21512 \u20303 \u23429 \u65306 \u32154 \u12369 \u12390 \u20837 \u21147  ---------- */\
+function seqStepsHtml(st) \{\
+  if (st.step === 'result') return resultChoicesHtml('\uc0\u25276 \u12377 \u12392 \u27425 \u12398 \u37096 \u23627 \u12408 ');\
+  if (st.step === 'age') return `<p class="q">\uc0\u24180 \u40802 \u23652 \u65288 \u12384 \u12356 \u12383 \u12356 \u12391 \u22823 \u19976 \u22827 \u12391 \u12377 \u65289 </p>\
+      <div class="choices two">$\{AGES.map((a, i) => `<button class="choice$\{i === AGES.length - 1 ? ' wide' : ''\}" data-age="$\{a\}">$\{a\}</button>`).join('')\}</div>\
+      <button class="btn block" data-back="result">\uc0\u8592  \u32080 \u26524 \u12398 \u36984 \u25246 \u12395 \u12418 \u12393 \u12427 </button>`;\
+  if (st.step === 'interest') return interestChoicesHtml();\
+  if (st.step === 'follow') return `<p class="q">\uc0\u12371 \u12398 \u26041 \u12398 \u20877 \u35370 \u21839 \u12399 \u12393 \u12358 \u12375 \u12414 \u12377 \u12363 \u65311 </p>\
+      <div class="choices two">\
+        <button class="choice" data-fol="1">\uc0\u31169 \u12364 \u20877 \u35370 \u21839 \u12375 \u12414 \u12377 <small>\u12411 \u12363 \u12398 \u20154 \u12399 \u35370 \u21839 \u12434 \u25511 \u12360 \u12414 \u12377 </small></button>\
+        <button class="choice" data-fol="0">\uc0\u20170 \u22238 \u12399 \u35352 \u37682 \u12384 \u12369 </button></div>\
+      <button class="btn block" data-back="interest">\uc0\u8592  \u38306 \u24515 \u12398 \u36984 \u25246 \u12395 \u12418 \u12393 \u12427 </button>`;\
+  if (st.step === 'dnc') return refuseStepHtml(true);\
+  return '';\
+\}\
+function openAptSeq(hid, startUnit) \{\
+  const h0 = houseById(hid); if (!h0 || !h0.units.length) return;\
+  const t = terrById(h0.terrId);\
+  const since = unitDoneSince(h0), inRound = since !== todayIso();\
+  const isRef = u => !!D().dnc[K(hid, u)];\
+  const doneToday = u => !isRef(u) && visitedSince(K(hid, u), since); // \uc0\u32209 \u12398 \u12481 \u12455 \u12483 \u12463 \u12364 \u20184 \u12367 \u37096 \u23627 \
+  let idx = startUnit ? Math.max(0, h0.units.indexOf(startUnit)) : h0.units.findIndex(u => !doneToday(u) && !isRef(u));\
+  if (idx < 0) idx = h0.units.length; // \uc0\u12377 \u12409 \u12390 \u20837 \u21147 \u28168 \u12415 \
+  const st = \{ step: 'result', age: null, interest: null, override: false, finished: idx >= h0.units.length \};\
+  const go = i => \{\
+    const n = (houseById(hid) || h0).units.length;\
+    idx = Math.max(0, i);\
+    Object.assign(st, \{ step: 'result', age: null, interest: null, override: false, finished: idx >= n \});\
+    paint();\
+  \};\
+  // \uc0\u27425 \u12395 \u20837 \u21147 \u12377 \u12427 \u37096 \u23627 \u65306 \u12414 \u12384 \u32209 \u12398 \u12481 \u12455 \u12483 \u12463 \u12364 \u12394 \u12367 \u12289 \u25298 \u21542 \u12391 \u12418 \u12394 \u12356 \u37096 \u23627 \
+  const nextIdx = from => \{\
+    const us = (houseById(hid) || h0).units;\
+    for (let i = from; i < us.length; i++) if (!doneToday(us[i]) && !isRef(us[i])) return i;\
+    return us.length;\
+  \};\
+  const save = (result, extra) => \{ saveVisit(hid, houseById(hid).units[idx], result, extra, true); go(nextIdx(idx + 1)); \};\
+\
+  const paint = () => \{\
+    const h = houseById(hid); if (!h) \{ closeSheet(); return; \}\
+    const n = h.units.length, cnt = h.units.filter(doneToday).length, need = h.units.filter(u => !isRef(u)).length;\
+    let b = headHtml(t, `$\{esc(h.label || '\uc0\u38598 \u21512 \u20303 \u23429 ')\}\u12288 \u32154 \u12369 \u12390 \u20837 \u21147 `, `$\{inRound ? '\u21463 \u12369 \u21462 \u12387 \u12390 \u12363 \u12425 \u35370 \u12397 \u12383 \u37096 \u23627 ' : '\u20170 \u26085 \u20837 \u21147 \u12375 \u12383 \u37096 \u23627 '\} $\{cnt\} / $\{need\}`);\
+    b += `<div class="unitstrip">$\{h.units.map((u, i) => \{\
+      const s = statusOf(K(hid, u));\
+      return `<button class="uchip st-$\{s\}$\{i === idx && !st.finished ? ' cur' : ''\}$\{doneToday(u) ? ' donec' : ''\}" data-jump="$\{i\}" aria-label="$\{esc(u)\}\uc0\u21495 \u23460 \u12408 ">$\{esc(u)\}</button>`;\
+    \}).join('')\}</div>`;\
+    if (st.finished) \{\
+      b += `<div class="okmsg"><b>$\{cnt === need ? '\uc0\u12377 \u12409 \u12390 \u12398 \u37096 \u23627 \u12395 \u32209 \u12398 \u12481 \u12455 \u12483 \u12463 \u12364 \u12388 \u12365 \u12414 \u12375 \u12383 \u12290 ' : '\u26368 \u24460 \u12398 \u37096 \u23627 \u12414 \u12391 \u36914 \u12415 \u12414 \u12375 \u12383 \u12290 '\}</b>\u37096 \u23627 \u30058 \u21495 \u12434 \u12479 \u12483 \u12503 \u12377 \u12427 \u12392 \u12289 \u12381 \u12398 \u37096 \u23627 \u12434 \u20837 \u21147 \u12391 \u12365 \u12414 \u12377 \u12290 </div>\
+        <button class="btn primary block" data-close>\uc0\u38281 \u12376 \u12427 </button>\
+        <button class="btn block" id="seqBack">\uc0\u37096 \u23627 \u12398 \u19968 \u35239 \u12539 \u24314 \u29289 \u12398 \u32232 \u38598 </button>`;\
+    \} else \{\
+      const u = h.units[idx], k = K(hid, u), f = fol(k), last = visitsOf(k)[0];\
+      const other = !!f && f.by !== me().id;\
+      b += `<p class="seqroom"><b>$\{esc(u)\}</b>\uc0\u21495 \u23460  <span class="muted">\u65288 $\{idx + 1\} / $\{n\}\u65289 </span></p>`;\
+      b += `<p class="muted">$\{last ? `\uc0\u21069 \u22238 \u65306 $\{fmtDate(last.at)\}\u12288 $\{RESULT_LABEL[last.result]\}` : '\u12399 \u12376 \u12417 \u12390 \u35370 \u12397 \u12427 \u37096 \u23627 '\}</p>`;\
+      if (D().dnc[k]) b += `<div class="notice refnote"><b>\uc0\u25298 \u21542 \u12398 \u37096 \u23627 \u12391 \u12377 \u12290 </b>\u35370 \u21839 \u12375 \u12394 \u12356 \u12391 \u12289 \u27425 \u12398 \u37096 \u23627 \u12408 \u36914 \u12435 \u12391 \u12367 \u12384 \u12373 \u12356 \u12290 </div>`;\
+      else if (other && !isAdmin() && !st.override) b += `<div class="notice warn"><b>\uc0\u20877 \u35370 \u21839 \u12434 \u21463 \u12369 \u25345 \u12387 \u12390 \u12356 \u12427 \u20154 \u12364 \u12356 \u12414 \u12377 \u12290 </b>\u35370 \u21839 \u12399 \u25511 \u12360 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 <span class="actions"><button class="btn small" id="seqOverride">\u12381 \u12428 \u12391 \u12418 \u35352 \u37682 \u12377 \u12427 </button></span></div>`;\
+      else b += seqStepsHtml(st);\
+      b += `<div class="seqnav">\
+          <button class="btn" id="seqPrev"$\{idx === 0 ? ' disabled' : ''\}>\uc0\u8592  \u21069 \u12398 \u37096 \u23627 </button>\
+          <button class="btn" id="seqNext">\uc0\u12392 \u12400 \u12375 \u12390 \u27425 \u12408  \u8594 </button></div>\
+        $\{navLink(h)\}\
+        <button class="btn block" id="seqBack">\uc0\u37096 \u23627 \u12398 \u19968 \u35239 \u12539 \u24314 \u29289 \u12398 \u32232 \u38598 </button>`;\
+    \}\
+    setSheet(b);\
+\
+    const S = $('#sheet'), k = st.finished ? null : K(hid, h.units[idx]);\
+    $$('[data-jump]', S).forEach(x => x.onclick = () => go(Number(x.dataset.jump)));\
+    $$('[data-res]', S).forEach(x => x.onclick = () => \{\
+      const r = x.dataset.res;\
+      if (r === 'met') \{ st.step = 'age'; paint(); \}\
+      else if (r === 'refused') \{ st.step = 'dnc'; paint(); \}\
+      else save('away', \{\});\
+    \});\
+    $$('[data-age]', S).forEach(x => x.onclick = () => \{ st.age = x.dataset.age; st.step = 'interest'; paint(); \});\
+    $$('[data-int]', S).forEach(x => x.onclick = () => \{\
+      const it = x.dataset.int;\
+      if (it === '\uc0\u25298 \u21542 ') \{ st.step = 'dnc'; paint(); \}\
+      else if (it !== '\uc0\u38306 \u24515 \u12394 \u12375 ' && !fol(k)) \{ st.interest = it; st.step = 'follow'; paint(); \}\
+      else save('met', \{ age: st.age, interest: it \});\
+    \});\
+    $$('[data-fol]', S).forEach(x => x.onclick = () => save('met', \{ age: st.age, interest: st.interest, follow: x.dataset.fol === '1' \}));\
+    $$('[data-refok]', S).forEach(x => x.onclick = () => save('refused', \{ age: st.age, dnc: true \}));\
+    $$('[data-back]', S).forEach(x => x.onclick = () => \{ st.step = x.dataset.back; paint(); \});\
+    const on = (id, fn) => \{ const el = $('#' + id); if (el) el.onclick = fn; \};\
+    on('seqOverride', () => \{ st.override = true; paint(); \});\
+    on('seqPrev', () => go(idx - 1));\
+    on('seqNext', () => go(nextIdx(idx + 1)));\
+    on('seqBack', () => openBuilding(hid));\
+  \};\
+  paint();\
+\}\
+\
+/* ---------- \uc0\u23478 \u12434 \u36861 \u21152  ---------- */\
+function addAt(ll) \{\
+  const tid = terrOf(ll.lat, ll.lng);\
+  if (!tid) \{ toast('\uc0\u21306 \u22495 \u12398 \u32218 \u12398 \u22806 \u12391 \u12377 \u12290 \u21306 \u22495 \u12398 \u20013 \u12434 \u12479 \u12483 \u12503 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 '); return; \}\
+  if (tmpMarker) map.removeLayer(tmpMarker);\
+  tmpMarker = L.marker(ll, \{ icon: L.divIcon(\{ className: '', html: '<div class="pin st-temp">\uc0\u65291 </div>', iconSize: [34, 34], iconAnchor: [17, 17] \}), interactive: false \}).addTo(map);\
+  openAddForm(ll, tid);\
+\}\
+function openAddForm(ll, tid) \{\
+  const t = terrById(tid);\
+  const f = \{ type: 'house', label: '', floors: 2, per: 4 \};\
+  const stepper = (id, label) => `<div class="field"><span>$\{label\}</span><div class="stepper">\
+      <button type="button" data-step="$\{id\}" data-d="-1" aria-label="$\{label\}\uc0\u12434 \u28187 \u12425 \u12377 ">\u8722 </button><output>$\{f[id]\}</output>\
+      <button type="button" data-step="$\{id\}" data-d="1" aria-label="$\{label\}\uc0\u12434 \u22679 \u12420 \u12377 ">\u65291 </button></div></div>`;\
+  const paint = () => \{\
+    const apt = f.type === 'apt';\
+    setSheet(headHtml(t, '\uc0\u12371 \u12371 \u12395 \u36861 \u21152 \u12375 \u12414 \u12377 ', `\u21306 \u22495 $\{t.no\}\u12288 $\{esc(t.name)\}`) + `\
+      <p class="q">\uc0\u24314 \u29289 \u12398 \u31278 \u39006 </p>\
+      <div class="choices two">\
+        <button class="choice$\{!apt ? ' on' : ''\}" data-type="house" aria-pressed="$\{!apt\}"><i class="pin st-new">\uc0\u23478 </i>\u19968 \u25144 \u24314 \u12390 </button>\
+        <button class="choice$\{apt ? ' on' : ''\}" data-type="apt" aria-pressed="$\{apt\}"><i class="pin apt">\uc0\u38598 </i>\u12450 \u12497 \u12540 \u12488 \u12539 \u12510 \u12531 \u12471 \u12519 \u12531 </button>\
+      </div>\
+      <label class="field"><span>$\{apt ? '\uc0\u24314 \u29289 \u21517 ' : '\u30446 \u21360 \u65288 \u35211 \u12383 \u30446 \u12394 \u12393 \u65289 '\}</span>\
+        <input type="text" id="fLabel" maxlength="30" value="$\{esc(f.label)\}" placeholder="$\{apt ? '\uc0\u20363 \u65306 \u12295 \u12295 \u12495 \u12452 \u12484 ' : '\u20363 \u65306 \u38738 \u12356 \u38272 \u12539 2\u38542 \u24314 \u12390 '\}">\
+        <small class="hint">\uc0\u20303 \u12435 \u12391 \u12356 \u12427 \u20154 \u12398 \u21517 \u21069 \u12399 \u26360 \u12363 \u12394 \u12356 \u12391 \u12367 \u12384 \u12373 \u12356 \u12290 </small></label>\
+      $\{apt ? stepper('floors', '\uc0\u38542 \u12398 \u25968 ') + stepper('per', '1\u12388 \u12398 \u38542 \u12398 \u37096 \u23627 \u12398 \u25968 ') +\
+        `<p class="hint">\uc0\u37096 \u23627 \u30058 \u21495 \u12399  101 \u12316  $\{f.floors\}$\{pad(f.per)\} \u12398 \u12424 \u12358 \u12395 \u33258 \u21205 \u12391 \u20184 \u12365 \u12414 \u12377 \u12290 \u12354 \u12392 \u12363 \u12425 \u36861 \u21152 \u12418 \u12391 \u12365 \u12414 \u12377 \u12290 </p>` : ''\}\
+      <button class="btn primary block" id="fSave">\uc0\u12371 \u12398 \u22580 \u25152 \u12395 \u36861 \u21152 \u12377 \u12427 </button>\
+      <button class="btn block" data-close>\uc0\u12420 \u12417 \u12427 </button>`);\
+    const S = $('#sheet');\
+    $$('[data-type]', S).forEach(x => x.onclick = () => \{ f.label = $('#fLabel').value; f.type = x.dataset.type; paint(); \});\
+    $$('[data-step]', S).forEach(x => x.onclick = () => \{\
+      f.label = $('#fLabel').value;\
+      f[x.dataset.step] = Math.min(30, Math.max(1, f[x.dataset.step] + Number(x.dataset.d)));\
+      paint();\
+    \});\
+    $('#fSave').onclick = () => \{\
+      const label = $('#fLabel').value.trim();\
+      const units = [];\
+      if (f.type === 'apt') for (let a = 1; a <= f.floors; a++) for (let b = 1; b <= f.per; b++) units.push(`$\{a\}$\{pad(b)\}`);\
+      closeSheet(); setMode('normal');\
+      commit(f.type === 'apt' ? '\uc0\u38598 \u21512 \u20303 \u23429 \u12434 \u36861 \u21152 \u12375 \u12414 \u12375 \u12383 ' : '\u23478 \u12434 \u36861 \u21152 \u12375 \u12414 \u12375 \u12383 ', () => \{\
+        D().houses.push(\{ id: 'h' + uid(), terrId: tid, type: f.type, lat: ll.lat, lng: ll.lng, label, units, createdAt: new Date().toISOString(), createdBy: me().id \});\
+      \});\
+    \};\
+  \};\
+  paint();\
+\}\
+\
+/* ---------- \uc0\u21306 \u22495 \u12398 \u32218 \u24341 \u12365  ---------- */\
+function startDraw(targetId) \{\
+  showView('map');\
+  setMode('draw');\
+  draw = \{\
+    points: [], targetId,\
+    line: L.polyline([], \{ color: '#C2410C', weight: 4, dashArray: '8 6', interactive: false \}).addTo(map),\
+    dots: L.layerGroup().addTo(map)\
+  \};\
+  $('#drawTitle').textContent = targetId ? `\uc0\u21306 \u22495 $\{terrById(targetId).no\}\u12398 \u32218 \u12434 \u24341 \u12365 \u30452 \u12377 ` : '\u26032 \u12375 \u12356 \u21306 \u22495 \u12398 \u32218 \u12434 \u24341 \u12367 ';\
+  if (targetId) setTimeout(() => fitTerr(targetId), 60);\
+  redrawDraw();\
+\}\
+function drawClick(ll) \{ draw.points.push([ll.lat, ll.lng]); redrawDraw(); \}\
+function redrawDraw() \{\
+  const p = draw.points;\
+  draw.line.setLatLngs(p.length > 2 ? [...p, p[0]] : p);\
+  draw.dots.clearLayers();\
+  p.forEach((pt, i) => L.circleMarker(pt, \{ radius: i === 0 ? 10 : 7, color: '#C2410C', weight: 3, fillColor: '#fff', fillOpacity: 1, interactive: false \}).addTo(draw.dots));\
+  $('#drawCount').textContent = p.length;\
+\}\
+function endDraw() \{\
+  if (draw) \{ map.removeLayer(draw.line); map.removeLayer(draw.dots); \}\
+  draw = null; setMode('normal');\
+\}\
+function finishDraw() \{\
+  if (draw.points.length < 3) \{ toast('\uc0\u35282 \u12434 3\u12363 \u25152 \u20197 \u19978 \u12479 \u12483 \u12503 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 '); return; \}\
+  const pts = draw.points.slice();\
+  if (draw.targetId) \{\
+    const t = terrById(draw.targetId);\
+    endDraw();\
+    commit(`\uc0\u21306 \u22495 $\{t.no\}\u12398 \u32218 \u12434 \u24341 \u12365 \u30452 \u12375 \u12414 \u12375 \u12383 `, () => \{ t.polygon = pts; reassign(); \});\
+  \} else \{\
+    openTerrForm(\{ pts \});\
+  \}\
+\}\
+function openTerrForm(\{ pts = null, terr = null \}) \{\
+  const nextNo = Math.max(0, ...D().territories.map(t => t.no)) + 1;\
+  setSheet(headHtml(null, terr ? '\uc0\u21306 \u22495 \u12398 \u30058 \u21495 \u12392 \u21517 \u21069 ' : '\u26032 \u12375 \u12356 \u21306 \u22495 ', '') + `\
+    <label class="field"><span>\uc0\u21306 \u22495 \u30058 \u21495 </span><input type="number" id="fNo" inputmode="numeric" min="1" value="$\{terr ? terr.no : nextNo\}"></label>\
+    <label class="field"><span>\uc0\u21306 \u22495 \u12398 \u21517 \u21069 \u65288 \u30446 \u21360 \u12395 \u12394 \u12427 \u22320 \u21517 \u12394 \u12393 \u65289 </span><input type="text" id="fName" maxlength="30" value="$\{terr ? esc(terr.name) : ''\}" placeholder="\u20363 \u65306 \u12295 \u12295 \u20844 \u22290 \u12398 \u21271 \u20596 "></label>\
+    <button class="btn primary block" id="fSave">\uc0\u20445 \u23384 \u12377 \u12427 </button>\
+    <button class="btn block" data-close>\uc0\u12418 \u12393 \u12427 </button>`);\
+  $('#fSave').onclick = () => \{\
+    const no = parseInt($('#fNo').value, 10), name = $('#fName').value.trim();\
+    if (!no || no < 1) \{ toast('\uc0\u21306 \u22495 \u30058 \u21495 \u12434 \u20837 \u21147 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 '); return; \}\
+    if (D().territories.some(t => t.no === no && t !== terr)) \{ toast(`\uc0\u21306 \u22495 $\{no\}\u12399 \u12377 \u12391 \u12395 \u12354 \u12426 \u12414 \u12377 `); return; \}\
+    closeSheet();\
+    if (terr) \{\
+      commit('\uc0\u21306 \u22495 \u12398 \u30058 \u21495 \u12392 \u21517 \u21069 \u12434 \u22793 \u12360 \u12414 \u12375 \u12383 ', () => \{ terr.no = no; terr.name = name || `\u21306 \u22495 $\{no\}`; \});\
+    \} else \{\
+      endDraw();\
+      commit(`\uc0\u21306 \u22495 $\{no\}\u12434 \u20316 \u12426 \u12414 \u12375 \u12383 `, () => \{\
+        D().territories.push(\{ id: 't' + uid(), no, name: name || `\uc0\u21306 \u22495 $\{no\}`, polygon: pts, holder: null, lentAt: null \});\
+        reassign();\
+      \});\
+    \}\
+  \};\
+\}\
+\
+/* \uc0\u21476 \u12356 \u12459 \u12540 \u12489 \u12398 \u20889 \u30495 \u12434 \u19979 \u12395 \u25975 \u12365 \u12289 \u22320 \u22259 \u12434 \u21322 \u36879 \u26126 \u12395 \u12375 \u12390 \u20301 \u32622 \u12434 \u21512 \u12431 \u12379 \u12427  */\
+function applyOv() \{ map.getPane('tilePane').style.opacity = $('#ovRange').value / 100; \}\
+function clearOverlay() \{\
+  const img = $('#overlayImg');\
+  if (img.dataset.url) \{ URL.revokeObjectURL(img.dataset.url); delete img.dataset.url; \}\
+  img.removeAttribute('src'); img.hidden = true;\
+  $('#ovCtl').hidden = true;\
+  $('#map').classList.remove('see-through');\
+  if (map) map.getPane('tilePane').style.opacity = '';\
+\}\
+\
+/* ---------- \uc0\u21306 \u22495 \u12459 \u12540 \u12489 \u30011 \u38754  ---------- */\
+function renderToday() \{\
+  const start = new Date(); start.setHours(0, 0, 0, 0);\
+  const mine = D().visits.filter(v => v.by === me().id && Date.parse(v.at) >= start.getTime()).sort((a, b) => (a.at < b.at ? -1 : 1));\
+  let html = `<b>$\{esc(me().name)\}\uc0\u12373 \u12435 </b>\u12288 `;\
+  if (!mine.length) html += '\uc0\u20170 \u26085 \u12398 \u35352 \u37682 \u12399 \u12414 \u12384 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 ';\
+  else \{\
+    const f = new Date(mine[0].at), l = new Date(mine[mine.length - 1].at);\
+    const min = Math.round((l - f) / 60000);\
+    html += `\uc0\u20170 \u26085 \u12398 \u35352 \u37682  <b>$\{mine.length\}\u20214 </b>\u65288 \u20250 \u12360 \u12383  $\{mine.filter(v => v.result === 'met').length\}\u20214 \u65289 <br>\
+      <span class="muted">\uc0\u35352 \u37682 \u12375 \u12383 \u26178 \u38291  $\{fmtTime(f)\}\u12316 $\{fmtTime(l)\}\u65288 \u32004 $\{Math.floor(min / 60)\}\u26178 \u38291 $\{min % 60\}\u20998 \u65289 </span>`;\
+  \}\
+  $('#todayBox').innerHTML = `<div class="today">$\{html\}</div>`;\
+\}\
+function cardHtml(t, own) \{\
+  const since = t.lentAt ? Date.parse(t.lentAt) : Date.now() - 90 * DAY;\
+  const s = terrStats(t, since);\
+  const pct = s.n ? Math.round(s.visited / s.n * 100) : 0;\
+  const holder = t.holder ? userById(t.holder) : null;\
+  const who = own ? `\uc0\u21463 \u12369 \u21462 \u12387 \u12390 \u12363 \u12425  $\{daysSince(t.lentAt)\}\u26085 ` : (holder ? `\u25285 \u24403 \u65306 $\{esc(holder.name)\}\u12373 \u12435 ` : '\u25285 \u24403 \u32773 \u12394 \u12375 ');\
+  return `<article class="tcard">\
+    <span class="stamp"><small>\uc0\u21306 \u22495 </small>$\{t.no\}</span>\
+    <div><h3>$\{esc(t.name)\}</h3><p class="muted">$\{who\}</p>\
+      <div class="progress" role="progressbar" aria-valuenow="$\{pct\}" aria-valuemin="0" aria-valuemax="100" aria-label="\uc0\u35370 \u21839 \u12398 \u36914 \u12415 \u20855 \u21512 "><i style="width:$\{pct\}%"></i></div>\
+      <p class="muted">$\{t.lentAt ? '\uc0\u21463 \u12369 \u21462 \u12387 \u12390 \u12363 \u12425 ' : '\u12371 \u12398 90\u26085 \u12391 '\}\u35370 \u21839 \u12375 \u12383 \u23478 \u12539 \u37096 \u23627  $\{s.visited\} / $\{s.n\}</p>$\{own ? roundHint(t) : ''\}</div>\
+    <div class="actions"><button class="btn primary" data-open="$\{t.id\}">\uc0\u22320 \u22259 \u12434 \u12402 \u12425 \u12367 </button>$\{own ? `<button class="btn" data-return="$\{t.id\}">\u36820 \u21364 \u12377 \u12427 </button>` : ''\}</div>\
+  </article>`;\
+\}\
+function renderCards() \{\
+  renderToday();\
+  const ts = D().territories.slice().sort((a, b) => a.no - b.no);\
+  const mine = ts.filter(t => t.holder === me().id);\
+  $('#myCards').innerHTML = mine.length ? mine.map(t => cardHtml(t, true)).join('')\
+    : '<div class="empty">\uc0\u21463 \u12369 \u21462 \u12387 \u12390 \u12356 \u12427 \u21306 \u22495 \u12459 \u12540 \u12489 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 <br>\u19979 \u12398 \u12508 \u12479 \u12531 \u12363 \u12425 \u30003 \u12375 \u36796 \u12417 \u12414 \u12377 \u12290 </div>';\
+  renderRequestArea();\
+  renderMyAwayCards();\
+  $('#allCards').innerHTML = ts.filter(t => t.holder !== me().id).map(t => cardHtml(t, false)).join('');\
+\
+  const myF = Object.entries(D().follows)\
+    .filter(([k, f]) => f.by === me().id && houseById(parseKey(k)[0]))\
+    .sort((a, b) => followIdle(b[1]) - followIdle(a[1]));\
+  const need = myF.filter(([, f]) => followStage(f) > 0).length;\
+  $('#followAlert').innerHTML = need\
+    ? `<div class="notice warn">\uc0\u12375 \u12400 \u12425 \u12367 \u35370 \u21839 \u12375 \u12390 \u12356 \u12394 \u12356 \u20877 \u35370 \u21839 \u12364  <b>$\{need\}\u20214 </b> \u12354 \u12426 \u12414 \u12377 \u12290 <span class="actions"><button class="btn small" data-scroll="followsHead">\u30906 \u35469 \u12377 \u12427 </button></span></div>`\
+    : '';\
+  $('#myFollows').innerHTML = myF.length ? myF.map(([k, f]) => followItem(k, f, 'mine')).join('')\
+    : '<div class="empty">\uc0\u21463 \u12369 \u25345 \u12387 \u12390 \u12356 \u12427 \u20877 \u35370 \u21839 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 <br>\u38306 \u24515 \u12398 \u12354 \u12427 \u26041 \u12395 \u20250 \u12360 \u12383 \u12425 \u12289 \u35352 \u37682 \u12398 \u12392 \u12365 \u12395 \u12300 \u31169 \u12364 \u20877 \u35370 \u21839 \u12375 \u12414 \u12377 \u12301 \u12434 \u36984 \u12409 \u12414 \u12377 \u12290 </div>';\
+\}\
+\
+/* ---------- \uc0\u21306 \u22495 \u12459 \u12540 \u12489 \u12398 \u30003 \u12375 \u36796 \u12415 \u12539 \u21463 \u12369 \u21462 \u12426  ---------- */\
+const myPending = () => D().requests.find(r => r.by === me().id && r.status === 'pending');\
+const freeTerrs = () => D().territories.filter(t => !t.holder);\
+const heldCount = uid => D().territories.filter(t => t.holder === uid).length;\
+const agoLabel = iso => \{ const d = daysSince(iso); return d === 0 ? '\uc0\u20170 \u26085 ' : `$\{d\}\u26085 \u21069 `; \};\
+const byLongest = (a, b) => ((a.last || '') < (b.last || '') ? -1 : 1); // \uc0\u38263 \u12367 \u22238 \u12387 \u12390 \u12356 \u12394 \u12356 \u38918 \u65288 \u35352 \u37682 \u12394 \u12375 \u12364 \u20808 \u65289 \
+\
+function renderRequestArea() \{\
+  const p = myPending();\
+  if (p) \{\
+    const t = p.terrId ? terrById(p.terrId) : null;\
+    $('#reqArea').innerHTML = `<div class="reqbox">\
+      <p><b>\uc0\u21306 \u22495 \u12459 \u12540 \u12489 \u12434 \u30003 \u12375 \u36796 \u12415 \u20013 \u12391 \u12377 </b></p>\
+      <p class="muted">\uc0\u24076 \u26395 \u65306 $\{t ? `\u21306 \u22495 $\{t.no\}` : '\u12393 \u12371 \u12391 \u12418 \u12424 \u12356 '\}\u12288 $\{fmtDay(p.at)\}\u12395 \u30003 \u12375 \u36796 \u12415 </p>\
+      <p class="muted">\uc0\u20418 \u12364 \u27770 \u12417 \u12427 \u12392 \u12289 \u19978 \u12398 \u12300 \u12354 \u12394 \u12383 \u12398 \u21306 \u22495 \u12459 \u12540 \u12489 \u12301 \u12395 \u21152 \u12431 \u12426 \u12414 \u12377 \u12290 </p>\
+      <div class="actions"><button class="btn small" data-reqcancel="$\{p.id\}">\uc0\u30003 \u12375 \u36796 \u12415 \u12434 \u21462 \u12426 \u28040 \u12377 </button></div></div>`;\
+  \} else \{\
+    $('#reqArea').innerHTML = `<button class="btn block wideadd" data-reqopen>\uc0\u65291  \u21306 \u22495 \u12459 \u12540 \u12489 \u12434 \u12418 \u12358 1\u26522 \u12411 \u12375 \u12356 </button>`;\
+  \}\
+  const done = D().requests.filter(r => r.by === me().id && (r.status === 'approved' || r.status === 'declined') && !r.seen);\
+  $('#reqNotice').innerHTML = done.map(r => \{\
+    const t = terrById(r.terrId);\
+    return r.status === 'approved'\
+      ? `<div class="notice info"><b>\uc0\u20418 \u12363 \u12425 \u21306 \u22495 $\{t ? t.no : ''\}\u12398 \u12459 \u12540 \u12489 \u12364 \u23626 \u12365 \u12414 \u12375 \u12383 \u12290 </b>\u12300 \u12354 \u12394 \u12383 \u12398 \u21306 \u22495 \u12459 \u12540 \u12489 \u12301 \u12363 \u12425 \u22320 \u22259 \u12434 \u12402 \u12425 \u12369 \u12414 \u12377 \u12290 <span class="actions"><button class="btn small" data-reqseen="$\{r.id\}">\u12431 \u12363 \u12426 \u12414 \u12375 \u12383 </button></span></div>`\
+      : `<div class="notice warn"><b>\uc0\u30003 \u12375 \u36796 \u12415 \u12399 \u20170 \u22238 \u35211 \u36865 \u12426 \u12395 \u12394 \u12426 \u12414 \u12375 \u12383 \u12290 </b>\u12367 \u12431 \u12375 \u12367 \u12399 \u21306 \u22495 \u20418 \u12395 \u30456 \u35527 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 <span class="actions"><button class="btn small" data-reqseen="$\{r.id\}">\u12431 \u12363 \u12426 \u12414 \u12375 \u12383 </button></span></div>`;\
+  \}).join('');\
+\}\
+\
+function openRequestSheet() \{\
+  const max = D().settings.selfTakeMax, held = heldCount(me().id), canTake = held < max;\
+  const list = freeTerrs().map(t => \{\
+    return \{ t, last: t.completedAt, n: terrStats(t, 0).n, dist: myPos ? distM(myPos, center(t.polygon)) : null \};\
+  \});\
+  list.sort(myPos ? (a, b) => a.dist - b.dist : byLongest);\
+  const rows = list.map((\{ t, last, n, dist \}) => `<article class="pick">\
+      <span class="stamp sm">$\{t.no\}</span>\
+      <div><b>$\{esc(t.name)\}</b>\
+        <p class="muted">$\{n\}\uc0\u36562 \u12539 \u37096 \u23627 \u12288 $\{last ? `\u21069 \u22238 \u22238 \u12426 \u32066 \u12360 \u12383 \u26085  $\{fmtDay(last)\}` : '\u22238 \u12426 \u32066 \u12360 \u12383 \u35352 \u37682 \u12394 \u12375 '\}$\{dist != null ? `\u12288 \u12371 \u12371 \u12363 \u12425 \u32004 $\{fmtDist(dist)\}` : ''\}</p></div>\
+      $\{t.free && canTake\
+        ? `<button class="btn small primary" data-take="$\{t.id\}">\uc0\u21463 \u12369 \u21462 \u12427 </button>`\
+        : `<button class="btn small" data-ask="$\{t.id\}">\uc0\u20418 \u12395 \u38972 \u12416 </button>`\}\
+    </article>`).join('');\
+  setSheet(headHtml(null, '\uc0\u21306 \u22495 \u12459 \u12540 \u12489 \u12434 \u12418 \u12358 1\u26522 ', '') + `\
+    <p class="hint">\uc0\u12300 \u21463 \u12369 \u21462 \u12427 \u12301 \u12398 \u21306 \u22495 \u12399 \u12289 \u12377 \u12368 \u12395 \u12354 \u12394 \u12383 \u12398 \u12459 \u12540 \u12489 \u12395 \u12394 \u12426 \u12414 \u12377 \u12290 <br>\u12300 \u20418 \u12395 \u38972 \u12416 \u12301 \u12398 \u21306 \u22495 \u12399 \u12289 \u20418 \u12364 \u27770 \u12417 \u12390 \u12363 \u12425 \u23626 \u12365 \u12414 \u12377 \u12290 </p>\
+    $\{!canTake && list.some(x => x.t.free) ? `<div class="notice warn">\uc0\u33258 \u20998 \u12391 \u21463 \u12369 \u21462 \u12428 \u12427 \u12398 \u12399 $\{max\}\u26522 \u12414 \u12391 \u12391 \u12377 \u65288 \u20170  $\{held\}\u26522 \u65289 \u12290 \u20418 \u12395 \u38972 \u12416 \u12371 \u12392 \u12399 \u12391 \u12365 \u12414 \u12377 \u12290 </div>` : ''\}\
+    <div class="row"><button class="btn small" id="reqNear">$\{myPos ? '\uc0\u29694 \u22312 \u22320 \u12434 \u26356 \u26032 \u12377 \u12427 ' : '\u29694 \u22312 \u22320 \u12363 \u12425 \u36817 \u12356 \u38918 \u12395 \u12377 \u12427 '\}</button>\
+      <span class="muted">$\{myPos ? '\uc0\u36817 \u12356 \u38918 ' : '\u38263 \u12367 \u22238 \u12387 \u12390 \u12356 \u12394 \u12356 \u38918 '\}\u12395 \u20006 \u12435 \u12391 \u12356 \u12414 \u12377 </span></div>\
+    $\{rows || '<div class="empty">\uc0\u20170 \u12289 \u31354 \u12356 \u12390 \u12356 \u12427 \u21306 \u22495 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 </div>'\}\
+    <button class="btn block primary" data-ask="">\uc0\u12393 \u12371 \u12391 \u12418 \u12424 \u12356 \u12398 \u12391 \u20418 \u12395 \u38972 \u12416 </button>\
+    <button class="btn block" data-close>\uc0\u12418 \u12393 \u12427 </button>`);\
+  const S = $('#sheet');\
+  $('#reqNear').onclick = () => locate(openRequestSheet);\
+  $$('[data-take]', S).forEach(x => x.onclick = () => takeTerr(x.dataset.take));\
+  $$('[data-ask]', S).forEach(x => x.onclick = () => askTerr(x.dataset.ask || null));\
+\}\
+function takeTerr(id) \{\
+  const t = terrById(id);\
+  if (!t || t.holder) \{ toast('\uc0\u12371 \u12398 \u21306 \u22495 \u12399 \u12377 \u12391 \u12395 \u36024 \u12375 \u20986 \u12373 \u12428 \u12390 \u12356 \u12414 \u12377 '); return; \}\
+  if (!t.free || heldCount(me().id) >= D().settings.selfTakeMax) \{ toast('\uc0\u12371 \u12398 \u21306 \u22495 \u12399 \u20418 \u12395 \u38972 \u12435 \u12391 \u12367 \u12384 \u12373 \u12356 '); return; \}\
+  if (!confirm(`\uc0\u21306 \u22495 $\{t.no\}\u12434 \u21463 \u12369 \u21462 \u12426 \u12414 \u12377 \u12290 \u12424 \u12429 \u12375 \u12356 \u12391 \u12377 \u12363 \u65311 `)) return;\
+  closeSheet();\
+  commit(`\uc0\u21306 \u22495 $\{t.no\}\u12434 \u21463 \u12369 \u21462 \u12426 \u12414 \u12375 \u12383 `, () => \{\
+    const now = new Date().toISOString();\
+    t.holder = me().id; t.lentAt = now; t.selfTakenAt = now; t.selfSeen = false;\
+    D().requests = D().requests.filter(r => !(r.status === 'pending' && r.by === me().id && r.terrId === id));\
+  \});\
+\}\
+function askTerr(id) \{\
+  if (myPending()) \{ toast('\uc0\u12377 \u12391 \u12395 \u30003 \u12375 \u36796 \u12415 \u20013 \u12391 \u12377 '); return; \}\
+  const t = id ? terrById(id) : null;\
+  closeSheet();\
+  commit(t ? `\uc0\u21306 \u22495 $\{t.no\}\u12434 \u20418 \u12395 \u30003 \u12375 \u36796 \u12415 \u12414 \u12375 \u12383 ` : '\u21306 \u22495 \u12459 \u12540 \u12489 \u12434 \u20418 \u12395 \u30003 \u12375 \u36796 \u12415 \u12414 \u12375 \u12383 ', () => \{\
+    D().requests.push(\{ id: 'r' + uid(), by: me().id, terrId: id || null, at: new Date().toISOString(), status: 'pending' \});\
+  \});\
+\}\
+\
+/* \uc0\u20418 \u65306 \u30003 \u12375 \u36796 \u12415 \u12392 \u12289 \u33258 \u20998 \u12391 \u21463 \u12369 \u21462 \u12425 \u12428 \u12383 \u21306 \u22495 \u65288 \u29992 \u20214 \u12364 \u12354 \u12427 \u12392 \u12365 \u12384 \u12369 \u34920 \u31034 \u65289  */\
+function renderInbox() \{\
+  const reqs = D().requests.filter(r => r.status === 'pending').sort((a, b) => (a.at < b.at ? -1 : 1));\
+  const taken = D().territories.filter(t => t.holder && t.selfTakenAt && t.selfSeen === false);\
+  const free = freeTerrs().map(t => (\{ t, last: t.completedAt \})).sort(byLongest);\
+  let html = '';\
+  if (reqs.length) \{\
+    html += `<h2 class="sec">\uc0\u21306 \u22495 \u12459 \u12540 \u12489 \u12398 \u30003 \u12375 \u36796 \u12415 \u65288 $\{reqs.length\}\u20214 \u65289 </h2>\
+      <p class="hint">\uc0\u36024 \u12375 \u20986 \u12377 \u21306 \u22495 \u12399 \u12289 \u24076 \u26395 \u12398 \u21306 \u22495 \u12363 \u12289 \u38263 \u12367 \u22238 \u12387 \u12390 \u12356 \u12394 \u12356 \u21306 \u22495 \u12364 \u20808 \u12395 \u36984 \u12400 \u12428 \u12390 \u12356 \u12414 \u12377 \u12290 </p>` + reqs.map(r => \{\
+      const want = r.terrId ? terrById(r.terrId) : null;\
+      const wantFree = !!want && !want.holder;\
+      const held = D().territories.filter(t => t.holder === r.by);\
+      const over = held.filter(t => t.lentAt && daysSince(t.lentAt) > 120).length;\
+      const def = wantFree ? want.id : (free[0] ? free[0].t.id : '');\
+      const opts = free.map((\{ t, last \}) =>\
+        `<option value="$\{t.id\}"$\{t.id === def ? ' selected' : ''\}>\uc0\u21306 \u22495 $\{t.no\}\u65288 $\{last ? `\u21069 \u22238  $\{fmtDay(last)\}` : '\u22238 \u12426 \u32066 \u12360 \u12383 \u35352 \u37682 \u12394 \u12375 '\}\u65289 </option>`).join('');\
+      return `<article class="ritem k-new"><div>\
+          <p class="rt">$\{esc(uname(r.by))\}\uc0\u12373 \u12435 </p>\
+          <p class="muted">\uc0\u24076 \u26395 \u65306 $\{want ? `\u21306 \u22495 $\{want.no\}$\{wantFree ? '' : '\u65288 \u12377 \u12391 \u12395 \u36024 \u20986 \u20013 \u65289 '\}` : '\u12393 \u12371 \u12391 \u12418 \u12424 \u12356 '\}\u12288 $\{fmtDay(r.at)\}</p>\
+          <p class="muted">\uc0\u20170 \u25345 \u12387 \u12390 \u12356 \u12427 \u12459 \u12540 \u12489  $\{held.length\}\u26522 $\{over ? `<span class="tag-warn">4\u12363 \u26376 \u36229  $\{over\}\u26522 </span>` : ''\}</p>\
+        </div><span></span>\
+        <div class="actions span">\
+          $\{free.length\
+            ? `<label>\uc0\u36024 \u12375 \u20986 \u12377 \u21306 \u22495  <select data-reqterr="$\{r.id\}">$\{opts\}</select></label><button class="btn small primary" data-reqok="$\{r.id\}">\u36024 \u12375 \u20986 \u12377 </button>`\
+            : '<span class="muted">\uc0\u31354 \u12356 \u12390 \u12356 \u12427 \u21306 \u22495 \u12364 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 </span>'\}\
+          <button class="btn small" data-reqno="$\{r.id\}">\uc0\u35211 \u36865 \u12427 </button>\
+        </div></article>`;\
+    \}).join('');\
+  \}\
+  if (taken.length) \{\
+    html += `<h2 class="sec">\uc0\u33258 \u20998 \u12391 \u21463 \u12369 \u21462 \u12425 \u12428 \u12383 \u21306 \u22495 \u65288 $\{taken.length\}\u20214 \u65289 </h2>` + taken.map(t =>\
+      `<article class="ritem k-away"><div>\
+        <p class="rt"><span class="stamp xs">$\{t.no\}</span> $\{esc(t.name)\}</p>\
+        <p class="muted">$\{esc(uname(t.holder))\}\uc0\u12373 \u12435 \u12288 $\{fmtDay(t.selfTakenAt)\}\u12395 \u21463 \u12369 \u21462 \u12426 \u65288 \u20170  $\{heldCount(t.holder)\}\u26522 \u65289 </p>\
+      </div><button class="btn small" data-takenseen="$\{t.id\}">\uc0\u30906 \u35469 \u12375 \u12383 </button></article>`).join('');\
+  \}\
+  $('#adInbox').innerHTML = html;\
+  const n = reqs.length + taken.length;\
+  $('#tabBadge').textContent = n;\
+  $('#tabBadge').hidden = !n;\
+\
+  const st = D().settings;\
+  $('#adTakeSet').innerHTML = `<div class="setrow">\
+    <span>\uc0\u12300 \u33258 \u30001 \u12395 \u21463 \u12369 \u21462 \u12387 \u12390 \u12424 \u12356 \u12301 \u21306 \u22495 \u12434 \u12289 1\u20154 \u12364 \u33258 \u20998 \u12391 \u21463 \u12369 \u21462 \u12428 \u12427 \u26522 \u25968 <br><small class="hint">\u12377 \u12391 \u12395 \u25345 \u12387 \u12390 \u12356 \u12427 \u12459 \u12540 \u12489 \u12418 \u25968 \u12360 \u12414 \u12377 </small></span>\
+    <div class="stepper"><button type="button" data-takemax="-1" aria-label="\uc0\u26522 \u25968 \u12434 \u28187 \u12425 \u12377 ">\u8722 </button><output class="wide">$\{st.selfTakeMax\}\u26522 \u12414 \u12391 </output>\
+    <button type="button" data-takemax="1" aria-label="\uc0\u26522 \u25968 \u12434 \u22679 \u12420 \u12377 ">\u65291 </button></div></div>\
+    <div class="setrow">\
+    <span>\uc0\u21306 \u22495 \u12459 \u12540 \u12489 \u12434 \u12300 \u23436 \u20102 \u12301 \u12395 \u12391 \u12365 \u12427 \u30446 \u23433 <br><small class="hint">\u35370 \u12397 \u12383 \u23478 \u12398 \u21106 \u21512 \u12290 \u30446 \u23433 \u12395 \u23626 \u12367 \u12392 \u12289 \u26412 \u20154 \u12398 \u30011 \u38754 \u12395 \u12300 \u36820 \u21364 \u12375 \u12390 \u23436 \u20102 \u12395 \u12391 \u12365 \u12414 \u12377 \u12301 \u12392 \u20986 \u12414 \u12377 </small></span>\
+    <div class="stepper"><button type="button" data-donepct="-5" aria-label="\uc0\u30446 \u23433 \u12434 \u19979 \u12370 \u12427 ">\u8722 </button><output class="wide">$\{st.donePct\}%</output>\
+    <button type="button" data-donepct="5" aria-label="\uc0\u30446 \u23433 \u12434 \u19978 \u12370 \u12427 ">\u65291 </button></div></div>`;\
+\}\
+function approveReq(id) \{\
+  const r = D().requests.find(x => x.id === id); if (!r) return;\
+  const sel = $(`[data-reqterr="$\{id\}"]`), t = sel ? terrById(sel.value) : null;\
+  if (!t || t.holder) \{ toast('\uc0\u12381 \u12398 \u21306 \u22495 \u12399 \u36024 \u12375 \u20986 \u12379 \u12414 \u12379 \u12435 '); return; \}\
+  commit(`\uc0\u21306 \u22495 $\{t.no\}\u12434 $\{uname(r.by)\}\u12373 \u12435 \u12395 \u36024 \u12375 \u20986 \u12375 \u12414 \u12375 \u12383 `, () => \{\
+    const now = new Date().toISOString();\
+    t.holder = r.by; t.lentAt = now;\
+    Object.assign(r, \{ status: 'approved', terrId: t.id, decidedAt: now, seen: false \});\
+  \});\
+\}\
+function declineReq(id) \{\
+  const r = D().requests.find(x => x.id === id); if (!r) return;\
+  if (!confirm(`$\{uname(r.by)\}\uc0\u12373 \u12435 \u12398 \u30003 \u12375 \u36796 \u12415 \u12434 \u35211 \u36865 \u12426 \u12414 \u12377 \u12290 \u12424 \u12429 \u12375 \u12356 \u12391 \u12377 \u12363 \u65311 `)) return;\
+  commit('\uc0\u30003 \u12375 \u36796 \u12415 \u12434 \u35211 \u36865 \u12426 \u12414 \u12375 \u12383 ', () => \{\
+    Object.assign(r, \{ status: 'declined', decidedAt: new Date().toISOString(), seen: false \});\
+  \});\
+\}\
+\
+/* ---------- \uc0\u21306 \u22495 \u12398 \u36820 \u21364 \u65288 \u22238 \u12426 \u32066 \u12360 \u12383 \u26085 \u12398 \u35352 \u37682 \u65289  ---------- */\
+function openReturnSheet(tid) \{\
+  const t = terrById(tid); if (!t || !t.holder) return;\
+  const r = roundInfo(tid, true), th = D().settings.donePct;\
+  const total = r.c.todo + r.c.done, reached = r.pct >= th;\
+  const sub = `$\{esc(uname(t.holder))\}\uc0\u12373 \u12435 $\{t.lentAt ? `\u12288 \u21463 \u12369 \u21462 \u12387 \u12390 \u12363 \u12425  $\{daysSince(t.lentAt)\}\u26085 ` : ''\}`;\
+  setSheet(headHtml(t, `\uc0\u21306 \u22495 $\{t.no\}\u12434 \u36820 \u21364 \u12375 \u12414 \u12377 `, sub) + `\
+    <div class="progress big" role="progressbar" aria-valuenow="$\{r.pct\}" aria-valuemin="0" aria-valuemax="100" aria-label="\uc0\u22238 \u12387 \u12383 \u21106 \u21512 "><i style="width:$\{r.pct\}%"></i></div>\
+    <p class="muted">\uc0\u21463 \u12369 \u21462 \u12387 \u12390 \u12363 \u12425 \u35370 \u12397 \u12383 \u23478  $\{r.c.done\} / $\{total\}\u65288 $\{r.pct\}%\u65289 $\{r.c.todo ? `\u12288 \u27531 \u12426  $\{r.c.todo\}\u36562 ` : ''\}</p>\
+    <p class="q">\uc0\u21306 \u22495 \u12434 \u22238 \u12426 \u32066 \u12360 \u12414 \u12375 \u12383 \u12363 \u65311 </p>\
+    <div class="choices two">\
+      <button class="choice$\{reached ? ' on' : ''\}" data-ret="1">\uc0\u22238 \u12426 \u32066 \u12360 \u12414 \u12375 \u12383 <small>\u23436 \u20102 \u12392 \u12375 \u12390 \u35352 \u37682 \u12375 \u12414 \u12377 </small></button>\
+      <button class="choice$\{reached ? '' : ' on'\}" data-ret="0">\uc0\u36884 \u20013 \u12414 \u12391 \u12391 \u12377 </button>\
+    </div>\
+    <p class="hint">$\{reached\
+      ? `\uc0\u23436 \u20102 \u12398 \u30446 \u23433 \u65288 $\{th\}%\u65289 \u12434 \u12371 \u12360 \u12390 \u12356 \u12414 \u12377 \u12290 `\
+      : `\uc0\u23436 \u20102 \u12398 \u30446 \u23433 \u12399 $\{th\}%\u12391 \u12377 \u12290 \u20107 \u24773 \u12364 \u12354 \u12427 \u12392 \u12365 \u12399 \u12300 \u22238 \u12426 \u32066 \u12360 \u12414 \u12375 \u12383 \u12301 \u12434 \u36984 \u12409 \u12414 \u12377 \u12290 `\}\
+      \uc0\u27531 \u12426 \u12398 \u23478 \u12399 \u12289 \u27425 \u12395 \u22238 \u12427 \u20154 \u12398 \u12362 \u12377 \u12377 \u12417 \u12395 \u20986 \u12414 \u12377 \u12290 \u20250 \u12360 \u12394 \u12363 \u12387 \u12383 \u23478 \u12399 \u12289 \u26178 \u38291 \u24111 \u12434 \u22793 \u12360 \u12390 \u35370 \u12397 \u12427 \u12300 \u30041 \u23432 \u23429 \u12459 \u12540 \u12489 \u12301 \u12395 \u12394 \u12426 \u12414 \u12377 \u12290 </p>\
+    <button class="btn block" data-close>\uc0\u12418 \u12393 \u12427 </button>`);\
+  $$('[data-ret]', $('#sheet')).forEach(x => x.onclick = () => returnTerr(tid, x.dataset.ret === '1'));\
+\}\
+function returnTerr(tid, completed) \{\
+  const t = terrById(tid); if (!t) return;\
+  const r = roundInfo(tid, true), pct = r ? r.pct : null;\
+  closeSheet();\
+  if (roundTerr === tid) roundTerr = null;\
+  commit(`\uc0\u21306 \u22495 $\{t.no\}\u12434 \u36820 \u21364 \u12375 \u12414 \u12375 \u12383 $\{completed ? `\u65288 \u23436 \u20102 \u12539 $\{pct\}%\u65289 ` : ''\}`, () => \{\
+    const now = new Date().toISOString();\
+    D().returns.push(\{ id: 'x' + uid(), terrId: tid, by: t.holder, lentAt: t.lentAt, at: now, completed, pct \});\
+    if (completed) \{ t.completedAt = now; t.completedPct = pct; \}\
+    t.holder = null; t.lentAt = null; t.returnedAt = now;\
+  \});\
+\}\
+\
+/* ---------- \uc0\u30041 \u23432 \u23429 \u12459 \u12540 \u12489  ---------- */\
+let focusCard = null, roundTerr = null, roundNums = null, barMini = false;\
+const slotText = s => \{ const [dt, b] = s.split('\uc0\u12539 '); return `$\{dt\}\u12398 $\{b\}\u65288 $\{BAND_HINT[b]\}\u65289 `; \};\
+const slotShort = s => s.replace('\uc0\u12539 ', '\u12398 ');\
+const activeCards = () => \{ const now = Date.now(); return D().awayCards.filter(c => !c.endedAt && Date.parse(c.expiresAt) > now); \};\
+const isUnmet = k => \{ const vs = visitsOf(k); return vs.length > 0 && vs.every(v => v.result === 'away'); \};\
+const triedSlots = k => new Set(visitsOf(k).map(v => slotOf(new Date(v.at))));\
+// \uc0\u25285 \u24403 \u32773 \u12398 \u12356 \u12427 \u21306 \u22495 \u12399 \u25285 \u24403 \u32773 \u12384 \u12369 \u12290 \u31354 \u12356 \u12390 \u12356 \u12427 \u21306 \u22495 \u12399 \u12289 \u22238 \u12426 \u32066 \u12360 \u12383 \u35352 \u37682 \u12364 \u12354 \u12427 \u12418 \u12398 \u12384 \u12369 \u12290 \
+const awayEligibleTerr = (t, uid) => (t.holder ? t.holder === uid : !!t.completedAt);\
+\
+/* \uc0\u21306 \u22495 \u12372 \u12392 \u12398 \u12300 \u12414 \u12384 \u20250 \u12360 \u12390 \u12356 \u12394 \u12356 \u23478 \u12301  */\
+function unmetIndex() \{\
+  const m = new Map(), now = Date.now();\
+  for (const h of D().houses) \{\
+    if (!h.terrId) continue;\
+    for (const u of targets(h)) \{\
+      const k = K(h.id, u);\
+      if (D().dnc[k] || D().follows[k] || D().released[k] || !isUnmet(k)) continue;\
+      const tried = triedSlots(k);\
+      if (!m.has(h.terrId)) m.set(h.terrId, []);\
+      m.get(h.terrId).push(\{ k, h, u, tried, recent: now - Date.parse(visitsOf(k)[0].at) < 3 * DAY, hard: tried.size >= SLOTS.length \});\
+    \}\
+  \}\
+  return m;\
+\}\
+function lockedKeys() \{ const s = new Set(); activeCards().forEach(c => c.keys.forEach(k => s.add(k))); return s; \}\
+function cardKeys(items, slot, locked) \{\
+  return items.filter(x => !x.hard && !x.recent && !x.tried.has(slot) && !locked.has(x.k)).map(x => x.k);\
+\}\
+function awaySuggestions(uid, slots) \{\
+  const idx = unmetIndex(), locked = lockedKeys(), res = [];\
+  for (const t of D().territories) \{\
+    if (!awayEligibleTerr(t, uid) || !idx.has(t.id)) continue;\
+    for (const slot of slots) \{\
+      const keys = cardKeys(idx.get(t.id), slot, locked);\
+      if (keys.length) res.push(\{ t, slot, keys, dist: myPos ? distM(myPos, center(t.polygon)) : null \});\
+    \}\
+  \}\
+  res.sort(myPos ? (a, b) => a.dist - b.dist || b.keys.length - a.keys.length : (a, b) => b.keys.length - a.keys.length);\
+  return res;\
+\}\
+function cardProgress(c) \{\
+  const keys = c.keys.filter(k => houseById(parseKey(k)[0]));\
+  return \{ total: keys.length, done: keys.filter(k => visitsOf(k).some(v => v.at >= c.at)).length \};\
+\}\
+function takeAwayCard(tid, slot) \{\
+  const max = D().settings.awayMax;\
+  if (activeCards().filter(c => c.by === me().id).length >= max) \{\
+    toast(`\uc0\u30041 \u23432 \u23429 \u12459 \u12540 \u12489 \u12399 $\{max\}\u26522 \u12414 \u12391 \u25345 \u12390 \u12414 \u12377 \u12290 \u32066 \u12360 \u12390 \u12363 \u12425 \u21463 \u12369 \u21462 \u12387 \u12390 \u12367 \u12384 \u12373 \u12356 `); return;\
+  \}\
+  const t = terrById(tid);\
+  if (!t || !awayEligibleTerr(t, me().id)) \{ toast('\uc0\u12371 \u12398 \u12459 \u12540 \u12489 \u12399 \u21463 \u12369 \u21462 \u12428 \u12414 \u12379 \u12435 '); return; \}\
+  const keys = cardKeys(unmetIndex().get(tid) || [], slot, lockedKeys());\
+  if (!keys.length) \{ toast('\uc0\u12371 \u12398 \u12459 \u12540 \u12489 \u12398 \u23478 \u12399 \u12289 \u20170 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 '); renderAll(); return; \}\
+  const now = new Date();\
+  const card = \{ id: 'c' + uid(), terrId: tid, slot, by: me().id, at: now.toISOString(),\
+    expiresAt: new Date(now.getTime() + D().settings.awayDays * DAY).toISOString(), keys \};\
+  commit(`\uc0\u30041 \u23432 \u23429 \u12459 \u12540 \u12489 \u65288 \u21306 \u22495 $\{t.no\}\u12539 $\{slotShort(slot)\}\u65289 \u12434 \u21463 \u12369 \u21462 \u12426 \u12414 \u12375 \u12383 `, () => \{ D().awayCards.push(card); \});\
+  openAwayCard(card.id);\
+\}\
+function endAwayCard(id) \{\
+  const c = D().awayCards.find(x => x.id === id); if (!c) return;\
+  if (!confirm('\uc0\u12371 \u12398 \u30041 \u23432 \u23429 \u12459 \u12540 \u12489 \u12434 \u32066 \u12360 \u12414 \u12377 \u12290 \u35370 \u12397 \u12390 \u12356 \u12394 \u12356 \u23478 \u12399 \u12289 \u12411 \u12363 \u12398 \u20154 \u12398 \u12459 \u12540 \u12489 \u12395 \u25147 \u12426 \u12414 \u12377 \u12290 \u12424 \u12429 \u12375 \u12356 \u12391 \u12377 \u12363 \u65311 ')) return;\
+  if (focusCard === id) focusCard = null;\
+  commit('\uc0\u30041 \u23432 \u23429 \u12459 \u12540 \u12489 \u12434 \u32066 \u12360 \u12414 \u12375 \u12383 ', () => \{ c.endedAt = new Date().toISOString(); \});\
+\}\
+function openAwayCard(id) \{\
+  const c = D().awayCards.find(x => x.id === id); if (!c) return;\
+  focusCard = id; roundTerr = null; firstMapShow = false;\
+  $('#terrJump').value = c.terrId;\
+  showView('map'); renderTerrs();\
+  const pts = c.keys.map(k => houseById(parseKey(k)[0])).filter(Boolean).map(h => [h.lat, h.lng]);\
+  setTimeout(() => \{\
+    if (pts.length) map.fitBounds(L.latLngBounds(pts), \{ padding: [70, 70], maxZoom: 18 \}); else fitTerr(c.terrId);\
+    renderHouses();\
+  \}, 60);\
+\}\
+/* \uc0\u22320 \u22259 \u12398 \u30446 \u31435 \u12383 \u12379 \u26041 \u65288 \u30041 \u23432 \u23429 \u12459 \u12540 \u12489 \u65295 \u33258 \u20998 \u12398 \u21306 \u22495 \u12459 \u12540 \u12489 \u12434 \u22238 \u12427 \u12392 \u12365 \u65289  */\
+const visitedSince = (k, iso) => visitsOf(k).some(v => v.at >= iso);\
+const FOCUS_RANK = ['hl', '', 'later', 'done', 'dim', 'refuse'];\
+const todayIso = () => \{ const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); \};\
+/* \uc0\u32209 \u12398 \u12481 \u12455 \u12483 \u12463 \u12398 \u22522 \u28310 \u65306 \u33258 \u20998 \u12398 \u21306 \u22495 \u12394 \u12425 \u21463 \u12369 \u21462 \u12387 \u12390 \u12363 \u12425 \u12289 \u12381 \u12428 \u20197 \u22806 \u12399 \u20170 \u26085  */\
+function unitDoneSince(h) \{\
+  const t = terrById(h.terrId);\
+  return t && t.holder === me().id && t.lentAt ? t.lentAt : todayIso();\
+\}\
+const focusCls = st => (st ? ' ' + st : '');\
+const doneMark = st => (st === 'done' ? '<u>\uc0\u10003 </u>' : '');\
+const PLAN_SIZE = 10;\
+const roundMode = () => me().roundMode || 'reco';\
+\
+/* \uc0\u23478 \u65288 \u37096 \u23627 \u65289 \u12372 \u12392 \u12398 \u12300 \u20170 \u35370 \u12397 \u12427 \u20385 \u20516 \u12301 \u12392 \u29702 \u30001  */\
+function scoreTarget(k, cur) \{\
+  const vs = visitsOf(k), reasons = [];\
+  let sc = 10;\
+  const metS = new Set(), awayS = new Set();\
+  vs.forEach(v => \{\
+    const s = slotOf(new Date(v.at));\
+    if (v.result === 'met') metS.add(s); else if (v.result === 'away') awayS.add(s);\
+  \});\
+  const m = vs.find(v => v.result === 'met');\
+  if (!vs.length) \{ sc += 15; reasons.push('\uc0\u12399 \u12376 \u12417 \u12390 \u35370 \u12397 \u12427 \u23478 '); \}\
+  if (m && m.interest === '\uc0\u38306 \u24515 \u12354 \u12426 ') \{ sc += 40; reasons.push('\u38306 \u24515 \u12354 \u12426 '); \}\
+  else if (m && m.interest === '\uc0\u23569 \u12375 \u12354 \u12426 ') \{ sc += 25; reasons.push('\u23569 \u12375 \u38306 \u24515 \u12354 \u12426 '); \}\
+  if (m && YOUNG.has(m.age)) \{ sc += 10; reasons.push(`$\{m.age\}\uc0\u12398 \u26041 `); \}\
+  if (metS.has(cur)) \{ sc += 15; reasons.push('\uc0\u12371 \u12398 \u26178 \u38291 \u12395 \u20250 \u12360 \u12383 \u12371 \u12392 \u12364 \u12354 \u12427 '); \}\
+  else if (awayS.has(cur)) \{ sc -= 30; reasons.push('\uc0\u12371 \u12398 \u26178 \u38291 \u12399 \u30041 \u23432 \u12384 \u12387 \u12383 '); \}\
+  else if (vs.length && !m) \{\
+    sc += 30;\
+    reasons.push(`\uc0\u30041 \u23432 $\{awayS.size ? vs.filter(v => v.result === 'away').length + '\u22238 ' : ''\}\u12539 \u12371 \u12398 \u26178 \u38291 \u12399 \u12414 \u12384 \u35370 \u12397 \u12390 \u12356 \u12394 \u12356 `);\
+  \}\
+  return \{ sc, reasons \};\
+\}\
+\
+/* \uc0\u33258 \u20998 \u12398 \u21306 \u22495 \u12459 \u12540 \u12489 \u65306 \u21463 \u12369 \u21462 \u12387 \u12390 \u12363 \u12425 \u12398 \u29366 \u27841  */\
+function roundInfo(tid, anyHolder) \{\
+  const t = terrById(tid);\
+  if (!t || !t.holder || (!anyHolder && t.holder !== me().id)) return null;\
+  const since = t.lentAt || '', cur = slotOf(new Date());\
+  const map = new Map(), items = [], c = \{ todo: 0, done: 0 \};\
+  for (const h of D().houses) \{\
+    if (h.terrId !== tid) continue;\
+    for (const u of targets(h)) \{\
+      const k = K(h.id, u), f = fol(k);\
+      let st;\
+      if (D().dnc[k]) st = 'refuse';\
+      else if (f && f.by !== t.holder) st = 'skip';\
+      else if (since && visitedSince(k, since)) st = 'done';\
+      else \{ st = 'todo'; items.push(Object.assign(\{ k, h, u \}, scoreTarget(k, cur))); \}\
+      map.set(k, st);\
+      if (st === 'todo' || st === 'done') c[st]++;\
+    \}\
+  \}\
+  const total = c.todo + c.done;\
+  return \{ t, cur, map, c, items, pct: total ? Math.round(c.done / total * 100) : 100 \};\
+\}\
+/* \uc0\u12362 \u12377 \u12377 \u12417 \u12398 \u22238 \u12426 \u26041 \u65306 \u28857 \u25968 \u12398 \u39640 \u12356 \u23478 \u12363 \u12425 \u36984 \u12403 \u12289 \u36817 \u12356 \u38918 \u12395 \u12388 \u12394 \u12368 \u65288 \u38598 \u21512 \u20303 \u23429 \u12399 1\u12363 \u25152 \u12395 \u12414 \u12392 \u12417 \u12427 \u65289  */\
+function roundPlan(r) \{\
+  const g = new Map();\
+  r.items.forEach(x => \{\
+    const s = g.get(x.h.id) || \{ h: x.h, units: [], sc: -Infinity, reasons: [] \};\
+    s.units.push(x.u);\
+    if (x.sc > s.sc) s.sc = x.sc;\
+    x.reasons.forEach(y => \{ if (!s.reasons.includes(y)) s.reasons.push(y); \});\
+    g.set(x.h.id, s);\
+  \});\
+  const pool = [...g.values()].filter(s => s.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, PLAN_SIZE);\
+  const out = [];\
+  let at = myPos || (pool[0] ? [pool[0].h.lat, pool[0].h.lng] : null);\
+  while (pool.length) \{\
+    let bi = 0, bd = Infinity;\
+    pool.forEach((s, i) => \{ const d = distM(at, [s.h.lat, s.h.lng]); if (d < bd) \{ bd = d; bi = i; \} \});\
+    const s = pool.splice(bi, 1)[0];\
+    s.dist = bd; out.push(s); at = [s.h.lat, s.h.lng];\
+  \}\
+  return out;\
+\}\
+const stopLabel = s => (s.h.type === 'apt' ? `$\{esc(s.h.label || '\uc0\u38598 \u21512 \u20303 \u23429 ')\}\u65288 $\{s.units.length\}\u37096 \u23627 \u65289 ` : esc(s.h.label || '\u23478 '));\
+function roundHint(t) \{\
+  const r = roundInfo(t.id);\
+  if (!r) return '';\
+  if (!r.c.todo) return `<p class="hint-strong ok">\uc0\u12377 \u12409 \u12390 \u12398 \u23478 \u12395 \u32209 \u12398 \u12481 \u12455 \u12483 \u12463 \u12364 \u12388 \u12365 \u12414 \u12375 \u12383 \u12290 \u36820 \u21364 \u12398 \u12392 \u12365 \u12395 \u12300 \u22238 \u12426 \u32066 \u12360 \u12414 \u12375 \u12383 \u12301 \u12434 \u36984 \u12435 \u12391 \u12367 \u12384 \u12373 \u12356 \u12290 </p>`;\
+  const near = r.pct >= D().settings.donePct\
+    ? `<p class="hint-strong ok">\uc0\u12411 \u12412 \u22238 \u12426 \u32066 \u12360 \u12414 \u12375 \u12383 \u65288 $\{r.pct\}%\u65289 \u12290 \u36820 \u21364 \u12375 \u12390 \u23436 \u20102 \u12395 \u12391 \u12365 \u12414 \u12377 \u12290 </p>` : '';\
+  const plan = roundPlan(r);\
+  if (!plan.length) return near;\
+  const intr = plan.filter(s => s.reasons.some(y => y.includes('\uc0\u38306 \u24515 '))).length;\
+  return near + `<p class="hint-strong">\uc0\u20170 \u65288 $\{slotShort(r.cur)\}\u65289 \u12398 \u12362 \u12377 \u12377 \u12417  $\{plan.length\}\u12363 \u25152 $\{intr ? `\u65288 \u38306 \u24515 \u12398 \u12354 \u12427 \u23478  $\{intr\}\u12363 \u25152 \u65289 ` : ''\}\u12290 \u12300 \u22320 \u22259 \u12434 \u12402 \u12425 \u12367 \u12301 \u12391 \u30058 \u21495 \u38918 \u12395 \u22238 \u12428 \u12414 \u12377 \u12290 </p>`;\
+\}\
+/* \uc0\u23478 \u12372 \u12392 \u12398 \u34920 \u31034 \u12434 \u36820 \u12377 \u38306 \u25968 \u65288 \u30446 \u31435 \u12383 \u12379 \u12390 \u12356 \u12394 \u12356 \u12392 \u12365 \u12399  null\u65289  */\
+function focusFn() \{\
+  roundNums = null;\
+  const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;\
+  if (focusCard && !c) focusCard = null;\
+  if (c) \{\
+    const set = new Set(c.keys);\
+    return k => (set.has(k) ? (visitedSince(k, c.at) ? 'done' : 'hl') : (D().dnc[k] ? 'refuse' : 'dim'));\
+  \}\
+  const r = roundTerr ? roundInfo(roundTerr) : null;\
+  if (roundTerr && !r) roundTerr = null;\
+  if (!r) return null;\
+  if (roundMode() === 'progress') \{\
+    return k => \{ const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? '' : s === 'refuse' ? 'refuse' : 'dim'; \};\
+  \}\
+  const plan = roundPlan(r);\
+  roundNums = new Map(plan.map((s, i) => [s.h.id, i + 1]));\
+  const inPlan = new Set();\
+  plan.forEach(s => s.units.forEach(u => inPlan.add(K(s.h.id, u))));\
+  return k => \{ const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? (inPlan.has(k) ? 'hl' : 'later') : s === 'refuse' ? 'refuse' : 'dim'; \};\
+\}\
+function openPlanSheet() \{\
+  const r = roundTerr ? roundInfo(roundTerr) : null; if (!r) return;\
+  const plan = roundPlan(r);\
+  setSheet(headHtml(r.t, '\uc0\u12362 \u12377 \u12377 \u12417 \u12398 \u22238 \u12426 \u26041 ', `\u20170 \u12399 $\{slotShort(r.cur)\}\u12288 \u12414 \u12384 \u35370 \u12397 \u12390 \u12356 \u12394 \u12356 \u23478  $\{r.c.todo\}`) + `\
+    <p class="hint">\uc0\u20170 \u12398 \u26178 \u38291 \u24111 \u12539 \u38306 \u24515 \u12539 \u12371 \u12428 \u12414 \u12391 \u12398 \u35352 \u37682 \u12363 \u12425 $\{PLAN_SIZE\}\u12363 \u25152 \u12414 \u12391 \u36984 \u12403 \u12289 \u36817 \u12356 \u38918 \u12395 \u12388 \u12394 \u12356 \u12391 \u12356 \u12414 \u12377 \u12290 \u35370 \u12397 \u12427 \u12392 \u19968 \u35239 \u12363 \u12425 \u22806 \u12428 \u12289 \u27425 \u12398 \u23478 \u12364 \u21152 \u12431 \u12426 \u12414 \u12377 \u12290 </p>\
+    <div class="row"><button class="btn small" id="planNear">$\{myPos ? '\uc0\u29694 \u22312 \u22320 \u12434 \u26356 \u26032 \u12375 \u12390 \u20006 \u12409 \u30452 \u12377 ' : '\u29694 \u22312 \u22320 \u12363 \u12425 \u20006 \u12409 \u30452 \u12377 '\}</button></div>\
+    $\{plan.length ? `<ol class="plan">$\{plan.map((s, i) => `<li>\
+        <span class="numbadge">$\{i + 1\}</span>\
+        <div><b>$\{stopLabel(s)\}</b><p class="muted">$\{s.reasons.slice(0, 3).join('\uc0\u12539 ')\}</p>\
+          <p class="muted">$\{i === 0 ? (myPos ? `\uc0\u29694 \u22312 \u22320 \u12363 \u12425 \u32004 $\{fmtDist(s.dist)\}` : '\u12371 \u12371 \u12363 \u12425 \u22987 \u12417 \u12414 \u12377 ') : `\u21069 \u12398 \u23478 \u12363 \u12425 \u32004 $\{fmtDist(s.dist)\}`\}</p></div>\
+        <button class="btn small" data-plan="$\{s.h.id\}">\uc0\u22320 \u22259 \u12391 \u35211 \u12427 </button></li>`).join('')\}</ol>`\
+      : '<div class="empty">\uc0\u20170 \u12398 \u26178 \u38291 \u24111 \u12398 \u12362 \u12377 \u12377 \u12417 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 <br>\u12300 \u36914 \u12415 \u20855 \u21512 \u12301 \u12395 \u20999 \u12426 \u12363 \u12360 \u12390 \u12289 \u27531 \u12426 \u12398 \u23478 \u12434 \u22238 \u12387 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 </div>'\}\
+    <button class="btn block" data-close>\uc0\u12418 \u12393 \u12427 </button>`);\
+  $('#planNear').onclick = () => locate(openPlanSheet);\
+  $$('[data-plan]', $('#sheet')).forEach(x => x.onclick = () => \{\
+    const h = houseById(x.dataset.plan);\
+    closeSheet();\
+    map.setView([h.lat, h.lng], 19);\
+    setTimeout(() => (h.type === 'apt' ? openAptSeq(h.id) : openTarget(h.id, '', false)), 250);\
+  \});\
+\}\
+function renderCardBar() \{\
+  const bar = $('#cardBar');\
+  const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;\
+  const r = !c && roundTerr ? roundInfo(roundTerr) : null;\
+  $('#legend').hidden = !!(c || r);\
+  if (!c && !r) \{ bar.hidden = true; return; \}\
+  bar.hidden = false;\
+  const key = (cls, mark, label) => `<span><i class="pin mini st-new$\{cls\}">$\{mark\}</i>$\{label\}</span>`;\
+  const closeBtn = `<button class="btn small" id="cardBarClose">\uc0\u12405 \u12388 \u12358 \u12398 \u34920 \u31034 \u12395 \u25147 \u12377 </button>`;\
+  if (c) \{\
+    const t = terrById(c.terrId), p = cardProgress(c);\
+    bar.classList.remove('mini');\
+    bar.innerHTML = `<p><b>\uc0\u30041 \u23432 \u23429 \u12459 \u12540 \u12489 \u12288 \u21306 \u22495 $\{t ? t.no : '-'\}</b>\u12288 $\{slotText(c.slot)\}\u12395 \u35370 \u12397 \u12390 \u12367 \u12384 \u12373 \u12356 </p>\
+      <p class="keys">$\{key(' hl', '', `\uc0\u12414 \u12384 \u35370 \u12397 \u12390 \u12356 \u12394 \u12356 \u23478  $\{p.total - p.done\}`)\}$\{key(' done', '<u>\u10003 </u>', `\u35370 \u12397 \u12383 \u23478  $\{p.done\}`)\}</p>\
+      $\{p.total && p.done === p.total ? '<p class="okmsg"><b>\uc0\u12377 \u12409 \u12390 \u35370 \u12397 \u12414 \u12375 \u12383 \u12290 </b>\u12300 \u21306 \u22495 \u12459 \u12540 \u12489 \u12301 \u30011 \u38754 \u12391 \u12300 \u32066 \u12360 \u12427 \u12301 \u12434 \u25276 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 </p>' : ''\}\
+      <div class="row">$\{closeBtn\}</div>`;\
+  \} else \{\
+    const n = r.c, total = n.todo + n.done, pct = total ? Math.round(n.done / total * 100) : 0, mode = roundMode();\
+    let body = '', extra = '';\
+    if (!n.todo) \{\
+      body = `<p class="okmsg"><b>\uc0\u12377 \u12409 \u12390 \u12398 \u23478 \u12395 \u32209 \u12398 \u12481 \u12455 \u12483 \u12463 \u12364 \u12388 \u12365 \u12414 \u12375 \u12383 \u12290 </b>\u21306 \u22495 \u12434 \u22238 \u12426 \u32066 \u12360 \u12414 \u12375 \u12383 \u12290 </p>`;\
+      extra = `<button class="btn small primary" id="barReturn">\uc0\u36820 \u21364 \u12377 \u12427 </button>`;\
+    \} else if (mode === 'progress') \{\
+      body = `<p class="keys">$\{key('', '', `\uc0\u12414 \u12384  $\{n.todo\}`)\}$\{key(' done', '<u>\u10003 </u>', `\u28168 \u12415  $\{n.done\}`)\}</p>\
+        <p class="muted">\uc0\u32209 \u12398 \u12481 \u12455 \u12483 \u12463 \u12364 \u20840 \u37096 \u12398 \u23478 \u12395 \u12388 \u12367 \u12392 \u23436 \u20102 \u12391 \u12377 \u12290 </p>`;\
+    \} else \{\
+      const plan = roundPlan(r), first = plan[0];\
+      const planUnits = plan.reduce((a, s) => a + s.units.length, 0);\
+      body = (first\
+          ? `<p class="next"><span class="numbadge">1</span> <b>$\{stopLabel(first)\}</b>\uc0\u12288 $\{first.reasons.slice(0, 2).join('\u12539 ')\}</p>`\
+          : '<p class="muted">\uc0\u20170 \u12398 \u26178 \u38291 \u24111 \u12398 \u12362 \u12377 \u12377 \u12417 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 \u12300 \u36914 \u12415 \u20855 \u21512 \u12301 \u12391 \u27531 \u12426 \u12398 \u23478 \u12434 \u30906 \u35469 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 </p>') +\
+        `<p class="keys"><span><span class="numbadge sm">1</span>\uc0\u12362 \u12377 \u12377 \u12417  $\{plan.length\}\u12363 \u25152 </span>$\{key(' later', '', `\u12411 \u12363 \u12398 \u23478  $\{n.todo - planUnits\}`)\}$\{key(' done', '<u>\u10003 </u>', `\u28168 \u12415  $\{n.done\}`)\}</p>`;\
+      if (first) extra = `<button class="btn small primary" id="barList">\uc0\u12362 \u12377 \u12377 \u12417 \u38918 \u12398 \u19968 \u35239 </button>`;\
+    \}\
+    if (n.todo && r.pct >= D().settings.donePct) \{\
+      body = `<p class="okmsg"><b>\uc0\u12411 \u12412 \u22238 \u12426 \u32066 \u12360 \u12414 \u12375 \u12383 \u65288 $\{pct\}%\u65289 \u12290 </b>\u36820 \u21364 \u12375 \u12390 \u23436 \u20102 \u12395 \u12391 \u12365 \u12414 \u12377 \u12290 \u27531 \u12426 \u12398 \u23478 \u12399 \u12289 \u27425 \u12395 \u22238 \u12427 \u20154 \u12398 \u12362 \u12377 \u12377 \u12417 \u12395 \u20986 \u12414 \u12377 \u12290 </p>` + body;\
+      extra = `<button class="btn small primary" id="barReturn">\uc0\u36820 \u21364 \u12377 \u12427 </button>` + extra.replace(' primary', '');\
+    \}\
+    bar.classList.toggle('mini', barMini);\
+    bar.innerHTML = `<div class="barhead"><p><b>\uc0\u21306 \u22495 $\{r.t.no\}\u12434 \u22238 \u12387 \u12390 \u12356 \u12414 \u12377 </b>\u12288 \u20170 \u12399 $\{slotShort(r.cur)\}</p>\
+        <button class="foldbtn" id="barFold" aria-expanded="$\{!barMini\}">$\{barMini ? '\uc0\u12402 \u12425 \u12367 ' : '\u12383 \u12383 \u12416 '\}</button></div>\
+      <div class="progress big" role="progressbar" aria-valuenow="$\{pct\}" aria-valuemin="0" aria-valuemax="100" aria-label="\uc0\u22238 \u12387 \u12383 \u21106 \u21512 "><i style="width:$\{pct\}%"></i></div>\
+      <p class="muted">\uc0\u35370 \u12397 \u12383 \u23478  $\{n.done\} / $\{total\}\u65288 $\{pct\}%\u65289 </p>\
+      <div class="fold">\
+        <div class="seg" role="group" aria-label="\uc0\u34920 \u31034 \u12398 \u20999 \u12426 \u12363 \u12360 ">\
+          <button data-rmode="reco" aria-pressed="$\{mode === 'reco'\}">\uc0\u12362 \u12377 \u12377 \u12417 \u38918 </button>\
+          <button data-rmode="progress" aria-pressed="$\{mode === 'progress'\}">\uc0\u36914 \u12415 \u20855 \u21512 </button>\
+        </div>\
+        $\{body\}\
+        <div class="row">$\{extra\}$\{closeBtn\}</div>\
+      </div>`;\
+    $('#barFold').onclick = () => \{ barMini = !barMini; renderCardBar(); \};\
+    $$('[data-rmode]', bar).forEach(x => x.onclick = () => \{ me().roundMode = x.dataset.rmode; Store.save(); renderHouses(); \});\
+    if ($('#barList')) $('#barList').onclick = openPlanSheet;\
+    if ($('#barReturn')) $('#barReturn').onclick = () => openReturnSheet(r.t.id);\
+  \}\
+  $('#cardBarClose').onclick = () => \{ focusCard = null; roundTerr = null; renderHouses(); \};\
+\}\
+function awayCardHtml(c) \{\
+  const t = terrById(c.terrId), p = cardProgress(c);\
+  const pct = p.total ? Math.round(p.done / p.total * 100) : 0;\
+  const left = Math.max(0, Math.ceil((Date.parse(c.expiresAt) - Date.now()) / DAY));\
+  return `<article class="tcard away">\
+    <span class="stamp away"><small>\uc0\u30041 \u23432 \u23429 </small>$\{t ? t.no : '-'\}</span>\
+    <div><h3>$\{slotText(c.slot)\}</h3><p class="muted">\uc0\u21306 \u22495 $\{t ? t.no : '-'\}\u12288 $\{t ? esc(t.name) : ''\}</p>\
+      <div class="progress" role="progressbar" aria-valuenow="$\{pct\}" aria-valuemin="0" aria-valuemax="100" aria-label="\uc0\u35370 \u12397 \u12383 \u21106 \u21512 "><i style="width:$\{pct\}%"></i></div>\
+      <p class="muted">\uc0\u35370 \u12397 \u12383 \u23478  $\{p.done\} / $\{p.total\}\u12288 \u12354 \u12392 $\{left\}\u26085 \u12391 \u33258 \u21205 \u30340 \u12395 \u32066 \u12431 \u12426 \u12414 \u12377 </p>\
+      $\{p.total && p.done === p.total ? '<p><b>\uc0\u12377 \u12409 \u12390 \u35370 \u12397 \u12414 \u12375 \u12383 \u12290 \u12300 \u32066 \u12360 \u12427 \u12301 \u12434 \u25276 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 </b></p>' : ''\}</div>\
+    <div class="actions"><button class="btn primary" data-awayopen="$\{c.id\}">\uc0\u22320 \u22259 \u12434 \u12402 \u12425 \u12367 </button><button class="btn" data-awayend="$\{c.id\}">\u32066 \u12360 \u12427 </button></div>\
+  </article>`;\
+\}\
+function renderMyAwayCards() \{\
+  const mine = activeCards().filter(c => c.by === me().id);\
+  $('#myAway').innerHTML = mine.length ? `<h2 class="sec">\uc0\u30041 \u23432 \u23429 \u12459 \u12540 \u12489 </h2>` + mine.map(awayCardHtml).join('') : '';\
+\}\
+function renderAwaySuggest() \{\
+  const u = me(), reg = !!(u.slots && u.slots.length), cur = slotOf(new Date());\
+  const slots = reg ? u.slots.slice().sort(bySlot) : [cur];\
+  const st = D().settings, mine = activeCards().filter(c => c.by === u.id).length, full = mine >= st.awayMax;\
+  $('#slotEdit').textContent = reg ? '\uc0\u34892 \u12369 \u12427 \u26178 \u38291 \u12434 \u22793 \u12360 \u12427 ' : '\u34892 \u12369 \u12427 \u26178 \u38291 \u12434 \u30331 \u37682 \u12377 \u12427 ';\
+  $('#awayHint').innerHTML = (reg\
+      ? `\uc0\u12354 \u12394 \u12383 \u12398 \u34892 \u12369 \u12427 \u26178 \u38291 \u65288 $\{slots.map(slotShort).join('\u12289 ')\}\u65289 \u12395 \u21512 \u12358 \u12459 \u12540 \u12489 \u12391 \u12377 \u12290 `\
+      : `\uc0\u20170 \u12398 \u26178 \u38291 \u24111 \u65288 $\{slotShort(cur)\}\u65289 \u12395 \u21512 \u12358 \u12459 \u12540 \u12489 \u12391 \u12377 \u12290 `) +\
+    `\uc0\u21463 \u12369 \u21462 \u12427 \u12392 $\{st.awayDays\}\u26085 \u38291 \u20351 \u12360 \u12414 \u12377 \u12290 \u36820 \u21364 \u12399 \u12356 \u12426 \u12414 \u12379 \u12435 \u12290 ` +\
+    (mine ? `<br><b>\uc0\u21463 \u12369 \u21462 \u12426 \u20013  $\{mine\}\u26522 </b>\u65288 $\{st.awayMax\}\u26522 \u12414 \u12391 \u65289 \u12290 \u12300 \u21306 \u22495 \u12459 \u12540 \u12489 \u12301 \u30011 \u38754 \u12395 \u12354 \u12426 \u12414 \u12377 \u12290 ` : '');\
+  const list = awaySuggestions(u.id, slots).slice(0, 10);\
+  $('#awayList').innerHTML = list.length ? list.map(x => `<article class="ritem k-away"><div>\
+      <p class="rt"><span class="stamp xs">$\{x.t.no\}</span> $\{slotText(x.slot)\}$\{x.slot === cur ? ' <span class="nowtag">\uc0\u20170 </span>' : ''\}</p>\
+      <p class="muted">\uc0\u12414 \u12384 \u20250 \u12360 \u12390 \u12356 \u12394 \u12356 \u23478  $\{x.keys.length\}\u36562 $\{x.dist != null ? `\u12288 \u12371 \u12371 \u12363 \u12425 \u32004 $\{fmtDist(x.dist)\}` : ''\}$\{x.t.holder ? '\u12288 \u12354 \u12394 \u12383 \u12398 \u21306 \u22495 ' : ''\}</p>\
+    </div><button class="btn small primary" data-awaytake="$\{x.t.id\}" data-slot="$\{x.slot\}"$\{full ? ' disabled' : ''\}>\uc0\u21463 \u12369 \u21462 \u12427 </button></article>`).join('') +\
+    (full ? `<p class="hint">\uc0\u25345 \u12390 \u12427 \u26522 \u25968 \u12395 \u36948 \u12375 \u12390 \u12356 \u12414 \u12377 \u12290 \u21463 \u12369 \u21462 \u12426 \u20013 \u12398 \u12459 \u12540 \u12489 \u12434 \u32066 \u12360 \u12427 \u12392 \u12289 \u21463 \u12369 \u21462 \u12428 \u12414 \u12377 \u12290 </p>` : '')\
+    : `<div class="empty">\uc0\u20170 \u12289 \u21512 \u12358 \u30041 \u23432 \u23429 \u12459 \u12540 \u12489 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 $\{reg ? '' : '<br>\u12300 \u34892 \u12369 \u12427 \u26178 \u38291 \u12434 \u30331 \u37682 \u12377 \u12427 \u12301 \u12392 \u12289 \u12411 \u12363 \u12398 \u26178 \u38291 \u24111 \u12398 \u12459 \u12540 \u12489 \u12418 \u25506 \u12379 \u12414 \u12377 \u12290 '\}</div>`;\
+\}\
+function openSlotSheet() \{\
+  const sel = new Set(me().slots || []);\
+  const paint = () => \{\
+    setSheet(headHtml(null, '\uc0\u34892 \u12369 \u12427 \u26178 \u38291 ', '') + `\
+      <p class="hint">\uc0\u12424 \u12367 \u22857 \u20181 \u12395 \u34892 \u12369 \u12427 \u26178 \u38291 \u12434 \u12479 \u12483 \u12503 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 \u65288 \u12356 \u12367 \u12388 \u12391 \u12418 \u36984 \u12409 \u12414 \u12377 \u65289 \u12290 </p>\
+      <table class="slotpick"><tr><th></th>$\{BANDS.map(b => `<th>$\{b\}<br><small>$\{BAND_HINT[b]\}</small></th>`).join('')\}</tr>\
+      $\{['\uc0\u24179 \u26085 ', '\u22303 \u26085 '].map(dt => `<tr><th>$\{dt\}</th>$\{BANDS.map(b => \{\
+        const s = dt + '\uc0\u12539 ' + b;\
+        return `<td><button class="slotbtn" data-s="$\{s\}" aria-pressed="$\{sel.has(s)\}" aria-label="$\{dt\}\uc0\u12398 $\{b\}">$\{sel.has(s) ? '\u10003 ' : ''\}</button></td>`;\
+      \}).join('')\}</tr>`).join('')\}</table>\
+      <button class="btn primary block" id="slotSave">\uc0\u20445 \u23384 \u12377 \u12427 </button>\
+      <button class="btn block" data-close>\uc0\u12418 \u12393 \u12427 </button>`);\
+    $$('[data-s]', $('#sheet')).forEach(x => x.onclick = () => \{\
+      const s = x.dataset.s; if (sel.has(s)) sel.delete(s); else sel.add(s); paint();\
+    \});\
+    $('#slotSave').onclick = () => \{\
+      me().slots = [...sel].sort(bySlot);\
+      Store.save(); closeSheet(); renderAll();\
+      toast(sel.size ? '\uc0\u34892 \u12369 \u12427 \u26178 \u38291 \u12434 \u20445 \u23384 \u12375 \u12414 \u12375 \u12383 ' : '\u34892 \u12369 \u12427 \u26178 \u38291 \u12434 \u31354 \u12395 \u12375 \u12414 \u12375 \u12383 \u65288 \u20170 \u12398 \u26178 \u38291 \u24111 \u12391 \u25506 \u12375 \u12414 \u12377 \u65289 ');\
+    \};\
+  \};\
+  paint();\
+\}\
+\
+/* \uc0\u20418 \u65306 \u30041 \u23432 \u23429 \u12398 \u29366 \u27841  */\
+function renderAwayAdmin() \{\
+  const st = D().settings, idx = unmetIndex(), act = activeCards();\
+  const step = (key, label, unit, d) => `<div class="setrow"><span>$\{label\}</span><div class="stepper">\
+    <button type="button" data-aset="$\{key\}" data-d="-$\{d\}" aria-label="$\{label\}\uc0\u12434 \u28187 \u12425 \u12377 ">\u8722 </button><output class="wide">$\{st[key]\}$\{unit\}</output>\
+    <button type="button" data-aset="$\{key\}" data-d="$\{d\}" aria-label="$\{label\}\uc0\u12434 \u22679 \u12420 \u12377 ">\u65291 </button></div></div>`;\
+  $('#adAwaySet').innerHTML = step('awayDays', '\uc0\u30041 \u23432 \u23429 \u12459 \u12540 \u12489 \u12364 \u33258 \u21205 \u12391 \u32066 \u12431 \u12427 \u12414 \u12391 ', '\u26085 ', 1) + step('awayMax', '1\u20154 \u12364 \u21516 \u26178 \u12395 \u25345 \u12390 \u12427 \u30041 \u23432 \u23429 \u12459 \u12540 \u12489 ', '\u26522 \u12414 \u12391 ', 1);\
+\
+  const all = [...idx.values()].flat();\
+  const cnt = \{\};\
+  all.forEach(x => \{ if (!x.hard) SLOTS.forEach(s => \{ if (!x.tried.has(s)) cnt[s] = (cnt[s] || 0) + 1; \}); \});\
+  const maxN = Math.max(0, ...Object.values(cnt));\
+  $('#adAwaySlots').innerHTML = `<tr><th></th>$\{BANDS.map(b => `<th>$\{b\}<br><small>$\{BAND_HINT[b]\}</small></th>`).join('')\}</tr>` +\
+    ['\uc0\u24179 \u26085 ', '\u22303 \u26085 '].map(dt => `<tr><th>$\{dt\}</th>$\{BANDS.map(b => \{\
+      const n = cnt[dt + '\uc0\u12539 ' + b] || 0;\
+      return `<td class="$\{n && n === maxN ? 'thin' : ''\}"><b>$\{n\}</b>\uc0\u36562 </td>`;\
+    \}).join('')\}</tr>`).join('');\
+\
+  const rows = D().territories.slice().sort((a, b) => a.no - b.no).map(t => \{\
+    const items = idx.get(t.id) || [];\
+    if (!items.length) return '';\
+    const avg = (items.reduce((s, x) => s + x.tried.size, 0) / items.length).toFixed(1);\
+    const using = act.filter(c => c.terrId === t.id).length;\
+    return `<tr><th>\uc0\u21306 \u22495 $\{t.no\}</th><td>$\{items.length\}\u36562 </td><td>$\{avg\} / $\{SLOTS.length\}</td><td>$\{using ? `$\{using\}\u26522 ` : '\'97'\}</td>\
+      <td>$\{t.holder ? `$\{esc(uname(t.holder))\}\uc0\u12373 \u12435 ` : (t.completedAt ? '\u12384 \u12428 \u12391 \u12418 ' : '<span class="muted">\u22238 \u12426 \u32066 \u12360 \u12383 \u35352 \u37682 \u12394 \u12375 </span>')\}</td></tr>`;\
+  \}).join('');\
+  $('#adAwayTerrs').innerHTML = rows\
+    ? `<table class="slots narrow"><tr><th>\uc0\u21306 \u22495 </th><th>\u20250 \u12360 \u12390 \u12356 \u12394 \u12356 \u23478 </th><th>\u35430 \u12375 \u12383 \u26178 \u38291 \u24111 \u65288 \u24179 \u22343 \u65289 </th><th>\u20351 \u29992 \u20013 \u12398 \u12459 \u12540 \u12489 </th><th>\u30041 \u23432 \u23429 \u12459 \u12540 \u12489 \u12434 \u20351 \u12360 \u12427 \u20154 </th></tr>$\{rows\}</table>`\
+    : '<p class="muted">\uc0\u20250 \u12360 \u12390 \u12356 \u12394 \u12356 \u23478 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 </p>';\
+\
+  const hard = all.filter(x => x.hard);\
+  $('#adHard').innerHTML = hard.length ? hard.slice(0, 30).map(x => \{\
+    const t = terrById(x.h.terrId);\
+    return `<article class="ritem k-new"><div>\
+      <p class="rt"><span class="stamp xs">$\{t ? t.no : '-'\}</span> $\{targetName(x.h, x.u)\}</p>\
+      <p class="muted">\uc0\u30041 \u23432  $\{visitsOf(x.k).length\}\u22238 \u12288 \u12377 \u12409 \u12390 \u12398 \u26178 \u38291 \u24111 \u12391 \u20250 \u12360 \u12390 \u12356 \u12414 \u12379 \u12435 </p>\
+    </div><button class="btn small" data-go="$\{x.h.id\}" data-unit="$\{esc(x.u)\}">\uc0\u22320 \u22259 \u12391 \u35211 \u12427 </button></article>`;\
+  \}).join('') + (hard.length > 30 ? `<p class="muted">\uc0\u12411 \u12363  $\{hard.length - 30\}\u20214 </p>` : '')\
+    : '<div class="empty">\uc0\u20170 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 </div>';\
+\}\
+\
+/* ---------- \uc0\u12362 \u12377 \u12377 \u12417 \u30011 \u38754  ---------- */\
+let recoFilter = 'all';\
+const RECO_KINDS = [\
+  ['all', '\uc0\u12377 \u12409 \u12390 '], ['handoff', '\u24341 \u12365 \u32153 \u12366 \u12434 \u24453 \u12387 \u12390 \u12356 \u12427 \u23478 '], ['interest', '\u38306 \u24515 \u12398 \u12354 \u12427 \u23478 '], ['young', '\u33509 \u12356 \u19990 \u20195 ']\
+];\
+function computeReco() \{\
+  const now = new Date(), slot = slotOf(now), onlyMine = $('#recoMine').checked;\
+  const items = [];\
+  for (const h of D().houses) \{\
+    const t = terrById(h.terrId); if (!t) continue;\
+    const othersTerr = onlyMine && t.holder && t.holder !== me().id;\
+    for (const unit of targets(h)) \{\
+      const k = K(h.id, unit);\
+      if (D().dnc[k] || D().follows[k]) continue; // \uc0\u21463 \u12369 \u25345 \u12385 \u20013 \u12398 \u23478 \u12399 \u20986 \u12373 \u12394 \u12356 \
+      const rel = D().released[k];\
+      if (othersTerr && !rel) continue;            // \uc0\u24341 \u12365 \u32153 \u12366 \u24453 \u12385 \u12399 \u12384 \u12428 \u12395 \u12391 \u12418 \u35211 \u12379 \u12427 \
+      const vs = visitsOf(k), last = vs[0];\
+      const idle = last ? Math.floor((now - Date.parse(last.at)) / DAY) : Infinity;\
+      const met = vs.find(v => v.result === 'met'); // \uc0\u12356 \u12385 \u12400 \u12435 \u26032 \u12375 \u12356 \u12300 \u20250 \u12360 \u12383 \u12301 \
+      let kind = null, reason = '', score = 0;\
+      if (rel) \{\
+        const bs = bestSlot(k);\
+        kind = 'handoff'; score = 100;\
+        reason = '\uc0\u20877 \u35370 \u21839 \u12398 \u24341 \u12365 \u32153 \u12366 \u12434 \u24453 \u12387 \u12390 \u12356 \u12414 \u12377 ' + (met && met.interest ? `\u65288 $\{met.interest\}\u12539 $\{met.age || ''\}\u65289 ` : '') + (bs ? `\u12290 \u20250 \u12360 \u12383 \u26178 \u38291 \u24111 \u65306 $\{bs\}` : '');\
+      \}\
+      if (!kind && met) \{\
+        if ((met.interest === '\uc0\u38306 \u24515 \u12354 \u12426 ' || met.interest === '\u23569 \u12375 \u12354 \u12426 ') && idle >= 30) \{\
+          kind = 'interest'; score = 90; reason = `$\{met.interest\}\uc0\u12539 $\{met.age\}\u65288 $\{idle\}\u26085 \u38291  \u35370 \u21839 \u12394 \u12375 \u65289 `;\
+        \} else if (YOUNG.has(met.age) && idle >= 60) \{\
+          kind = 'young'; score = 60; reason = `$\{met.age\}\uc0\u12398 \u26041 \u12395 \u20250 \u12360 \u12383 \u23478 \u65288 $\{idle\}\u26085 \u38291  \u35370 \u21839 \u12394 \u12375 \u65289 `;\
+        \}\
+      \}\
+      if (kind) items.push(\{ h, unit, t, kind, reason, score, dist: myPos ? distM(myPos, [h.lat, h.lng]) : null \});\
+    \}\
+  \}\
+  return \{ items, slot, band: bandOf(now) \};\
+\}\
+function renderReco() \{\
+  renderAwaySuggest();\
+  const \{ items, slot, band \} = computeReco();\
+  $('#recoNow').textContent = `\uc0\u20170 \u12399 \u12300 $\{slot\}\u12301 \u65288 $\{BAND_HINT[band]\}\u65289 \u12391 \u12377 \u12290 $\{myPos ? '\u29694 \u22312 \u22320 \u12363 \u12425 \u36817 \u12356 \u38918 \u12395 \u20006 \u12409 \u12390 \u12356 \u12414 \u12377 \u12290 ' : ''\}`;\
+  const count = k => k === 'all' ? items.length : items.filter(i => i.kind === k).length;\
+  $('#recoChips').innerHTML = RECO_KINDS.map(([k, l]) => `<button class="chip" data-kind="$\{k\}" aria-pressed="$\{recoFilter === k\}">$\{l\}\uc0\u65288 $\{count(k)\}\u65289 </button>`).join('');\
+  let list = recoFilter === 'all' ? items : items.filter(i => i.kind === recoFilter);\
+  list.sort(myPos ? (a, b) => a.dist - b.dist : (a, b) => b.score - a.score || a.t.no - b.t.no);\
+  const MAX = 40, more = list.length - MAX;\
+  list = list.slice(0, MAX);\
+  $('#recoList').innerHTML = list.length ? list.map(i => \{\
+    const name = i.h.type === 'apt' ? `$\{esc(i.h.label || '\uc0\u38598 \u21512 \u20303 \u23429 ')\} $\{esc(i.unit)\}\u21495 \u23460 ` : esc(i.h.label || '\u23478 ');\
+    return `<article class="ritem k-$\{i.kind\}"><div>\
+        <p class="rt"><span class="stamp xs">$\{i.t.no\}</span> $\{name\}</p>\
+        <p class="muted">$\{esc(i.reason)\}</p>\
+        $\{i.dist != null ? `<p class="muted">\uc0\u12371 \u12371 \u12363 \u12425 \u32004  $\{fmtDist(i.dist)\}</p>` : ''\}\
+      </div><button class="btn small primary" data-go="$\{i.h.id\}" data-unit="$\{esc(i.unit)\}">\uc0\u22320 \u22259 \u12391 \u35211 \u12427 </button></article>`;\
+  \}).join('') + (more > 0 ? `<p class="muted">\uc0\u12411 \u12363  $\{more\}\u20214 \u12290 \u19978 \u12398 \u20998 \u39006 \u12391 \u32094 \u12426 \u12371 \u12417 \u12414 \u12377 \u12290 </p>` : '')\
+    : '<div class="empty">\uc0\u20170 \u12398 \u26465 \u20214 \u12395 \u21512 \u12358 \u23478 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 </div>';\
+\}\
+function goTo(hid, unit) \{\
+  const h = houseById(hid); if (!h) return;\
+  showView('map');\
+  setTimeout(() => \{\
+    map.setView([h.lat, h.lng], 19);\
+    if (h.type === 'apt' && h.units.length) openAptSeq(hid, unit || null);\
+    else if (h.type === 'apt') openBuilding(hid);\
+    else openTarget(hid, '', false);\
+  \}, 80);\
+\}\
+function locate(after) \{\
+  if (!navigator.geolocation) \{ toast('\uc0\u12371 \u12398 \u31471 \u26411 \u12391 \u12399 \u29694 \u22312 \u22320 \u12434 \u20351 \u12360 \u12414 \u12379 \u12435 '); return; \}\
+  toast('\uc0\u29694 \u22312 \u22320 \u12434 \u35519 \u12409 \u12390 \u12356 \u12414 \u12377 \'85');\
+  navigator.geolocation.getCurrentPosition(p => \{\
+    myPos = [p.coords.latitude, p.coords.longitude];\
+    if (map) \{\
+      if (posMarker) map.removeLayer(posMarker);\
+      posMarker = L.circleMarker(myPos, \{ radius: 10, color: '#fff', weight: 3, fillColor: '#1565C0', fillOpacity: 1, interactive: false \}).addTo(map);\
+    \}\
+    after && after();\
+    toast('\uc0\u29694 \u22312 \u22320 \u12364 \u12431 \u12363 \u12426 \u12414 \u12375 \u12383 ');\
+  \}, () => toast('\uc0\u29694 \u22312 \u22320 \u12434 \u21462 \u24471 \u12391 \u12365 \u12414 \u12379 \u12435 \u12391 \u12375 \u12383 \u12290 \u31471 \u26411 \u12398 \u20301 \u32622 \u24773 \u22577 \u12398 \u35373 \u23450 \u12434 \u30906 \u35469 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 '), \{ enableHighAccuracy: true, timeout: 10000 \});\
+\}\
+\
+/* ---------- \uc0\u20418 \u12398 \u30011 \u38754  ---------- */\
+function renderAdmin() \{\
+  renderInbox();\
+  renderAwayAdmin();\
+  renderFollowAdmin();\
+  const now = Date.now();\
+  const ts = D().territories.slice().sort((a, b) => a.no - b.no);\
+  let targetsN = 0, met90 = 0;\
+  const stats = new Map();\
+  ts.forEach(t => \{ const s = terrStats(t, now - 90 * DAY); stats.set(t.id, s); targetsN += s.n; met90 += s.met; \});\
+  const outside = D().houses.filter(h => !h.terrId).length;\
+  const lent = ts.filter(t => t.holder).length;\
+  const over = ts.filter(t => t.holder && t.lentAt && daysSince(t.lentAt) > 120).length;\
+  const dncN = Object.keys(D().dnc).length;\
+  $('#adTiles').innerHTML = `\
+    <div class="tile"><b>$\{ts.length\}</b>\uc0\u21306 \u22495 \u65288 \u36024 \u20986 \u20013  $\{lent\}\u65289 </div>\
+    <div class="tile$\{over ? ' alert' : ''\}"><b>$\{over\}</b>4\uc0\u12363 \u26376 \u12434 \u12371 \u12360 \u12383 \u36024 \u20986 </div>\
+    <div class="tile"><b>$\{targetsN\}</b>\uc0\u23478 \u12539 \u37096 \u23627 $\{outside ? `\u65288 \u21306 \u22495 \u22806  $\{outside\}\u65289 ` : ''\}</div>\
+    <div class="tile"><b>$\{targetsN ? Math.round(met90 / targetsN * 100) : 0\}%</b>\uc0\u12371 \u12398 90\u26085 \u12391 \u20250 \u12360 \u12383 \u23478 \u12539 \u37096 \u23627 </div>\
+    <div class="tile"><b>$\{dncN\}</b>\uc0\u25298 \u21542 \u12398 \u23478 \u12539 \u37096 \u23627 </div>`;\
+\
+  // \uc0\u26178 \u38291 \u24111 \u12372 \u12392 \u12398 \u20250 \u12360 \u12383 \u21106 \u21512 \
+  const cell = \{\};\
+  for (const v of D().visits) \{\
+    if (now - Date.parse(v.at) > 180 * DAY) continue;\
+    const d = new Date(v.at), key = dayTypeOf(d) + bandOf(d);\
+    cell[key] = cell[key] || \{ n: 0, m: 0 \};\
+    cell[key].n++; if (v.result === 'met') cell[key].m++;\
+  \}\
+  let best = null, bestP = -1;\
+  for (const [k, c] of Object.entries(cell)) \{ if (c.n >= 10 && c.m / c.n > bestP) \{ bestP = c.m / c.n; best = k; \} \}\
+  $('#adSlots').innerHTML = `<tr><th></th>$\{BANDS.map(b => `<th>$\{b\}<br><small>$\{BAND_HINT[b]\}</small></th>`).join('')\}</tr>` +\
+    ['\uc0\u24179 \u26085 ', '\u22303 \u26085 '].map(dt => `<tr><th>$\{dt\}</th>$\{BANDS.map(b => \{\
+      const c = cell[dt + b];\
+      if (!c) return '<td class="muted">\uc0\u35352 \u37682 \u12394 \u12375 </td>';\
+      const p = Math.round(c.m / c.n * 100);\
+      return `<td class="$\{best === dt + b ? 'best' : ''\}"><b>$\{p\}%</b><br><small>$\{c.n\}\uc0\u20214 </small><div class="bar"><i style="width:$\{p\}%"></i></div></td>`;\
+    \}).join('')\}</tr>`).join('');\
+\
+  // \uc0\u21306 \u22495 \u19968 \u35239 \
+  const userOpts = sel => `<option value="">\uc0\u65288 \u12384 \u12428 \u12418 \u25345 \u12387 \u12390 \u12356 \u12394 \u12356 \u65289 </option>` +\
+    D().users.map(u => `<option value="$\{u.id\}"$\{u.id === sel ? ' selected' : ''\}>$\{esc(u.name)\}</option>`).join('');\
+  $('#adTerrs').innerHTML = ts.map(t => \{\
+    const s = stats.get(t.id), d = t.lentAt ? daysSince(t.lentAt) : 0;\
+    return `<article class="trow"><span class="stamp sm">$\{t.no\}</span>\
+      <div><b>$\{esc(t.name)\}</b><div class="meta">\
+        <span>\uc0\u23478 \u12539 \u37096 \u23627  $\{s.n\}</span><span>90\u26085 \u20197 \u20869 \u12395 \u35370 \u21839  $\{s.visited\}</span>\
+        <span>\uc0\u21069 \u22238 \u22238 \u12426 \u32066 \u12360 \u12383 \u26085  $\{t.completedAt ? fmtDay(t.completedAt) + (t.completedPct != null && t.completedPct < 100 ? `\u65288 $\{t.completedPct\}%\u65289 ` : '') : '\u35352 \u37682 \u12394 \u12375 '\}</span>\
+        <span>\uc0\u26368 \u32066 \u35352 \u37682  $\{s.last ? fmtDate(s.last) : '\u12394 \u12375 '\}</span>\
+        $\{t.holder ? `<span class="$\{d > 120 ? 'tag-warn' : ''\}">\uc0\u36024 \u20986  $\{d\}\u26085 $\{d > 120 ? '\u65288 4\u12363 \u26376 \u36229 \u65289 ' : ''\}</span>` : ''\}\
+      </div></div>\
+      <div class="actions">\
+        <label>\uc0\u25285 \u24403  <select data-holder="$\{t.id\}">$\{userOpts(t.holder)\}</select></label>\
+        <button class="btn small" data-open="$\{t.id\}">\uc0\u22320 \u22259 </button>\
+        <button class="btn small" data-redraw="$\{t.id\}">\uc0\u32218 \u12434 \u24341 \u12365 \u30452 \u12377 </button>\
+        <button class="btn small" data-rename="$\{t.id\}">\uc0\u30058 \u21495 \u12539 \u21517 \u21069 </button>\
+        <label class="check"><input type="checkbox" data-free="$\{t.id\}"$\{t.free ? ' checked' : ''\}>\uc0\u33258 \u30001 \u12395 \u21463 \u12369 \u21462 \u12387 \u12390 \u12424 \u12356 </label>\
+      </div></article>`;\
+  \}).join('');\
+\}\
+/* \uc0\u21462 \u12426 \u27531 \u12375 \u65306 \u38306 \u24515 \u12364 \u12354 \u12427 \u12398 \u12395 \u21463 \u12369 \u25345 \u12385 \u12364 \u12394 \u12367 \u12289 \u12375 \u12400 \u12425 \u12367 \u35370 \u21839 \u12364 \u12394 \u12356 \u23478 \u65288 \u24341 \u12365 \u32153 \u12366 \u24453 \u12385 \u12434 \u20808 \u12395 \u65289  */\
+function leftItems() \{\
+  const s = D().settings, out = [];\
+  for (const h of D().houses) \{\
+    for (const unit of targets(h)) \{\
+      const k = K(h.id, unit);\
+      if (D().follows[k] || D().dnc[k]) continue;\
+      const m = lastInterest(k); if (!m) continue;\
+      const idle = daysSince(visitsOf(k)[0].at), rel = D().released[k];\
+      if (!rel && idle < s.remindDays) continue;\
+      out.push(\{ k, h, unit, m, idle, rel \});\
+    \}\
+  \}\
+  return out.sort((a, b) => (b.rel ? 1 : 0) - (a.rel ? 1 : 0) || b.idle - a.idle);\
+\}\
+function renderFollowAdmin() \{\
+  const s = D().settings;\
+  const entries = Object.entries(D().follows).filter(([k]) => houseById(parseKey(k)[0]));\
+  const check = entries.filter(([, f]) => followStage(f) === 2).sort((a, b) => followIdle(b[1]) - followIdle(a[1]));\
+  const left = leftItems();\
+  $('#adFollowTiles').innerHTML = `\
+    <div class="tile"><b>$\{entries.length\}</b>\uc0\u21463 \u12369 \u25345 \u12385 \u20013 \u12398 \u20877 \u35370 \u21839 </div>\
+    <div class="tile$\{check.length ? ' alert' : ''\}"><b>$\{check.length\}</b>\uc0\u30906 \u35469 \u12364 \u24517 \u35201 \u12394 \u21463 \u12369 \u25345 \u12385 </div>\
+    <div class="tile$\{left.length ? ' alert' : ''\}"><b>$\{left.length\}</b>\uc0\u21462 \u12426 \u27531 \u12375 \u65288 \u21463 \u12369 \u25345 \u12385 \u12394 \u12375 \u65289 </div>`;\
+\
+  const wk = d => `$\{d / 7\}\uc0\u36913 \u38291 `;\
+  const stepper = (key, label) => `<div class="setrow"><span>$\{label\}</span><div class="stepper">\
+      <button type="button" data-set="$\{key\}" data-d="-7" aria-label="$\{label\}\uc0\u12434 \u30701 \u12367 \u12377 \u12427 ">\u8722 </button><output class="wide">$\{wk(s[key])\}</output>\
+      <button type="button" data-set="$\{key\}" data-d="7" aria-label="$\{label\}\uc0\u12434 \u38263 \u12367 \u12377 \u12427 ">\u65291 </button></div></div>`;\
+  $('#adFollowSet').innerHTML = stepper('remindDays', '\uc0\u12300 \u12375 \u12400 \u12425 \u12367 \u35370 \u21839 \u12394 \u12375 \u12301 \u12392 \u12375 \u12390 \u26412 \u20154 \u12395 \u30693 \u12425 \u12379 \u12427 \u12414 \u12391 ') +\
+    stepper('escalateDays', '\uc0\u12300 \u30906 \u35469 \u12364 \u24517 \u35201 \u12301 \u12392 \u12375 \u12390 \u20418 \u12395 \u30693 \u12425 \u12379 \u12427 \u12414 \u12391 ');\
+\
+  const by = \{\};\
+  entries.forEach(([, f]) => \{\
+    const o = by[f.by] = by[f.by] || \{ n: 0, s1: 0, s2: 0 \};\
+    o.n++; const g = followStage(f); if (g === 1) o.s1++; if (g === 2) o.s2++;\
+  \});\
+  const ids = Object.keys(by);\
+  $('#adFollowUsers').innerHTML = ids.length\
+    ? `<table class="slots narrow"><tr><th>\uc0\u21517 \u21069 </th><th>\u21463 \u12369 \u25345 \u12385 </th><th>\u12375 \u12400 \u12425 \u12367 \u35370 \u21839 \u12394 \u12375 </th><th>\u30906 \u35469 \u12364 \u24517 \u35201 </th></tr>$\{ids.map(id =>\
+        `<tr><th>$\{esc(uname(id))\}</th><td>$\{by[id].n\}</td><td>$\{by[id].s1\}</td><td class="$\{by[id].s2 ? 'warncell' : ''\}">$\{by[id].s2\}</td></tr>`).join('')\}</table>`\
+    : '<p class="muted">\uc0\u21463 \u12369 \u25345 \u12385 \u12399 \u12414 \u12384 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 </p>';\
+\
+  $('#adFollowCheck').innerHTML = check.length ? check.map(([k, f]) => followItem(k, f, 'admin')).join('')\
+    : '<div class="empty">\uc0\u30906 \u35469 \u12364 \u24517 \u35201 \u12394 \u21463 \u12369 \u25345 \u12385 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 </div>';\
+\
+  $('#adLeft').innerHTML = left.length ? left.slice(0, 30).map(i => \{\
+    const t = terrById(i.h.terrId), bs = bestSlot(i.k);\
+    return `<article class="ritem $\{i.rel ? 'k-handoff' : 'k-interest'\}"><div>\
+      <p class="rt"><span class="stamp xs">$\{t ? t.no : '-'\}</span> $\{targetName(i.h, i.unit)\}</p>\
+      <p class="muted">$\{i.rel ? '<b>\uc0\u24341 \u12365 \u32153 \u12366 \u24453 \u12385 </b>\u12288 ' : ''\}$\{esc(i.m.interest)\}\u12539 $\{esc(i.m.age || '')\}\u12288 \u26368 \u24460 \u12398 \u35352 \u37682 \u12363 \u12425  $\{i.idle\}\u26085 $\{bs ? `\u12288 \u20250 \u12360 \u12383 \u26178 \u38291 \u24111 \u65306 $\{bs\}` : ''\}</p>\
+    </div><button class="btn small" data-go="$\{i.h.id\}" data-unit="$\{esc(i.unit)\}">\uc0\u22320 \u22259 \u12391 \u35211 \u12427 </button>\
+    <div class="actions span"><label>\uc0\u21463 \u12369 \u25345 \u12388 \u20154  <select data-assign="$\{esc(i.k)\}">$\{userOptions('', '\u36984 \u12435 \u12391 \u12367 \u12384 \u12373 \u12356 ')\}</select></label></div></article>`;\
+  \}).join('') + (left.length > 30 ? `<p class="muted">\uc0\u12411 \u12363  $\{left.length - 30\}\u20214 </p>` : '')\
+    : '<div class="empty">\uc0\u21462 \u12426 \u27531 \u12373 \u12428 \u12390 \u12356 \u12427 \u23478 \u12399 \u12354 \u12426 \u12414 \u12379 \u12435 \u12290 </div>';\
+\
+  $('#adBulk').innerHTML = `\
+    <label>\uc0\u12384 \u12428 \u12363 \u12425  <select id="bkFrom"><option value="">\u36984 \u12435 \u12391 \u12367 \u12384 \u12373 \u12356 </option>$\{ids.map(id => `<option value="$\{id\}">$\{esc(uname(id))\}\u65288 $\{by[id].n\}\u20214 \u65289 </option>`).join('')\}</select></label>\
+    <label>\uc0\u12384 \u12428 \u12408  <select id="bkTo">$\{userOptions('', '\u24341 \u12365 \u32153 \u12366 \u24453 \u12385 \u12395 \u12377 \u12427 ')\}</select></label>\
+    <button class="btn" id="bkGo">\uc0\u12414 \u12392 \u12417 \u12390 \u31227 \u12377 </button>`;\
+\}\
+function changeSetting(key, d) \{\
+  const s = D().settings;\
+  if (key === 'remindDays') \{\
+    s.remindDays = Math.min(84, Math.max(7, s.remindDays + d));\
+    if (s.escalateDays < s.remindDays + 7) s.escalateDays = s.remindDays + 7;\
+  \} else \{\
+    s.escalateDays = Math.min(140, Math.max(s.remindDays + 7, s.escalateDays + d));\
+  \}\
+  Store.save(); renderAll(); toast('\uc0\u26085 \u25968 \u12434 \u22793 \u12360 \u12414 \u12375 \u12383 ');\
+\}\
+function bulkMove() \{\
+  const from = $('#bkFrom').value, to = $('#bkTo').value;\
+  if (!from) \{ toast('\uc0\u12300 \u12384 \u12428 \u12363 \u12425 \u12301 \u12434 \u36984 \u12435 \u12391 \u12367 \u12384 \u12373 \u12356 '); return; \}\
+  if (from === to) \{ toast('\uc0\u21516 \u12376 \u20154 \u12399 \u36984 \u12409 \u12414 \u12379 \u12435 '); return; \}\
+  const keys = Object.keys(D().follows).filter(k => D().follows[k].by === from);\
+  const toLabel = to ? `$\{uname(to)\}\uc0\u12373 \u12435 ` : '\u24341 \u12365 \u32153 \u12366 \u24453 \u12385 ';\
+  if (!confirm(`$\{uname(from)\}\uc0\u12373 \u12435 \u12398 \u21463 \u12369 \u25345 \u12385  $\{keys.length\}\u20214 \u12434 \u12300 $\{toLabel\}\u12301 \u12395 \u31227 \u12375 \u12414 \u12377 \u12290 \u12424 \u12429 \u12375 \u12356 \u12391 \u12377 \u12363 \u65311 `)) return;\
+  commit(`$\{keys.length\}\uc0\u20214 \u12434 $\{toLabel\}\u12395 \u31227 \u12375 \u12414 \u12375 \u12383 `, () => \{\
+    keys.forEach(k => \{ if (to) startFollow(k, to); else releaseFollow(k, 'handoff'); \});\
+  \});\
+\}\
+function exportCsv() \{\
+  const rows = [['\uc0\u21306 \u22495 \u30058 \u21495 ', '\u23478 ID', '\u31278 \u39006 ', '\u37096 \u23627 ', '\u32080 \u26524 ', '\u24180 \u40802 \u23652 ', '\u38306 \u24515 ', '\u26085 \u26178 ', '\u26332 \u26085 \u21306 \u20998 ', '\u26178 \u38291 \u24111 ']];\
+  for (const v of D().visits) \{\
+    const h = houseById(v.houseId), t = h && terrById(h.terrId), d = new Date(v.at);\
+    rows.push([t ? t.no : '', v.houseId, h ? (h.type === 'apt' ? '\uc0\u38598 \u21512 \u20303 \u23429 ' : '\u19968 \u25144 \u24314 \u12390 ') : '', v.unit || '',\
+      RESULT_LABEL[v.result], v.age || '', v.interest || '',\
+      `$\{d.getFullYear()\}-$\{pad(d.getMonth() + 1)\}-$\{pad(d.getDate())\} $\{pad(d.getHours())\}:$\{pad(d.getMinutes())\}`,\
+      dayTypeOf(d), bandOf(d)]);\
+  \}\
+  const csv = '\\uFEFF' + rows.map(r => r.map(c => `"$\{String(c).replace(/"/g, '""')\}"`).join(',')).join('\\r\\n');\
+  const a = document.createElement('a');\
+  const n = new Date();\
+  a.href = URL.createObjectURL(new Blob([csv], \{ type: 'text/csv' \}));\
+  a.download = `\uc0\u35370 \u21839 \u35352 \u37682 _$\{n.getFullYear()\}$\{pad(n.getMonth() + 1)\}$\{pad(n.getDate())\}.csv`;\
+  document.body.appendChild(a); a.click(); a.remove();\
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);\
+\}\
+\
+/* ---------- \uc0\u30011 \u38754 \u12398 \u20999 \u12426 \u12363 \u12360  ---------- */\
+let currentView = 'cards';\
+function showView(name) \{\
+  if (name === 'admin' && !isAdmin()) name = 'cards';\
+  if (currentView === 'map' && name !== 'map' && mode !== 'normal') \{ if (draw) endDraw(); else setMode('normal'); \}\
+  currentView = name;\
+  $$('.view').forEach(v => \{ v.hidden = v.id !== 'view-' + name; \});\
+  $$('#tabs button').forEach(b => \{ if (b.dataset.view === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); \});\
+  if (name === 'map') \{\
+    setTimeout(() => \{\
+      map.invalidateSize();\
+      if (firstMapShow) \{ firstMapShow = false; if (!$('#terrJump').value) fitAll(); \}\
+      renderHouses();\
+    \}, 30);\
+  \}\
+  if (name === 'reco') renderReco();\
+\}\
+function updateTabs() \{\
+  $('#tabAdmin').hidden = !isAdmin();\
+  $('#tabs').classList.toggle('three', !isAdmin());\
+\}\
+function fillWho() \{\
+  $('#whoSel').innerHTML = D().users.map(u => `<option value="$\{u.id\}"$\{u.id === D().currentUser ? ' selected' : ''\}>$\{esc(u.name)\}</option>`).join('');\
+\}\
+function renderAll() \{\
+  buildIndex();\
+  renderCards();\
+  fillTerrJump();\
+  if (map) \{ renderTerrs(); renderHouses(); \}\
+  if (currentView === 'reco') renderReco();\
+  if (isAdmin()) renderAdmin();\
+\}\
+function openTerr(id) \{\
+  const t = terrById(id);\
+  focusCard = null;\
+  roundTerr = t && t.holder === me().id ? id : null; // \uc0\u33258 \u20998 \u12398 \u21306 \u22495 \u12394 \u12425 \u12300 \u22238 \u12427 \u34920 \u31034 \u12301 \u12395 \u12377 \u12427 \
+  $('#terrJump').value = id;\
+  firstMapShow = false;\
+  showView('map');\
+  renderTerrs();\
+  setTimeout(() => fitTerr(id), 60);\
+\}\
+\
+/* ---------- \uc0\u12508 \u12479 \u12531 \u12398 \u21205 \u12365  ---------- */\
+function bindStatic() \{\
+  $$('#tabs button').forEach(b => b.onclick = () => showView(b.dataset.view));\
+  $('#whoSel').onchange = e => \{\
+    D().currentUser = e.target.value; Store.save();\
+    updateTabs(); renderAll();\
+    if (currentView === 'admin' && !isAdmin()) showView('cards');\
+  \};\
+  $('#backdrop').onclick = closeSheet;\
+  document.addEventListener('keydown', e => \{\
+    if (e.key !== 'Escape') return;\
+    if (!$('#sheet').hidden) closeSheet();\
+    else if (draw) endDraw();\
+    else if (mode !== 'normal') setMode('normal');\
+  \});\
+\
+  // \uc0\u21306 \u22495 \u12459 \u12540 \u12489 \u12539 \u33258 \u20998 \u12398 \u20877 \u35370 \u21839 \
+  $('#view-cards').addEventListener('click', e => \{\
+    const q = sel => e.target.closest(sel);\
+    let x;\
+    if ((x = q('[data-open]'))) openTerr(x.dataset.open);\
+    else if ((x = q('[data-go]'))) goTo(x.dataset.go, x.dataset.unit);\
+    else if ((x = q('[data-fact]'))) followAction(x.dataset.fact, x.dataset.key);\
+    else if ((x = q('[data-scroll]'))) $('#' + x.dataset.scroll).scrollIntoView(\{ behavior: 'smooth', block: 'start' \});\
+    else if (q('[data-reqopen]')) openRequestSheet();\
+    else if ((x = q('[data-reqcancel]'))) \{\
+      const id = x.dataset.reqcancel;\
+      if (!confirm('\uc0\u30003 \u12375 \u36796 \u12415 \u12434 \u21462 \u12426 \u28040 \u12375 \u12414 \u12377 \u12290 \u12424 \u12429 \u12375 \u12356 \u12391 \u12377 \u12363 \u65311 ')) return;\
+      commit('\uc0\u30003 \u12375 \u36796 \u12415 \u12434 \u21462 \u12426 \u28040 \u12375 \u12414 \u12375 \u12383 ', () => \{ D().requests = D().requests.filter(r => r.id !== id); \});\
+    \}\
+    else if ((x = q('[data-reqseen]'))) \{\
+      const r = D().requests.find(r => r.id === x.dataset.reqseen);\
+      if (r) \{ r.seen = true; Store.save(); renderAll(); \}\
+    \}\
+    else if ((x = q('[data-return]'))) openReturnSheet(x.dataset.return);\
+    else if ((x = q('[data-awayopen]'))) openAwayCard(x.dataset.awayopen);\
+    else if ((x = q('[data-awayend]'))) endAwayCard(x.dataset.awayend);\
+  \});\
+\
+  // \uc0\u22320 \u22259 \
+  $('#terrJump').onchange = e => \{\
+    const v = e.target.value, t = terrById(v);\
+    focusCard = null;\
+    roundTerr = t && t.holder === me().id ? v : null;\
+    renderTerrs(); renderHouses();\
+    if (v) fitTerr(v);\
+  \};\
+  $('#btnAdd').onclick = () => \{ setMode('add'); if (map.getZoom() < 17) toast('\uc0\u22580 \u25152 \u12364 \u12431 \u12363 \u12427 \u12414 \u12391 \u22320 \u22259 \u12434 \u25313 \u22823 \u12375 \u12390 \u12363 \u12425 \u12479 \u12483 \u12503 \u12375 \u12390 \u12367 \u12384 \u12373 \u12356 '); \};\
+  $('#addCancel').onclick = () => \{ closeSheet(); setMode('normal'); \};\
+  $('#btnLocate').onclick = () => locate(() => map.setView(myPos, 18));\
+  $('#btnBase').onclick = () => \{\
+    map.removeLayer(baseLayers[baseName]);\
+    baseName = baseName === 'pale' ? 'photo' : 'pale';\
+    baseLayers[baseName].addTo(map);\
+    $('#btnBase').textContent = baseName === 'pale' ? '\uc0\u20889 \u30495 ' : '\u22320 \u22259 ';\
+  \};\
+  $('#drawUndo').onclick = () => \{ draw.points.pop(); redrawDraw(); \};\
+  $('#drawDone').onclick = finishDraw;\
+  $('#drawCancel').onclick = () => \{ closeSheet(); endDraw(); \};\
+  $('#ovFile').onchange = e => \{\
+    const file = e.target.files[0]; if (!file) return;\
+    const img = $('#overlayImg');\
+    if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);\
+    const url = URL.createObjectURL(file);\
+    img.src = url; img.dataset.url = url; img.hidden = false;\
+    $('#ovCtl').hidden = false;\
+    $('#map').classList.add('see-through');\
+    applyOv();\
+    toast('\uc0\u22320 \u22259 \u12434 \u21205 \u12363 \u12375 \u12390 \u12289 \u20889 \u30495 \u12398 \u36947 \u12392 \u37325 \u12394 \u12427 \u20301 \u32622 \u12395 \u21512 \u12431 \u12379 \u12390 \u12367 \u12384 \u12373 \u12356 ');\
+    e.target.value = '';\
+  \};\
+  $('#ovRange').oninput = applyOv;\
+  $('#ovClear').onclick = clearOverlay;\
+\
+  // \uc0\u12362 \u12377 \u12377 \u12417 \
+  $('#recoChips').addEventListener('click', e => \{ const c = e.target.closest('[data-kind]'); if (c) \{ recoFilter = c.dataset.kind; renderReco(); \} \});\
+  $('#recoMine').onchange = renderReco;\
+  $('#recoLocate').onclick = () => locate(renderReco);\
+  $('#slotEdit').onclick = openSlotSheet;\
+  $('#awayList').addEventListener('click', e => \{\
+    const x = e.target.closest('[data-awaytake]');\
+    if (x && !x.disabled) takeAwayCard(x.dataset.awaytake, x.dataset.slot);\
+  \});\
+  $('#recoList').addEventListener('click', e => \{ const g = e.target.closest('[data-go]'); if (g) goTo(g.dataset.go, g.dataset.unit); \});\
+\
+  // \uc0\u20418 \u12398 \u30011 \u38754 \
+  $('#adNewTerr').onclick = () => startDraw(null);\
+  $('#adCsv').onclick = exportCsv;\
+  $('#adReset').onclick = () => \{\
+    if (!confirm('\uc0\u12371 \u12398 \u31471 \u26411 \u12398 \u35430 \u20316 \u12487 \u12540 \u12479 \u12434 \u26368 \u21021 \u12398 \u29366 \u24907 \u12395 \u25147 \u12375 \u12414 \u12377 \u12290 \u12424 \u12429 \u12375 \u12356 \u12391 \u12377 \u12363 \u65311 ')) return;\
+    const cu = D().currentUser;\
+    Store.data = makeDemo(); Store.data.currentUser = cu; Store.save();\
+    fillWho(); updateTabs(); renderAll(); toast('\uc0\u35430 \u20316 \u12487 \u12540 \u12479 \u12395 \u25147 \u12375 \u12414 \u12375 \u12383 ');\
+  \};\
+  $('#view-admin').addEventListener('click', e => \{\
+    const q = sel => e.target.closest(sel);\
+    let x;\
+    if ((x = q('[data-open]'))) openTerr(x.dataset.open);\
+    else if ((x = q('[data-redraw]'))) startDraw(x.dataset.redraw);\
+    else if ((x = q('[data-rename]'))) openTerrForm(\{ terr: terrById(x.dataset.rename) \});\
+    else if ((x = q('[data-go]'))) goTo(x.dataset.go, x.dataset.unit);\
+    else if ((x = q('[data-fact]'))) followAction(x.dataset.fact, x.dataset.key);\
+    else if ((x = q('[data-set]'))) changeSetting(x.dataset.set, Number(x.dataset.d));\
+    else if (q('#bkGo')) bulkMove();\
+    else if ((x = q('[data-donepct]'))) \{\
+      const st = D().settings;\
+      st.donePct = Math.min(100, Math.max(50, st.donePct + Number(x.dataset.donepct)));\
+      Store.save(); renderAll(); toast('\uc0\u23436 \u20102 \u12398 \u30446 \u23433 \u12434 \u22793 \u12360 \u12414 \u12375 \u12383 ');\
+    \}\
+    else if ((x = q('[data-aset]'))) \{\
+      const st = D().settings, key = x.dataset.aset;\
+      const lim = key === 'awayDays' ? [3, 14] : [1, 5];\
+      st[key] = Math.min(lim[1], Math.max(lim[0], st[key] + Number(x.dataset.d)));\
+      Store.save(); renderAll(); toast('\uc0\u35373 \u23450 \u12434 \u22793 \u12360 \u12414 \u12375 \u12383 ');\
+    \}\
+    else if ((x = q('[data-reqok]'))) approveReq(x.dataset.reqok);\
+    else if ((x = q('[data-reqno]'))) declineReq(x.dataset.reqno);\
+    else if ((x = q('[data-takenseen]'))) \{ const t = terrById(x.dataset.takenseen); if (t) \{ t.selfSeen = true; Store.save(); renderAll(); \} \}\
+    else if ((x = q('[data-takemax]'))) \{\
+      const st = D().settings;\
+      st.selfTakeMax = Math.min(5, Math.max(1, st.selfTakeMax + Number(x.dataset.takemax)));\
+      Store.save(); renderAll(); toast('\uc0\u26522 \u25968 \u12434 \u22793 \u12360 \u12414 \u12375 \u12383 ');\
+    \}\
+  \});\
+  $('#view-admin').addEventListener('change', e => \{\
+    const s = e.target, k = s.dataset.assign || s.dataset.reassign;\
+    if (!k || !s.value) return;\
+    const cur = fol(k);\
+    if (cur && cur.by === s.value) return;\
+    const v = s.value;\
+    commit(`$\{uname(v)\}\uc0\u12373 \u12435 \u12364 \u20877 \u35370 \u21839 \u12434 \u21463 \u12369 \u25345 \u12385 \u12414 \u12377 `, () => startFollow(k, v));\
+  \});\
+  $('#adTerrs').addEventListener('change', e => \{\
+    const fr = e.target.closest('[data-free]');\
+    if (fr) \{\
+      const t = terrById(fr.dataset.free);\
+      t.free = fr.checked; Store.save(); renderAll();\
+      toast(t.free ? `\uc0\u21306 \u22495 $\{t.no\}\u12434 \u33258 \u30001 \u12395 \u21463 \u12369 \u21462 \u12428 \u12427 \u12424 \u12358 \u12395 \u12375 \u12414 \u12375 \u12383 ` : `\u21306 \u22495 $\{t.no\}\u12399 \u20418 \u12364 \u27770 \u12417 \u12427 \u21306 \u22495 \u12395 \u12375 \u12414 \u12375 \u12383 `);\
+      return;\
+    \}\
+    const s = e.target.closest('[data-holder]'); if (!s) return;\
+    const t = terrById(s.dataset.holder), val = s.value;\
+    if (!val) \{ renderAll(); openReturnSheet(t.id); return; \} // \uc0\u36820 \u21364 \u12399 \u12300 \u20840 \u37096 \u22238 \u12387 \u12383 \u12363 \u12301 \u12434 \u30906 \u35469 \u12377 \u12427 \
+    commit(`\uc0\u21306 \u22495 $\{t.no\}\u12434 $\{uname(val)\}\u12373 \u12435 \u12395 \u36024 \u12375 \u20986 \u12375 \u12414 \u12375 \u12383 `, () => \{\
+      t.holder = val;\
+      t.lentAt = new Date().toISOString();\
+    \});\
+  \});\
+\}\
+\
+async function init() \{\
+  if (!window.L) \{\
+    document.body.innerHTML = '<p style="padding:24px;font-size:20px">\uc0\u22320 \u22259 \u12398 \u37096 \u21697 \u12434 \u35501 \u12415 \u36796 \u12417 \u12414 \u12379 \u12435 \u12391 \u12375 \u12383 \u12290 \u12452 \u12531 \u12479 \u12540 \u12493 \u12483 \u12488 \u12395 \u12388 \u12394 \u12364 \u12387 \u12390 \u12356 \u12427 \u12363 \u30906 \u35469 \u12375 \u12390 \u12289 \u12418 \u12358 \u19968 \u24230 \u38283 \u12356 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 </p>';\
+    return;\
+  \}\
+  if (LIVE) \{\
+    showBlocking('\uc0\u35501 \u12415 \u36796 \u12435 \u12391 \u12356 \u12414 \u12377 \'85', '\u12375 \u12400 \u12425 \u12367 \u12362 \u24453 \u12385 \u12367 \u12384 \u12373 \u12356 \u12290 ');\
+    try \{\
+      await Store.loadLive();\
+    \} catch (e) \{\
+      if (e.code === 'auth') showBlocking('\uc0\u12371 \u12398 \u12522 \u12531 \u12463 \u12391 \u12399 \u38283 \u12369 \u12414 \u12379 \u12435 ', '\u21306 \u22495 \u20418 \u12363 \u12425 \u12418 \u12425 \u12387 \u12383 \u25307 \u24453 \u12522 \u12531 \u12463 \u12434 \u38283 \u12356 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 ');\
+      else showBlocking('\uc0\u35501 \u12415 \u36796 \u12417 \u12414 \u12379 \u12435 \u12391 \u12375 \u12383 ', '\u12452 \u12531 \u12479 \u12540 \u12493 \u12483 \u12488 \u12395 \u12388 \u12394 \u12364 \u12387 \u12390 \u12356 \u12427 \u12363 \u30906 \u35469 \u12375 \u12390 \u12289 \u12418 \u12358 \u19968 \u24230 \u38283 \u12356 \u12390 \u12367 \u12384 \u12373 \u12356 \u12290 ');\
+      return;\
+    \}\
+    hideBlocking();\
+  \} else \{\
+    Store.load();\
+  \}\
+  initMap();\
+  bindStatic();\
+  fillWho();\
+  updateTabs();\
+  renderAll();\
+  showView('cards');\
+  if (LIVE) \{\
+    $('#modePill').hidden = true;\
+    $('#whoSel').hidden = true; $('#whoLabel').hidden = true;\
+    $('#whoName').hidden = false; $('#whoName').textContent = `$\{me().name\}\uc0\u12373 \u12435 `;\
+    $('#liveTools').hidden = false;\
+    $('#adReset').hidden = true;\
+    $('#btnLogout').onclick = logout;\
+    const again = () => \{ if (document.hidden) return; if (Store.queue.length) flush(); else refresh().catch(() => \{\}); \};\
+    setInterval(again, 90000);\
+    window.addEventListener('online', flush);\
+    document.addEventListener('visibilitychange', again);\
+    flush();\
+  \}\
+\}\
+init();\
+</script>\
+</body>\
+</html>}
