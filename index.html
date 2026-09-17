@@ -244,6 +244,14 @@ ol.plan p{margin:0}
 .blockbox{max-width:520px;background:#fff;border:2px solid var(--line);border-radius:16px;padding:24px;font-size:19px}
 .blockbox h2{font-size:24px;margin-bottom:10px}
 .pill.sync{background:var(--away);color:#1F1A00;border-color:var(--away);font-weight:700}
+.stamp.long{font-size:19px;letter-spacing:-.03em}
+.stamp.sm.long{font-size:15px}
+.stamp.xs.long{font-size:14px}
+.floorlist{display:grid;gap:8px}
+.floorrow{display:flex;align-items:center;gap:12px;background:#F6F8F7;border-radius:12px;padding:6px 10px}
+.floorrow b{min-width:48px;font-size:20px}
+#addBar .seg{display:flex;flex-wrap:wrap}
+#addBar .seg button{flex:1;min-width:130px}
 .hint-strong.ok{color:var(--terr)}
 .hint-strong{color:var(--draw);font-weight:700;font-size:16px;margin-top:4px}
 .unit.hl{outline:4px solid var(--draw);outline-offset:2px}
@@ -313,8 +321,12 @@ ol.plan p{margin:0}
         <span><i class="pin st-met">会<em>再</em></i>再訪問の受け持ちあり</span>
       </div>
       <div class="modebar" id="addBar" hidden>
-        <p><b>家を追加：</b>追加したい場所を地図でタップしてください。</p>
-        <div class="row"><button class="btn" id="addCancel">やめる</button></div>
+        <p><b>家を追加：</b><span id="addMsg"></span></p>
+        <div class="seg" role="group" aria-label="追加のしかた">
+          <button data-addmode="quick">一戸建てをすぐ追加</button>
+          <button data-addmode="form">入力して追加（アパートなど）</button>
+        </div>
+        <div class="row"><button class="btn primary" id="addCancel">追加を終わる</button><span class="muted" id="addCount"></span></div>
       </div>
       <div class="modebar" id="drawBar" hidden>
         <p><b id="drawTitle">区域の線を引く</b>：区域の角を順番にタップ（<span id="drawCount">0</span>か所）</p>
@@ -497,10 +509,10 @@ function makeDemo() {
   ];
   const rect = (a, b, c, d) => [[a, c], [a, d], [b, d], [b, c]];
   const territories = [
-    { id: 't1', no: 1, name: '試作区域 北西', polygon: rect(26.1600, 26.1640, 127.6720, 127.6765), holder: 'u1', lentAt: iso(now - 20 * DAY), completedAt: iso(now - 150 * DAY) },
-    { id: 't2', no: 2, name: '試作区域 北東', polygon: rect(26.1600, 26.1640, 127.6765, 127.6810), holder: 'u2', lentAt: iso(now - 130 * DAY), completedAt: iso(now - 300 * DAY) },
-    { id: 't3', no: 3, name: '試作区域 南', polygon: rect(26.1560, 26.1600, 127.6720, 127.6810), holder: null, lentAt: null, free: true, completedAt: iso(now - 200 * DAY) },
-    { id: 't4', no: 4, name: '試作区域 東', polygon: rect(26.1560, 26.1600, 127.6810, 127.6850), holder: null, lentAt: null, completedAt: iso(now - 60 * DAY) }
+    { id: 't1', no: '1', name: '試作区域 北西', polygon: rect(26.1600, 26.1640, 127.6720, 127.6765), holder: 'u1', lentAt: iso(now - 20 * DAY), completedAt: iso(now - 150 * DAY) },
+    { id: 't2', no: '2', name: '試作区域 北東', polygon: rect(26.1600, 26.1640, 127.6765, 127.6810), holder: 'u2', lentAt: iso(now - 130 * DAY), completedAt: iso(now - 300 * DAY) },
+    { id: 't3', no: '3', name: '試作区域 南', polygon: rect(26.1560, 26.1600, 127.6720, 127.6810), holder: null, lentAt: null, free: true, completedAt: iso(now - 200 * DAY) },
+    { id: 't4', no: '4', name: '試作区域 東', polygon: rect(26.1560, 26.1600, 127.6810, 127.6850), holder: null, lentAt: null, completedAt: iso(now - 60 * DAY) }
   ];
   const labels = ['青い門', '白い塀', '2階建て', '角の家', '駐車場あり', '赤瓦', '花壇あり', '平屋'];
   const houses = [], visits = [];
@@ -509,7 +521,7 @@ function makeDemo() {
     const la = t.polygon.map(p => p[0]), ln = t.polygon.map(p => p[1]);
     const la0 = Math.min(...la), la1 = Math.max(...la), ln0 = Math.min(...ln), ln1 = Math.max(...ln);
     const pos = () => [la0 + (la1 - la0) * (0.08 + 0.84 * r()), ln0 + (ln1 - ln0) * (0.08 + 0.84 * r())];
-    const n = t.no === 3 ? 30 : t.no === 4 ? 16 : 22;
+    const n = t.no === '3' ? 30 : t.no === '4' ? 16 : 22;
     for (let i = 0; i < n; i++) {
       const [lat, lng] = pos();
       houses.push({ id: `h${t.no}_${i}`, terrId: t.id, type: 'house', lat, lng, label: pick(labels), units: [], createdAt: iso(now - 400 * DAY) });
@@ -634,7 +646,7 @@ function applyDiff(st, ch) {
 }
 
 const Store = {
-  key: 'kuiki_demo_v5',
+  key: 'kuiki_demo_v6',
   data: null,
   base: null,   // 本番：サーバーの状態（＋送る予定の変更）
   token: '',
@@ -789,6 +801,15 @@ const me = () => userById(D().currentUser) || D().users[0];
 const isAdmin = () => me().role === 'admin';
 const targets = h => h.type === 'apt' ? h.units : [''];
 const K = (hid, unit) => hid + '|' + (unit || '');
+/* 区域番号：「53」「53-1」などを文字として扱い、数字の順に並べる */
+const cmpNo = (a, b) => String(a).localeCompare(String(b), 'ja', { numeric: true });
+const byNo = (a, b) => cmpNo(a.no, b.no);
+const noCls = no => (String(no).length >= 3 ? ' long' : '');
+function normNo(v) {
+  return String(v || '').trim()
+    .replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[－ー―‐−–—]/g, '-').replace(/\s+/g, '');
+}
 const canDelHouse = h => isAdmin() || h.createdBy === me().id;
 
 /* 変更 → 保存 → 再表示 → 「取り消す」付きのお知らせ */
@@ -894,7 +915,7 @@ function closeSheet() {
   $('#sheet').hidden = true; $('#backdrop').hidden = true;
   if (tmpMarker && map) { map.removeLayer(tmpMarker); tmpMarker = null; }
 }
-const headHtml = (t, title, sub) => `<div class="sheet-head">${t ? `<span class="stamp sm">${t.no}</span>` : ''}<div><h2 id="sheetTitle">${title}</h2>${sub ? `<p class="muted">${sub}</p>` : ''}</div><button class="icon-btn" data-close aria-label="閉じる">×</button></div>`;
+const headHtml = (t, title, sub) => `<div class="sheet-head">${t ? `<span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>` : ''}<div><h2 id="sheetTitle">${title}</h2>${sub ? `<p class="muted">${sub}</p>` : ''}</div><button class="icon-btn" data-close aria-label="閉じる">×</button></div>`;
 const navLink = h => `<a class="btn block" href="https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}" target="_blank" rel="noopener">Googleマップで道順を見る</a>`;
 
 /* ---------- 地図 ---------- */
@@ -935,7 +956,7 @@ function renderTerrs() {
   for (const t of D().territories) {
     const on = t.id === cur;
     L.polygon(t.polygon, { color: '#0E7C66', weight: on ? 5 : 3, fillColor: '#0E7C66', fillOpacity: on ? 0.07 : 0.02, interactive: false }).addTo(terrLayer);
-    L.marker(center(t.polygon), { icon: L.divIcon({ className: 'terr-label', html: `<span>${t.no}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false }).addTo(terrLayer);
+    L.marker(center(t.polygon), { icon: L.divIcon({ className: 'terr-label', html: `<span>${esc(t.no)}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false }).addTo(terrLayer);
   }
 }
 function renderHouses() {
@@ -956,8 +977,8 @@ function renderHouses() {
 }
 function fillTerrJump() {
   const sel = $('#terrJump'), cur = sel.value;
-  const ts = D().territories.slice().sort((a, b) => a.no - b.no);
-  sel.innerHTML = '<option value="">区域をえらぶ</option>' + ts.map(t => `<option value="${t.id}">区域 ${t.no}</option>`).join('');
+  const ts = D().territories.slice().sort(byNo);
+  sel.innerHTML = '<option value="">区域をえらぶ</option>' + ts.map(t => `<option value="${t.id}">区域 ${esc(t.no)}</option>`).join('');
   if (ts.some(t => t.id === cur)) sel.value = cur;
 }
 function fitTerr(id) {
@@ -971,7 +992,7 @@ function fitAll() {
 function onHouseTap(id) {
   const h = houseById(id); if (!h) return;
   if (mode === 'draw') { drawClick(L.latLng(h.lat, h.lng)); return; }
-  if (mode === 'add') { toast('そこには印があります。少しずらしてタップしてください'); return; }
+  if (mode === 'add') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
   if (h.type === 'apt') { if (h.units.length) openAptSeq(id); else openBuilding(id); }
   else openTarget(id, '', false);
 }
@@ -1199,7 +1220,7 @@ function followItem(k, f, mode) {
       `<label>変更 <select data-reassign="${esc(k)}">${userOptions(f.by)}</select></label>`;
   }
   return `<article class="ritem f-s${stg}"><div>
-      <p class="rt"><span class="stamp xs">${t ? t.no : '-'}</span> ${targetName(h, unit)}</p>
+      <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(h, unit)}</p>
       <p class="muted">${mode === 'admin' ? `受け持ち：${esc(uname(f.by))}さん　` : ''}最後の記録から ${d}日${state}</p>
       ${m ? `<p class="muted">${esc(m.interest)}・${esc(m.age || '')}${bs ? `　会えた時間帯：${bs}` : ''}</p>` : ''}
     </div><button class="btn small" data-go="${hid}" data-unit="${esc(unit)}">地図で見る</button>
@@ -1224,17 +1245,29 @@ function openBuilding(hid) {
     <div class="units">${cells || '<p class="muted">部屋がありません。下の「建物の編集」から追加してください。</p>'}</div>
     ${navLink(h)}
     <details class="more"><summary>建物の編集</summary>
-      <label class="field"><span>部屋を追加</span><span class="inline"><input type="text" id="fUnit" maxlength="10" placeholder="例：305"><button class="btn small" id="fUnitAdd">追加</button></span></label>
+      <label class="field"><span>部屋を追加</span><span class="inline"><input type="text" id="fUnit" placeholder="例：305　（空白で区切ると複数）"><button class="btn small" id="fUnitAdd">追加</button></span></label>
+      ${canDelHouse(h) ? `<label class="field"><span>部屋を削除</span><span class="inline"><input type="text" id="fUnitDel" placeholder="例：104"><button class="btn small danger" id="fUnitDelBtn">削除</button></span>
+        <small class="hint">部屋番号がまちがっていたときに使います。</small></label>` : ''}
       <label class="field"><span>建物名・目印を変える</span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="${esc(h.label)}"><button class="btn small" id="fLabelSave">保存</button></span></label>
       ${canDelHouse(h) ? '<button class="btn small danger" id="fDel">この建物を削除する</button>' : ''}
     </details>`);
   $$('[data-unit]', $('#sheet')).forEach(x => x.onclick = () => openTarget(hid, x.dataset.unit, true));
   if ($('#seqStart')) $('#seqStart').onclick = () => openAptSeq(hid);
   $('#fUnitAdd').onclick = () => {
-    const u = $('#fUnit').value.trim();
-    if (!u) { toast('部屋番号を入力してください'); return; }
-    if (h.units.includes(u)) { toast(`${u}号室はすでにあります`); return; }
-    commit(`${u}号室を追加しました`, () => { h.units.push(u); });
+    const us = parseUnits($('#fUnit').value).filter(u => !h.units.includes(u));
+    if (!us.length) { toast('新しい部屋番号を入力してください'); return; }
+    commit(`${us.join('・')}号室を追加しました`, () => { h.units.push(...us); h.units.sort((a, b) => cmpNo(a, b)); });
+    openBuilding(hid);
+  };
+  if ($('#fUnitDelBtn')) $('#fUnitDelBtn').onclick = () => {
+    const u = parseUnits($('#fUnitDel').value)[0];
+    if (!u || !h.units.includes(u)) { toast('その部屋番号はありません'); return; }
+    const n = visitsOf(K(hid, u)).length;
+    if (!confirm(`${u}号室を削除します。${n ? `この部屋の記録${n}件も見えなくなります。` : ''}よろしいですか？`)) return;
+    commit(`${u}号室を削除しました`, () => {
+      h.units = h.units.filter(x => x !== u);
+      const k = K(hid, u); delete D().dnc[k]; delete D().follows[k]; delete D().released[k];
+    });
     openBuilding(hid);
   };
   $('#fLabelSave').onclick = () => { const v = $('#fLabel').value.trim(); commit('建物名を変えました', () => { h.label = v; }); openBuilding(hid); };
@@ -1337,23 +1370,58 @@ function openAptSeq(hid, startUnit) {
   paint();
 }
 
-/* ---------- 家を追加 ---------- */
+/* ---------- 家を追加 ----------
+   ・一戸建て：地図をタップするだけで、続けて追加
+   ・アパート／目印つき：入力画面を開いて追加（追加後も続けてタップできる） */
+let addQuick = true, addCount = 0;
+function updateAddBar() {
+  $('#addMsg').textContent = addQuick
+    ? '家の場所（屋根の真ん中）をタップすると、すぐに一戸建てとして追加されます。続けてタップできます。'
+    : '追加したい場所をタップすると、入力画面が開きます。';
+  $$('#addBar [data-addmode]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.addmode === 'quick') === addQuick)));
+  $('#addCount').textContent = addCount ? `この回で追加：${addCount}件` : '';
+}
 function addAt(ll) {
   const tid = terrOf(ll.lat, ll.lng);
   if (!tid) { toast('区域の線の外です。区域の中をタップしてください'); return; }
+  if (map.getZoom() < 17) { toast('場所がずれないように、もう少し地図を拡大してからタップしてください'); return; }
+  if (addQuick) {
+    addCount++; updateAddBar();
+    commit(`一戸建てを追加しました（${addCount}件目）`, () => {
+      D().houses.push({ id: 'h' + uid(), terrId: tid, type: 'house', lat: ll.lat, lng: ll.lng, label: '', units: [], createdAt: new Date().toISOString(), createdBy: me().id });
+    });
+    return;
+  }
   if (tmpMarker) map.removeLayer(tmpMarker);
   tmpMarker = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="pin st-temp">＋</div>', iconSize: [34, 34], iconAnchor: [17, 17] }), interactive: false }).addTo(map);
   openAddForm(ll, tid);
 }
+/* 部屋番号を作る：自分で入力した番号があればそれを使い、なければ階ごとの数から作る */
+function parseUnits(text) {
+  const seen = new Set();
+  return String(text || '').replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .split(/[\s,、，・]+/).map(x => x.trim()).filter(x => x && x.length <= 10 && !seen.has(x) && seen.add(x));
+}
+function floorUnits(rooms) {
+  const out = [];
+  rooms.forEach((n, i) => { for (let r = 1; r <= n; r++) out.push(`${i + 1}${pad(r)}`); });
+  return out;
+}
 function openAddForm(ll, tid) {
   const t = terrById(tid);
-  const f = { type: 'house', label: '', floors: 2, per: 4 };
-  const stepper = (id, label) => `<div class="field"><span>${label}</span><div class="stepper">
-      <button type="button" data-step="${id}" data-d="-1" aria-label="${label}を減らす">−</button><output>${f[id]}</output>
-      <button type="button" data-step="${id}" data-d="1" aria-label="${label}を増やす">＋</button></div></div>`;
+  const f = { type: 'apt', label: '', rooms: [2, 4], manual: '' };
+  const keep = () => {
+    const l = $('#fLabel'); if (l) f.label = l.value;
+    const m = $('#fManual'); if (m) f.manual = m.value;
+  };
   const paint = () => {
     const apt = f.type === 'apt';
-    setSheet(headHtml(t, 'ここに追加します', `区域${t.no}　${esc(t.name)}`) + `
+    const manual = parseUnits(f.manual);
+    const units = manual.length ? manual : floorUnits(f.rooms);
+    const preview = manual.length
+      ? `自分で入力した ${manual.length}部屋`
+      : f.rooms.map((n, i) => (n === 1 ? `${i + 1}01` : `${i + 1}01〜${i + 1}${pad(n)}`)).join(' ／ ');
+    setSheet(headHtml(t, 'ここに追加します', `区域${esc(t.no)}　${esc(t.name)}`) + `
       <p class="q">建物の種類</p>
       <div class="choices two">
         <button class="choice${!apt ? ' on' : ''}" data-type="house" aria-pressed="${!apt}"><i class="pin st-new">家</i>一戸建て</button>
@@ -1362,24 +1430,47 @@ function openAddForm(ll, tid) {
       <label class="field"><span>${apt ? '建物名' : '目印（見た目など）'}</span>
         <input type="text" id="fLabel" maxlength="30" value="${esc(f.label)}" placeholder="${apt ? '例：〇〇ハイツ' : '例：青い門・2階建て'}">
         <small class="hint">住んでいる人の名前は書かないでください。</small></label>
-      ${apt ? stepper('floors', '階の数') + stepper('per', '1つの階の部屋の数') +
-        `<p class="hint">部屋番号は 101 〜 ${f.floors}${pad(f.per)} のように自動で付きます。あとから追加もできます。</p>` : ''}
+      ${apt ? `
+      <div class="field"><span>階の数</span><div class="stepper">
+        <button type="button" data-floors="-1" aria-label="階を減らす">−</button><output>${f.rooms.length}</output>
+        <button type="button" data-floors="1" aria-label="階を増やす">＋</button></div></div>
+      <div class="field"><span>階ごとの部屋の数</span>
+        <div class="floorlist">${f.rooms.map((n, i) => `<div class="floorrow"><b>${i + 1}階</b><div class="stepper">
+          <button type="button" data-room="${i}" data-d="-1" aria-label="${i + 1}階の部屋を減らす">−</button><output>${n}</output>
+          <button type="button" data-room="${i}" data-d="1" aria-label="${i + 1}階の部屋を増やす">＋</button></div><span class="muted">部屋</span></div>`).join('')}
+        </div></div>
+      <p class="hint">部屋番号：${esc(preview)}（全部で ${units.length}部屋）</p>
+      <details class="more"${f.manual ? ' open' : ''}><summary>部屋番号を自分で入力する</summary>
+        <label class="field"><span>部屋番号（空白か「、」で区切る）</span>
+          <input type="text" id="fManual" value="${esc(f.manual)}" placeholder="例：101 102 201 202 203 205"></label>
+        <p class="hint">入力すると、上の階ごとの数より優先されます。</p>
+        <button type="button" class="btn small" id="fPreview">部屋の数を確認する</button>
+      </details>` : ''}
       <button class="btn primary block" id="fSave">この場所に追加する</button>
       <button class="btn block" data-close>やめる</button>`);
     const S = $('#sheet');
-    $$('[data-type]', S).forEach(x => x.onclick = () => { f.label = $('#fLabel').value; f.type = x.dataset.type; paint(); });
-    $$('[data-step]', S).forEach(x => x.onclick = () => {
-      f.label = $('#fLabel').value;
-      f[x.dataset.step] = Math.min(30, Math.max(1, f[x.dataset.step] + Number(x.dataset.d)));
+    $$('[data-type]', S).forEach(x => x.onclick = () => { keep(); f.type = x.dataset.type; paint(); });
+    $$('[data-floors]', S).forEach(x => x.onclick = () => {
+      keep();
+      if (Number(x.dataset.floors) > 0) { if (f.rooms.length < 30) f.rooms.push(f.rooms[f.rooms.length - 1] || 1); }
+      else if (f.rooms.length > 1) f.rooms.pop();
       paint();
     });
+    $$('[data-room]', S).forEach(x => x.onclick = () => {
+      keep();
+      const i = Number(x.dataset.room);
+      f.rooms[i] = Math.min(30, Math.max(1, f.rooms[i] + Number(x.dataset.d)));
+      paint();
+    });
+    if ($('#fPreview')) $('#fPreview').onclick = () => { keep(); paint(); };
     $('#fSave').onclick = () => {
-      const label = $('#fLabel').value.trim();
-      const units = [];
-      if (f.type === 'apt') for (let a = 1; a <= f.floors; a++) for (let b = 1; b <= f.per; b++) units.push(`${a}${pad(b)}`);
-      closeSheet(); setMode('normal');
-      commit(f.type === 'apt' ? '集合住宅を追加しました' : '家を追加しました', () => {
-        D().houses.push({ id: 'h' + uid(), terrId: tid, type: f.type, lat: ll.lat, lng: ll.lng, label, units, createdAt: new Date().toISOString(), createdBy: me().id });
+      keep();
+      const label = f.label.trim();
+      const us = f.type === 'apt' ? (parseUnits(f.manual).length ? parseUnits(f.manual) : floorUnits(f.rooms)) : [];
+      closeSheet();
+      addCount++; updateAddBar();
+      commit(f.type === 'apt' ? `集合住宅を追加しました（${us.length}部屋）` : '一戸建てを追加しました', () => {
+        D().houses.push({ id: 'h' + uid(), terrId: tid, type: f.type, lat: ll.lat, lng: ll.lng, label, units: us, createdAt: new Date().toISOString(), createdBy: me().id });
       });
     };
   };
@@ -1423,16 +1514,18 @@ function finishDraw() {
   }
 }
 function openTerrForm({ pts = null, terr = null }) {
-  const nextNo = Math.max(0, ...D().territories.map(t => t.no)) + 1;
+  const maxNo = Math.max(0, ...D().territories.map(t => parseInt(normNo(t.no), 10) || 0));
   setSheet(headHtml(null, terr ? '区域の番号と名前' : '新しい区域', '') + `
-    <label class="field"><span>区域番号</span><input type="number" id="fNo" inputmode="numeric" min="1" value="${terr ? terr.no : nextNo}"></label>
+    <label class="field"><span>区域番号</span>
+      <input type="text" id="fNo" maxlength="10" autocomplete="off" value="${esc(terr ? terr.no : String(maxNo + 1))}">
+      <small class="hint">「53」「53-1」のように入力できます（ハイフンで枝番）。</small></label>
     <label class="field"><span>区域の名前（目印になる地名など）</span><input type="text" id="fName" maxlength="30" value="${terr ? esc(terr.name) : ''}" placeholder="例：〇〇公園の北側"></label>
     <button class="btn primary block" id="fSave">保存する</button>
     <button class="btn block" data-close>もどる</button>`);
   $('#fSave').onclick = () => {
-    const no = parseInt($('#fNo').value, 10), name = $('#fName').value.trim();
-    if (!no || no < 1) { toast('区域番号を入力してください'); return; }
-    if (D().territories.some(t => t.no === no && t !== terr)) { toast(`区域${no}はすでにあります`); return; }
+    const no = normNo($('#fNo').value), name = $('#fName').value.trim();
+    if (!/^[0-9A-Za-z]+(-[0-9A-Za-z]+)*$/.test(no)) { toast('区域番号は「53」「53-1」のように入力してください'); return; }
+    if (D().territories.some(t => String(t.no) === no && t !== terr)) { toast(`区域${no}はすでにあります`); return; }
     closeSheet();
     if (terr) {
       commit('区域の番号と名前を変えました', () => { terr.no = no; terr.name = name || `区域${no}`; });
@@ -1478,7 +1571,7 @@ function cardHtml(t, own) {
   const holder = t.holder ? userById(t.holder) : null;
   const who = own ? `受け取ってから ${daysSince(t.lentAt)}日` : (holder ? `担当：${esc(holder.name)}さん` : '担当者なし');
   return `<article class="tcard">
-    <span class="stamp"><small>区域</small>${t.no}</span>
+    <span class="stamp${noCls(t.no)}"><small>区域</small>${esc(t.no)}</span>
     <div><h3>${esc(t.name)}</h3><p class="muted">${who}</p>
       <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪問の進み具合"><i style="width:${pct}%"></i></div>
       <p class="muted">${t.lentAt ? '受け取ってから' : 'この90日で'}訪問した家・部屋 ${s.visited} / ${s.n}</p>${own ? roundHint(t) : ''}</div>
@@ -1487,7 +1580,7 @@ function cardHtml(t, own) {
 }
 function renderCards() {
   renderToday();
-  const ts = D().territories.slice().sort((a, b) => a.no - b.no);
+  const ts = D().territories.slice().sort(byNo);
   const mine = ts.filter(t => t.holder === me().id);
   $('#myCards').innerHTML = mine.length ? mine.map(t => cardHtml(t, true)).join('')
     : '<div class="empty">受け取っている区域カードはありません。<br>下のボタンから申し込めます。</div>';
@@ -1541,7 +1634,7 @@ function openRequestSheet() {
   });
   list.sort(myPos ? (a, b) => a.dist - b.dist : byLongest);
   const rows = list.map(({ t, last, n, dist }) => `<article class="pick">
-      <span class="stamp sm">${t.no}</span>
+      <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
       <div><b>${esc(t.name)}</b>
         <p class="muted">${n}軒・部屋　${last ? `前回回り終えた日 ${fmtDay(last)}` : '回り終えた記録なし'}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p></div>
       ${t.free && canTake
@@ -1614,7 +1707,7 @@ function renderInbox() {
   if (taken.length) {
     html += `<h2 class="sec">自分で受け取られた区域（${taken.length}件）</h2>` + taken.map(t =>
       `<article class="ritem k-away"><div>
-        <p class="rt"><span class="stamp xs">${t.no}</span> ${esc(t.name)}</p>
+        <p class="rt"><span class="stamp xs${noCls(t.no)}">${esc(t.no)}</span> ${esc(t.name)}</p>
         <p class="muted">${esc(uname(t.holder))}さん　${fmtDay(t.selfTakenAt)}に受け取り（今 ${heldCount(t.holder)}枚）</p>
       </div><button class="btn small" data-takenseen="${t.id}">確認した</button></article>`).join('');
   }
@@ -1959,7 +2052,7 @@ function awayCardHtml(c) {
   const pct = p.total ? Math.round(p.done / p.total * 100) : 0;
   const left = Math.max(0, Math.ceil((Date.parse(c.expiresAt) - Date.now()) / DAY));
   return `<article class="tcard away">
-    <span class="stamp away"><small>留守宅</small>${t ? t.no : '-'}</span>
+    <span class="stamp away${t ? noCls(t.no) : ''}"><small>留守宅</small>${t ? esc(t.no) : '-'}</span>
     <div><h3>${slotText(c.slot)}</h3><p class="muted">区域${t ? t.no : '-'}　${t ? esc(t.name) : ''}</p>
       <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪ねた割合"><i style="width:${pct}%"></i></div>
       <p class="muted">訪ねた家 ${p.done} / ${p.total}　あと${left}日で自動的に終わります</p>
@@ -1983,7 +2076,7 @@ function renderAwaySuggest() {
     (mine ? `<br><b>受け取り中 ${mine}枚</b>（${st.awayMax}枚まで）。「区域カード」画面にあります。` : '');
   const list = awaySuggestions(u.id, slots).slice(0, 10);
   $('#awayList').innerHTML = list.length ? list.map(x => `<article class="ritem k-away"><div>
-      <p class="rt"><span class="stamp xs">${x.t.no}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}</p>
+      <p class="rt"><span class="stamp xs${noCls(x.t.no)}">${esc(x.t.no)}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}</p>
       <p class="muted">まだ会えていない家 ${x.keys.length}軒${x.dist != null ? `　ここから約${fmtDist(x.dist)}` : ''}${x.t.holder ? '　あなたの区域' : ''}</p>
     </div><button class="btn small primary" data-awaytake="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`).join('') +
     (full ? `<p class="hint">持てる枚数に達しています。受け取り中のカードを終えると、受け取れます。</p>` : '')
@@ -2031,7 +2124,7 @@ function renderAwayAdmin() {
       return `<td class="${n && n === maxN ? 'thin' : ''}"><b>${n}</b>軒</td>`;
     }).join('')}</tr>`).join('');
 
-  const rows = D().territories.slice().sort((a, b) => a.no - b.no).map(t => {
+  const rows = D().territories.slice().sort(byNo).map(t => {
     const items = idx.get(t.id) || [];
     if (!items.length) return '';
     const avg = (items.reduce((s, x) => s + x.tried.size, 0) / items.length).toFixed(1);
@@ -2047,7 +2140,7 @@ function renderAwayAdmin() {
   $('#adHard').innerHTML = hard.length ? hard.slice(0, 30).map(x => {
     const t = terrById(x.h.terrId);
     return `<article class="ritem k-new"><div>
-      <p class="rt"><span class="stamp xs">${t ? t.no : '-'}</span> ${targetName(x.h, x.u)}</p>
+      <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(x.h, x.u)}</p>
       <p class="muted">留守 ${visitsOf(x.k).length}回　すべての時間帯で会えていません</p>
     </div><button class="btn small" data-go="${x.h.id}" data-unit="${esc(x.u)}">地図で見る</button></article>`;
   }).join('') + (hard.length > 30 ? `<p class="muted">ほか ${hard.length - 30}件</p>` : '')
@@ -2098,13 +2191,13 @@ function renderReco() {
   const count = k => k === 'all' ? items.length : items.filter(i => i.kind === k).length;
   $('#recoChips').innerHTML = RECO_KINDS.map(([k, l]) => `<button class="chip" data-kind="${k}" aria-pressed="${recoFilter === k}">${l}（${count(k)}）</button>`).join('');
   let list = recoFilter === 'all' ? items : items.filter(i => i.kind === recoFilter);
-  list.sort(myPos ? (a, b) => a.dist - b.dist : (a, b) => b.score - a.score || a.t.no - b.t.no);
+  list.sort(myPos ? (a, b) => a.dist - b.dist : (a, b) => b.score - a.score || cmpNo(a.t.no, b.t.no));
   const MAX = 40, more = list.length - MAX;
   list = list.slice(0, MAX);
   $('#recoList').innerHTML = list.length ? list.map(i => {
     const name = i.h.type === 'apt' ? `${esc(i.h.label || '集合住宅')} ${esc(i.unit)}号室` : esc(i.h.label || '家');
     return `<article class="ritem k-${i.kind}"><div>
-        <p class="rt"><span class="stamp xs">${i.t.no}</span> ${name}</p>
+        <p class="rt"><span class="stamp xs${noCls(i.t.no)}">${esc(i.t.no)}</span> ${name}</p>
         <p class="muted">${esc(i.reason)}</p>
         ${i.dist != null ? `<p class="muted">ここから約 ${fmtDist(i.dist)}</p>` : ''}
       </div><button class="btn small primary" data-go="${i.h.id}" data-unit="${esc(i.unit)}">地図で見る</button></article>`;
@@ -2141,7 +2234,7 @@ function renderAdmin() {
   renderAwayAdmin();
   renderFollowAdmin();
   const now = Date.now();
-  const ts = D().territories.slice().sort((a, b) => a.no - b.no);
+  const ts = D().territories.slice().sort(byNo);
   let targetsN = 0, met90 = 0;
   const stats = new Map();
   ts.forEach(t => { const s = terrStats(t, now - 90 * DAY); stats.set(t.id, s); targetsN += s.n; met90 += s.met; });
@@ -2179,7 +2272,7 @@ function renderAdmin() {
     D().users.map(u => `<option value="${u.id}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
   $('#adTerrs').innerHTML = ts.map(t => {
     const s = stats.get(t.id), d = t.lentAt ? daysSince(t.lentAt) : 0;
-    return `<article class="trow"><span class="stamp sm">${t.no}</span>
+    return `<article class="trow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
       <div><b>${esc(t.name)}</b><div class="meta">
         <span>家・部屋 ${s.n}</span><span>90日以内に訪問 ${s.visited}</span>
         <span>前回回り終えた日 ${t.completedAt ? fmtDay(t.completedAt) + (t.completedPct != null && t.completedPct < 100 ? `（${t.completedPct}%）` : '') : '記録なし'}</span>
@@ -2244,7 +2337,7 @@ function renderFollowAdmin() {
   $('#adLeft').innerHTML = left.length ? left.slice(0, 30).map(i => {
     const t = terrById(i.h.terrId), bs = bestSlot(i.k);
     return `<article class="ritem ${i.rel ? 'k-handoff' : 'k-interest'}"><div>
-      <p class="rt"><span class="stamp xs">${t ? t.no : '-'}</span> ${targetName(i.h, i.unit)}</p>
+      <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(i.h, i.unit)}</p>
       <p class="muted">${i.rel ? '<b>引き継ぎ待ち</b>　' : ''}${esc(i.m.interest)}・${esc(i.m.age || '')}　最後の記録から ${i.idle}日${bs ? `　会えた時間帯：${bs}` : ''}</p>
     </div><button class="btn small" data-go="${i.h.id}" data-unit="${esc(i.unit)}">地図で見る</button>
     <div class="actions span"><label>受け持つ人 <select data-assign="${esc(i.k)}">${userOptions('', '選んでください')}</select></label></div></article>`;
@@ -2385,7 +2478,11 @@ function bindStatic() {
     renderTerrs(); renderHouses();
     if (v) fitTerr(v);
   };
-  $('#btnAdd').onclick = () => { setMode('add'); if (map.getZoom() < 17) toast('場所がわかるまで地図を拡大してからタップしてください'); };
+  $('#btnAdd').onclick = () => {
+    addCount = 0; setMode('add'); updateAddBar();
+    if (map.getZoom() < 17) toast('場所がわかるまで地図を拡大してから、タップしてください');
+  };
+  $$('#addBar [data-addmode]').forEach(b => b.onclick = () => { addQuick = b.dataset.addmode === 'quick'; closeSheet(); updateAddBar(); });
   $('#addCancel').onclick = () => { closeSheet(); setMode('normal'); };
   $('#btnLocate').onclick = () => locate(() => map.setView(myPos, 18));
   $('#btnBase').onclick = () => {
