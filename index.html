@@ -258,6 +258,12 @@ ol.plan p{margin:0}
 .modebar .barhead p{margin:0}
 .modebar input[type=range].wide{width:min(240px,55vw)}
 #map.drawing .terr-label span{opacity:.35}
+body.focusmode header.top,body.focusmode nav.tabs{display:none}
+.modebar{padding:8px 10px}
+.modebar .row{margin:6px 0 0}
+.seg.small{display:flex;width:100%;margin:6px 0 0}
+.seg.small button{flex:1;min-height:44px;padding:0 6px;font-size:15px}
+#map.drawing .pin{transform:scale(.78);opacity:.9}
 .hint-strong.ok{color:var(--terr)}
 .hint-strong{color:var(--draw);font-weight:700;font-size:16px;margin-top:4px}
 .unit.hl{outline:4px solid var(--draw);outline-offset:2px}
@@ -335,15 +341,20 @@ ol.plan p{margin:0}
         <div class="row"><button class="btn primary" id="addCancel">追加を終わる</button><span class="muted" id="addCount"></span></div>
       </div>
       <div class="modebar" id="drawBar" hidden>
-        <div class="barhead"><p><b id="drawTitle">区域の線を引く</b>（角 <span id="drawCount">0</span>か所）</p>
+        <div class="barhead"><p><b id="drawTitle">区域の線を引く</b>　角 <span id="drawCount">0</span>か所<span id="drawAddCount"></span></p>
           <button class="foldbtn" id="drawFold" aria-expanded="true">たたむ</button></div>
+        <div class="seg small" role="group" aria-label="地図をタップしたときの動き">
+          <button data-drawtap="line">線を引く</button>
+          <button data-drawtap="house">一戸建てを追加</button>
+          <button data-drawtap="apt">アパートを追加</button>
+        </div>
         <div class="row">
           <button class="btn small" id="drawUndo">1つ戻す</button>
           <button class="btn small primary" id="drawDone">完成</button>
           <button class="btn small" id="drawCancel">やめる</button>
         </div>
         <div class="fold">
-          <p class="muted">区域の角を順番にタップします。</p>
+          <p class="muted" id="drawHelp"></p>
           <div class="row">
             <label class="btn small">古いカードの写真を重ねる<input type="file" accept="image/*" id="ovFile" hidden></label>
             <label class="check"><input type="checkbox" id="drawHouses">家の印を表示</label>
@@ -948,7 +959,10 @@ function initMap() {
   baseLayers.pale.addTo(map);
   terrLayer = L.layerGroup().addTo(map);
   houseLayer = L.layerGroup().addTo(map);
-  map.on('click', e => { if (mode === 'draw') drawClick(e.latlng); else if (mode === 'add') addAt(e.latlng); });
+  map.on('click', e => {
+    if (mode === 'draw') { if (drawTap === 'line') drawClick(e.latlng); else addAt(e.latlng, true); }
+    else if (mode === 'add') addAt(e.latlng, false);
+  });
   map.on('moveend', renderHouses);
 }
 function houseIcon(h, ff) {
@@ -982,7 +996,7 @@ function renderHouses() {
   houseLayer.clearLayers();
   const ff = focusFn();
   renderCardBar();
-  if (mode === 'draw' && !drawShowHouses) { $('#zoomHint').hidden = true; return; } // 線引き中は写真が見えるように家の印を隠す
+  if (mode === 'draw' && drawTap === 'line' && !drawShowHouses) { $('#zoomHint').hidden = true; return; } // 線引き中は写真が見えるように家の印を隠す
   const show = map.getZoom() >= 15;
   $('#zoomHint').hidden = show;
   if (!show) return;
@@ -1010,7 +1024,8 @@ function fitAll() {
 }
 function onHouseTap(id) {
   const h = houseById(id); if (!h) return;
-  if (mode === 'draw') { drawClick(L.latLng(h.lat, h.lng)); return; }
+  if (mode === 'draw' && drawTap === 'line') { drawClick(L.latLng(h.lat, h.lng)); return; }
+  if (mode === 'draw') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
   if (mode === 'add') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
   if (h.type === 'apt') { if (h.units.length) openAptSeq(id); else openBuilding(id); }
   else openTarget(id, '', false);
@@ -1023,7 +1038,12 @@ function setMode(m) {
   $('#map').classList.toggle('crosshair', m !== 'normal');
   $('#map').classList.toggle('drawing', m === 'draw');
   if (m !== 'draw') clearOverlay();
-  if (map) { map.options.zoomDelta = m === 'draw' ? 0.25 : 1; renderHouses(); }
+  document.body.classList.toggle('focusmode', m !== 'normal'); // 作業中は上下の帯を隠して地図を広く
+  if (map) {
+    map.options.zoomDelta = m === 'draw' ? 0.25 : 1;
+    renderHouses();
+    setTimeout(() => map.invalidateSize(), 30);
+  }
 }
 
 /* ---------- 家・部屋の記録 ---------- */
@@ -1396,19 +1416,22 @@ function openAptSeq(hid, startUnit) {
    ・アパート／目印つき：入力画面を開いて追加（追加後も続けてタップできる） */
 let addQuick = true, addCount = 0;
 function updateAddBar() {
+  $('#drawAddCount').textContent = addCount ? `　家 ${addCount}件追加` : '';
   $('#addMsg').textContent = addQuick
     ? '家の場所（屋根の真ん中）をタップすると、すぐに一戸建てとして追加されます。続けてタップできます。'
     : '追加したい場所をタップすると、入力画面が開きます。';
   $$('#addBar [data-addmode]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.addmode === 'quick') === addQuick)));
   $('#addCount').textContent = addCount ? `この回で追加：${addCount}件` : '';
 }
-function addAt(ll) {
+function addAt(ll, inDraw) {
   const tid = terrOf(ll.lat, ll.lng);
-  if (!tid) { toast('区域の線の外です。区域の中をタップしてください'); return; }
+  // 線引き中は、まだ区域が無い場所にも置ける（線を完成したときに区域が決まる）
+  if (!tid && !inDraw) { toast('区域の線の外です。区域の中をタップしてください'); return; }
   if (map.getZoom() < 17) { toast('場所がずれないように、もう少し地図を拡大してからタップしてください'); return; }
-  if (addQuick) {
+  if (inDraw ? drawTap === 'house' : addQuick) {
     addCount++; updateAddBar();
-    commit(`一戸建てを追加しました（${addCount}件目）`, () => {
+    const note = !tid && addCount === 1 ? '。区域は線を完成すると決まります' : '';
+    commit(`一戸建てを追加しました（${addCount}件目）${note}`, () => {
       D().houses.push({ id: 'h' + uid(), terrId: tid, type: 'house', lat: ll.lat, lng: ll.lng, label: '', units: [], createdAt: new Date().toISOString(), createdBy: me().id });
     });
     return;
@@ -1429,8 +1452,9 @@ function floorUnits(rooms) {
   return out;
 }
 function openAddForm(ll, tid) {
-  const t = terrById(tid);
+  const t = tid ? terrById(tid) : null;
   const f = { type: 'apt', label: '', rooms: [2, 4], manual: '' };
+  if (mode === 'draw' && drawTap === 'house') f.type = 'house';
   const keep = () => {
     const l = $('#fLabel'); if (l) f.label = l.value;
     const m = $('#fManual'); if (m) f.manual = m.value;
@@ -1442,7 +1466,7 @@ function openAddForm(ll, tid) {
     const preview = manual.length
       ? `自分で入力した ${manual.length}部屋`
       : f.rooms.map((n, i) => (n === 1 ? `${i + 1}01` : `${i + 1}01〜${i + 1}${pad(n)}`)).join(' ／ ');
-    setSheet(headHtml(t, 'ここに追加します', `区域${esc(t.no)}　${esc(t.name)}`) + `
+    setSheet(headHtml(t, 'ここに追加します', t ? `区域${esc(t.no)}　${esc(t.name)}` : '区域は、線を完成したときに決まります') + `
       <p class="q">建物の種類</p>
       <div class="choices two">
         <button class="choice${!apt ? ' on' : ''}" data-type="house" aria-pressed="${!apt}"><i class="pin st-new">家</i>一戸建て</button>
@@ -1503,8 +1527,10 @@ function startDraw(targetId) {
   showView('map');
   focusCard = null; roundTerr = null;
   drawShowHouses = false; $('#drawHouses').checked = false;
-  $('#drawBar').classList.remove('mini'); $('#drawFold').textContent = 'たたむ';
+  addCount = 0; updateAddBar();
+  setDrawFold(false);
   setMode('draw');
+  setDrawTap('line');
   draw = {
     points: [], targetId,
     line: L.polyline([], { color: '#C2410C', weight: 4, dashArray: '8 6', interactive: false }).addTo(map),
@@ -1567,7 +1593,26 @@ function openTerrForm({ pts = null, terr = null }) {
    ・合わせるとき：写真は画面に固定。地図を動かして道を重ねる（回転も調整できる）
    ・固定したあと：写真は地図にくっつき、地図を動かすと一緒に動く */
 let ovState = null; // { url, pinned, rot, center, refZoom, w, h, el }
-let drawShowHouses = false;
+let drawShowHouses = false, drawTap = 'line';
+const DRAW_HELP = {
+  line: '区域の角を順番にタップします。',
+  house: '家の場所（屋根の真ん中）をタップすると、一戸建てが追加されます。まちがえたときは、お知らせの「取り消す」を押します。',
+  apt: 'アパートの場所をタップすると、部屋の数を入れる画面が開きます。'
+};
+function setDrawTap(v) {
+  drawTap = v;
+  $$('#drawBar [data-drawtap]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.drawtap === v)));
+  $('#drawUndo').hidden = v !== 'line';
+  $('#drawHelp').textContent = DRAW_HELP[v];
+  $('#drawHouses').parentNode.hidden = v !== 'line';
+  closeSheet();
+  renderHouses();
+}
+function setDrawFold(mini) {
+  $('#drawBar').classList.toggle('mini', mini);
+  $('#drawFold').textContent = mini ? 'ひらく' : 'たたむ';
+  $('#drawFold').setAttribute('aria-expanded', String(!mini));
+}
 function applyOv() {
   map.getPane('tilePane').style.opacity = $('#ovRange').value / 100;
 }
@@ -1618,7 +1663,8 @@ function pinOverlay() {
   map.getPane('cardPane').appendChild(ovState.el);
   img.hidden = true;
   placeOverlay(); updateOvUi();
-  toast('写真を地図に固定しました');
+  if (mode === 'draw') setDrawFold(true); // 作業する地図を広くする
+  toast('写真を地図に固定しました。上の案内は小さくしました（「ひらく」で戻せます）');
 }
 function unpinOverlay() {
   if (!ovState || !ovState.pinned) return;
@@ -2604,12 +2650,8 @@ function bindStatic() {
   $('#ovPin').onclick = () => { if (ovState && ovState.pinned) unpinOverlay(); else pinOverlay(); };
   $('#ovClear').onclick = clearOverlay;
   $('#drawHouses').onchange = e => { drawShowHouses = e.target.checked; renderHouses(); };
-  $('#drawFold').onclick = () => {
-    const bar = $('#drawBar'), mini = !bar.classList.contains('mini');
-    bar.classList.toggle('mini', mini);
-    $('#drawFold').textContent = mini ? 'ひらく' : 'たたむ';
-    $('#drawFold').setAttribute('aria-expanded', String(!mini));
-  };
+  $('#drawFold').onclick = () => setDrawFold(!$('#drawBar').classList.contains('mini'));
+  $$('#drawBar [data-drawtap]').forEach(b => b.onclick = () => setDrawTap(b.dataset.drawtap));
 
   // おすすめ
   $('#recoChips').addEventListener('click', e => { const c = e.target.closest('[data-kind]'); if (c) { recoFilter = c.dataset.kind; renderReco(); } });
