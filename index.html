@@ -445,6 +445,9 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
         <h3 class="sub">まとめて引き継ぎ</h3>
         <p class="hint">奉仕が難しくなった人の受け持ちを、まとめて別の人に移します。</p>
         <div class="actions" id="adBulk"></div>
+        <h2 class="sec">記録する項目</h2>
+        <p class="hint">会衆で記録する項目を決められます。記録しない項目は、入力画面にも出ません。</p>
+        <div id="adRecSet"></div>
         <h2 class="sec">データ</h2>
         <div id="adDataSet"></div>
         <div class="row">
@@ -491,18 +494,32 @@ const YOUNG = new Set(['若い世代', '10〜20代', '30〜40代']);        // �
 const INTERESTS = ['再訪問したい', '再訪問しない'];
 const INTERESTED = new Set(['再訪問したい', '関心あり', '少しあり']); // 以前の記録の値も含める
 const INT_LABEL = { 再訪問したい: '★ また訪ねたい', 再訪問しない: '今回だけ' };
+/* 会衆で決める「記録する項目」 */
+const recAgeOn = () => D().settings.recAge !== 0;
+const recIntOn = () => D().settings.recInterest !== 0;
+/* 会えたあと、次に進む画面（記録しない項目はとばす） */
+function metNext(st, k, save) {
+  if (recAgeOn() && st.step === 'result') { st.step = 'age'; return true; }
+  if (recIntOn() && st.step !== 'interest') { st.step = 'interest'; return true; }
+  if (!fol(k)) { st.step = 'follow'; return true; }
+  save('met', { age: st.age, interest: st.interest });
+  return false;
+}
+const backFromInterest = () => (recAgeOn() ? 'age' : 'result');
+const backFromFollow = () => (recIntOn() ? 'interest' : backFromInterest());
 const ageName = v => (YOUNG.has(v) ? '若い世代' : v === 'わからない' ? 'わからない' : v ? 'それ以外' : '');
 const intName = v => (INTERESTED.has(v) ? 'また訪ねたい' : v ? '今回だけ' : '');
 const RESULT_LABEL = { met: '会えた', away: '留守', refused: '拒否' };
 const ST_LABEL = { new: '未訪問', met: '会えた', away: '留守', refused: '拒否', dnc: '拒否' };
 const ST_CHAR = { new: '未', met: '会', away: '留', refused: '拒', dnc: '拒' };
 
-/* 結果の選択：会えた／留守 */
+/* 結果の選択：会えた／留守（「また訪ねたいか」を記録しない設定のときは、拒否もここに置く） */
+const refuseBtnHtml = () => `<button class="choice refbtn" data-int="拒否"><i class="pin st-dnc">拒</i>拒否<small>もう来ないでほしいと言われた</small></button>`;
 function resultChoicesHtml(awaySub) {
   return `<div class="choices two">
       <button class="choice c-met" data-res="met"><i class="pin st-met">会</i>会えた</button>
       <button class="choice c-away" data-res="away"><i class="pin st-away">留</i>留守${awaySub ? `<small>${awaySub}</small>` : ''}</button>
-    </div>`;
+    </div>` + (recIntOn() ? '' : refuseBtnHtml());
 }
 /* 年代の選択（だいたいで） */
 function ageChoicesHtml() {
@@ -515,15 +532,15 @@ function ageChoicesHtml() {
 function interestChoicesHtml() {
   return `<p class="q">また訪ねたい方でしたか？</p>
     <div class="choices two">${INTERESTS.map(a => `<button class="choice" data-int="${a}">${INT_LABEL[a]}</button>`).join('')}</div>
-    <button class="choice refbtn" data-int="拒否"><i class="pin st-dnc">拒</i>拒否<small>もう来ないでほしいと言われた</small></button>
-    <button class="btn block" data-back="age">← 年代の選択にもどる</button>`;
+    ${refuseBtnHtml()}
+    <button class="btn block" data-back="${backFromInterest()}">← ${recAgeOn() ? '年代' : '結果'}の選択にもどる</button>`;
 }
 /* 拒否の確認：まちがえて押しても戻れるようにする */
 function refuseStepHtml(isUnit) {
   return `<div class="refhead"><i class="pin st-dnc">拒</i><b>拒否として記録します</b></div>
     <p>地図のこの${isUnit ? '部屋' : '家'}に赤い「拒」のマークが付き、次からおすすめやカードに出なくなります。</p>
     <button class="btn block refok" data-refok>拒否として記録する</button>
-    <button class="btn block" data-back="interest">← まちがえた（前の選択にもどる）</button>`;
+    <button class="btn block" data-back="${recIntOn() ? 'interest' : 'result'}">← まちがえた（前の選択にもどる）</button>`;
 }
 const BANDS = ['朝', '昼', '午後', '夕方', '夜'];
 const BAND_HINT = { 朝: '〜11時', 昼: '11〜14時', 午後: '14〜17時', 夕方: '17〜19時', 夜: '19時〜' };
@@ -778,7 +795,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1 }, d.settings || {});
   },
   /* 控えを作り直す（訪問記録は件数が多いので、idだけ覚える） */
   buildFp() {
@@ -1398,11 +1415,15 @@ function openTarget(hid, unit, fromBuilding) {
     const S = $('#sheet');
     $$('[data-res]', S).forEach(x => x.onclick = () => {
       const r = x.dataset.res;
-      if (r === 'met') { st.step = 'age'; paint(); }
+      const save = (res, ex) => saveVisit(hid, unit, res, ex);
+      if (r === 'met') { if (metNext(st, k, save)) paint(); }
       else if (r === 'refused') { st.step = 'dnc'; paint(); }
       else saveVisit(hid, unit, 'away', {});
     });
-    $$('[data-age]', S).forEach(x => x.onclick = () => { st.age = x.dataset.age; st.step = 'interest'; paint(); });
+    $$('[data-age]', S).forEach(x => x.onclick = () => {
+      st.age = x.dataset.age;
+      if (metNext(st, k, (res, ex) => saveVisit(hid, unit, res, ex))) paint();
+    });
     $$('[data-int]', S).forEach(x => x.onclick = () => {
       const it = x.dataset.int;
       if (it === '拒否') { st.step = 'dnc'; paint(); }
@@ -1450,8 +1471,10 @@ function saveVisit(hid, unit, result, extra, keepOpen) {
   commit(msg, () => {
     const now = new Date().toISOString();
     const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id };
-    if (result === 'met') { v.age = extra.age; v.interest = extra.interest; }
-    else if (result === 'refused' && extra.age) v.age = extra.age;
+    if (result === 'met') { // 記録しない設定の項目は、そもそも持たせない
+      if (extra.age) v.age = extra.age;
+      if (extra.interest) v.interest = extra.interest;
+    } else if (result === 'refused' && extra.age) v.age = extra.age;
     D().visits.push(v);
     const f = D().follows[k];
     if (f && f.by === me().id) f.touchedAt = now; // 受け持ち本人の記録で期限を延ばす
@@ -1601,7 +1624,7 @@ function seqStepsHtml(st) {
       <div class="choices two">
         <button class="choice" data-fol="1">私が再訪問します<small>ほかの人は訪問を控えます</small></button>
         <button class="choice" data-fol="0">今回は記録だけ</button></div>
-      <button class="btn block" data-back="interest">← 前の選択にもどる</button>`;
+      <button class="btn block" data-back="${backFromFollow()}">← 前の選択にもどる</button>`;
   if (st.step === 'dnc') return refuseStepHtml(true);
   return '';
 }
@@ -1660,11 +1683,11 @@ function openAptSeq(hid, startUnit) {
     $$('[data-jump]', S).forEach(x => x.onclick = () => go(Number(x.dataset.jump)));
     $$('[data-res]', S).forEach(x => x.onclick = () => {
       const r = x.dataset.res;
-      if (r === 'met') { st.step = 'age'; paint(); }
+      if (r === 'met') { if (metNext(st, k, save)) paint(); }
       else if (r === 'refused') { st.step = 'dnc'; paint(); }
       else save('away', {});
     });
-    $$('[data-age]', S).forEach(x => x.onclick = () => { st.age = x.dataset.age; st.step = 'interest'; paint(); });
+    $$('[data-age]', S).forEach(x => x.onclick = () => { st.age = x.dataset.age; if (metNext(st, k, save)) paint(); });
     $$('[data-int]', S).forEach(x => x.onclick = () => {
       const it = x.dataset.int;
       if (it === '拒否') { st.step = 'dnc'; paint(); }
@@ -2507,6 +2530,7 @@ function scoreTarget(k, cur) {
   if (!vs.length) { sc += 15; reasons.push('はじめて訪ねる家'); }
   const see = m && seeV(m, k);
   if (see && INTERESTED.has(m.interest)) { sc += m.interest === '少しあり' ? 25 : 40; reasons.push('★ また訪ねたい'); }
+  else if (see && !recIntOn()) { sc += 15; reasons.push('以前会えた家'); }
   if (see && YOUNG.has(m.age)) { sc += 10; reasons.push('若い世代'); }
   if (metS.has(cur)) { sc += 15; reasons.push('この時間に会えたことがある'); }
   else if (awayS.has(cur)) { sc -= 30; reasons.push('この時間は留守だった'); }
@@ -2860,6 +2884,13 @@ function renderDataSet() {
   const row = (key, label, unit, d, hint) => `<div class="setrow"><span>${label}<br><small class="hint">${hint}</small></span><div class="stepper">
     <button type="button" data-kset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${st[key]}${unit}</output>
     <button type="button" data-kset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div></div>`;
+  const sw = (key, label, hint) => `<div class="setrow"><span>${label}<br><small class="hint">${hint}</small></span>
+    <div class="seg" role="group" aria-label="${label}">
+      <button type="button" data-sset="${key}" data-v="1" aria-pressed="${st[key] !== 0}">記録する</button>
+      <button type="button" data-sset="${key}" data-v="0" aria-pressed="${st[key] === 0}">記録しない</button></div></div>`;
+  $('#adRecSet').innerHTML =
+    sw('recAge', '年代（若い世代／それ以外）', '「若い世代の方に会えた家」のおすすめに使います') +
+    sw('recInterest', '「また訪ねたいか（★）」', '記録しない設定にすると、会えたあとすぐに「私が再訪問します／今回は記録だけ」を聞きます。拒否は結果の画面に表示します');
   $('#adDataSet').innerHTML =
     row('keepMonths', '訪問記録を残す期間', 'か月', 6, 'これより古い記録は、家ごとの最後の1件を残して、毎月整理します（自動整理を設定したとき）') +
     row('cacheDays', '通信がない端末にデータを残す期間', '日', 5, 'この日数のあいだ通信できなかった端末は、保存した区域の情報を自動で消します');
@@ -3188,6 +3219,10 @@ function bindStatic() {
     else if ((x = q('[data-fact]'))) followAction(x.dataset.fact, x.dataset.key);
     else if ((x = q('[data-set]'))) changeSetting(x.dataset.set, Number(x.dataset.d));
     else if (q('#bkGo')) bulkMove();
+    else if ((x = q('[data-sset]'))) {
+      D().settings[x.dataset.sset] = Number(x.dataset.v);
+      Store.save(); renderAll(); toast('記録する項目を変えました');
+    }
     else if ((x = q('[data-kset]'))) {
       const st = D().settings, key = x.dataset.kset;
       const lim = key === 'keepMonths' ? [6, 36] : [5, 60];
