@@ -306,7 +306,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
         <div id="myAway"></div>
         <h2 class="sec" id="followsHead">あなたの再訪問</h2>
         <div id="myFollows"></div>
-        <details class="all"><summary>ほかの区域を見る</summary><div id="allCards"></div></details>
+        <details class="all" id="allDetails"><summary>ほかの区域を見る</summary><div id="allCards"></div></details>
         <div class="row" id="liveTools" hidden><button class="btn small" id="btnLogout">この端末から消す</button>
           <span class="muted">端末を人に渡すときや、使わなくなったときに押してください。</span></div>
         <div class="notice info">記録に残すのは「会えた・留守・年齢層・関心」だけです。住んでいる人の名前・電話番号・家族のこと・会話の内容は書かないでください。</div>
@@ -616,43 +616,54 @@ function makeDemo() {
 }
 
 /* ---------- 保存 ----------
-   API_URL が空のとき：試作モード（この端末だけに保存）
-   API_URL を入れたとき：本番モード（Googleスプレッドシートに保存。
-   通信できないときは端末にためておき、つながったときに送る） */
+   config.js に GAS のURLが無いとき：試作モード（この端末だけに保存）
+   URLがあるとき：本番モード
+   ・最初の1回だけ全部を受け取り、以後は「前回から変わった分」だけをやりとりする
+   ・受け取ったデータは端末（IndexedDB）に残し、圏外でも使える
+   ・送れなかった変更は端末にためて、つながったときに送る */
 const API_URL = (function () {
   const u = window.KUIKI_CONFIG && window.KUIKI_CONFIG.apiUrl;
   return typeof u === 'string' && /^https:\/\/script\.google\.com\//.test(u.trim()) ? u.trim() : '';
 })(); // GAS の「ウェブアプリのURL」は config.js に書く
 const LIVE = !!API_URL;
-const TOKEN_KEY = 'kuiki_token', CACHE_KEY = 'kuiki_cache', QUEUE_KEY = 'kuiki_queue';
+const TOKEN_KEY = 'kuiki_token', QUEUE_KEY = 'kuiki_queue', OLD_CACHE_KEY = 'kuiki_cache';
 const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'users'];
 const MAP_COLS = ['dnc', 'follows', 'released'];
+const RES_NAME = { m: 'met', a: 'away', r: 'refused' };
 const clone = o => JSON.parse(JSON.stringify(o));
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
 const lsDel = k => { try { localStorage.removeItem(k); } catch (e) { /* 何もしない */ } };
 
-/* 前の状態 a と今の状態 b の違い（送る変更） */
-function diffState(a, b) {
-  const out = {};
-  ARR_COLS.forEach(c => {
-    const am = new Map((a[c] || []).map(x => [x.id, JSON.stringify(x)]));
-    const bm = new Map((b[c] || []).map(x => [x.id, x]));
-    const up = [], del = [];
-    bm.forEach((x, id) => { if (am.get(id) !== JSON.stringify(x)) up.push(clone(x)); });
-    am.forEach((_, id) => { if (!bm.has(id)) del.push(id); });
-    if (up.length || del.length) out[c] = { up, del };
-  });
-  MAP_COLS.forEach(c => {
-    const A = a[c] || {}, B = b[c] || {}, up = [], del = [];
-    Object.keys(B).forEach(id => { if (JSON.stringify(A[id]) !== JSON.stringify(B[id])) up.push({ id, value: clone(B[id]) }); });
-    Object.keys(A).forEach(id => { if (!(id in B)) del.push(id); });
-    if (up.length || del.length) out[c] = { up, del };
-  });
-  if (JSON.stringify(a.settings) !== JSON.stringify(b.settings)) out.settings = clone(b.settings);
-  return out;
-}
-/* まだ送っていない変更を、受け取った状態に重ねる */
+/* 端末の大きな保存場所（IndexedDB） */
+const IDB = {
+  db: null,
+  open() {
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise((res, rej) => {
+      if (!window.indexedDB) { rej(new Error('no indexedDB')); return; }
+      const r = indexedDB.open('kuiki-map', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => { this.db = r.result; res(this.db); };
+      r.onerror = () => rej(r.error);
+    });
+  },
+  async run(mode, fn) {
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('kv', mode), st = tx.objectStore('kv');
+      const q = fn(st);
+      tx.oncomplete = () => res(q && q.result);
+      tx.onerror = () => rej(tx.error);
+      tx.onabort = () => rej(tx.error);
+    });
+  },
+  get(k) { return this.run('readonly', st => st.get(k)); },
+  set(k, v) { return this.run('readwrite', st => st.put(v, k)); },
+  del(k) { return this.run('readwrite', st => st.delete(k)); }
+};
+
+/* まだ送っていない変更を、手元のデータに重ねる */
 function applyDiff(st, ch) {
   ARR_COLS.forEach(c => {
     if (!ch[c]) return;
@@ -673,9 +684,12 @@ function applyDiff(st, ch) {
 const Store = {
   key: 'kuiki_demo_v6',
   data: null,
-  base: null,   // 本番：サーバーの状態（＋送る予定の変更）
+  fp: null,      // 本番：サーバーに伝え済み（または送信待ち）の内容の控え
+  seq: null,     // 本番：受け取り済みの変更番号
   token: '',
-  queue: [],    // 本番：まだ送っていない変更
+  queue: [],     // 本番：まだ送っていない変更
+  inbox: [],     // 本番：受け取ったが、入力中のため反映を待っている変更
+  needFull: false,
   load() {
     const s = lsGet(this.key);
     if (s) { try { this.data = JSON.parse(s); this.migrate(); return; } catch (e) { /* 作り直す */ } }
@@ -688,42 +702,131 @@ const Store = {
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
     d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90 }, d.settings || {});
   },
+  /* 控えを作り直す（訪問記録は件数が多いので、idだけ覚える） */
+  buildFp() {
+    const fp = {};
+    ARR_COLS.forEach(c => { fp[c] = new Map((this.data[c] || []).map(x => [x.id, c === 'visits' ? 1 : JSON.stringify(x)])); });
+    MAP_COLS.forEach(c => { fp[c] = new Map(Object.entries(this.data[c] || {}).map(([k, v]) => [k, JSON.stringify(v)])); });
+    fp.settings = JSON.stringify(this.data.settings);
+    this.fp = fp;
+  },
+  /* 控えと比べて、変わった分だけを取り出す（取り出した分は控えに入れる） */
+  collectChanges() {
+    const out = {}, d = this.data, fp = this.fp;
+    ARR_COLS.forEach(c => {
+      const f = fp[c], up = [], del = [], seen = new Set();
+      for (const x of d[c] || []) {
+        seen.add(x.id);
+        if (c === 'visits') { // 訪問記録は追加と削除だけ
+          if (!f.has(x.id)) { up.push(clone(x)); f.set(x.id, 1); }
+        } else {
+          const j = JSON.stringify(x);
+          if (f.get(x.id) !== j) { up.push(JSON.parse(j)); f.set(x.id, j); }
+        }
+      }
+      for (const id of [...f.keys()]) if (!seen.has(id)) { del.push(id); f.delete(id); }
+      if (up.length || del.length) out[c] = { up, del };
+    });
+    MAP_COLS.forEach(c => {
+      const f = fp[c], obj = d[c] || {}, up = [], del = [];
+      Object.keys(obj).forEach(id => {
+        const j = JSON.stringify(obj[id]);
+        if (f.get(id) !== j) { up.push({ id, value: JSON.parse(j) }); f.set(id, j); }
+      });
+      for (const id of [...f.keys()]) if (!(id in obj)) { del.push(id); f.delete(id); }
+      if (up.length || del.length) out[c] = { up, del };
+    });
+    const sj = JSON.stringify(d.settings);
+    if (sj !== fp.settings) { out.settings = JSON.parse(sj); fp.settings = sj; }
+    return out;
+  },
   save() {
     if (!LIVE) {
       if (!lsSet(this.key, JSON.stringify(this.data))) toast('この端末に保存できませんでした');
       return;
     }
-    const ch = diffState(this.base, this.data);
+    const ch = this.collectChanges();
     if (!Object.keys(ch).length) return;
     this.queue.push(ch);
-    this.base = clone(this.data);
     this.persistQueue();
+    this.saveCacheSoon();
     flush();
   },
   persistQueue() {
     if (!lsSet(QUEUE_KEY, JSON.stringify(this.queue))) toast('この端末に保存できませんでした。通信できる場所で開き直してください');
     updateSyncBadge();
   },
-  setServer(state) {
-    this.data = state; this.migrate();
+  /* 送信待ちの変更を重ね、控えもそれに合わせる */
+  reapplyQueue() {
     this.queue.forEach(ch => applyDiff(this.data, ch));
-    this.base = clone(this.data);
+    this.buildFp();
+  },
+  /* 全部を受け取ったとき */
+  setServer(j) {
+    const st = j.state;
+    if (st.visitsC) {
+      st.visits = st.visitsC.map(a => {
+        const v = { id: a[0], houseId: a[1], unit: a[2], result: RES_NAME[a[3]] || 'away', at: new Date(a[4] * 1000).toISOString(), by: a[5] };
+        if (a[6]) v.age = a[6];
+        if (a[7]) v.interest = a[7];
+        return v;
+      });
+      delete st.visitsC;
+    }
+    this.data = st; this.migrate();
+    this.seq = j.seq;
+    this.reapplyQueue();
+  },
+  /* 変わった分だけを受け取ったとき */
+  applyDelta(j) {
+    const d = this.data, idx = {};
+    const indexOf = c => idx[c] || (idx[c] = new Map(d[c].map((x, i) => [x.id, i])));
+    const dels = {};
+    for (const [c, id, v] of j.changes) {
+      if (MAP_COLS.includes(c)) {
+        if (v === null) delete d[c][id]; else d[c][id] = v;
+        continue;
+      }
+      if (!ARR_COLS.includes(c) || c === 'users') continue;
+      const m = indexOf(c);
+      if (v === null) { if (m.has(id)) (dels[c] = dels[c] || new Set()).add(id); continue; }
+      if (m.has(id)) { d[c][m.get(id)] = v; if (dels[c]) dels[c].delete(id); }
+      else m.set(id, d[c].push(v) - 1);
+    }
+    Object.keys(dels).forEach(c => { if (dels[c].size) d[c] = d[c].filter(x => !dels[c].has(x.id)); });
+    d.users = j.users; d.settings = j.settings; d.currentUser = j.currentUser;
+    this.migrate();
+    this.seq = j.seq;
+    this.reapplyQueue();
+  },
+  cacheTimer: null,
+  saveCacheSoon() {
+    if (!LIVE) return;
+    clearTimeout(this.cacheTimer);
+    this.cacheTimer = setTimeout(() => {
+      IDB.set('cache', { tag: this.token.slice(0, 12), seq: this.seq, state: this.data, savedAt: Date.now() })
+        .catch(() => { /* 保存できなくても、次に開いたとき読み直す */ });
+    }, 2000);
   },
   async loadLive() {
-    this.token = readToken();
+    const tk = readToken();
+    this.token = tk.token;
+    lsDel(OLD_CACHE_KEY); // 以前の保存場所は使わない
     try { this.queue = JSON.parse(lsGet(QUEUE_KEY) || '[]'); } catch (e) { this.queue = []; }
     if (!this.token) throw Object.assign(new Error('no token'), { code: 'auth' });
+    let cache = null;
     try {
-      const j = await api('load');
-      lsSet(CACHE_KEY, JSON.stringify(j.state));
-      lastRefresh = Date.now();
-      this.setServer(j.state);
-    } catch (e) {
-      const c = lsGet(CACHE_KEY);
-      if (e.code === 'auth' || !c) throw e;
-      this.setServer(JSON.parse(c));
-      setTimeout(() => toast('インターネットにつながっていません。前回の情報を表示しています'), 600);
+      if (tk.changed) await IDB.del('cache');
+      else cache = await IDB.get('cache');
+    } catch (e) { cache = null; }
+    if (cache && cache.tag === this.token.slice(0, 12) && cache.state) {
+      this.setServer({ seq: cache.seq, state: cache.state }); // すぐ表示して、あとで差分を取りに行く
+      return 'cache';
     }
+    const j = await api('load', { since: null });
+    this.setServer(j);
+    this.saveCacheSoon();
+    return 'server';
   }
 };
 
@@ -731,13 +834,14 @@ const Store = {
 function readToken() {
   const u = new URL(location.href), t = u.searchParams.get('t');
   if (t) {
-    if (lsGet(TOKEN_KEY) !== t) { lsDel(CACHE_KEY); lsDel(QUEUE_KEY); } // 別の人のリンク
+    const changed = lsGet(TOKEN_KEY) !== t;
+    if (changed) lsDel(QUEUE_KEY); // 別の人のリンク
     lsSet(TOKEN_KEY, t);
     u.searchParams.delete('t');
     history.replaceState(null, '', u.pathname + u.search + u.hash); // 画面のURLからコードを消す
-    return t;
+    return { token: t, changed };
   }
-  return lsGet(TOKEN_KEY) || '';
+  return { token: lsGet(TOKEN_KEY) || '', changed: false };
 }
 async function api(action, extra) {
   const res = await fetch(API_URL, {
@@ -747,49 +851,66 @@ async function api(action, extra) {
   });
   if (!res.ok) throw new Error('通信エラー ' + res.status);
   const j = await res.json();
-  if (!j.ok) throw Object.assign(new Error(j.error || 'error'), { code: j.error });
+  if (!j.ok) {
+    if (j.error === 'auth') IDB.del('cache').catch(() => {});
+    throw Object.assign(new Error(j.error || 'error'), { code: j.error });
+  }
   return j;
 }
 let flushing = false, lastRefresh = 0;
+const isBusy = () => !$('#sheet').hidden || mode !== 'normal';
+/* 受け取った変更は、入力中でなければすぐ、入力中なら終わってから反映する */
+function receive(j) {
+  if (j.mode === 'full') Store.inbox = [j];
+  else Store.inbox = Store.inbox.filter(x => x.mode === 'full').concat([j]);
+  applyInbox();
+}
+function applyInbox() {
+  if (!LIVE || !Store.inbox.length || isBusy() || flushing) return;
+  const list = Store.inbox;
+  Store.inbox = [];
+  list.forEach(j => { if (j.mode === 'full') Store.setServer(j); else Store.applyDelta(j); });
+  Store.saveCacheSoon();
+  updateTabs();
+  renderAll();
+}
 async function flush() {
   if (!LIVE || flushing || !Store.queue.length) { updateSyncBadge(); return; }
   flushing = true; updateSyncBadge();
-  let rejected = 0, ok = false;
+  let rejected = 0;
   try {
     while (Store.queue.length) {
-      const j = await api('sync', { changes: Store.queue[0] });
+      const j = await api('sync', { changes: Store.queue[0], since: Store.needFull ? null : Store.seq });
       rejected += (j.rejected || []).length;
       Store.queue.shift();
       Store.persistQueue();
+      if (j.mode === 'full') Store.needFull = false;
+      Store.inbox = j.mode === 'full' ? [j] : Store.inbox.filter(x => x.mode === 'full').concat([j]);
+      lastRefresh = Date.now();
     }
-    ok = true;
   } catch (e) {
     if (e.code === 'auth') showBlocking('このリンクは使えなくなりました', '区域係から新しい招待リンクをもらってください。');
     // 通信できないときは、あとで送り直す
   } finally {
     flushing = false; updateSyncBadge();
   }
-  if (ok && rejected) {
+  if (rejected) {
+    // 手元だけに残った変更を消すため、全部を読み直す
     toast('一部の変更は反映できませんでした。最新の情報に更新します');
+    Store.needFull = true;
     refresh(true).catch(() => {});
-  } else if (ok && Date.now() - lastRefresh > 60000) {
-    refresh().catch(() => {});
+  } else {
+    applyInbox();
   }
 }
-/* 最新の情報を取り直す（入力中は待つ） */
+/* 最新の変更を取りに行く */
 async function refresh(force) {
   if (!LIVE || flushing || Store.queue.length) return;
-  const busy = () => !$('#sheet').hidden || mode !== 'normal';
-  if (!force && busy()) return;
-  const j = await api('load');
+  if (!force && Date.now() - lastRefresh < 20000) return;
   lastRefresh = Date.now();
-  if (flushing || Store.queue.length) return;
-  if (!force && busy()) return;
-  if (force) { closeSheet(); if (draw) endDraw(); else if (mode !== 'normal') setMode('normal'); }
-  lsSet(CACHE_KEY, JSON.stringify(j.state));
-  Store.setServer(j.state);
-  updateTabs();
-  renderAll();
+  const j = await api('load', { since: Store.needFull ? null : Store.seq });
+  if (j.mode === 'full') Store.needFull = false;
+  receive(j);
 }
 function updateSyncBadge() {
   const el = $('#syncState');
@@ -810,7 +931,9 @@ function logout() {
     ? `まだ送っていない記録が${n}件あります。消すと送られません。それでもこの端末から消しますか？`
     : 'この端末から、区域マップの情報と招待リンクを消します。よろしいですか？';
   if (!confirm(q)) return;
-  [TOKEN_KEY, CACHE_KEY, QUEUE_KEY].forEach(lsDel);
+  [TOKEN_KEY, QUEUE_KEY, OLD_CACHE_KEY].forEach(lsDel);
+  clearTimeout(Store.cacheTimer);
+  IDB.del('cache').catch(() => {});
   showBlocking('この端末から消しました', 'もう一度使うときは、区域係からもらった招待リンクを開いてください。');
 }
 const D = () => Store.data;
@@ -839,15 +962,24 @@ const canDelHouse = h => isAdmin() || h.createdBy === me().id;
 
 /* 変更 → 保存 → 再表示 → 「取り消す」付きのお知らせ */
 function commit(msg, fn) {
-  const snap = JSON.stringify(Store.data);
+  const visits = D().visits.slice();
+  const rest = JSON.stringify(Object.assign({}, D(), { visits: undefined }));
   fn(); Store.save(); renderAll();
-  toast(msg, () => { closeSheet(); Store.data = JSON.parse(snap); Store.save(); renderAll(); toast('取り消しました'); });
+  toast(msg, () => {
+    closeSheet();
+    const o = JSON.parse(rest); o.visits = visits;
+    Store.data = o; Store.save(); renderAll(); toast('取り消しました');
+  });
 }
 
 /* ---------- 記録の索引 ---------- */
-let IDX = new Map();
+let IDX = new Map(), HBT = new Map();
 function buildIndex() {
-  IDX = new Map();
+  IDX = new Map(); HBT = new Map();
+  for (const h of D().houses) {
+    if (!HBT.has(h.terrId)) HBT.set(h.terrId, []);
+    HBT.get(h.terrId).push(h);
+  }
   for (const v of D().visits) {
     const k = K(v.houseId, v.unit);
     if (!IDX.has(k)) IDX.set(k, []);
@@ -856,6 +988,7 @@ function buildIndex() {
   for (const a of IDX.values()) a.sort((x, y) => (x.at < y.at ? 1 : -1)); // 新しい順
 }
 const visitsOf = k => IDX.get(k) || [];
+const housesOf = tid => HBT.get(tid) || [];
 function statusOf(k) {
   if (D().dnc[k]) return 'dnc';
   const v = visitsOf(k)[0];
@@ -902,8 +1035,7 @@ const fmtDist = m => m < 1000 ? `${Math.round(m / 10) * 10}m` : `${(m / 1000).to
 
 function terrStats(t, sinceMs) {
   const now = Date.now(); let n = 0, visited = 0, met = 0, last = null;
-  for (const h of D().houses) {
-    if (h.terrId !== t.id) continue;
+  for (const h of housesOf(t.id)) {
     for (const u of targets(h)) {
       n++;
       const vs = visitsOf(K(h.id, u));
@@ -939,6 +1071,7 @@ function setSheet(html) {
 function closeSheet() {
   $('#sheet').hidden = true; $('#backdrop').hidden = true;
   if (tmpMarker && map) { map.removeLayer(tmpMarker); tmpMarker = null; }
+  if (LIVE && Store.inbox.length) setTimeout(applyInbox, 0);
 }
 const headHtml = (t, title, sub) => `<div class="sheet-head">${t ? `<span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>` : ''}<div><h2 id="sheetTitle">${title}</h2>${sub ? `<p class="muted">${sub}</p>` : ''}</div><button class="icon-btn" data-close aria-label="閉じる">×</button></div>`;
 const navLink = h => `<a class="btn block" href="https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}" target="_blank" rel="noopener">Googleマップで道順を見る</a>`;
@@ -997,12 +1130,12 @@ function renderHouses() {
   const ff = focusFn();
   renderCardBar();
   if (mode === 'draw' && drawTap === 'line' && !drawShowHouses) { $('#zoomHint').hidden = true; return; } // 線引き中は写真が見えるように家の印を隠す
-  const show = map.getZoom() >= 15;
+  const b = map.getBounds().pad(0.2);
+  const list = map.getZoom() >= 15.5 ? D().houses.filter(h => b.contains([h.lat, h.lng])) : null;
+  const show = !!list && list.length <= 800; // 印が多すぎると動きが重くなるので、拡大してから出す
   $('#zoomHint').hidden = show;
   if (!show) return;
-  const b = map.getBounds().pad(0.2);
-  for (const h of D().houses) {
-    if (!b.contains([h.lat, h.lng])) continue;
+  for (const h of list) {
     const m = L.marker([h.lat, h.lng], { icon: houseIcon(h, ff), title: h.label || '', zIndexOffset: roundNums && roundNums.has(h.id) ? 1000 : 0 });
     m.on('click', () => onHouseTap(h.id));
     m.addTo(houseLayer);
@@ -1022,13 +1155,41 @@ function fitAll() {
   const pts = D().territories.flatMap(t => t.polygon);
   if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [30, 30] });
 }
+/* 自分の区域カード以外で記録するときの確認（区域ごとに1回。画面を開き直すとまた出る） */
+const terrAck = new Set();
+function needTerrConfirm(tid, keys) {
+  if (!tid || isAdmin()) return false;
+  const t = terrById(tid);
+  if (!t || t.holder === me().id || terrAck.has(tid)) return false;
+  if (keys && keys.length) {
+    const cardKeys = new Set();
+    activeCards().forEach(c => { if (c.by === me().id) c.keys.forEach(k => cardKeys.add(k)); });
+    // 自分の再訪問・引き継ぎ待ち・自分の留守宅カードの家は、確認しない
+    if (keys.some(k => { const f = fol(k); return (f && f.by === me().id) || D().released[k] || cardKeys.has(k); })) return false;
+  }
+  return true;
+}
+function guardTerr(tid, keys, proceed) {
+  if (!needTerrConfirm(tid, keys)) { proceed(); return; }
+  const t = terrById(tid);
+  setSheet(headHtml(t, 'あなたの区域カードではありません', esc(t.name)) + `
+    <div class="notice warn"><b>区域${esc(t.no)}は、あなたが受け取っている区域カードではありません。</b><br>
+      ${t.holder ? 'ほかの人が担当しています。' : '今は担当者がいません。'}</div>
+    <p>再訪問など、必要なときだけ記録してください。</p>
+    <button class="btn primary block" id="gOk">わかりました。続ける</button>
+    <button class="btn block" data-close>やめる</button>
+    <p class="hint">この区域では、画面を開き直すまで、この確認は出ません。自分の再訪問・留守宅カードの家では出ません。</p>`);
+  $('#gOk').onclick = () => { terrAck.add(tid); closeSheet(); proceed(); };
+}
 function onHouseTap(id) {
   const h = houseById(id); if (!h) return;
   if (mode === 'draw' && drawTap === 'line') { drawClick(L.latLng(h.lat, h.lng)); return; }
   if (mode === 'draw') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
   if (mode === 'add') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
-  if (h.type === 'apt') { if (h.units.length) openAptSeq(id); else openBuilding(id); }
-  else openTarget(id, '', false);
+  guardTerr(h.terrId, targets(h).map(u => K(h.id, u)), () => {
+    if (h.type === 'apt') { if (h.units.length) openAptSeq(id); else openBuilding(id); }
+    else openTarget(id, '', false);
+  });
 }
 function setMode(m) {
   mode = m;
@@ -1038,6 +1199,7 @@ function setMode(m) {
   $('#map').classList.toggle('crosshair', m !== 'normal');
   $('#map').classList.toggle('drawing', m === 'draw');
   if (m !== 'draw') clearOverlay();
+  if (m === 'normal' && LIVE && Store.inbox.length) setTimeout(applyInbox, 0);
   document.body.classList.toggle('focusmode', m !== 'normal'); // 作業中は上下の帯を隠して地図を広く
   if (map) {
     map.options.zoomDelta = m === 'draw' ? 0.25 : 1;
@@ -1428,6 +1590,7 @@ function addAt(ll, inDraw) {
   // 線引き中は、まだ区域が無い場所にも置ける（線を完成したときに区域が決まる）
   if (!tid && !inDraw) { toast('区域の線の外です。区域の中をタップしてください'); return; }
   if (map.getZoom() < 17) { toast('場所がずれないように、もう少し地図を拡大してからタップしてください'); return; }
+  if (!inDraw && needTerrConfirm(tid, null)) { guardTerr(tid, null, () => addAt(ll, inDraw)); return; }
   if (inDraw ? drawTap === 'house' : addQuick) {
     addCount++; updateAddBar();
     const note = !tid && addCount === 1 ? '。区域は線を完成すると決まります' : '';
@@ -1732,7 +1895,7 @@ function renderCards() {
     : '<div class="empty">受け取っている区域カードはありません。<br>下のボタンから申し込めます。</div>';
   renderRequestArea();
   renderMyAwayCards();
-  $('#allCards').innerHTML = ts.filter(t => t.holder !== me().id).map(t => cardHtml(t, false)).join('');
+  $('#allCards').innerHTML = $('#allDetails').open ? ts.filter(t => t.holder !== me().id).map(t => cardHtml(t, false)).join('') : '';
 
   const myF = Object.entries(D().follows)
     .filter(([k, f]) => f.by === me().id && houseById(parseKey(k)[0]))
@@ -2044,8 +2207,7 @@ function roundInfo(tid, anyHolder) {
   if (!t || !t.holder || (!anyHolder && t.holder !== me().id)) return null;
   const since = t.lentAt || '', cur = slotOf(new Date());
   const map = new Map(), items = [], c = { todo: 0, done: 0 };
-  for (const h of D().houses) {
-    if (h.terrId !== tid) continue;
+  for (const h of housesOf(tid)) {
     for (const u of targets(h)) {
       const k = K(h.id, u), f = fol(k);
       let st;
@@ -2355,9 +2517,11 @@ function goTo(hid, unit) {
   showView('map');
   setTimeout(() => {
     map.setView([h.lat, h.lng], 19);
-    if (h.type === 'apt' && h.units.length) openAptSeq(hid, unit || null);
-    else if (h.type === 'apt') openBuilding(hid);
-    else openTarget(hid, '', false);
+    guardTerr(h.terrId, unit ? [K(hid, unit)] : targets(h).map(u => K(hid, u)), () => {
+      if (h.type === 'apt' && h.units.length) openAptSeq(hid, unit || null);
+      else if (h.type === 'apt') openBuilding(hid);
+      else openTarget(hid, '', false);
+    });
   }, 80);
 }
 function locate(after) {
@@ -2543,13 +2707,16 @@ function showView(name) {
   $$('.view').forEach(v => { v.hidden = v.id !== 'view-' + name; });
   $$('#tabs button').forEach(b => { if (b.dataset.view === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   if (name === 'map') {
+    renderTerrs();
     setTimeout(() => {
       map.invalidateSize();
       if (firstMapShow) { firstMapShow = false; if (!$('#terrJump').value) fitAll(); }
       renderHouses();
     }, 30);
   }
+  if (name === 'cards') renderCards();
   if (name === 'reco') renderReco();
+  if (name === 'admin') renderAdmin();
 }
 function updateTabs() {
   $('#tabAdmin').hidden = !isAdmin();
@@ -2560,11 +2727,19 @@ function fillWho() {
 }
 function renderAll() {
   buildIndex();
-  renderCards();
   fillTerrJump();
-  if (map) { renderTerrs(); renderHouses(); }
+  if (currentView === 'cards') renderCards();
+  if (map && currentView === 'map') { renderTerrs(); renderHouses(); }
   if (currentView === 'reco') renderReco();
-  if (isAdmin()) renderAdmin();
+  if (currentView === 'admin' && isAdmin()) renderAdmin();
+  updateAdminBadge();
+}
+function updateAdminBadge() {
+  const b = $('#tabBadge');
+  if (!isAdmin()) { b.hidden = true; return; }
+  const n = D().requests.filter(r => r.status === 'pending').length +
+    D().territories.filter(t => t.holder && t.selfTakenAt && t.selfSeen === false).length;
+  b.textContent = n; b.hidden = !n;
 }
 function openTerr(id) {
   const t = terrById(id);
@@ -2593,6 +2768,7 @@ function bindStatic() {
     else if (mode !== 'normal') setMode('normal');
   });
 
+  $('#allDetails').addEventListener('toggle', () => { if ($('#allDetails').open) renderCards(); else $('#allCards').innerHTML = ''; });
   // 区域カード・自分の再訪問
   $('#view-cards').addEventListener('click', e => {
     const q = sel => e.target.closest(sel);
@@ -2734,10 +2910,11 @@ async function init() {
     document.body.innerHTML = '<p style="padding:24px;font-size:20px">地図の部品を読み込めませんでした。インターネットにつながっているか確認して、もう一度開いてください。</p>';
     return;
   }
+  let from = '';
   if (LIVE) {
-    showBlocking('読み込んでいます…', 'しばらくお待ちください。');
+    showBlocking('読み込んでいます…', '初めて開くときは、少し時間がかかります。');
     try {
-      await Store.loadLive();
+      from = await Store.loadLive();
     } catch (e) {
       if (e.code === 'auth') showBlocking('このリンクでは開けません', '区域係からもらった招待リンクを開いてください。');
       else showBlocking('読み込めませんでした', 'インターネットにつながっているか確認して、もう一度開いてください。');
@@ -2761,10 +2938,11 @@ async function init() {
     $('#adReset').hidden = true;
     $('#btnLogout').onclick = logout;
     const again = () => { if (document.hidden) return; if (Store.queue.length) flush(); else refresh().catch(() => {}); };
-    setInterval(again, 90000);
+    setInterval(again, 60000);
     window.addEventListener('online', flush);
     document.addEventListener('visibilitychange', again);
-    flush();
+    if (Store.queue.length) flush();
+    else if (from === 'cache') refresh(true).catch(() => toast('インターネットにつながっていません。前回の情報を表示しています'));
   }
 }
 init();
