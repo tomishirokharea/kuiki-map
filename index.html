@@ -252,6 +252,12 @@ ol.plan p{margin:0}
 .floorrow b{min-width:48px;font-size:20px}
 #addBar .seg{display:flex;flex-wrap:wrap}
 #addBar .seg button{flex:1;min-width:130px}
+.cardimg{position:absolute;max-width:none!important;max-height:none!important;transform-origin:center center;pointer-events:none;user-select:none}
+#overlayImg{transform-origin:center center}
+.modebar.mini .fold{display:none}
+.modebar .barhead p{margin:0}
+.modebar input[type=range].wide{width:min(240px,55vw)}
+#map.drawing .terr-label span{opacity:.35}
 .hint-strong.ok{color:var(--terr)}
 .hint-strong{color:var(--draw);font-weight:700;font-size:16px;margin-top:4px}
 .unit.hl{outline:4px solid var(--draw);outline-offset:2px}
@@ -329,18 +335,26 @@ ol.plan p{margin:0}
         <div class="row"><button class="btn primary" id="addCancel">追加を終わる</button><span class="muted" id="addCount"></span></div>
       </div>
       <div class="modebar" id="drawBar" hidden>
-        <p><b id="drawTitle">区域の線を引く</b>：区域の角を順番にタップ（<span id="drawCount">0</span>か所）</p>
+        <div class="barhead"><p><b id="drawTitle">区域の線を引く</b>（角 <span id="drawCount">0</span>か所）</p>
+          <button class="foldbtn" id="drawFold" aria-expanded="true">たたむ</button></div>
         <div class="row">
           <button class="btn small" id="drawUndo">1つ戻す</button>
           <button class="btn small primary" id="drawDone">完成</button>
           <button class="btn small" id="drawCancel">やめる</button>
         </div>
-        <div class="row">
-          <label class="btn small">古いカードの写真を重ねる<input type="file" accept="image/*" id="ovFile" hidden></label>
-          <span id="ovCtl" hidden>
-            <label>地図の濃さ <input type="range" id="ovRange" min="0" max="100" value="50"></label>
-            <button class="btn small" id="ovClear">写真を消す</button>
-          </span>
+        <div class="fold">
+          <p class="muted">区域の角を順番にタップします。</p>
+          <div class="row">
+            <label class="btn small">古いカードの写真を重ねる<input type="file" accept="image/*" id="ovFile" hidden></label>
+            <label class="check"><input type="checkbox" id="drawHouses">家の印を表示</label>
+          </div>
+          <div id="ovCtl" hidden>
+            <div class="row"><label>地図の濃さ <input type="range" class="wide" id="ovRange" min="0" max="100" value="50"></label></div>
+            <div class="row" id="ovRotRow"><label>写真の回転 <input type="range" class="wide" id="ovRot" min="-45" max="45" step="0.5" value="0"></label>
+              <span id="ovRotVal">0°</span></div>
+            <div class="row"><button class="btn small primary" id="ovPin">写真を地図に固定する</button><button class="btn small" id="ovClear">写真を消す</button></div>
+            <p class="hint" id="ovHint"></p>
+          </div>
         </div>
       </div>
     </section>
@@ -923,7 +937,11 @@ let map, terrLayer, houseLayer, baseLayers, baseName = 'pale', mode = 'normal';
 let tmpMarker = null, draw = null, myPos = null, posMarker = null, firstMapShow = true;
 
 function initMap() {
-  map = L.map('map', { zoomControl: false }).setView(HOME_VIEW, 17);
+  map = L.map('map', { zoomControl: false, zoomSnap: 0.125, zoomDelta: 1, wheelPxPerZoomLevel: 120 }).setView(HOME_VIEW, 17);
+  map.createPane('cardPane'); // 古いカードの写真（地図の下）
+  map.getPane('cardPane').style.zIndex = 150;
+  map.getPane('cardPane').style.pointerEvents = 'none';
+  map.on('zoom viewreset zoomend', placeOverlay);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   const opt = { maxZoom: 20, maxNativeZoom: 18, attribution: GSI_ATTR };
   baseLayers = { pale: L.tileLayer(TILE_PALE, opt), photo: L.tileLayer(TILE_PHOTO, opt) };
@@ -964,6 +982,7 @@ function renderHouses() {
   houseLayer.clearLayers();
   const ff = focusFn();
   renderCardBar();
+  if (mode === 'draw' && !drawShowHouses) { $('#zoomHint').hidden = true; return; } // 線引き中は写真が見えるように家の印を隠す
   const show = map.getZoom() >= 15;
   $('#zoomHint').hidden = show;
   if (!show) return;
@@ -1002,7 +1021,9 @@ function setMode(m) {
   $('#drawBar').hidden = m !== 'draw';
   $('#mapTools').hidden = m !== 'normal';
   $('#map').classList.toggle('crosshair', m !== 'normal');
+  $('#map').classList.toggle('drawing', m === 'draw');
   if (m !== 'draw') clearOverlay();
+  if (map) { map.options.zoomDelta = m === 'draw' ? 0.25 : 1; renderHouses(); }
 }
 
 /* ---------- 家・部屋の記録 ---------- */
@@ -1480,6 +1501,9 @@ function openAddForm(ll, tid) {
 /* ---------- 区域の線引き ---------- */
 function startDraw(targetId) {
   showView('map');
+  focusCard = null; roundTerr = null;
+  drawShowHouses = false; $('#drawHouses').checked = false;
+  $('#drawBar').classList.remove('mini'); $('#drawFold').textContent = 'たたむ';
   setMode('draw');
   draw = {
     points: [], targetId,
@@ -1539,12 +1563,88 @@ function openTerrForm({ pts = null, terr = null }) {
   };
 }
 
-/* 古いカードの写真を下に敷き、地図を半透明にして位置を合わせる */
-function applyOv() { map.getPane('tilePane').style.opacity = $('#ovRange').value / 100; }
-function clearOverlay() {
+/* 古いカードの写真を重ねる
+   ・合わせるとき：写真は画面に固定。地図を動かして道を重ねる（回転も調整できる）
+   ・固定したあと：写真は地図にくっつき、地図を動かすと一緒に動く */
+let ovState = null; // { url, pinned, rot, center, refZoom, w, h, el }
+let drawShowHouses = false;
+function applyOv() {
+  map.getPane('tilePane').style.opacity = $('#ovRange').value / 100;
+}
+function applyRot() {
+  if (!ovState) return;
+  $('#overlayImg').style.transform = `rotate(${ovState.rot}deg)`;
+  $('#ovRotVal').textContent = `${ovState.rot > 0 ? '右に' : ovState.rot < 0 ? '左に' : ''}${Math.abs(ovState.rot)}°`;
+  placeOverlay();
+}
+function loadOverlay(file) {
+  clearOverlay();
+  const url = URL.createObjectURL(file);
+  ovState = { url, pinned: false, rot: 0 };
   const img = $('#overlayImg');
-  if (img.dataset.url) { URL.revokeObjectURL(img.dataset.url); delete img.dataset.url; }
-  img.removeAttribute('src'); img.hidden = true;
+  img.src = url; img.hidden = false;
+  $('#ovRot').value = 0;
+  $('#map').classList.add('see-through');
+  applyOv(); applyRot(); updateOvUi();
+  toast('地図を動かして、写真の道と地図の道を重ねてください');
+}
+function updateOvUi() {
+  $('#ovCtl').hidden = !ovState;
+  if (!ovState) return;
+  const p = ovState.pinned;
+  $('#ovPin').textContent = p ? '写真の位置を合わせ直す' : '写真を地図に固定する';
+  $('#ovPin').classList.toggle('primary', !p);
+  $('#ovRotRow').hidden = p;
+  $('#ovHint').textContent = p
+    ? '写真は地図に固定されています。地図を動かしたり拡大・縮小しても、写真が一緒に動きます。'
+    : '地図を動かしたり拡大・縮小して、写真の道と地図の道を重ねます（＋−ボタンは細かく動きます）。傾いているときは「写真の回転」で直し、重なったら「写真を地図に固定する」を押します。';
+}
+function pinOverlay() {
+  const img = $('#overlayImg');
+  if (!ovState || !img.naturalWidth) { toast('写真の読み込みが終わってから押してください'); return; }
+  const sz = map.getSize();
+  const s = Math.min(sz.x / img.naturalWidth, sz.y / img.naturalHeight);
+  Object.assign(ovState, {
+    w: img.naturalWidth * s, h: img.naturalHeight * s,
+    center: map.containerPointToLatLng([sz.x / 2, sz.y / 2]),
+    refZoom: map.getZoom(), pinned: true
+  });
+  if (!ovState.el) {
+    ovState.el = document.createElement('img');
+    ovState.el.className = 'cardimg leaflet-zoom-hide';
+    ovState.el.alt = '';
+    ovState.el.src = ovState.url;
+  }
+  map.getPane('cardPane').appendChild(ovState.el);
+  img.hidden = true;
+  placeOverlay(); updateOvUi();
+  toast('写真を地図に固定しました');
+}
+function unpinOverlay() {
+  if (!ovState || !ovState.pinned) return;
+  map.setView(ovState.center, ovState.refZoom, { animate: false });
+  ovState.pinned = false;
+  if (ovState.el) ovState.el.remove();
+  $('#overlayImg').hidden = false;
+  applyRot(); updateOvUi();
+}
+function placeOverlay() {
+  if (!ovState || !ovState.pinned || !map) return;
+  const p = map.latLngToLayerPoint(ovState.center);
+  const k = map.getZoomScale(map.getZoom(), ovState.refZoom);
+  const w = ovState.w * k, h = ovState.h * k, el = ovState.el;
+  el.style.width = `${w}px`; el.style.height = `${h}px`;
+  el.style.left = `${p.x - w / 2}px`; el.style.top = `${p.y - h / 2}px`;
+  el.style.transform = `rotate(${ovState.rot}deg)`;
+}
+function clearOverlay() {
+  if (ovState) {
+    if (ovState.el) ovState.el.remove();
+    URL.revokeObjectURL(ovState.url);
+  }
+  ovState = null;
+  const img = $('#overlayImg');
+  img.removeAttribute('src'); img.hidden = true; img.style.transform = '';
   $('#ovCtl').hidden = true;
   $('#map').classList.remove('see-through');
   if (map) map.getPane('tilePane').style.opacity = '';
@@ -1993,7 +2093,7 @@ function renderCardBar() {
   const bar = $('#cardBar');
   const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
   const r = !c && roundTerr ? roundInfo(roundTerr) : null;
-  $('#legend').hidden = !!(c || r);
+  $('#legend').hidden = !!(c || r) || mode === 'draw';
   if (!c && !r) { bar.hidden = true; return; }
   bar.hidden = false;
   const key = (cls, mark, label) => `<span><i class="pin mini st-new${cls}">${mark}</i>${label}</span>`;
@@ -2496,18 +2596,20 @@ function bindStatic() {
   $('#drawCancel').onclick = () => { closeSheet(); endDraw(); };
   $('#ovFile').onchange = e => {
     const file = e.target.files[0]; if (!file) return;
-    const img = $('#overlayImg');
-    if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
-    const url = URL.createObjectURL(file);
-    img.src = url; img.dataset.url = url; img.hidden = false;
-    $('#ovCtl').hidden = false;
-    $('#map').classList.add('see-through');
-    applyOv();
-    toast('地図を動かして、写真の道と重なる位置に合わせてください');
+    loadOverlay(file);
     e.target.value = '';
   };
   $('#ovRange').oninput = applyOv;
+  $('#ovRot').oninput = e => { if (ovState) { ovState.rot = Number(e.target.value); applyRot(); } };
+  $('#ovPin').onclick = () => { if (ovState && ovState.pinned) unpinOverlay(); else pinOverlay(); };
   $('#ovClear').onclick = clearOverlay;
+  $('#drawHouses').onchange = e => { drawShowHouses = e.target.checked; renderHouses(); };
+  $('#drawFold').onclick = () => {
+    const bar = $('#drawBar'), mini = !bar.classList.contains('mini');
+    bar.classList.toggle('mini', mini);
+    $('#drawFold').textContent = mini ? 'ひらく' : 'たたむ';
+    $('#drawFold').setAttribute('aria-expanded', String(!mini));
+  };
 
   // おすすめ
   $('#recoChips').addEventListener('click', e => { const c = e.target.closest('[data-kind]'); if (c) { recoFilter = c.dataset.kind; renderReco(); } });
