@@ -281,6 +281,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .dv.snapped{border-color:var(--terr);background:#DDF1EA}
 .dv.sel{background:var(--draw);border-color:#fff;box-shadow:0 0 0 4px var(--draw),0 1px 3px #0006}
 .dmid{width:22px;height:22px;border-radius:50%;background:#ffffffd9;border:2px dashed var(--draw);color:var(--draw);font-size:13px;font-weight:700;display:grid;place-items:center;line-height:1}
+.sub .btn.small{min-height:36px;font-size:14px;padding:0 10px;margin-left:8px;vertical-align:middle}
 .hint-strong.ok{color:var(--terr)}
 .hint-strong{color:var(--draw);font-weight:700;font-size:16px;margin-top:4px}
 .unit.hl{outline:4px solid var(--draw);outline-offset:2px}
@@ -326,7 +327,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
         <details class="all" id="allDetails"><summary>ほかの区域を見る</summary><div id="allCards"></div></details>
         <div class="row" id="liveTools" hidden><button class="btn small" id="btnLogout">この端末から消す</button>
           <span class="muted">端末を人に渡すときや、使わなくなったときに押してください。</span></div>
-        <div class="notice info">記録に残すのは「会えた・留守・年齢層・関心」だけです。住んでいる人の名前・電話番号・家族のこと・会話の内容は書かないでください。</div>
+        <div class="notice info">記録に残すのは「会えた・留守・拒否」「年代（若い世代かそれ以外か）」「また訪ねたいか」だけです。住んでいる人の名前・電話番号・家族のこと・会話の内容は書かないでください。</div>
       </div>
     </section>
 
@@ -439,12 +440,13 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
         <h3 class="sub">確認が必要な受け持ち</h3>
         <p class="hint">本人に声をかけてから、延長・引き継ぎ・解除を選んでください。</p>
         <div id="adFollowCheck"></div>
-        <h3 class="sub">取り残し（関心があるのに受け持ちがない家）</h3>
+        <h3 class="sub">取り残し（★ また訪ねたい家なのに受け持ちがない家）</h3>
         <div id="adLeft"></div>
         <h3 class="sub">まとめて引き継ぎ</h3>
         <p class="hint">奉仕が難しくなった人の受け持ちを、まとめて別の人に移します。</p>
         <div class="actions" id="adBulk"></div>
         <h2 class="sec">データ</h2>
+        <div id="adDataSet"></div>
         <div class="row">
           <button class="btn" id="adCsv">訪問記録をCSVで書き出す</button>
           <button class="btn danger" id="adReset">試作データに戻す</button>
@@ -482,9 +484,15 @@ const pad = n => String(n).padStart(2, '0');
 const DAY = 86400000;
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-const AGES = ['10〜20代', '30〜40代', '50〜60代', '70代以上', 'わからない'];
-const YOUNG = new Set(['10〜20代', '30〜40代']);
-const INTERESTS = ['関心あり', '少しあり', '関心なし'];
+/* 記録する中身は必要な分だけ（年代は2つ、関心は「また訪ねたいか」だけ） */
+const AGES = ['若い世代', 'それ以外'];
+const AGE_SUB = { 若い世代: '40代くらいまで', それ以外: '50代くらいから' };
+const YOUNG = new Set(['若い世代', '10〜20代', '30〜40代']);        // 以前の記録の値も含める
+const INTERESTS = ['再訪問したい', '再訪問しない'];
+const INTERESTED = new Set(['再訪問したい', '関心あり', '少しあり']); // 以前の記録の値も含める
+const INT_LABEL = { 再訪問したい: '★ また訪ねたい', 再訪問しない: '今回だけ' };
+const ageName = v => (YOUNG.has(v) ? '若い世代' : v === 'わからない' ? 'わからない' : v ? 'それ以外' : '');
+const intName = v => (INTERESTED.has(v) ? 'また訪ねたい' : v ? '今回だけ' : '');
 const RESULT_LABEL = { met: '会えた', away: '留守', refused: '拒否' };
 const ST_LABEL = { new: '未訪問', met: '会えた', away: '留守', refused: '拒否', dnc: '拒否' };
 const ST_CHAR = { new: '未', met: '会', away: '留', refused: '拒', dnc: '拒' };
@@ -496,19 +504,26 @@ function resultChoicesHtml(awaySub) {
       <button class="choice c-away" data-res="away"><i class="pin st-away">留</i>留守${awaySub ? `<small>${awaySub}</small>` : ''}</button>
     </div>`;
 }
-/* 関心の選択：拒否は離して置き、色も分ける */
+/* 年代の選択（だいたいで） */
+function ageChoicesHtml() {
+  return `<p class="q">会えた方は、どちらに近いですか？</p>
+    <div class="choices two">${AGES.map(a => `<button class="choice" data-age="${a}">${a}<small>${AGE_SUB[a]}</small></button>`).join('')}</div>
+    <p class="hint">だいたいで大丈夫です。子どもだけが出たときは、記録せずに「留守」にしてください。</p>
+    <button class="btn block" data-back="result">← 結果の選択にもどる</button>`;
+}
+/* また訪ねたいか：拒否は離して置き、色も分ける */
 function interestChoicesHtml() {
-  return `<p class="q">関心はありましたか？</p>
-    <div class="choices three">${INTERESTS.map(a => `<button class="choice" data-int="${a}">${a}</button>`).join('')}</div>
+  return `<p class="q">また訪ねたい方でしたか？</p>
+    <div class="choices two">${INTERESTS.map(a => `<button class="choice" data-int="${a}">${INT_LABEL[a]}</button>`).join('')}</div>
     <button class="choice refbtn" data-int="拒否"><i class="pin st-dnc">拒</i>拒否<small>もう来ないでほしいと言われた</small></button>
-    <button class="btn block" data-back="age">← 年齢層の選択にもどる</button>`;
+    <button class="btn block" data-back="age">← 年代の選択にもどる</button>`;
 }
 /* 拒否の確認：まちがえて押しても戻れるようにする */
 function refuseStepHtml(isUnit) {
   return `<div class="refhead"><i class="pin st-dnc">拒</i><b>拒否として記録します</b></div>
     <p>地図のこの${isUnit ? '部屋' : '家'}に赤い「拒」のマークが付き、次からおすすめやカードに出なくなります。</p>
     <button class="btn block refok" data-refok>拒否として記録する</button>
-    <button class="btn block" data-back="interest">← まちがえた（関心の選択にもどる）</button>`;
+    <button class="btn block" data-back="interest">← まちがえた（前の選択にもどる）</button>`;
 }
 const BANDS = ['朝', '昼', '午後', '夕方', '夜'];
 const BAND_HINT = { 朝: '〜11時', 昼: '11〜14時', 午後: '14〜17時', 夕方: '17〜19時', 夜: '19時〜' };
@@ -612,7 +627,7 @@ function makeDemo() {
   houses.forEach(h => targets(h).forEach(unit => {
     const k = K(h.id, unit);
     const m = visits.filter(v => v.houseId === h.id && v.unit === unit && v.result === 'met').sort((a, b) => (a.at < b.at ? 1 : -1))[0];
-    if (!m || m.interest === '関心なし') return;
+    if (!m || !INTERESTED.has(m.interest)) return;
     const x = r2();
     if (x < 0.6) {
       const by = r2() < 0.6 ? 'u1' : 'u2';
@@ -646,7 +661,7 @@ const API_URL = (function () {
   return typeof u === 'string' && /^https:\/\/script\.google\.com\//.test(u.trim()) ? u.trim() : '';
 })(); // GAS の「ウェブアプリのURL」は config.js に書く
 const LIVE = !!API_URL;
-const TOKEN_KEY = 'kuiki_token', QUEUE_KEY = 'kuiki_queue', OLD_CACHE_KEY = 'kuiki_cache';
+const TOKEN_KEY = 'kuiki_token', QUEUE_KEY = 'kuiki_queue', OLD_CACHE_KEY = 'kuiki_cache', SYNC_KEY = 'kuiki_sync_at', LOCK_KEY = 'kuiki_lock_ok';
 const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'users'];
 const MAP_COLS = ['dnc', 'follows', 'released'];
 const RES_NAME = { m: 'met', a: 'away', r: 'refused' };
@@ -654,6 +669,46 @@ const clone = o => JSON.parse(JSON.stringify(o));
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
 const lsDel = k => { try { localStorage.removeItem(k); } catch (e) { /* 何もしない */ } };
+
+/* 自分が詳細を見られる範囲（担当している区域・受け持っている再訪問） */
+function permSig() {
+  const id = Store.data.currentUser;
+  return {
+    t: Store.data.territories.filter(t => t.holder === id).map(t => t.id),
+    f: Object.keys(Store.data.follows).filter(k => Store.data.follows[k].by === id)
+  };
+}
+/* 見られない記録の年代・また訪ねたいかを、端末からも消す（区域係は除く） */
+function scrubVisits() {
+  if (!LIVE) return;
+  const d = Store.data, u = d.users.find(x => x.id === d.currentUser);
+  if (!u || u.role === 'admin') return;
+  const ps = permSig(), hold = new Set(ps.t), fk = new Set(ps.f);
+  const terrOfHouse = new Map(d.houses.map(h => [h.id, h.terrId]));
+  d.visits.forEach(v => {
+    if (v.by === u.id || (v.age === undefined && v.interest === undefined)) return;
+    if (hold.has(terrOfHouse.get(v.houseId)) || fk.has(v.houseId + '|' + (v.unit || ''))) return;
+    delete v.age; delete v.interest;
+  });
+}
+/* 新しく区域や再訪問を受け持ったら、その詳細を受け取るため全部を読み直す */
+function checkPermGain() {
+  if (!LIVE || !Store.permSeen || isAdmin()) return;
+  const ps = permSig();
+  const gained = ps.t.some(x => !Store.permSeen.has('t:' + x)) || ps.f.some(x => !Store.permSeen.has('f:' + x));
+  if (gained && !Store.needFull) { Store.needFull = true; refresh(true).catch(() => {}); }
+}
+/* しばらく通信できなかった端末は、保存したデータを消す */
+const cacheDaysLimit = () => ((Store.data && Store.data.settings && Store.data.settings.cacheDays) || 30);
+function checkExpiry() {
+  if (!LIVE || !Store.syncAt) return false;
+  if (Date.now() - Store.syncAt <= cacheDaysLimit() * DAY) return false;
+  clearTimeout(Store.cacheTimer);
+  IDB.del('cache').catch(() => {});
+  Store.data = null;
+  showBlocking('端末の情報を消しました', `${cacheDaysLimit()}日以上通信できなかったため、区域の情報をこのスマホから消しました。通信できる場所で開き直すと、また使えます。`);
+  return true;
+}
 
 /* 端末の大きな保存場所（IndexedDB） */
 const IDB = {
@@ -702,7 +757,7 @@ function applyDiff(st, ch) {
 }
 
 const Store = {
-  key: 'kuiki_demo_v6',
+  key: 'kuiki_demo_v7',
   data: null,
   fp: null,      // 本番：サーバーに伝え済み（または送信待ち）の内容の控え
   seq: null,     // 本番：受け取り済みの変更番号
@@ -710,6 +765,9 @@ const Store = {
   queue: [],     // 本番：まだ送っていない変更
   inbox: [],     // 本番：受け取ったが、入力中のため反映を待っている変更
   needFull: false,
+  permSeen: null,  // 本番：詳細を受け取り済みの範囲
+  syncAt: 0,       // 本番：最後に通信できた時刻
+  expired: false,
   load() {
     const s = lsGet(this.key);
     if (s) { try { this.data = JSON.parse(s); this.migrate(); return; } catch (e) { /* 作り直す */ } }
@@ -720,7 +778,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30 }, d.settings || {});
   },
   /* 控えを作り直す（訪問記録は件数が多いので、idだけ覚える） */
   buildFp() {
@@ -770,6 +828,7 @@ const Store = {
     this.queue.push(ch);
     this.persistQueue();
     this.saveCacheSoon();
+    checkPermGain();
     flush();
   },
   persistQueue() {
@@ -795,7 +854,10 @@ const Store = {
     }
     this.data = st; this.migrate();
     this.seq = j.seq;
+    const ps = permSig();
+    this.permSeen = new Set(ps.t.map(x => 't:' + x).concat(ps.f.map(x => 'f:' + x)));
     this.reapplyQueue();
+    scrubVisits();
   },
   /* 変わった分だけを受け取ったとき */
   applyDelta(j) {
@@ -818,6 +880,7 @@ const Store = {
     this.migrate();
     this.seq = j.seq;
     this.reapplyQueue();
+    scrubVisits();
   },
   cacheTimer: null,
   saveCacheSoon() {
@@ -839,6 +902,14 @@ const Store = {
       if (tk.changed) await IDB.del('cache');
       else cache = await IDB.get('cache');
     } catch (e) { cache = null; }
+    this.syncAt = Number(lsGet(SYNC_KEY) || 0) || (cache && cache.savedAt) || 0;
+    if (cache) {
+      const days = (cache.state && cache.state.settings && cache.state.settings.cacheDays) || 30;
+      if (Date.now() - this.syncAt > days * DAY) { // しばらく通信できなかった端末
+        try { await IDB.del('cache'); } catch (e) { /* 何もしない */ }
+        cache = null; this.expired = true;
+      }
+    }
     if (cache && cache.tag === this.token.slice(0, 12) && cache.state) {
       this.setServer({ seq: cache.seq, state: cache.state }); // すぐ表示して、あとで差分を取りに行く
       return 'cache';
@@ -875,6 +946,8 @@ async function api(action, extra) {
     if (j.error === 'auth') IDB.del('cache').catch(() => {});
     throw Object.assign(new Error(j.error || 'error'), { code: j.error });
   }
+  Store.syncAt = Date.now();
+  lsSet(SYNC_KEY, String(Store.syncAt));
   return j;
 }
 let flushing = false, lastRefresh = 0;
@@ -893,6 +966,7 @@ function applyInbox() {
   Store.saveCacheSoon();
   updateTabs();
   renderAll();
+  checkPermGain();
 }
 async function flush() {
   if (!LIVE || flushing || !Store.queue.length) { updateSyncBadge(); return; }
@@ -951,7 +1025,7 @@ function logout() {
     ? `まだ送っていない記録が${n}件あります。消すと送られません。それでもこの端末から消しますか？`
     : 'この端末から、区域マップの情報と招待リンクを消します。よろしいですか？';
   if (!confirm(q)) return;
-  [TOKEN_KEY, QUEUE_KEY, OLD_CACHE_KEY].forEach(lsDel);
+  [TOKEN_KEY, QUEUE_KEY, OLD_CACHE_KEY, SYNC_KEY].forEach(lsDel);
   clearTimeout(Store.cacheTimer);
   IDB.del('cache').catch(() => {});
   showBlocking('この端末から消しました', 'もう一度使うときは、区域係からもらった招待リンクを開いてください。');
@@ -1020,7 +1094,17 @@ const followIdle = f => daysSince(f.touchedAt);
 function followStage(f) { const d = followIdle(f), s = D().settings; return d >= s.escalateDays ? 2 : d >= s.remindDays ? 1 : 0; }
 function parseKey(k) { const i = k.indexOf('|'); return [k.slice(0, i), k.slice(i + 1)]; }
 function targetName(h, unit) { return h.type === 'apt' ? `${esc(h.label || '集合住宅')} ${esc(unit)}号室` : esc(h.label || '家'); }
-function lastInterest(k) { const m = visitsOf(k).find(v => v.result === 'met'); return m && (m.interest === '関心あり' || m.interest === '少しあり') ? m : null; }
+/* 年代・また訪ねたいかを見られるのは、区域係・その区域の担当者・再訪問を受け持っている本人・記録した本人だけ */
+function canSeeDetail(k) {
+  if (isAdmin()) return true;
+  const h = houseById(parseKey(k)[0]), t = h && terrById(h.terrId), f = fol(k);
+  return !!((t && t.holder === me().id) || (f && f.by === me().id));
+}
+const seeV = (v, k) => v.by === me().id || canSeeDetail(k);
+function lastInterest(k) {
+  const m = visitsOf(k).find(v => v.result === 'met');
+  return m && seeV(m, k) && INTERESTED.has(m.interest) ? m : null;
+}
 function bestSlot(k) {
   const c = {}; let best = null;
   for (const v of visitsOf(k)) {
@@ -1237,7 +1321,7 @@ function setMode(m) {
 function openTarget(hid, unit, fromBuilding) {
   const h = houseById(hid); if (!h) return;
   const t = terrById(h.terrId), k = K(hid, unit);
-  const st = { step: 'result', age: null, interest: null, override: false };
+  const st = { step: 'result', age: null, interest: null, override: false, detail: false };
   const title = targetName(h, unit);
   const sub = t ? `区域${t.no}　${esc(t.name)}` : '区域の線の外';
 
@@ -1265,7 +1349,7 @@ function openTarget(hid, unit, fromBuilding) {
       b += `<div class="notice warn"><b>引き継ぎを待っている家です。</b>再訪問を受け持てる方はお願いします。
         <span class="actions"><button class="btn small primary" id="shTake">私が受け持つ</button></span></div>`;
     } else if (lastInterest(k) && !dnc) {
-      b += `<div class="notice info">以前、関心のある方に会えています。
+      b += `<div class="notice info">以前、また訪ねたい方（★）に会えています。
         <span class="actions"><button class="btn small" id="shTake">私が再訪問を受け持つ</button></span></div>`;
     }
 
@@ -1273,9 +1357,7 @@ function openTarget(hid, unit, fromBuilding) {
       if (st.step === 'result') {
         b += `<p class="q">訪問の結果を選んでください</p>` + resultChoicesHtml('');
       } else if (st.step === 'age') {
-        b += `<p class="q">会えた方の年齢層（だいたいで大丈夫です）</p>
-        <div class="choices two">${AGES.map((a, i) => `<button class="choice${i === AGES.length - 1 ? ' wide' : ''}" data-age="${a}">${a}</button>`).join('')}</div>
-        <button class="btn block" data-back="result">← 結果の選択にもどる</button>`;
+        b += ageChoicesHtml();
       } else if (st.step === 'interest') {
         b += interestChoicesHtml();
       } else if (st.step === 'follow') {
@@ -1284,18 +1366,22 @@ function openTarget(hid, unit, fromBuilding) {
           <button class="choice" data-fol="1">私が再訪問します<small>ほかの人は訪問を控えます</small></button>
           <button class="choice" data-fol="0">今回は記録だけ</button>
         </div>
-        <button class="btn block" data-back="interest">← 関心の選択にもどる</button>`;
+        <button class="btn block" data-back="interest">← 前の選択にもどる</button>`;
       } else if (st.step === 'dnc') {
         b += refuseStepHtml(!!unit);
       }
     }
 
     if (isUnmet(k)) b += `<div class="notice info">これまで留守だった時間帯：${[...triedSlots(k)].sort(bySlot).map(slotShort).join('、')}<br>ほかの時間帯に訪ねてみてください。</div>`;
-    b += `<h3 class="sub">これまでの記録</h3>`;
+    const hasDetail = vs.some(v => seeV(v, k) && (v.age || v.interest));
+    b += `<h3 class="sub">これまでの記録${hasDetail ? ` <button class="btn small" id="shDetail">${st.detail ? 'くわしい表示を閉じる' : 'くわしく表示'}</button>` : ''}</h3>`;
     b += vs.length
       ? `<ul class="history">${vs.slice(0, 5).map(v => {
           const d = new Date(v.at);
-          const extra = v.result === 'met' ? `（${esc(v.age || '')}・${esc(v.interest || '')}）` : (v.result === 'refused' && v.age ? `（${esc(v.age)}）` : '');
+          const sv = seeV(v, k);
+          const extra = !sv ? '' : st.detail
+            ? (v.result === 'met' ? `（${esc(ageName(v.age))}・${esc(intName(v.interest))}）` : (v.result === 'refused' && v.age ? `（${esc(ageName(v.age))}）` : ''))
+            : (v.result === 'met' && INTERESTED.has(v.interest) ? ' ★' : '');
           return `<li><i class="pin st-${v.result}">${ST_CHAR[v.result]}</i><span>${fmtDate(v.at)}　${slotOf(d)}<br>${RESULT_LABEL[v.result]}${extra}</span></li>`;
         }).join('')}</ul>${vs.length > 5 ? `<p class="muted">ほか ${vs.length - 5}件</p>` : ''}`
       : '<p class="muted">まだ記録はありません。</p>';
@@ -1320,7 +1406,7 @@ function openTarget(hid, unit, fromBuilding) {
     $$('[data-int]', S).forEach(x => x.onclick = () => {
       const it = x.dataset.int;
       if (it === '拒否') { st.step = 'dnc'; paint(); }
-      else if (it !== '関心なし' && !fol(k)) { st.interest = it; st.step = 'follow'; paint(); }
+      else if (INTERESTED.has(it) && !fol(k)) { st.interest = it; st.step = 'follow'; paint(); }
       else saveVisit(hid, unit, 'met', { age: st.age, interest: it });
     });
     $$('[data-fol]', S).forEach(x => x.onclick = () =>
@@ -1333,6 +1419,7 @@ function openTarget(hid, unit, fromBuilding) {
     on('shRelease', () => { followAction('release', k); paint(); });
     on('shStop', () => openReleaseSheet(k, false));
     on('shOverride', () => { st.override = true; paint(); });
+    on('shDetail', () => { st.detail = !st.detail; paint(); });
     on('shTake', () => { followAction('take', k); paint(); });
     if ($('#shAssign')) $('#shAssign').onchange = e => {
       const v = e.target.value;
@@ -1450,7 +1537,7 @@ function followItem(k, f, mode) {
   return `<article class="ritem f-s${stg}"><div>
       <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(h, unit)}</p>
       <p class="muted">${mode === 'admin' ? `受け持ち：${esc(uname(f.by))}さん　` : ''}最後の記録から ${d}日${state}</p>
-      ${m ? `<p class="muted">${esc(m.interest)}・${esc(m.age || '')}${bs ? `　会えた時間帯：${bs}` : ''}</p>` : ''}
+      ${m ? `<p class="muted">★${YOUNG.has(m.age) ? '・若い世代' : ''}${bs ? `　会えた時間帯：${bs}` : ''}</p>` : ''}
     </div><button class="btn small" data-go="${hid}" data-unit="${esc(unit)}">地図で見る</button>
     ${acts ? `<div class="actions span">${acts}</div>` : ''}</article>`;
 }
@@ -1508,15 +1595,13 @@ function openBuilding(hid) {
 /* ---------- 集合住宅：続けて入力 ---------- */
 function seqStepsHtml(st) {
   if (st.step === 'result') return resultChoicesHtml('押すと次の部屋へ');
-  if (st.step === 'age') return `<p class="q">年齢層（だいたいで大丈夫です）</p>
-      <div class="choices two">${AGES.map((a, i) => `<button class="choice${i === AGES.length - 1 ? ' wide' : ''}" data-age="${a}">${a}</button>`).join('')}</div>
-      <button class="btn block" data-back="result">← 結果の選択にもどる</button>`;
+  if (st.step === 'age') return ageChoicesHtml();
   if (st.step === 'interest') return interestChoicesHtml();
   if (st.step === 'follow') return `<p class="q">この方の再訪問はどうしますか？</p>
       <div class="choices two">
         <button class="choice" data-fol="1">私が再訪問します<small>ほかの人は訪問を控えます</small></button>
         <button class="choice" data-fol="0">今回は記録だけ</button></div>
-      <button class="btn block" data-back="interest">← 関心の選択にもどる</button>`;
+      <button class="btn block" data-back="interest">← 前の選択にもどる</button>`;
   if (st.step === 'dnc') return refuseStepHtml(true);
   return '';
 }
@@ -1583,7 +1668,7 @@ function openAptSeq(hid, startUnit) {
     $$('[data-int]', S).forEach(x => x.onclick = () => {
       const it = x.dataset.int;
       if (it === '拒否') { st.step = 'dnc'; paint(); }
-      else if (it !== '関心なし' && !fol(k)) { st.interest = it; st.step = 'follow'; paint(); }
+      else if (INTERESTED.has(it) && !fol(k)) { st.interest = it; st.step = 'follow'; paint(); }
       else save('met', { age: st.age, interest: it });
     });
     $$('[data-fol]', S).forEach(x => x.onclick = () => save('met', { age: st.age, interest: st.interest, follow: x.dataset.fol === '1' }));
@@ -2136,7 +2221,7 @@ function renderCards() {
     ? `<div class="notice warn">しばらく訪問していない再訪問が <b>${need}件</b> あります。<span class="actions"><button class="btn small" data-scroll="followsHead">確認する</button></span></div>`
     : '';
   $('#myFollows').innerHTML = myF.length ? myF.map(([k, f]) => followItem(k, f, 'mine')).join('')
-    : '<div class="empty">受け持っている再訪問はありません。<br>関心のある方に会えたら、記録のときに「私が再訪問します」を選べます。</div>';
+    : '<div class="empty">受け持っている再訪問はありません。<br>また訪ねたい方に会えたら、記録のときに「私が再訪問します」を選べます。</div>';
 }
 
 /* ---------- 区域カードの申し込み・受け取り ---------- */
@@ -2420,9 +2505,9 @@ function scoreTarget(k, cur) {
   });
   const m = vs.find(v => v.result === 'met');
   if (!vs.length) { sc += 15; reasons.push('はじめて訪ねる家'); }
-  if (m && m.interest === '関心あり') { sc += 40; reasons.push('関心あり'); }
-  else if (m && m.interest === '少しあり') { sc += 25; reasons.push('少し関心あり'); }
-  if (m && YOUNG.has(m.age)) { sc += 10; reasons.push(`${m.age}の方`); }
+  const see = m && seeV(m, k);
+  if (see && INTERESTED.has(m.interest)) { sc += m.interest === '少しあり' ? 25 : 40; reasons.push('★ また訪ねたい'); }
+  if (see && YOUNG.has(m.age)) { sc += 10; reasons.push('若い世代'); }
   if (metS.has(cur)) { sc += 15; reasons.push('この時間に会えたことがある'); }
   else if (awayS.has(cur)) { sc -= 30; reasons.push('この時間は留守だった'); }
   else if (vs.length && !m) {
@@ -2483,8 +2568,8 @@ function roundHint(t) {
     ? `<p class="hint-strong ok">ほぼ回り終えました（${r.pct}%）。返却して完了にできます。</p>` : '';
   const plan = roundPlan(r);
   if (!plan.length) return near;
-  const intr = plan.filter(s => s.reasons.some(y => y.includes('関心'))).length;
-  return near + `<p class="hint-strong">今（${slotShort(r.cur)}）のおすすめ ${plan.length}か所${intr ? `（関心のある家 ${intr}か所）` : ''}。「地図をひらく」で番号順に回れます。</p>`;
+  const intr = plan.filter(s => s.reasons.some(y => y.includes('★'))).length;
+  return near + `<p class="hint-strong">今（${slotShort(r.cur)}）のおすすめ ${plan.length}か所${intr ? `（★ ${intr}か所）` : ''}。「地図をひらく」で番号順に回れます。</p>`;
 }
 /* 家ごとの表示を返す関数（目立たせていないときは null） */
 function focusFn() {
@@ -2511,7 +2596,7 @@ function openPlanSheet() {
   const r = roundTerr ? roundInfo(roundTerr) : null; if (!r) return;
   const plan = roundPlan(r);
   setSheet(headHtml(r.t, 'おすすめの回り方', `今は${slotShort(r.cur)}　まだ訪ねていない家 ${r.c.todo}`) + `
-    <p class="hint">今の時間帯・関心・これまでの記録から${PLAN_SIZE}か所まで選び、近い順につないでいます。訪ねると一覧から外れ、次の家が加わります。</p>
+    <p class="hint">今の時間帯・また訪ねたいか・これまでの記録から${PLAN_SIZE}か所まで選び、近い順につないでいます。訪ねると一覧から外れ、次の家が加わります。</p>
     <div class="row"><button class="btn small" id="planNear">${myPos ? '現在地を更新して並べ直す' : '現在地から並べ直す'}</button></div>
     ${plan.length ? `<ol class="plan">${plan.map((s, i) => `<li>
         <span class="numbadge">${i + 1}</span>
@@ -2688,7 +2773,7 @@ function renderAwayAdmin() {
 /* ---------- おすすめ画面 ---------- */
 let recoFilter = 'all';
 const RECO_KINDS = [
-  ['all', 'すべて'], ['handoff', '引き継ぎを待っている家'], ['interest', '関心のある家'], ['young', '若い世代']
+  ['all', 'すべて'], ['handoff', '引き継ぎを待っている家'], ['interest', '★ また訪ねたい家'], ['young', '若い世代']
 ];
 function computeReco() {
   const now = new Date(), slot = slotOf(now), onlyMine = $('#recoMine').checked;
@@ -2708,13 +2793,14 @@ function computeReco() {
       if (rel) {
         const bs = bestSlot(k);
         kind = 'handoff'; score = 100;
-        reason = '再訪問の引き継ぎを待っています' + (met && met.interest ? `（${met.interest}・${met.age || ''}）` : '') + (bs ? `。会えた時間帯：${bs}` : '');
+        reason = '再訪問の引き継ぎを待っています' + (bs ? `。会えた時間帯：${bs}` : '');
       }
-      if (!kind && met) {
-        if ((met.interest === '関心あり' || met.interest === '少しあり') && idle >= 30) {
-          kind = 'interest'; score = 90; reason = `${met.interest}・${met.age}（${idle}日間 訪問なし）`;
+      const see = met && seeV(met, k);
+      if (!kind && see) {
+        if (INTERESTED.has(met.interest) && idle >= 30) {
+          kind = 'interest'; score = 90; reason = `★（${idle}日間 訪問なし）`;
         } else if (YOUNG.has(met.age) && idle >= 60) {
-          kind = 'young'; score = 60; reason = `${met.age}の方に会えた家（${idle}日間 訪問なし）`;
+          kind = 'young'; score = 60; reason = `若い世代の方に会えた家（${idle}日間 訪問なし）`;
         }
       }
       if (kind) items.push({ h, unit, t, kind, reason, score, dist: myPos ? distM(myPos, [h.lat, h.lng]) : null });
@@ -2769,8 +2855,18 @@ function locate(after) {
 }
 
 /* ---------- 係の画面 ---------- */
+function renderDataSet() {
+  const st = D().settings;
+  const row = (key, label, unit, d, hint) => `<div class="setrow"><span>${label}<br><small class="hint">${hint}</small></span><div class="stepper">
+    <button type="button" data-kset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${st[key]}${unit}</output>
+    <button type="button" data-kset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div></div>`;
+  $('#adDataSet').innerHTML =
+    row('keepMonths', '訪問記録を残す期間', 'か月', 6, 'これより古い記録は、家ごとの最後の1件を残して、毎月整理します（自動整理を設定したとき）') +
+    row('cacheDays', '通信がない端末にデータを残す期間', '日', 5, 'この日数のあいだ通信できなかった端末は、保存した区域の情報を自動で消します');
+}
 function renderAdmin() {
   renderInbox();
+  renderDataSet();
   renderAwayAdmin();
   renderFollowAdmin();
   const now = Date.now();
@@ -2878,7 +2974,7 @@ function renderFollowAdmin() {
     const t = terrById(i.h.terrId), bs = bestSlot(i.k);
     return `<article class="ritem ${i.rel ? 'k-handoff' : 'k-interest'}"><div>
       <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(i.h, i.unit)}</p>
-      <p class="muted">${i.rel ? '<b>引き継ぎ待ち</b>　' : ''}${esc(i.m.interest)}・${esc(i.m.age || '')}　最後の記録から ${i.idle}日${bs ? `　会えた時間帯：${bs}` : ''}</p>
+      <p class="muted">${i.rel ? '<b>引き継ぎ待ち</b>　' : ''}★${YOUNG.has(i.m.age) ? '・若い世代' : ''}　最後の記録から ${i.idle}日${bs ? `　会えた時間帯：${bs}` : ''}</p>
     </div><button class="btn small" data-go="${i.h.id}" data-unit="${esc(i.unit)}">地図で見る</button>
     <div class="actions span"><label>受け持つ人 <select data-assign="${esc(i.k)}">${userOptions('', '選んでください')}</select></label></div></article>`;
   }).join('') + (left.length > 30 ? `<p class="muted">ほか ${left.length - 30}件</p>` : '')
@@ -2911,11 +3007,11 @@ function bulkMove() {
   });
 }
 function exportCsv() {
-  const rows = [['区域番号', '家ID', '種類', '部屋', '結果', '年齢層', '関心', '日時', '曜日区分', '時間帯']];
+  const rows = [['区域番号', '家ID', '種類', '部屋', '結果', '年代', '再訪問', '日時', '曜日区分', '時間帯']];
   for (const v of D().visits) {
     const h = houseById(v.houseId), t = h && terrById(h.terrId), d = new Date(v.at);
     rows.push([t ? t.no : '', v.houseId, h ? (h.type === 'apt' ? '集合住宅' : '一戸建て') : '', v.unit || '',
-      RESULT_LABEL[v.result], v.age || '', v.interest || '',
+      RESULT_LABEL[v.result], ageName(v.age), intName(v.interest),
       `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
       dayTypeOf(d), bandOf(d)]);
   }
@@ -3092,6 +3188,12 @@ function bindStatic() {
     else if ((x = q('[data-fact]'))) followAction(x.dataset.fact, x.dataset.key);
     else if ((x = q('[data-set]'))) changeSetting(x.dataset.set, Number(x.dataset.d));
     else if (q('#bkGo')) bulkMove();
+    else if ((x = q('[data-kset]'))) {
+      const st = D().settings, key = x.dataset.kset;
+      const lim = key === 'keepMonths' ? [6, 36] : [5, 60];
+      st[key] = Math.min(lim[1], Math.max(lim[0], st[key] + Number(x.dataset.d)));
+      Store.save(); renderAll(); toast('設定を変えました');
+    }
     else if ((x = q('[data-donepct]'))) {
       const st = D().settings;
       st.donePct = Math.min(100, Math.max(50, st.donePct + Number(x.dataset.donepct)));
@@ -3150,6 +3252,7 @@ async function init() {
       from = await Store.loadLive();
     } catch (e) {
       if (e.code === 'auth') showBlocking('このリンクでは開けません', '区域係からもらった招待リンクを開いてください。');
+      else if (Store.expired) showBlocking('端末の情報を消しました', 'しばらく通信できなかったため、区域の情報をこのスマホから消しました。通信できる場所で開き直すと、また使えます。');
       else showBlocking('読み込めませんでした', 'インターネットにつながっているか確認して、もう一度開いてください。');
       return;
     }
@@ -3170,12 +3273,23 @@ async function init() {
     $('#liveTools').hidden = false;
     $('#adReset').hidden = true;
     $('#btnLogout').onclick = logout;
-    const again = () => { if (document.hidden) return; if (Store.queue.length) flush(); else refresh().catch(() => {}); };
+    const again = () => {
+      if (document.hidden || checkExpiry()) return;
+      if (Store.queue.length) flush(); else refresh().catch(() => {});
+    };
     setInterval(again, 60000);
     window.addEventListener('online', flush);
     document.addEventListener('visibilitychange', again);
     if (Store.queue.length) flush();
     else if (from === 'cache') refresh(true).catch(() => toast('インターネットにつながっていません。前回の情報を表示しています'));
+    if (!lsGet(LOCK_KEY)) {
+      setSheet(headHtml(null, 'はじめにお願い', '') + `
+        <div class="notice warn"><b>スマホに画面ロック（パスコード、指紋、顔認証）を設定してください。</b><br>
+          区域の情報はスマホの中にも保存されます。スマホをなくしても、ほかの人に見られないようにするためです。</div>
+        <p>${cacheDaysLimit()}日以上通信できなかったスマホでは、保存した情報を自動で消します。</p>
+        <button class="btn primary block" id="lockOk">画面ロックを設定しました</button>`);
+      $('#lockOk').onclick = () => { lsSet(LOCK_KEY, '1'); closeSheet(); };
+    }
   }
 }
 init();
