@@ -350,6 +350,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
         <span><i class="pin st-away">留</i>留守</span>
         <span><i class="pin st-refused">拒</i>拒否</span>
         <span><i class="pin st-met">会<em>再</em></i>再訪問の受け持ちあり</span>
+        <span><i class="pin st-new" style="opacity:.4">未</i>自分の区域以外（薄い印）</span>
       </div>
       <div class="modebar" id="addBar" hidden>
         <p><b>家を追加：</b><span id="addMsg"></span></p>
@@ -548,6 +549,11 @@ const BAND_HINT = { 朝: '〜11時', 昼: '11〜14時', 午後: '14〜17時', �
 const SLOTS = [];
 ['平日', '土日'].forEach(dt => BANDS.forEach(b => SLOTS.push(dt + '・' + b)));
 const bySlot = (a, b) => SLOTS.indexOf(a) - SLOTS.indexOf(b);
+const SLOT_BIT = {};
+SLOTS.forEach((s, i) => { SLOT_BIT[s] = 1 << i; });
+const hasSlot = (mask, s) => !!(mask & SLOT_BIT[s]);
+const slotCount = m => { let n = 0; while (m) { n += m & 1; m >>= 1; } return n; };
+const slotList = m => SLOTS.filter(s => hasSlot(m, s));
 const HOME_VIEW = [26.1771, 127.6811]; // 区域がまだ無いときの表示位置（豊見城市役所付近）
 const TILE_PALE = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png';
 const TILE_PHOTO = 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg';
@@ -932,7 +938,7 @@ const Store = {
       this.setServer({ seq: cache.seq, state: cache.state }); // すぐ表示して、あとで差分を取りに行く
       return 'cache';
     }
-    const j = await api('load', { since: null });
+    const j = await loadAll(p => showBlocking('読み込んでいます…', `初めて開くときは少し時間がかかります（${p}%）`));
     this.setServer(j);
     this.saveCacheSoon();
     return 'server';
@@ -968,6 +974,48 @@ async function api(action, extra) {
   lsSet(SYNC_KEY, String(Store.syncAt));
   return j;
 }
+/* 初回や読み直しは、分けて受け取る（件数が多くても止まらないように） */
+function expandHouse(a) {
+  return {
+    id: a[0], terrId: a[1] || null, type: a[2] === 'a' ? 'apt' : 'house',
+    lat: a[3], lng: a[4], label: a[5] || '',
+    units: a[6] ? String(a[6]).split('|') : [],
+    createdAt: new Date((a[8] || 0) * 1000).toISOString(), createdBy: a[7] || ''
+  };
+}
+async function loadAll(onProgress) {
+  const meta = await api('load', { part: 'meta' });
+  const st = meta.state;
+  st.houses = [];
+  const vis = [];
+  const total = Math.max(1, (meta.counts ? meta.counts.houses + meta.counts.visits : 0));
+  let done = 0;
+  for (const part of ['houses', 'visits']) {
+    let off = 0;
+    while (off !== null) {
+      const r = await api('load', { part, offset: off });
+      if (part === 'houses') r.rows.forEach(a => st.houses.push(expandHouse(a)));
+      else r.rows.forEach(a => vis.push(a));
+      done += r.rows.length;
+      off = r.next;
+      if (onProgress) onProgress(Math.min(99, Math.round(done / total * 100)));
+    }
+  }
+  st.visitsC = vis;
+  return { mode: 'full', seq: meta.seq, state: st };
+}
+let reloading = false;
+async function reloadAll() {
+  if (!LIVE || reloading) return;
+  reloading = true;
+  try {
+    const j = await loadAll(p => updateSyncBadge(`読み込み中 ${p}%`));
+    Store.needFull = false;
+    Store.inbox = [j];
+    applyInbox();
+    Store.saveCacheSoon();
+  } finally { reloading = false; updateSyncBadge(); }
+}
 let flushing = false, lastRefresh = 0;
 const isBusy = () => !$('#sheet').hidden || mode !== 'normal';
 /* 受け取った変更は、入力中でなければすぐ、入力中なら終わってから反映する */
@@ -992,12 +1040,12 @@ async function flush() {
   let rejected = 0;
   try {
     while (Store.queue.length) {
-      const j = await api('sync', { changes: Store.queue[0], since: Store.needFull ? null : Store.seq });
+      const j = await api('sync', { changes: Store.queue[0], since: Store.seq });
       rejected += (j.rejected || []).length;
       Store.queue.shift();
       Store.persistQueue();
-      if (j.mode === 'full') Store.needFull = false;
-      Store.inbox = j.mode === 'full' ? [j] : Store.inbox.filter(x => x.mode === 'full').concat([j]);
+      if (j.mode === 'stale') Store.needFull = true;            // 差分では追いつけない → 全部を読み直す
+      else Store.inbox = Store.inbox.filter(x => x.mode === 'full').concat([j]);
       lastRefresh = Date.now();
     }
   } catch (e) {
@@ -1010,26 +1058,26 @@ async function flush() {
     // 手元だけに残った変更を消すため、全部を読み直す
     toast('一部の変更は反映できませんでした。最新の情報に更新します');
     Store.needFull = true;
-    refresh(true).catch(() => {});
-  } else {
-    applyInbox();
   }
+  applyInbox();
+  if (Store.needFull && !Store.queue.length) reloadAll().catch(() => {});
 }
 /* 最新の変更を取りに行く */
 async function refresh(force) {
   if (!LIVE || flushing || Store.queue.length) return;
   if (!force && Date.now() - lastRefresh < 20000) return;
   lastRefresh = Date.now();
-  const j = await api('load', { since: Store.needFull ? null : Store.seq });
-  if (j.mode === 'full') Store.needFull = false;
+  if (Store.needFull) { await reloadAll(); return; }
+  const j = await api('load', { since: Store.seq });
+  if (j.mode === 'stale') { Store.needFull = true; await reloadAll(); return; }
   receive(j);
 }
-function updateSyncBadge() {
+function updateSyncBadge(text) {
   const el = $('#syncState');
   if (!el) return;
   const n = Store.queue.length;
-  el.hidden = !LIVE || (!n && !flushing);
-  el.textContent = flushing ? '送信中…' : `未送信 ${n}件`;
+  el.hidden = !LIVE || (!n && !flushing && !text);
+  el.textContent = text || (flushing ? '送信中…' : `未送信 ${n}件`);
 }
 function showBlocking(title, msg) {
   $('#blockTitle').textContent = title;
@@ -1049,8 +1097,9 @@ function logout() {
   showBlocking('この端末から消しました', 'もう一度使うときは、区域係からもらった招待リンクを開いてください。');
 }
 const D = () => Store.data;
-const terrById = id => D().territories.find(t => t.id === id);
-const houseById = id => D().houses.find(h => h.id === id);
+let HID = new Map(), TID = new Map();
+const terrById = id => TID.get(id) || D().territories.find(t => t.id === id);
+const houseById = id => HID.get(id) || D().houses.find(h => h.id === id);
 const userById = id => D().users.find(u => u.id === id);
 const uname = id => (userById(id) || { name: '不明' }).name;
 function userOptions(sel, noneLabel) {
@@ -1085,10 +1134,14 @@ function commit(msg, fn) {
 }
 
 /* ---------- 記録の索引 ---------- */
-let IDX = new Map(), HBT = new Map();
+let IDX = new Map(), HBT = new Map(), SUM = new Map();
+const EMPTY_SUM = { n: 0, last: null, met: null, awayN: 0, slots: 0, metSlots: 0, awaySlots: 0, unmet: false, bestSlot: null };
+const sum = k => SUM.get(k) || EMPTY_SUM;
 function buildIndex() {
-  IDX = new Map(); HBT = new Map();
+  IDX = new Map(); HBT = new Map(); SUM = new Map(); HID = new Map(); TID = new Map();
+  for (const t of D().territories) TID.set(t.id, t);
   for (const h of D().houses) {
+    HID.set(h.id, h);
     if (!HBT.has(h.terrId)) HBT.set(h.terrId, []);
     HBT.get(h.terrId).push(h);
   }
@@ -1097,7 +1150,24 @@ function buildIndex() {
     if (!IDX.has(k)) IDX.set(k, []);
     IDX.get(k).push(v);
   }
-  for (const a of IDX.values()) a.sort((x, y) => (x.at < y.at ? 1 : -1)); // 新しい順
+  for (const [k, a] of IDX) {
+    a.sort((x, y) => (x.at < y.at ? 1 : -1)); // 新しい順
+    const s = { n: a.length, last: a[0], met: null, awayN: 0, slots: 0, metSlots: 0, awaySlots: 0, unmet: true, bestSlot: null };
+    let cnt = null;
+    for (let i = 0; i < a.length; i++) {
+      const v = a[i], sl = slotOf(new Date(v.at)), bit = SLOT_BIT[sl]; // 日時の読み取りはここで1回だけ
+      s.slots |= bit;
+      if (v.result === 'met') {
+        if (!s.met) s.met = v;
+        s.unmet = false; s.metSlots |= bit;
+        cnt = cnt || {};
+        cnt[sl] = (cnt[sl] || 0) + 1;
+        if (!s.bestSlot || cnt[sl] > cnt[s.bestSlot]) s.bestSlot = sl;
+      } else if (v.result === 'away') { s.awayN++; s.awaySlots |= bit; }
+      else s.unmet = false;
+    }
+    SUM.set(k, s);
+  }
 }
 const visitsOf = k => IDX.get(k) || [];
 const housesOf = tid => HBT.get(tid) || [];
@@ -1113,25 +1183,17 @@ function followStage(f) { const d = followIdle(f), s = D().settings; return d >=
 function parseKey(k) { const i = k.indexOf('|'); return [k.slice(0, i), k.slice(i + 1)]; }
 function targetName(h, unit) { return h.type === 'apt' ? `${esc(h.label || '集合住宅')} ${esc(unit)}号室` : esc(h.label || '家'); }
 /* 年代・また訪ねたいかを見られるのは、区域係・その区域の担当者・再訪問を受け持っている本人・記録した本人だけ */
-function canSeeDetail(k) {
+function canSeeDetail(k, house) {
   if (isAdmin()) return true;
-  const h = houseById(parseKey(k)[0]), t = h && terrById(h.terrId), f = fol(k);
+  const h = house || houseById(parseKey(k)[0]), t = h && terrById(h.terrId), f = fol(k);
   return !!((t && t.holder === me().id) || (f && f.by === me().id));
 }
-const seeV = (v, k) => v.by === me().id || canSeeDetail(k);
+const seeV = (v, k, house) => v.by === me().id || canSeeDetail(k, house);
 function lastInterest(k) {
-  const m = visitsOf(k).find(v => v.result === 'met');
+  const m = sum(k).met;
   return m && seeV(m, k) && INTERESTED.has(m.interest) ? m : null;
 }
-function bestSlot(k) {
-  const c = {}; let best = null;
-  for (const v of visitsOf(k)) {
-    if (v.result !== 'met') continue;
-    const s = slotOf(new Date(v.at)); c[s] = (c[s] || 0) + 1;
-    if (!best || c[s] > c[best]) best = s;
-  }
-  return best;
-}
+const bestSlot = k => sum(k).bestSlot;
 const hasFollowIn = h => targets(h).some(u => fol(K(h.id, u)));
 function aptLeft(h) { return h.units.filter(u => { const s = statusOf(K(h.id, u)); return s === 'new' || s === 'away'; }).length; }
 
@@ -1160,12 +1222,12 @@ function terrStats(t, sinceMs) {
   for (const h of housesOf(t.id)) {
     for (const u of targets(h)) {
       n++;
-      const vs = visitsOf(K(h.id, u));
-      if (vs[0]) {
-        if (!last || vs[0].at > last) last = vs[0].at;
-        if (Date.parse(vs[0].at) >= sinceMs) visited++;
+      const s = sum(K(h.id, u));
+      if (s.last) {
+        if (!last || s.last.at > last) last = s.last.at;
+        if (Date.parse(s.last.at) >= sinceMs) visited++;
       }
-      if (vs.some(v => v.result === 'met' && now - Date.parse(v.at) <= 90 * DAY)) met++;
+      if (s.met && now - Date.parse(s.met.at) <= 90 * DAY) met++;
     }
   }
   return { n, visited, met, last };
@@ -1299,9 +1361,11 @@ function renderHouses() {
   const show = !!list && list.length <= 800; // 印が多すぎると動きが重くなるので、拡大してから出す
   $('#zoomHint').hidden = show;
   if (!show) return;
+  const mine = myPlaces(), dimOthers = !sel && !isAdmin(); // 何も選んでいないときは、自分の区域以外を薄く
   for (const h of list) {
     const m = L.marker([h.lat, h.lng], {
-      icon: houseIcon(h, ff), title: h.label || '', opacity: fade,
+      icon: houseIcon(h, ff), title: h.label || '',
+      opacity: fade * (dimOthers && !isMyHouse(h, mine) ? 0.4 : 1),
       zIndexOffset: roundNums && roundNums.has(h.id) ? 1000 : 0
     });
     m.on('click', () => onHouseTap(h.id));
@@ -1310,10 +1374,21 @@ function renderHouses() {
 }
 function fillTerrJump() {
   const sel = $('#terrJump'), cur = sel.value;
-  const ts = D().territories.slice().sort(byNo);
-  sel.innerHTML = '<option value="">区域をえらぶ</option>' + ts.map(t => `<option value="${t.id}">区域 ${esc(t.no)}</option>`).join('');
-  if (ts.some(t => t.id === cur)) sel.value = cur;
+  const all = D().territories.slice().sort(byNo);
+  const ts = isAdmin() ? all : all.filter(t => t.holder === me().id); // 伝道者は自分の区域カードだけ
+  const head = ts.length ? '区域をえらぶ' : '受け取っている区域はありません';
+  sel.innerHTML = `<option value="">${head}</option>` + ts.map(t => `<option value="${t.id}">区域 ${esc(t.no)}</option>`).join('');
+  sel.value = ts.some(t => t.id === cur) ? cur : '';
 }
+/* 自分の区域・自分の受け持ち・自分の留守宅カードの家か */
+function myPlaces() {
+  const id = me().id;
+  const terrs = new Set(D().territories.filter(t => t.holder === id).map(t => t.id));
+  const keys = new Set(Object.keys(D().follows).filter(k => D().follows[k].by === id));
+  activeCards().forEach(c => { if (c.by === id) c.keys.forEach(k => keys.add(k)); });
+  return { terrs, keys };
+}
+const isMyHouse = (h, mine) => mine.terrs.has(h.terrId) || targets(h).some(u => mine.keys.has(K(h.id, u)));
 function fitTerr(id) {
   const t = terrById(id); if (!t) return;
   // 上の操作ボタンと下の案内に隠れないように余白をとる
@@ -1346,10 +1421,11 @@ function guardTerr(tid, keys, proceed) {
   setSheet(headHtml(t, 'あなたの区域カードではありません', esc(t.name)) + `
     <div class="notice warn"><b>区域${esc(t.no)}は、あなたが受け取っている区域カードではありません。</b><br>
       ${t.holder ? 'ほかの人が担当しています。' : '今は担当者がいません。'}</div>
-    <p>再訪問など、必要なときだけ記録してください。</p>
-    <button class="btn primary block" id="gOk">わかりました。続ける</button>
-    <button class="btn block" data-close>やめる</button>
-    <p class="hint">この区域では、画面を開き直すまで、この確認は出ません。自分の再訪問・留守宅カードの家では出ません。</p>`);
+    <p class="q">再訪問などで訪問しましたか？</p>
+    <button class="btn primary block" id="gOk">はい。再訪問などで訪問しました</button>
+    <button class="btn block" data-close>いいえ（やめる）</button>
+    <p class="hint">区域カードを回るときは、受け取っている区域だけを訪問してください。<br>
+      この区域では、画面を開き直すまで、この確認は出ません。自分が受け持っている再訪問と、自分の留守宅カードの家では出ません。</p>`);
   $('#gOk').onclick = () => { terrAck.add(tid); closeSheet(); proceed(); };
 }
 function onHouseTap(id) {
@@ -1434,7 +1510,7 @@ function openTarget(hid, unit, fromBuilding) {
       }
     }
 
-    if (isUnmet(k)) b += `<div class="notice info">これまで留守だった時間帯：${[...triedSlots(k)].sort(bySlot).map(slotShort).join('、')}<br>ほかの時間帯に訪ねてみてください。</div>`;
+    if (isUnmet(k)) b += `<div class="notice info">これまで留守だった時間帯：${slotList(triedSlots(k)).map(slotShort).join('、')}<br>ほかの時間帯に訪ねてみてください。</div>`;
     const hasDetail = vs.some(v => seeV(v, k) && (v.age || v.interest));
     b += `<h3 class="sub">これまでの記録${hasDetail ? ` <button class="btn small" id="shDetail">${st.detail ? 'くわしい表示を閉じる' : 'くわしく表示'}</button>` : ''}</h3>`;
     b += vs.length
@@ -2476,8 +2552,8 @@ let focusCard = null, roundTerr = null, roundNums = null, barMini = false;
 const slotText = s => { const [dt, b] = s.split('・'); return `${dt}の${b}（${BAND_HINT[b]}）`; };
 const slotShort = s => s.replace('・', 'の');
 const activeCards = () => { const now = Date.now(); return D().awayCards.filter(c => !c.endedAt && Date.parse(c.expiresAt) > now); };
-const isUnmet = k => { const vs = visitsOf(k); return vs.length > 0 && vs.every(v => v.result === 'away'); };
-const triedSlots = k => new Set(visitsOf(k).map(v => slotOf(new Date(v.at))));
+const isUnmet = k => { const s = sum(k); return s.n > 0 && s.unmet; };
+const triedSlots = k => sum(k).slots;
 // 担当者のいる区域は担当者だけ。空いている区域は、回り終えた記録があるものだけ。
 const awayEligibleTerr = (t, uid) => (t.holder ? t.holder === uid : !!t.completedAt);
 
@@ -2489,16 +2565,16 @@ function unmetIndex() {
     for (const u of targets(h)) {
       const k = K(h.id, u);
       if (D().dnc[k] || D().follows[k] || D().released[k] || !isUnmet(k)) continue;
-      const tried = triedSlots(k);
+      const s = sum(k), tried = s.slots;
       if (!m.has(h.terrId)) m.set(h.terrId, []);
-      m.get(h.terrId).push({ k, h, u, tried, recent: now - Date.parse(visitsOf(k)[0].at) < 3 * DAY, hard: tried.size >= SLOTS.length });
+      m.get(h.terrId).push({ k, h, u, tried, recent: now - Date.parse(s.last.at) < 3 * DAY, hard: slotCount(tried) >= SLOTS.length });
     }
   }
   return m;
 }
 function lockedKeys() { const s = new Set(); activeCards().forEach(c => c.keys.forEach(k => s.add(k))); return s; }
 function cardKeys(items, slot, locked) {
-  return items.filter(x => !x.hard && !x.recent && !x.tried.has(slot) && !locked.has(x.k)).map(x => x.k);
+  return items.filter(x => !x.hard && !x.recent && !hasSlot(x.tried, slot) && !locked.has(x.k)).map(x => x.k);
 }
 function awaySuggestions(uid, slots) {
   const idx = unmetIndex(), locked = lockedKeys(), res = [];
@@ -2514,7 +2590,7 @@ function awaySuggestions(uid, slots) {
 }
 function cardProgress(c) {
   const keys = c.keys.filter(k => houseById(parseKey(k)[0]));
-  return { total: keys.length, done: keys.filter(k => visitsOf(k).some(v => v.at >= c.at)).length };
+  return { total: keys.length, done: keys.filter(k => visitedSince(k, c.at)).length };
 }
 function takeAwayCard(tid, slot) {
   const max = D().settings.awayMax;
@@ -2549,7 +2625,7 @@ function openAwayCard(id) {
   }, 60);
 }
 /* 地図の目立たせ方（留守宅カード／自分の区域カードを回るとき） */
-const visitedSince = (k, iso) => visitsOf(k).some(v => v.at >= iso);
+const visitedSince = (k, iso) => { const s = sum(k); return !!s.last && s.last.at >= iso; };
 const FOCUS_RANK = ['hl', '', 'later', 'done', 'dim', 'refuse'];
 const todayIso = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); };
 /* 緑のチェックの基準：自分の区域なら受け取ってから、それ以外は今日 */
@@ -2564,24 +2640,19 @@ const roundMode = () => me().roundMode || 'reco';
 
 /* 家（部屋）ごとの「今訪ねる価値」と理由 */
 function scoreTarget(k, cur) {
-  const vs = visitsOf(k), reasons = [];
+  const st = sum(k), reasons = [];
   let sc = 10;
-  const metS = new Set(), awayS = new Set();
-  vs.forEach(v => {
-    const s = slotOf(new Date(v.at));
-    if (v.result === 'met') metS.add(s); else if (v.result === 'away') awayS.add(s);
-  });
-  const m = vs.find(v => v.result === 'met');
-  if (!vs.length) { sc += 15; reasons.push('はじめて訪ねる家'); }
+  const metS = st.metSlots, awayS = st.awaySlots, m = st.met;
+  if (!st.n) { sc += 15; reasons.push('はじめて訪ねる家'); }
   const see = m && seeV(m, k);
   if (see && INTERESTED.has(m.interest)) { sc += m.interest === '少しあり' ? 25 : 40; reasons.push('★ また訪ねたい'); }
   else if (see && !recIntOn()) { sc += 15; reasons.push('以前会えた家'); }
   if (see && YOUNG.has(m.age)) { sc += 10; reasons.push('若い世代'); }
-  if (metS.has(cur)) { sc += 15; reasons.push('この時間に会えたことがある'); }
-  else if (awayS.has(cur)) { sc -= 30; reasons.push('この時間は留守だった'); }
-  else if (vs.length && !m) {
+  if (hasSlot(metS, cur)) { sc += 15; reasons.push('この時間に会えたことがある'); }
+  else if (hasSlot(awayS, cur)) { sc -= 30; reasons.push('この時間は留守だった'); }
+  else if (st.n && !m) {
     sc += 30;
-    reasons.push(`留守${awayS.size ? vs.filter(v => v.result === 'away').length + '回' : ''}・この時間はまだ訪ねていない`);
+    reasons.push(`留守${st.awayN ? st.awayN + '回' : ''}・この時間はまだ訪ねていない`);
   }
   return { sc, reasons };
 }
@@ -2808,7 +2879,7 @@ function renderAwayAdmin() {
 
   const all = [...idx.values()].flat();
   const cnt = {};
-  all.forEach(x => { if (!x.hard) SLOTS.forEach(s => { if (!x.tried.has(s)) cnt[s] = (cnt[s] || 0) + 1; }); });
+  all.forEach(x => { if (!x.hard) SLOTS.forEach(s => { if (!hasSlot(x.tried, s)) cnt[s] = (cnt[s] || 0) + 1; }); });
   const maxN = Math.max(0, ...Object.values(cnt));
   $('#adAwaySlots').innerHTML = `<tr><th></th>${BANDS.map(b => `<th>${b}<br><small>${BAND_HINT[b]}</small></th>`).join('')}</tr>` +
     ['平日', '土日'].map(dt => `<tr><th>${dt}</th>${BANDS.map(b => {
@@ -2819,7 +2890,7 @@ function renderAwayAdmin() {
   const rows = D().territories.slice().sort(byNo).map(t => {
     const items = idx.get(t.id) || [];
     if (!items.length) return '';
-    const avg = (items.reduce((s, x) => s + x.tried.size, 0) / items.length).toFixed(1);
+    const avg = (items.reduce((s, x) => s + slotCount(x.tried), 0) / items.length).toFixed(1);
     const using = act.filter(c => c.terrId === t.id).length;
     return `<tr><th>区域${t.no}</th><td>${items.length}軒</td><td>${avg} / ${SLOTS.length}</td><td>${using ? `${using}枚` : '—'}</td>
       <td>${t.holder ? `${esc(uname(t.holder))}さん` : (t.completedAt ? 'だれでも' : '<span class="muted">回り終えた記録なし</span>')}</td></tr>`;
@@ -2855,16 +2926,16 @@ function computeReco() {
       if (D().dnc[k] || D().follows[k]) continue; // 受け持ち中の家は出さない
       const rel = D().released[k];
       if (othersTerr && !rel) continue;            // 引き継ぎ待ちはだれにでも見せる
-      const vs = visitsOf(k), last = vs[0];
+      const s2 = sum(k), last = s2.last;
       const idle = last ? Math.floor((now - Date.parse(last.at)) / DAY) : Infinity;
-      const met = vs.find(v => v.result === 'met'); // いちばん新しい「会えた」
+      const met = s2.met; // いちばん新しい「会えた」
       let kind = null, reason = '', score = 0;
       if (rel) {
         const bs = bestSlot(k);
         kind = 'handoff'; score = 100;
         reason = '再訪問の引き継ぎを待っています' + (bs ? `。会えた時間帯：${bs}` : '');
       }
-      const see = met && seeV(met, k);
+      const see = met && seeV(met, k, h);
       if (!kind && see) {
         if (INTERESTED.has(met.interest) && idle >= 30) {
           kind = 'interest'; score = 90; reason = `★（${idle}日間 訪問なし）`;
@@ -3008,7 +3079,7 @@ function leftItems() {
       const k = K(h.id, unit);
       if (D().follows[k] || D().dnc[k]) continue;
       const m = lastInterest(k); if (!m) continue;
-      const idle = daysSince(visitsOf(k)[0].at), rel = D().released[k];
+      const idle = daysSince(sum(k).last.at), rel = D().released[k];
       if (!rel && idle < s.remindDays) continue;
       out.push({ k, h, unit, m, idle, rel });
     }
