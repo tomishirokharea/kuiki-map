@@ -98,6 +98,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .modebar{position:absolute;top:10px;left:10px;right:10px;z-index:600;background:var(--paper);border:3px solid var(--draw);border-radius:var(--r);padding:10px 12px;box-shadow:0 4px 12px #0004}
 .modebar .row{margin:8px 0 0}
 .modebar input[type=range]{width:150px;vertical-align:middle}
+.terr-label.faint span{opacity:.45}
 .terr-label span{display:inline-block;transform:translate(-50%,-50%);background:#ffffffee;border:3px solid var(--terr);color:var(--terr);font-weight:700;font-size:18px;border-radius:10px;padding:0 10px;white-space:nowrap;font-family:"BIZ UDPGothic",sans-serif}
 
 /* ===== 家の印（色＋文字で区別） ===== */
@@ -197,6 +198,8 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .pin.hl{box-shadow:0 0 0 4px var(--draw),0 1px 3px #0006}
 .pin.dim{opacity:.3}
 .pin.done,.unit.done,.uchip.donec{background-image:linear-gradient(rgba(255,255,255,.66),rgba(255,255,255,.66));color:#7a858c;border-color:#dfe5e2;box-shadow:none}
+.pin b.rc{position:absolute;right:-13px;top:-13px;min-width:22px;height:22px;border-radius:99px;background:#00796B;color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;border:2px solid #fff;padding:0 3px;line-height:1}
+.pin.apt b.rc{top:auto;bottom:-13px;right:-13px}
 .pin b.rj{position:absolute;right:-14px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:99px;background:var(--ref);color:#fff;font-size:11px;display:grid;place-items:center;border:2px solid #fff}
 .refnote{background:var(--ref-bg);border:2px solid var(--ref);color:#7f1d1d}
 .btn.refok{background:var(--ref);border-color:var(--ref);color:#fff}
@@ -350,6 +353,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
         <span><i class="pin st-away">留</i>留守</span>
         <span><i class="pin st-refused">拒</i>拒否</span>
         <span><i class="pin st-met">会<em>再</em></i>再訪問の受け持ちあり</span>
+        <span><i class="pin st-met">会<b class="rc">最</b></i>最近会えた（とばしてよい）</span>
         <span><i class="pin st-new" style="opacity:.4">未</i>自分の区域以外（薄い印）</span>
       </div>
       <div class="modebar" id="addBar" hidden>
@@ -802,7 +806,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1 }, d.settings || {});
   },
   /* 控えを作り直す（訪問記録は件数が多いので、idだけ覚える） */
   buildFp() {
@@ -1119,6 +1123,15 @@ function normNo(v) {
     .replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[－ー―‐−–—]/g, '-').replace(/\s+/g, '');
 }
+/* 最近会えた家（区域を回るときは、とばしてよい） */
+const skipDays = () => Number(D().settings.skipDays || 0);
+function recentMet(k) {
+  const d = skipDays();
+  if (!d || D().dnc[k]) return false;
+  const m = sum(k).met;
+  return !!m && Date.now() - Date.parse(m.at) <= d * DAY;
+}
+const recentMetHouse = h => targets(h).some(u => recentMet(K(h.id, u)));
 const canDelHouse = h => isAdmin() || h.createdBy === me().id;
 
 /* 変更 → 保存 → 再表示 → 「取り消す」付きのお知らせ */
@@ -1292,30 +1305,53 @@ function houseIcon(h, ff) {
       st = arr.length ? arr[0] : 'dim';
     }
     const nb = roundNums && roundNums.has(h.id) ? `<s>${roundNums.get(h.id)}</s>` : '';
-    const rj = targets(h).some(u => D().dnc[K(h.id, u)]) ? '<b class="rj">拒</b>' : '';
+    const rj = targets(h).some(u => D().dnc[K(h.id, u)]) ? '<b class="rj">拒</b>'
+      : (recentMetHouse(h) ? '<b class="rc">最</b>' : '');
     return L.divIcon({ className: '', html: `<div class="pin apt${ff ? focusCls(st) : ''}">集${left && !nb ? `<i>${left}</i>` : ''}${fo}${ff ? doneMark(st) : ''}${nb}${rj}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
   }
   const k = K(h.id, ''), s = statusOf(k), fo = fol(k) ? '<em>再</em>' : '';
   const st = ff ? ff(k) : null;
-  const nb = roundNums && roundNums.has(h.id) ? `<s>${roundNums.get(h.id)}</s>` : '';
+  const nb = roundNums && roundNums.has(h.id) ? `<s>${roundNums.get(h.id)}</s>`
+    : (recentMet(k) ? '<b class="rc">最</b>' : '');
   return L.divIcon({ className: '', html: `<div class="pin st-${s}${ff ? focusCls(st) : ''}">${ST_CHAR[s]}${fo}${ff ? doneMark(st) : ''}${nb}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
 }
 function renderTerrs() {
   terrLayer.clearLayers();
   const cur = selTerrId();
+  const tapOk = mode === 'normal'; // 線引き・家の追加のときは、地図のタップを区域の選択に使わない
   for (const t of D().territories) {
-    const on = t.id === cur;
-    L.polygon(t.polygon, { color: '#0E7C66', weight: on ? 5 : 3, fillColor: '#0E7C66', fillOpacity: on ? 0.07 : 0.02, interactive: false }).addTo(terrLayer);
-    L.marker(center(t.polygon), { icon: L.divIcon({ className: 'terr-label', html: `<span>${esc(t.no)}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false }).addTo(terrLayer);
+    const on = t.id === cur, dim = !!cur && !on; // えらんだ区域以外は薄く
+    const poly = L.polygon(t.polygon, {
+      color: '#0E7C66', weight: on ? 5 : 3, opacity: dim ? 0.3 : 1,
+      fillColor: '#0E7C66', fillOpacity: on ? 0.07 : 0.02,
+      interactive: tapOk, bubblingMouseEvents: false
+    }).addTo(terrLayer);
+    if (tapOk) poly.on('click', () => selectTerr(t.id === cur ? null : t.id, { toast: t.id !== cur }));
+    L.marker(center(t.polygon), {
+      icon: L.divIcon({ className: `terr-label${dim ? ' faint' : ''}`, html: `<span>${esc(t.no)}</span>`, iconSize: [0, 0] }),
+      interactive: false, keyboard: false
+    }).addTo(terrLayer);
   }
+}
+/* 区域をえらぶ（地図のタップ・プルダウン・区域カードから共通で使う） */
+function selectTerr(id, opts) {
+  const o = opts || {}, t = id ? terrById(id) : null;
+  curTerr = t ? id : null;
+  focusCard = null;
+  roundTerr = t && t.holder === me().id ? id : null; // 自分の区域なら「回る表示」にする
+  const sel = $('#terrJump');
+  sel.value = [...sel.options].some(x => x.value === (curTerr || '')) ? (curTerr || '') : '';
+  if (roundTerr && o.fit) barMini = true; // 区域全体が見えるように、案内は小さくしておく
+  renderTerrs(); renderHouses();
+  if (t && o.fit) setTimeout(() => fitTerr(id), 80);
+  if (t && o.toast) toast(`区域${t.no}をえらびました`);
 }
 /* 今えらんでいる区域（選んでいないときは null） */
 function selTerrId() {
   const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
   if (c) return c.terrId;
   if (roundTerr) return roundTerr;
-  const v = $('#terrJump').value;
-  return v && terrById(v) ? v : null;
+  return curTerr && terrById(curTerr) ? curTerr : null;
 }
 /* 画面上での区域の広さ（ピクセル） */
 function terrScreenArea(t) {
@@ -1378,7 +1414,7 @@ function fillTerrJump() {
   const ts = isAdmin() ? all : all.filter(t => t.holder === me().id); // 伝道者は自分の区域カードだけ
   const head = ts.length ? '区域をえらぶ' : '受け取っている区域はありません';
   sel.innerHTML = `<option value="">${head}</option>` + ts.map(t => `<option value="${t.id}">区域 ${esc(t.no)}</option>`).join('');
-  sel.value = ts.some(t => t.id === cur) ? cur : '';
+  sel.value = ts.some(t => t.id === curTerr) ? curTerr : '';
 }
 /* 自分の区域・自分の受け持ち・自分の留守宅カードの家か */
 function myPlaces() {
@@ -1391,11 +1427,11 @@ function myPlaces() {
 const isMyHouse = (h, mine) => mine.terrs.has(h.terrId) || targets(h).some(u => mine.keys.has(K(h.id, u)));
 function fitTerr(id) {
   const t = terrById(id); if (!t) return;
-  // 上の操作ボタンと下の案内に隠れないように余白をとる
+  // 上の操作ボタンと下の案内に隠れない範囲で、区域をできるだけ大きく表示する
   const bar = $('#cardBar'), tools = $('#mapTools');
-  const top = tools && !tools.hidden ? tools.offsetHeight + 20 : 40;
-  const bottom = bar && !bar.hidden ? bar.offsetHeight + 30 : 40;
-  map.fitBounds(L.latLngBounds(t.polygon), { paddingTopLeft: [30, top], paddingBottomRight: [30, bottom] });
+  const top = tools && !tools.hidden ? tools.offsetHeight + 12 : 16;
+  const bottom = bar && !bar.hidden ? bar.offsetHeight + 16 : 16;
+  map.fitBounds(L.latLngBounds(t.polygon), { paddingTopLeft: [12, top], paddingBottomRight: [12, bottom] });
 }
 function fitAll() {
   const pts = D().territories.flatMap(t => t.polygon);
@@ -1510,6 +1546,7 @@ function openTarget(hid, unit, fromBuilding) {
       }
     }
 
+    if (recentMet(k)) b += `<div class="notice info"><b>最近（${daysSince(sum(k).met.at)}日前）会えた家です。</b>区域を回るときは、とばしてかまいません。</div>`;
     if (isUnmet(k)) b += `<div class="notice info">これまで留守だった時間帯：${slotList(triedSlots(k)).map(slotShort).join('、')}<br>ほかの時間帯に訪ねてみてください。</div>`;
     const hasDetail = vs.some(v => seeV(v, k) && (v.age || v.interest));
     b += `<h3 class="sub">これまでの記録${hasDetail ? ` <button class="btn small" id="shDetail">${st.detail ? 'くわしい表示を閉じる' : 'くわしく表示'}</button>` : ''}</h3>`;
@@ -2493,7 +2530,17 @@ function renderInbox() {
     <div class="setrow">
     <span>区域カードを「完了」にできる目安<br><small class="hint">訪ねた家の割合。目安に届くと、本人の画面に「返却して完了にできます」と出ます</small></span>
     <div class="stepper"><button type="button" data-donepct="-5" aria-label="目安を下げる">−</button><output class="wide">${st.donePct}%</output>
-    <button type="button" data-donepct="5" aria-label="目安を上げる">＋</button></div></div>`;
+    <button type="button" data-donepct="5" aria-label="目安を上げる">＋</button></div></div>
+    <div class="setrow">
+      <span>「最近会えた家」としてとばす期間<br><small class="hint">この期間に会えた家には地図に「最」の印が付き、区域を回るときの「おすすめ順」に出ません（0＝使わない）</small></span>
+      <div class="stepper"><button type="button" data-kset="skipDays" data-d="-5" aria-label="期間を短くする">−</button>
+        <output class="wide">${st.skipDays ? st.skipDays + '日' : '使わない'}</output>
+        <button type="button" data-kset="skipDays" data-d="5" aria-label="期間を長くする">＋</button></div></div>
+    <div class="setrow">
+      <span>「最近会えた家」を完了の数に入れる<br><small class="hint">入れると、回り終えた割合（％）に数えます</small></span>
+      <div class="seg" role="group" aria-label="完了の数に入れる">
+        <button type="button" data-sset="skipDone" data-v="1" aria-pressed="${st.skipDone !== 0}">入れる</button>
+        <button type="button" data-sset="skipDone" data-v="0" aria-pressed="${st.skipDone === 0}">入れない</button></div></div>`;
 }
 function approveReq(id) {
   const r = D().requests.find(x => x.id === id); if (!r) return;
@@ -2548,7 +2595,7 @@ function returnTerr(tid, completed) {
 }
 
 /* ---------- 留守宅カード ---------- */
-let focusCard = null, roundTerr = null, roundNums = null, barMini = false;
+let focusCard = null, roundTerr = null, roundNums = null, barMini = false, curTerr = null;
 const slotText = s => { const [dt, b] = s.split('・'); return `${dt}の${b}（${BAND_HINT[b]}）`; };
 const slotShort = s => s.replace('・', 'の');
 const activeCards = () => { const now = Date.now(); return D().awayCards.filter(c => !c.endedAt && Date.parse(c.expiresAt) > now); };
@@ -2616,7 +2663,8 @@ function endAwayCard(id) {
 function openAwayCard(id) {
   const c = D().awayCards.find(x => x.id === id); if (!c) return;
   focusCard = id; roundTerr = null; firstMapShow = false;
-  $('#terrJump').value = c.terrId;
+  curTerr = c.terrId;
+  $('#terrJump').value = [...$('#terrJump').options].some(o => o.value === c.terrId) ? c.terrId : '';
   showView('map'); renderTerrs();
   const pts = c.keys.map(k => houseById(parseKey(k)[0])).filter(Boolean).map(h => [h.lat, h.lng]);
   setTimeout(() => {
@@ -2662,7 +2710,7 @@ function roundInfo(tid, anyHolder) {
   const t = terrById(tid);
   if (!t || !t.holder || (!anyHolder && t.holder !== me().id)) return null;
   const since = t.lentAt || '', cur = slotOf(new Date());
-  const map = new Map(), items = [], c = { todo: 0, done: 0 };
+  const map = new Map(), items = [], c = { todo: 0, done: 0, recent: 0 };
   for (const h of housesOf(tid)) {
     for (const u of targets(h)) {
       const k = K(h.id, u), f = fol(k);
@@ -2670,13 +2718,17 @@ function roundInfo(tid, anyHolder) {
       if (D().dnc[k]) st = 'refuse';
       else if (f && f.by !== t.holder) st = 'skip';
       else if (since && visitedSince(k, since)) st = 'done';
+      else if (recentMet(k)) st = 'recent';  // 最近会えた家は、今回はとばしてよい
       else { st = 'todo'; items.push(Object.assign({ k, h, u }, scoreTarget(k, cur))); }
       map.set(k, st);
       if (st === 'todo' || st === 'done') c[st]++;
+      else if (st === 'recent') c.recent++;
     }
   }
-  const total = c.todo + c.done;
-  return { t, cur, map, c, items, pct: total ? Math.round(c.done / total * 100) : 100 };
+  // 「最近会えた家」を完了の数に入れるかどうかは、区域係が決める
+  const inc = D().settings.skipDone !== 0 ? c.recent : 0;
+  const total = c.todo + c.done + inc;
+  return { t, cur, map, c, items, pct: total ? Math.round((c.done + inc) / total * 100) : 100 };
 }
 /* おすすめの回り方：点数の高い家から選び、近い順につなぐ（集合住宅は1か所にまとめる） */
 function roundPlan(r) {
@@ -2724,13 +2776,13 @@ function focusFn() {
   if (roundTerr && !r) roundTerr = null;
   if (!r) return null;
   if (roundMode() === 'progress') {
-    return k => { const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? '' : s === 'refuse' ? 'refuse' : 'dim'; };
+    return k => { const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? '' : s === 'refuse' ? 'refuse' : s === 'recent' ? 'later' : 'dim'; };
   }
   const plan = roundPlan(r);
   roundNums = new Map(plan.map((s, i) => [s.h.id, i + 1]));
   const inPlan = new Set();
   plan.forEach(s => s.units.forEach(u => inPlan.add(K(s.h.id, u))));
-  return k => { const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? (inPlan.has(k) ? 'hl' : 'later') : s === 'refuse' ? 'refuse' : 'dim'; };
+  return k => { const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? (inPlan.has(k) ? 'hl' : 'later') : s === 'refuse' ? 'refuse' : s === 'recent' ? 'later' : 'dim'; };
 }
 function openPlanSheet() {
   const r = roundTerr ? roundInfo(roundTerr) : null; if (!r) return;
@@ -2770,13 +2822,13 @@ function renderCardBar() {
       ${p.total && p.done === p.total ? '<p class="okmsg"><b>すべて訪ねました。</b>「区域カード」画面で「終える」を押してください。</p>' : ''}
       <div class="row">${closeBtn}</div>`;
   } else {
-    const n = r.c, total = n.todo + n.done, pct = total ? Math.round(n.done / total * 100) : 0, mode = roundMode();
+    const n = r.c, total = n.todo + n.done + n.recent, pct = r.pct, mode = roundMode();
     let body = '', extra = '';
     if (!n.todo) {
       body = `<p class="okmsg"><b>すべての家に緑のチェックがつきました。</b>区域を回り終えました。</p>`;
       extra = `<button class="btn small primary" id="barReturn">返却する</button>`;
     } else if (mode === 'progress') {
-      body = `<p class="keys">${key('', '', `まだ ${n.todo}`)}${key(' done', '<u>✓</u>', `済み ${n.done}`)}</p>
+      body = `<p class="keys">${key('', '', `まだ ${n.todo}`)}${key(' done', '<u>✓</u>', `済み ${n.done}`)}${n.recent ? `<span><i class="pin mini st-met later">最</i>最近会えた ${n.recent}</span>` : ''}</p>
         <p class="muted">緑のチェックが全部の家につくと完了です。</p>`;
     } else {
       const plan = roundPlan(r), first = plan[0];
@@ -2784,7 +2836,7 @@ function renderCardBar() {
       body = (first
           ? `<p class="next"><span class="numbadge">1</span> 次は <b>${stopLabel(first)}</b><br><span class="muted">${first.reasons.slice(0, 2).join('・')}</span></p>`
           : '<p class="muted">今の時間帯のおすすめはありません。「進み具合」で残りの家を確認してください。</p>') +
-        `<p class="keys"><span><span class="numbadge sm">1</span>おすすめ ${plan.length}か所</span>${key(' later', '', `ほかの家 ${n.todo - planUnits}`)}${key(' done', '<u>✓</u>', `済み ${n.done}`)}</p>`;
+        `<p class="keys"><span><span class="numbadge sm">1</span>おすすめ ${plan.length}か所</span>${key(' later', '', `ほかの家 ${n.todo - planUnits}`)}${key(' done', '<u>✓</u>', `済み ${n.done}`)}${n.recent ? `<span><i class="pin mini st-met later">最</i>最近会えた ${n.recent}</span>` : ''}</p>`;
       if (first) extra = `<button class="btn small primary" id="barList">一覧を見る</button>`;
     }
     if (n.todo && r.pct >= D().settings.donePct) {
@@ -3067,10 +3119,59 @@ function renderAdmin() {
         <button class="btn small" data-open="${t.id}">地図</button>
         <button class="btn small" data-redraw="${t.id}">線を直す</button>
         <button class="btn small" data-rename="${t.id}">番号・名前</button>
+        <button class="btn small danger" data-delterr="${t.id}">削除</button>
         <label class="check"><input type="checkbox" data-free="${t.id}"${t.free ? ' checked' : ''}>自由に受け取ってよい</label>
       </div></article>`;
   }).join('');
 }
+/* 区域の削除（区域係のみ）。家を残すか、まとめて消すかを選ぶ */
+function openDeleteTerr(tid) {
+  const t = terrById(tid); if (!t || !isAdmin()) return;
+  const hs = housesOf(tid);
+  const targetsN = hs.reduce((a, h) => a + targets(h).length, 0);
+  let visits = 0;
+  hs.forEach(h => targets(h).forEach(u => { visits += sum(K(h.id, u)).n; }));
+  setSheet(headHtml(t, `区域${esc(t.no)}を削除します`, esc(t.name)) + `
+    <div class="notice warn"><b>この区域には、家 ${hs.length}件（部屋を含めて ${targetsN}）と、訪問記録 ${visits}件があります。</b>
+      ${t.holder ? `<br>今は${esc(uname(t.holder))}さんに貸し出し中です。` : ''}</div>
+    <p class="q">家のデータはどうしますか？</p>
+    <div class="choices two">
+      <button class="choice" data-del="keep">家は残す<small>区域の線だけ消します。家は「区域外の家」になり、新しい区域の線を引くとその区域に入ります</small></button>
+      <button class="choice c-refx" data-del="all">家と記録もまとめて消す<small>元に戻せるのは、この画面のお知らせの「取り消す」だけです</small></button>
+    </div>
+    <button class="btn block" data-close>やめる</button>`);
+  $$('[data-del]', $('#sheet')).forEach(x => x.onclick = () => {
+    const all = x.dataset.del === 'all';
+    const msg = all
+      ? `区域${t.no}と、家 ${hs.length}件・訪問記録 ${visits}件をすべて削除します。\n本当によろしいですか？`
+      : `区域${t.no}の線を削除します。家 ${hs.length}件は「区域外の家」として残ります。\nよろしいですか？`;
+    if (!confirm(msg)) return;
+    closeSheet();
+    deleteTerr(tid, all);
+  });
+}
+function deleteTerr(tid, withHouses) {
+  const t = terrById(tid); if (!t) return;
+  const ids = housesOf(tid).map(h => h.id);
+  commit(withHouses ? `区域${t.no}と家 ${ids.length}件を削除しました` : `区域${t.no}を削除しました（家は残しました）`, () => {
+    if (withHouses) {
+      const set = new Set(ids);
+      D().houses = D().houses.filter(h => !set.has(h.id));
+      D().visits = D().visits.filter(v => !set.has(v.houseId));
+      [D().dnc, D().follows, D().released].forEach(m => Object.keys(m).forEach(k => { if (set.has(k.split('|')[0])) delete m[k]; }));
+    } else {
+      D().houses.forEach(h => { if (h.terrId === tid) h.terrId = null; });
+    }
+    // この区域の留守宅カードは終わりにし、申し込みは「どこでもよい」に変える
+    const now = new Date().toISOString();
+    D().awayCards.forEach(c => { if (c.terrId === tid && !c.endedAt) c.endedAt = now; });
+    D().requests.forEach(r => { if (r.terrId === tid) r.terrId = null; });
+    D().territories = D().territories.filter(x => x.id !== tid);
+    if (curTerr === tid) curTerr = null;
+    if (roundTerr === tid) roundTerr = null;
+  });
+}
+
 /* 取り残し：関心があるのに受け持ちがなく、しばらく訪問がない家（引き継ぎ待ちを先に） */
 function leftItems() {
   const s = D().settings, out = [];
@@ -3215,14 +3316,9 @@ function updateAdminBadge() {
   b.textContent = n; b.hidden = !n;
 }
 function openTerr(id) {
-  const t = terrById(id);
-  focusCard = null;
-  roundTerr = t && t.holder === me().id ? id : null; // 自分の区域なら「回る表示」にする
-  $('#terrJump').value = id;
   firstMapShow = false;
   showView('map');
-  renderTerrs();
-  setTimeout(() => fitTerr(id), 60);
+  selectTerr(id, { fit: true });
 }
 
 /* ---------- ボタンの動き ---------- */
@@ -3266,13 +3362,7 @@ function bindStatic() {
   });
 
   // 地図
-  $('#terrJump').onchange = e => {
-    const v = e.target.value, t = terrById(v);
-    focusCard = null;
-    roundTerr = t && t.holder === me().id ? v : null;
-    renderTerrs(); renderHouses();
-    if (v) fitTerr(v);
-  };
+  $('#terrJump').onchange = e => selectTerr(e.target.value || null, { fit: true });
   $('#btnAdd').onclick = () => {
     addCount = 0; setMode('add'); updateAddBar();
     if (map.getZoom() < 17) toast('場所がわかるまで地図を拡大してから、タップしてください');
@@ -3331,6 +3421,7 @@ function bindStatic() {
     if ((x = q('[data-open]'))) openTerr(x.dataset.open);
     else if ((x = q('[data-redraw]'))) startDraw(x.dataset.redraw);
     else if ((x = q('[data-rename]'))) openTerrForm({ terr: terrById(x.dataset.rename) });
+    else if ((x = q('[data-delterr]'))) openDeleteTerr(x.dataset.delterr);
     else if ((x = q('[data-go]'))) goTo(x.dataset.go, x.dataset.unit);
     else if ((x = q('[data-fact]'))) followAction(x.dataset.fact, x.dataset.key);
     else if ((x = q('[data-set]'))) changeSetting(x.dataset.set, Number(x.dataset.d));
@@ -3341,7 +3432,7 @@ function bindStatic() {
     }
     else if ((x = q('[data-kset]'))) {
       const st = D().settings, key = x.dataset.kset;
-      const lim = key === 'keepMonths' ? [6, 36] : [5, 60];
+      const lim = key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 90] : [5, 60];
       st[key] = Math.min(lim[1], Math.max(lim[0], st[key] + Number(x.dataset.d)));
       Store.save(); renderAll(); toast('設定を変えました');
     }
