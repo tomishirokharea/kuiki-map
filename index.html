@@ -365,6 +365,24 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .fontbtn small{font-size:12px;color:var(--ink2);font-family:"BIZ UDPGothic",sans-serif}
 .fontbtn[aria-pressed="true"]{border-color:var(--brand);background:var(--terr-soft);box-shadow:0 0 0 2px var(--brand)}
 body.simple .adv{display:none!important}
+/* 「地図で見る」の目印：四すみの枠が家にしぼりこまれ、輪が広がる */
+.tgt{position:relative;width:0;height:0;pointer-events:none}
+.tgt .rt{position:absolute;left:-38px;top:-38px;width:76px;height:76px;animation:tgtIn .75s cubic-bezier(.2,.8,.2,1) both}
+.tgt .rt span{position:absolute;width:22px;height:22px;border:5px solid var(--draw)}
+.tgt .rt span:nth-child(1){left:0;top:0;border-right:0;border-bottom:0;border-radius:8px 0 0 0}
+.tgt .rt span:nth-child(2){right:0;top:0;border-left:0;border-bottom:0;border-radius:0 8px 0 0}
+.tgt .rt span:nth-child(3){left:0;bottom:0;border-right:0;border-top:0;border-radius:0 0 0 8px}
+.tgt .rt span:nth-child(4){right:0;bottom:0;border-left:0;border-top:0;border-radius:0 0 8px 0}
+.tgt .ring{position:absolute;left:-30px;top:-30px;width:60px;height:60px;border-radius:50%;border:4px solid var(--draw);opacity:0;animation:tgtPulse 1.5s ease-out .75s infinite}
+.tgt b{position:absolute;left:0;bottom:48px;transform:translateX(-50%);background:var(--draw);color:#fff;padding:5px 14px;border-radius:99px;white-space:nowrap;font-size:17px;box-shadow:0 2px 6px #0005;animation:tgtLabel .3s .75s both}
+@keyframes tgtIn{from{transform:scale(3.2) rotate(45deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+@keyframes tgtPulse{0%{transform:scale(.7);opacity:.9}100%{transform:scale(2);opacity:0}}
+@keyframes tgtLabel{from{opacity:0;margin-bottom:-8px}to{opacity:1;margin-bottom:0}}
+@media (prefers-reduced-motion:reduce){.tgt .rt,.tgt .ring,.tgt b{animation:none;opacity:1}}
+.sharegrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px}
+.sharegrid button{min-height:56px;border-radius:12px;border:2px solid var(--ink);background:#fff;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;gap:8px}
+.sharegrid i{width:14px;height:14px;border-radius:50%;flex:none}
+.review-rec{min-height:64px;font-size:20px;margin-top:14px}
 .grab{display:block;width:56px;height:6px;border-radius:99px;background:var(--line);margin:-4px auto 8px}
 .grabhint{text-align:center;font-size:13px;color:var(--ink2);margin:-4px 0 6px}
 #sheet.dragging{transition:none}
@@ -928,7 +946,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1 }, d.settings || {});
   },
   /* 控えを作り直す（訪問記録は件数が多いので、idだけ覚える） */
   buildFp() {
@@ -1697,7 +1715,26 @@ function openTerrIds() {
   if (c) s.add(c.terrId);
   return s;
 }
+/* 「地図で見る」で目印を付けた家（その家だけは、ほかの区域でもタップできる） */
+let target = null, targetMarker = null, targetTimer = null;
+function clearTarget() {
+  clearTimeout(targetTimer);
+  if (targetMarker && map) map.removeLayer(targetMarker);
+  targetMarker = null; target = null;
+}
+function showTargetMarker(h) {
+  if (!target || target.hid !== h.id) return;
+  if (targetMarker) map.removeLayer(targetMarker);
+  targetMarker = L.marker([h.lat, h.lng], {
+    icon: L.divIcon({ className: '', iconSize: [0, 0],
+      html: '<div class="tgt"><div class="rt"><span></span><span></span><span></span><span></span></div><div class="ring"></div><b>ここです　タップして開く</b></div>' }),
+    interactive: false, keyboard: false, zIndexOffset: 3000
+  }).addTo(map);
+  clearTimeout(targetTimer);
+  targetTimer = setTimeout(() => { if (targetMarker) { map.removeLayer(targetMarker); targetMarker = null; } }, 15000); // 目印は15秒で消える（家はそのままタップできる）
+}
 function canTapHouse(h, okT, mine) {
+  if (target && target.hid === h.id) return true;
   if (!lockOn()) return true;
   const ok = okT || openTerrIds(), my = mine || myPlaces();
   return ok.has(h.terrId) || targets(h).some(u => my.keys.has(K(h.id, u)));
@@ -1741,6 +1778,7 @@ function renderTerrs() {
 /* 区域をえらぶ（地図のタップ・プルダウン・区域カードから共通で使う） */
 function selectTerr(id, opts) {
   const o = opts || {}, t = id ? terrById(id) : null;
+  clearTarget();
   curTerr = t ? id : null;
   focusCard = null;
   roundTerr = myTerr(t) ? id : null; // 自分の区域（一緒に回る区域も）なら「回る表示」にする
@@ -1878,13 +1916,17 @@ function onHouseTap(id) {
   if (mode === 'draw') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
   if (mode === 'add') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
   if (!canTapHouse(h)) { toast('自分の区域以外の家は選べません'); return; }
-  guardTerr(h.terrId, targets(h).map(u => K(h.id, u)), () => {
+  const tg = target && target.hid === id ? target : null;
+  if (tg) clearTarget();
+  guardTerr(h.terrId, tg && tg.unit ? [K(h.id, tg.unit)] : targets(h).map(u => K(h.id, u)), () => {
+    if (tg && (h.type !== 'apt' || tg.unit)) { openTarget(id, tg.unit, false, true); return; } // まず記録とメモを見る
     if (h.type === 'apt') { if (h.units.length) openAptSeq(id); else openBuilding(id); }
     else openTarget(id, '', false);
   });
 }
 function setMode(m) {
   mode = m;
+  if (m !== 'normal') clearTarget();
   $('#addBar').hidden = m !== 'add';
   $('#drawBar').hidden = m !== 'draw';
   $('#mapTools').hidden = m !== 'normal';
@@ -1903,10 +1945,10 @@ function setMode(m) {
 }
 
 /* ---------- 家・部屋の記録 ---------- */
-function openTarget(hid, unit, fromBuilding) {
+function openTarget(hid, unit, fromBuilding, review) {
   const h = houseById(hid); if (!h) return;
   const t = terrById(h.terrId), k = K(hid, unit);
-  const st = { step: 'result', age: null, interest: null, override: false, detail: false };
+  const st = { step: review ? 'review' : 'result', age: null, interest: null, override: false, detail: !!review };
   const title = targetName(h, unit);
   const sub = t ? `区域${t.no}　${esc(t.name)}` : '区域の線の外';
 
@@ -1927,8 +1969,9 @@ function openTarget(hid, unit, fromBuilding) {
     } else if (mine) {
       const memo = memoOf(k);
       b += `<div class="notice info"><b>あなたが再訪問を受け持っています。</b>記録を付けると、期限が自動で延びます。
-        ${memo ? `<p class="memoline">${esc(memo.text)}</p>` : ''}
-        <span class="actions"><button class="btn small" id="shMemo">${memo ? 'メモを直す' : 'メモを書く'}（このスマホだけ）</button><button class="btn small" id="shStop">受け持ちをやめる</button></span></div>`;
+        ${memo ? `<p class="memoline">${esc(memo.text)}</p><p class="muted">メモの更新：${fmtDate(memo.at)}</p>` : (st.step === 'review' ? '<p class="muted">メモはまだありません。</p>' : '')}
+        <span class="actions"><button class="btn small" id="shMemo">${memo ? 'メモを直す' : 'メモを書く'}（このスマホだけ）</button><button class="btn small" id="shStop">受け持ちをやめる</button></span>
+        ${memo && st.step === 'review' ? shareButtonsHtml() : ''}</div>`;
     } else if (other) {
       b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。
         ${st.override ? '' : '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>'}</div>`;
@@ -1965,15 +2008,16 @@ function openTarget(hid, unit, fromBuilding) {
     const hasDetail = vs.some(v => seeV(v, k) && (v.age || v.interest));
     b += `<h3 class="sub">これまでの記録${hasDetail ? ` <button class="btn small" id="shDetail">${st.detail ? 'くわしい表示を閉じる' : 'くわしく表示'}</button>` : ''}</h3>`;
     b += vs.length
-      ? `<ul class="history">${vs.slice(0, 5).map(v => {
+      ? `<ul class="history">${vs.slice(0, st.step === 'review' ? 10 : 5).map(v => {
           const d = new Date(v.at);
           const sv = seeV(v, k);
           const extra = !sv ? '' : st.detail
             ? (v.result === 'met' ? `（${esc(ageName(v.age))}・${esc(intName(v.interest))}）` : (v.result === 'refused' && v.age ? `（${esc(ageName(v.age))}）` : ''))
             : (v.result === 'met' && INTERESTED.has(v.interest) ? ' ★' : '');
           return `<li><i class="pin st-${v.result}">${ST_CHAR[v.result]}</i><span>${fmtDate(v.at)}　${slotOf(d)}<br>${RESULT_LABEL[v.result]}${extra}</span></li>`;
-        }).join('')}</ul>${vs.length > 5 ? `<p class="muted">ほか ${vs.length - 5}件</p>` : ''}`
+        }).join('')}</ul>${vs.length > (st.step === 'review' ? 10 : 5) ? `<p class="muted">ほか ${vs.length - (st.step === 'review' ? 10 : 5)}件</p>` : ''}`
       : '<p class="muted">まだ記録はありません。</p>';
+    if (st.step === 'review' && !blocked) b += `<button class="btn primary block review-rec" id="shRecord">訪問の結果を記録する</button>`;
 
     b += navLink(h);
     if (!unit) {
@@ -2012,6 +2056,8 @@ function openTarget(hid, unit, fromBuilding) {
     on('shRelease', () => { followAction('release', k); paint(); });
     on('shStop', () => openReleaseSheet(k, false));
     on('shMemo', () => openMemo(k, paint));
+    on('shRecord', () => { st.step = 'result'; st.detail = false; paint(); });
+    $$('[data-share]', S).forEach(x => x.onclick = () => shareMemo(k, x.dataset.share, paint));
     on('shOverride', () => { st.override = true; paint(); });
     on('shDetail', () => { st.detail = !st.detail; paint(); });
     on('shTake', () => { followAction('take', k); paint(); });
@@ -2106,8 +2152,10 @@ function openMemo(k, back) {
     <p class="hint">次の訪問に必要なことだけを短く書いてください。住んでいる人の名前・電話番号は書かないでください。<br>受け持ちが終わると、メモも自動で消えます。スマホを替えると、メモは引き継がれません。</p>
     ${m ? `<p class="muted">最後に保存：${fmtDate(m.at)}</p>` : ''}
     <button class="btn primary block" id="memoSave">保存する</button>
+    ${m ? shareButtonsHtml(true) : ''}
     ${m ? '<button class="btn danger block" id="memoDel">メモを消す</button>' : ''}
     <button class="btn block" id="memoBack">もどる</button>`);
+  $$('[data-share]', $('#sheet')).forEach(x => x.onclick = () => shareMemo(k, x.dataset.share, () => openMemo(k, back)));
   $('#memoSave').onclick = () => {
     const text = $('#memoText').value.trim(), o = memoAll();
     if (text) o[k] = { text, at: new Date().toISOString() }; else delete o[k];
@@ -2122,6 +2170,77 @@ function openMemo(k, back) {
     done();
   };
   $('#memoBack').onclick = done;
+}
+
+/* ---------- メモを外に残す（Googleマップ・LINE・メモ帳など） ----------
+   外に残したメモは、このアプリの保護（受け持ちが終わったら消えるなど）の外になるため、最初に一度だけ注意を出す */
+const shareOn = () => D().settings.memoShare !== 0;
+function shareButtonsHtml(withHead) {
+  if (!shareOn()) return '';
+  return (withHead ? '<h3 class="sub">外に残す</h3>' : '<p class="q" style="font-size:17px">外に残す</p>') + `<div class="sharegrid">
+    <button type="button" data-share="gmap"><i style="background:#1A73E8"></i>Googleマップ</button>
+    <button type="button" data-share="line"><i style="background:#06C755"></i>LINE</button>
+    <button type="button" data-share="share"><i style="background:#F2B705"></i>メモ帳など</button>
+    <button type="button" data-share="copy"><i style="background:var(--ink2)"></i>コピー</button></div>`;
+}
+const gmapUrl = h => `https://www.google.com/maps/search/?api=1&query=${h.lat.toFixed(6)},${h.lng.toFixed(6)}`;
+function memoText(k) {
+  const [hid, unit] = parseKey(k), h = houseById(hid), t = h && terrById(h.terrId), m = memoOf(k);
+  const name = h.type === 'apt' ? `${h.label || '集合住宅'} ${unit}号室` : (h.label || '家');
+  return `【再訪問メモ】${t ? `区域${t.no} ` : ''}${name}\n${m ? m.text : ''}\n（${fmtDay(m ? m.at : new Date().toISOString())}のメモ）\n場所：${gmapUrl(h)}`;
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* 古い方法でためす */ }
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  ta.remove();
+  return ok;
+}
+function shareMemo(k, how, back) {
+  if (!shareOn()) { toast('会衆の設定で、メモを外に残す機能は使えません'); return; }
+  if (!memoOf(k)) { toast('先にメモを保存してください'); return; }
+  const okKey = 'kuiki_share_ok_' + me().id;
+  if (!lsGet(okKey)) { // はじめての1回だけ、注意を読んでもらう
+    setSheet(headHtml(null, 'メモをアプリの外に残す前に', '') + `
+      <div class="notice warn"><b>外に残したメモは、受け持ちが終わっても自動では消えません。</b>いらなくなったら、自分で消してください。</div>
+      <p>・住んでいる人の名前・電話番号・家族のことは書かないでください。</p>
+      <p>・LINEで送るときは、<b>自分だけのトーク（Keepメモ）</b>をえらび、ほかの人に送らないでください。</p>
+      <p>・スマホには画面ロックを設定しておいてください。</p>
+      <button class="btn primary block" id="shOk">わかりました</button>
+      <button class="btn block" id="shNo">やめる</button>`);
+    $('#shOk').onclick = () => { lsSet(okKey, '1'); shareMemo(k, how, back); };
+    $('#shNo').onclick = () => (back ? back() : closeSheet());
+    return;
+  }
+  const text = memoText(k), h = houseById(parseKey(k)[0]);
+  if (how === 'line') { // LINEの「送る先をえらぶ」画面が開く（Keepメモもえらべる）
+    window.open('https://line.me/R/share?text=' + encodeURIComponent(text), '_blank', 'noopener');
+    return;
+  }
+  if (how === 'share') { // スマホの共有画面（メモ・Google Keepなど）
+    if (navigator.share) { navigator.share({ title: '再訪問メモ', text }).catch(() => {}); return; }
+    copyText(text).then(ok => toast(ok ? 'コピーしました。メモ帳に貼り付けてください' : 'コピーできませんでした'));
+    return;
+  }
+  if (how === 'copy') { copyText(text).then(ok => toast(ok ? 'メモをコピーしました' : 'コピーできませんでした')); return; }
+  // Googleマップ：アプリから直接ピンに書きこむことはできないため、コピーしてから、その場所を開く
+  copyText(text).then(ok => {
+    setSheet(headHtml(null, 'Googleマップに残す', ok ? 'メモをコピーしました' : '') + `
+      <ol class="plan" style="list-style:decimal;padding-left:24px">
+        <li style="display:list-item">下の「Googleマップで場所を開く」を押します。</li>
+        <li style="display:list-item">ピンの場所が出たら「保存」を押して、自分のリスト（例：再訪問）をえらびます。</li>
+        <li style="display:list-item">保存した場所の「メモ」の欄を長押しして「ペースト」します。</li>
+      </ol>
+      <p class="hint">Googleマップの画面の言葉は、バージョンによって少しちがうことがあります。${ok ? '' : 'コピーできなかったときは、下の「もう一度コピー」を押してください。'}</p>
+      <a class="btn primary block" href="${gmapUrl(h)}" target="_blank" rel="noopener">Googleマップで場所を開く</a>
+      <button class="btn block" id="gmCopy">もう一度コピー</button>
+      <button class="btn block" id="gmBack">もどる</button>`);
+    $('#gmCopy').onclick = () => copyText(text).then(r => toast(r ? 'メモをコピーしました' : 'コピーできませんでした'));
+    $('#gmBack').onclick = () => (back ? back() : closeSheet());
+  });
 }
 
 /* ---------- 再訪問の受け持ちの操作 ---------- */
@@ -3854,16 +3973,23 @@ function renderReco() {
   }).join('') + (more > 0 ? `<p class="muted">ほか ${more}件。上の分類で絞りこめます。</p>` : '')
     : '<div class="empty">今の条件に合う家はありません。</div>';
 }
+/* 「地図で見る」：その家まで地図が飛んでいき、四すみの枠で家をしぼりこんで見せる。
+   家をタップすると、まずこれまでの記録とメモ → 「訪問の結果を記録する」で結果を残す */
 function goTo(hid, unit) {
   const h = houseById(hid); if (!h) return;
+  clearTarget();
+  focusCard = null; roundTerr = null; curTerr = null; firstMapShow = false;
+  target = { hid, unit: unit || '' };
   showView('map');
+  $('#terrJump').value = '';
   setTimeout(() => {
-    map.setView([h.lat, h.lng], 19);
-    guardTerr(h.terrId, unit ? [K(hid, unit)] : targets(h).map(u => K(hid, u)), () => {
-      if (h.type === 'apt' && h.units.length) openAptSeq(hid, unit || null);
-      else if (h.type === 'apt') openBuilding(hid);
-      else openTarget(hid, '', false);
-    });
+    map.invalidateSize();
+    let shown = false;
+    const show = () => { if (shown) return; shown = true; renderTerrs(); renderHouses(); showTargetMarker(h); };
+    map.once('moveend', show);
+    map.flyTo([h.lat, h.lng], 19, { duration: 0.9 });
+    setTimeout(show, 1400); // 同じ場所のときなど、動かなかった場合
+    toast('オレンジの枠の家をタップすると、これまでの記録とメモが見られます');
   }, 80);
 }
 function locate(after) {
@@ -4385,7 +4511,11 @@ function renderDataSet() {
       <button type="button" data-sset="${key}" data-v="0" aria-pressed="${st[key] === 0}">記録しない</button></div></div>`;
   $('#adRecSet').innerHTML =
     sw('recAge', '年代（若い世代／それ以外）', '「若い世代の方に会えた家」のおすすめに使います') +
-    sw('recInterest', '「また訪ねたいか（★）」', '記録しない設定にすると、会えたあとすぐに「私が再訪問します／今回は記録だけ」を聞きます。拒否は結果の画面に表示します');
+    sw('recInterest', '「また訪ねたいか（★）」', '記録しない設定にすると、会えたあとすぐに「私が再訪問します／今回は記録だけ」を聞きます。拒否は結果の画面に表示します') +
+    `<div class="setrow"><span>再訪問のメモを、Googleマップ・LINE・メモ帳などに残す機能<br><small class="hint">「使えない」にすると、メモは本人のスマホのこのアプリの中だけになります</small></span>
+      <div class="seg" role="group" aria-label="メモを外に残す機能">
+        <button type="button" data-sset="memoShare" data-v="1" aria-pressed="${st.memoShare !== 0}">使える</button>
+        <button type="button" data-sset="memoShare" data-v="0" aria-pressed="${st.memoShare === 0}">使えない</button></div></div>`;
   $('#adDataSet').innerHTML =
     row('keepMonths', '訪問記録を残す期間', 'か月', 6, 'これより古い記録は、家ごとの最後の1件を残して、毎月整理します（自動整理を設定したとき）') +
     row('cacheDays', '通信がない端末にデータを残す期間', '日', 5, 'この日数のあいだ通信できなかった端末は、保存した区域の情報を自動で消します');
@@ -4610,6 +4740,7 @@ let currentView = 'cards';
 function showView(name) {
   if (name === 'admin' && !isAdmin()) name = 'cards';
   if (currentView === 'map' && name !== 'map' && mode !== 'normal') { if (draw) endDraw(); else setMode('normal'); }
+  if (name !== 'map') clearTarget();
   currentView = name;
   $$('.view').forEach(v => { v.hidden = v.id !== 'view-' + name; });
   $$('#tabs button').forEach(b => { if (b.dataset.view === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
