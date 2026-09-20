@@ -3321,6 +3321,8 @@ function renderCards() {
   $('#myCards').innerHTML = mine.length ? mine.map(t => cardHtml(t, true)).join('')
     : '<div class="empty">受け取っている区域カードはありません。<br>下のボタンから申し込めます。</div>';
   const helping = ts.filter(t => t.holder !== me().id && isHelper(t));
+  const myDummy = ts.find(t => t.dummy && t.holder === me().id);
+  $('#myCards').insertAdjacentHTML('afterbegin', myDummy ? `<div class="notice info"><b>検証用の区域${esc(myDummy.no)}を受け取っています。</b>おすすめや地図の出かたを確かめるための、ダミーの区域です。<span class="actions"><button class="btn small" data-dguide="${myDummy.id}">確かめ方を見る</button></span></div>` : '');
   $('#myHelp').innerHTML = helping.length ? `<h2 class="sec">一緒に回る区域（今日まで）</h2>` + helping.map(t => cardHtml(t, false, true)).join('') : '';
   renderRequestArea();
   renderMyAwayCards();
@@ -4256,7 +4258,10 @@ function openUiSheet() {
 }
 
 /* ---------- 検証用のダミーデータ（おすすめや印の出かたを確かめる） ---------- */
-const dummyTerr = () => D().territories.find(t => t.dummy);
+const dummyTerrs = () => D().territories.filter(t => t.dummy);
+const dummyTerr = () => dummyTerrs()[0];
+const dummyCards = () => D().awayCards.filter(c => c.dummy);
+const uidRand = () => Math.random().toString(36).slice(2, 7);
 const BAND_HOUR = { 朝: 9, 昼: 12, 午後: 15, 夕方: 18, 夜: 20 };
 function dateAtSlot(slot, daysAgo) {
   const [dt, b] = slot.split('・');
@@ -4266,153 +4271,179 @@ function dateAtSlot(slot, daysAgo) {
   while (d.getTime() > Date.now()) d.setDate(d.getDate() - 7);
   return d.toISOString();
 }
+/* 検証する人をえらぶ
+   ・年代や★は、区域の担当者にしか見えない（本番のサーバーでも隠す）ため、1人に1つずつ検証用の区域（Z1〜）を作る
+   ・だれでも留守宅カードを受け取れる共通の区域（Z0）も作る。どの時間帯でも合う家を入れる */
 function addDummy() {
-  if (dummyTerr()) { openDummyGuide(); return; }
-  if (LIVE && !confirm('本番のデータに、検証用の区域と家を入れます。ほかの人の地図にも表示され、係の画面の集計にも入ります。確認が終わったら、必ず「ダミーを消す」を押してください。入れますか？')) return;
+  if (dummyTerrs().length) { openDummyGuide(); return; }
+  const users = D().users.filter(u => !u.inactive).slice().sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  setSheet(headHtml(null, '検証用のダミーを入れる', '') + `
+    ${LIVE ? '<div class="notice warn"><b>本番のデータに入ります。</b>地図や係の画面の集計にも入るので、確かめ終わったら「ダミーを消す」で消してください。</div>' : ''}
+    <p class="q">検証する人をえらぶ（8人まで）</p>
+    <label class="field"><span>名前でさがす</span><input type="text" id="dmQ" placeholder="名前の一部を入れる" autocomplete="off"></label>
+    <div id="dmList">${users.map(u => `<label class="check" data-name="${esc(u.name)}"><input type="checkbox" data-dm="${u.id}"${u.id === me().id ? ' checked' : ''}>${esc(u.name)}${u.role === 'admin' ? '（区域係）' : ''}</label>`).join('')}</div>
+    <p class="hint">えらんだ人ごとに、その人が担当する検証用の区域（Z1〜）を作ります。年代や★は区域の担当者にしか見えない仕組みなので、1人に1区域です。<br>
+      ほかに、だれでも留守宅カードを受け取れる共通の区域（Z0）を作ります。Z0と各自の区域には、どの時間帯でも留守宅カードが出るように、時間帯をずらした留守の家を入れます。</p>
+    <button class="btn primary block" id="dmGo">えらんだ人のダミーを入れる</button>
+    <button class="btn block" data-close>やめる</button>`);
+  $('#dmQ').oninput = e => { const q = e.target.value.trim(); $$('#dmList [data-name]').forEach(l => { l.hidden = !!q && !l.dataset.name.includes(q); }); };
+  $('#dmList').onchange = e => { if (e.target.checked && $$('#dmList input:checked').length > 8) { e.target.checked = false; toast('8人までです'); } };
+  $('#dmGo').onclick = () => {
+    const ids = $$('#dmList input:checked').map(x => x.dataset.dm);
+    if (!ids.length) { toast('検証する人をえらんでください'); return; }
+    closeSheet();
+    createDummy(ids);
+  };
+}
+function createDummy(testers) {
   const now = Date.now(), iso = ms => new Date(ms).toISOString(), mine = me().id;
-  const other = LIVE ? mine : ((D().users.find(u => u.id !== mine) || me()).id); // 本番では自分の名前の記録しか作れない
   const cur = slotOf(new Date()), others = SLOTS.filter(x => x !== cur), o1 = others[0], o2 = others[4];
-  // 場所：今ある区域の東どなり（家を区域に入れ直さないので、ほかの家には影響しない）
-  const all = D().territories.flatMap(t => t.polygon);
-  const lat0 = all.length ? Math.min(...all.map(q => q[0])) : HOME_VIEW[0] - 0.0018;
+  // 場所：今ある区域の東どなりに、3列で並べる（家を区域に入れ直さないので、ほかの家には影響しない）
+  const all = D().territories.filter(t => !t.dummy).flatMap(t => t.polygon);
+  const lat0 = all.length ? Math.max(...all.map(q => q[0])) - 0.0036 : HOME_VIEW[0] - 0.0018;
   const lng0 = all.length ? Math.max(...all.map(q => q[1])) + 0.0008 : HOME_VIEW[1] - 0.0022;
-  const H = 0.0036, W = 0.0045, tid = 'tzz' + uid();
-  const pos = i => [lat0 + H * (0.15 + 0.7 * Math.floor(i / 5) / 3), lng0 + W * (0.1 + 0.8 * (i % 5) / 4)];
+  const H = 0.0036, W = 0.0045, G = 0.0004;
+  const box = i => {
+    const la = lat0 - Math.floor(i / 3) * (H + G), ln = lng0 + (i % 3) * (W + G);
+    return { poly: [[la, ln], [la, ln + W], [la + H, ln + W], [la + H, ln]], pos: j => [la + H * (0.12 + 0.76 * Math.floor(j / 6) / 3), ln + W * (0.08 + 0.84 * (j % 6) / 5)] };
+  };
+  const terrs = [], houses = [], visits = [], dnc = {}, follows = {}, released = {};
   const once = { age: 'それ以外', interest: '再訪問しない' }, star = { age: 'それ以外', interest: '再訪問したい' };
-  const SC = [
-    { l: '検証01 はじめての家' },
-    { l: '検証02 はじめての家' },
-    { l: '検証03 留守2回・今の時間はまだ', v: [['away', dateAtSlot(o1, 35)], ['away', dateAtSlot(o2, 45)]] },
-    { l: '検証04 今の時間帯は留守だった', v: [['away', dateAtSlot(cur, 28)]] },
-    { l: '検証05 今の時間帯に会えた', v: [['met', dateAtSlot(cur, 50), once]] },
-    { l: '検証06 ★また訪ねたい', v: [['met', dateAtSlot(o1, 40), { age: '若い世代', interest: '再訪問したい' }]] },
-    { l: '検証07 若い世代', v: [['met', dateAtSlot(o2, 70), { age: '若い世代', interest: '再訪問しない' }]] },
-    { l: '検証08 引き継ぎ待ち', v: [['met', dateAtSlot(o1, 32), Object.assign({ by: other }, star)]], released: true },
-    { l: '検証09 自分の受け持ち3週間', v: [['met', iso(now - 35 * DAY), star]], follow: 25 },
-    { l: '検証10 自分の受け持ち6週間', v: [['met', iso(now - 45 * DAY), star]], follow: 45 },
-    { l: '検証11 最近会えた（青）', v: [['met', iso(now - 25 * DAY), once]] },
-    { l: '検証12 今回会えた（緑）', v: [['met', iso(now - 5 * DAY), once]] },
-    { l: '検証13 今回留守（緑）', v: [['away', iso(now - 3 * DAY - 3600000)]] },
-    { l: '検証14 拒否', v: [['refused', dateAtSlot(o1, 90), { age: 'それ以外' }]], dnc: true },
-    { l: '検証15 どの時間帯も留守', v: SLOTS.map((x, i) => ['away', dateAtSlot(x, 30 + i * 7)]) },
-    { l: '検証16 10分前にほかの人', v: [['away', iso(now - 10 * 60000), { by: other }]], demoOnly: true },
-    { l: '検証アパート', apt: {
-      '101': [], '102': [['away', dateAtSlot(o1, 35)]], '103': [['met', dateAtSlot(cur, 50), once]],
-      '201': [['refused', dateAtSlot(o2, 90), { age: 'それ以外' }]], '202': [['away', dateAtSlot(cur, 28)]],
-      '203': [['met', dateAtSlot(o2, 40), star]] }, aptDnc: ['201'] }
-  ];
-  const houses = [], visits = [], dnc = {}, follows = {}, released = {};
-  let n = 0;
-  SC.forEach(sc => {
-    if (LIVE && sc.demoOnly) return;
-    const [lat, lng] = pos(n++), hid = 'zz_' + uid() + n;
-    const units = sc.apt ? Object.keys(sc.apt) : [];
-    houses.push({ id: hid, terrId: tid, type: sc.apt ? 'apt' : 'house', lat, lng, label: sc.l, units, createdAt: iso(now - 400 * DAY), createdBy: mine });
-    const addV = (unit, [res, at, ex]) => {
-      const x = ex || {};
-      const v = { id: uid() + Math.random().toString(36).slice(2, 6), houseId: hid, unit, result: res, at, by: LIVE ? mine : (x.by || mine) };
-      if (x.age && res !== 'away') v.age = x.age;
-      if (res === 'met' && x.interest) v.interest = x.interest;
-      visits.push(v);
-    };
-    if (sc.apt) {
-      Object.entries(sc.apt).forEach(([u, list]) => list.forEach(e => addV(u, e)));
-      (sc.aptDnc || []).forEach(u => { dnc[K(hid, u)] = true; });
-    } else {
-      (sc.v || []).forEach(e => addV('', e));
+  const addHouse = (tid, pos, label, apt) => {
+    const hid = 'zz_' + uid() + uidRand();
+    houses.push({ id: hid, terrId: tid, type: apt ? 'apt' : 'house', lat: pos[0], lng: pos[1], label, units: apt ? Object.keys(apt) : [], createdAt: iso(now - 400 * DAY), createdBy: mine });
+    return hid;
+  };
+  const addV = (hid, unit, [res, at, ex], by) => {
+    const x = ex || {};
+    const v = { id: uid() + uidRand(), houseId: hid, unit, result: res, at, by: LIVE ? mine : (x.by || by) };
+    if (x.age && res !== 'away') v.age = x.age;
+    if (res === 'met' && x.interest) v.interest = x.interest;
+    visits.push(v);
+  };
+  // どの時間帯でも留守宅カードになる家：10の時間帯を、家ごとにずらして1〜2回ずつ留守にする
+  const spread = (tid, b, startJ, n, prefix) => {
+    for (let j = 0; j < n; j++) {
+      const hid = addHouse(tid, b.pos(startJ + j), `${prefix}${String(j + 1).padStart(2, '0')} 留守（${slotShort(SLOTS[j % 10])}）`);
+      addV(hid, '', ['away', dateAtSlot(SLOTS[j % 10], 12 + j * 3)], mine);
+      if (j % 3 === 0) addV(hid, '', ['away', dateAtSlot(SLOTS[(j + 5) % 10], 40 + j)], mine);
+    }
+  };
+  // 共通の区域 Z0：担当者なし・回り終えた記録あり → だれでも留守宅カードを受け取れる
+  const b0 = box(0), t0 = 'tzz' + uid() + uidRand();
+  terrs.push({ id: t0, no: 'Z0', name: '【検証用】みんなの留守宅', dummy: true, helpers: [], polygon: b0.poly, holder: null, lentAt: null, free: false, completedAt: iso(now - 30 * DAY) });
+  spread(t0, b0, 0, 20, '共通');
+  // 1人に1区域
+  const other = LIVE ? mine : ((D().users.find(u => !testers.includes(u.id)) || D().users.find(u => u.id !== testers[0]) || me()).id);
+  testers.forEach((owner, i) => {
+    const b = box(i + 1), tid = 'tzz' + uid() + uidRand(), no = 'Z' + (i + 1);
+    terrs.push({ id: tid, no, name: `【検証用】${uname(owner)}さん`, dummy: true, helpers: [], polygon: b.poly,
+      holder: owner, lentAt: iso(now - 20 * DAY), completedAt: iso(now - 60 * DAY) });
+    const SC = [
+      { l: '検証01 はじめての家' }, { l: '検証02 はじめての家' },
+      { l: '検証03 留守2回・今の時間はまだ', v: [['away', dateAtSlot(o1, 35)], ['away', dateAtSlot(o2, 45)]] },
+      { l: '検証04 作ったときの時間帯は留守', v: [['away', dateAtSlot(cur, 28)]] },
+      { l: '検証05 作ったときの時間帯に会えた', v: [['met', dateAtSlot(cur, 50), once]] },
+      { l: '検証06 ★また訪ねたい', v: [['met', dateAtSlot(o1, 40), { age: '若い世代', interest: '再訪問したい' }]] },
+      { l: '検証07 若い世代', v: [['met', dateAtSlot(o2, 70), { age: '若い世代', interest: '再訪問しない' }]] },
+      { l: '検証08 引き継ぎ待ち', v: [['met', dateAtSlot(o1, 32), Object.assign({ by: other }, star)]], released: true },
+      { l: '検証09 自分の受け持ち3週間', v: [['met', iso(now - 35 * DAY), star]], follow: 25 },
+      { l: '検証10 自分の受け持ち6週間', v: [['met', iso(now - 45 * DAY), star]], follow: 45 },
+      { l: '検証11 最近会えた（青）', v: [['met', iso(now - 25 * DAY), once]] },
+      { l: '検証12 今回会えた（緑）', v: [['met', iso(now - 5 * DAY), once]] },
+      { l: '検証13 今回留守（緑）', v: [['away', iso(now - 3 * DAY - 3600000)]] },
+      { l: '検証14 拒否', v: [['refused', dateAtSlot(o1, 90), { age: 'それ以外' }]], dnc: true },
+      { l: '検証15 どの時間帯も留守', v: SLOTS.map((x, k) => ['away', dateAtSlot(x, 30 + k * 7)]) },
+      { l: '検証16 10分前にほかの人', v: [['away', iso(now - 10 * 60000), { by: other }]] },
+      { l: '検証アパート', apt: {
+        '101': [], '102': [['away', dateAtSlot(o1, 35)]], '103': [['met', dateAtSlot(cur, 50), once]],
+        '201': [['refused', dateAtSlot(o2, 90), { age: 'それ以外' }]], '202': [['away', dateAtSlot(cur, 28)]],
+        '203': [['met', dateAtSlot(o2, 40), star]] }, aptDnc: ['201'] }
+    ];
+    SC.forEach((sc, j) => {
+      const hid = addHouse(tid, b.pos(j), sc.l, sc.apt);
+      if (sc.apt) {
+        Object.entries(sc.apt).forEach(([u, list]) => list.forEach(e => addV(hid, u, e, owner)));
+        (sc.aptDnc || []).forEach(u => { dnc[K(hid, u)] = true; });
+        return;
+      }
+      (sc.v || []).forEach(e => addV(hid, '', e, owner));
       const k = K(hid, '');
       if (sc.dnc) dnc[k] = true;
-      if (sc.follow) follows[k] = { by: mine, since: iso(now - 60 * DAY), touchedAt: iso(now - sc.follow * DAY) };
+      if (sc.follow) follows[k] = { by: owner, since: iso(now - 60 * DAY), touchedAt: iso(now - sc.follow * DAY) };
       if (sc.released) released[k] = { at: iso(now - 5 * DAY), reason: 'handoff' };
-    }
+    });
+    spread(tid, b, SC.length, 6, '検証'); // 各自の区域にも、時間帯をずらした留守の家
   });
   let cardN = 0;
-  commit(`検証用の区域Z1と家 ${houses.length}件を入れました`, () => {
-    D().territories.push({ id: tid, no: 'Z1', name: '【検証用】おすすめ確認', dummy: true, helpers: [],
-      polygon: [[lat0, lng0], [lat0, lng0 + W], [lat0 + H, lng0 + W], [lat0 + H, lng0]],
-      holder: mine, lentAt: iso(now - 20 * DAY), completedAt: iso(now - 60 * DAY) });
+  commit(`検証用の区域 ${terrs.length}つと家 ${houses.length}件を入れました`, () => {
+    D().territories.push(...terrs);
     D().houses.push(...houses);
     D().visits.push(...visits);
     Object.assign(D().dnc, dnc); Object.assign(D().follows, follows); Object.assign(D().released, released);
     buildIndex();
-    cardN = makeDummyAwayCards(); // 留守宅カードも、今の（豊見城の）区域カードの中に何枚か作る
+    cardN = makeDummyAwayCards(testers);
   });
   openDummyGuide();
-  if (cardN) setTimeout(() => toast(`留守宅カードも ${cardN}枚 作りました`), 7500);
+  if (cardN) setTimeout(() => toast(`留守宅カードの見本も ${cardN}枚 作りました`), 7500);
 }
-/* 留守宅カードのダミー：
-   ・自分の分：持てる枚数まで。今ある区域（豊見城の区域カード）を先に使い、足りなければZ1
-   ・試作モードでは、ほかの人の分も作る（使う人を切りかえて確かめられる）
-   ・試作モードでは、自分の1枚目に「訪ねた家」を2件入れて、進み具合も見られるようにする */
-function makeDummyAwayCards() {
-  const now = Date.now(), iso = ms => new Date(ms).toISOString(), made = [];
-  const makeFor = (who, max, preferReal) => {
-    for (let i = 0; i < max; i++) {
-      const list = awaySuggestions(who, SLOTS)
-        .filter(x => !made.some(c => c.by === who && c.terrId === x.t.id && c.slot === x.slot))
-        .sort((a, b) => (preferReal ? (a.t.dummy ? 1 : 0) - (b.t.dummy ? 1 : 0) : 0) || b.keys.length - a.keys.length);
-      const x = list[0]; if (!x) return;
-      const c = { id: 'c' + who + uidRand(), terrId: x.t.id, slot: x.slot, by: who, at: iso(now - 2 * DAY),
-        expiresAt: iso(now + (D().settings.awayDays - 2) * DAY), keys: x.keys.slice(0, 12), dummy: true, dv: [] };
-      D().awayCards.push(c); made.push(c);
-    }
-  };
-  const mine = me().id, have = activeCards().filter(c => c.by === mine).length;
-  makeFor(mine, Math.max(0, D().settings.awayMax - have), true);
-  if (!LIVE) {
-    D().users.filter(u => u.id !== mine).forEach(u => makeFor(u.id, 1, true));
-    const first = made.find(c => c.by === mine);
-    if (first) first.keys.slice(0, 2).forEach((k, i) => {
-      const [hid, unit] = parseKey(k);
-      const v = { id: uid() + 'dv' + i, houseId: hid, unit, result: i ? 'met' : 'away', at: iso(now - (i + 1) * 3600000), by: mine };
-      if (i) { v.age = 'それ以外'; v.interest = '再訪問しない'; }
-      D().visits.push(v); first.dv.push(v.id);
-    });
-  }
-  return made.length;
+/* 留守宅カードの見本：検証する人ごとに1枚（家は3軒だけにして、ほかの家は自分で受け取れるように残す） */
+function makeDummyAwayCards(testers) {
+  const now = Date.now(), iso = ms => new Date(ms).toISOString();
+  let n = 0;
+  testers.forEach(who => {
+    if (activeCards().filter(c => c.by === who).length >= D().settings.awayMax) return;
+    const own = D().territories.find(t => t.dummy && t.holder === who);
+    const x = awaySuggestions(who, SLOTS).find(s => own && s.t.id === own.id);
+    if (!x) return;
+    const c = { id: 'c' + who + uidRand(), terrId: x.t.id, slot: x.slot, by: who, at: iso(now - 2 * DAY),
+      expiresAt: iso(now + (D().settings.awayDays - 2) * DAY), keys: x.keys.slice(0, 3), dummy: true, dv: [] };
+    D().awayCards.push(c); n++;
+    const [hid, unit] = parseKey(c.keys[0]); // 1軒は訪ねた家（緑のチェック）にして、進み具合も見られるようにする
+    const v = { id: uid() + 'dv' + uidRand(), houseId: hid, unit, result: 'away', at: iso(now - 3600000), by: LIVE ? me().id : who };
+    D().visits.push(v); c.dv.push(v.id);
+  });
+  return n;
 }
-const uidRand = () => Math.random().toString(36).slice(2, 7);
-const dummyCards = () => D().awayCards.filter(c => c.dummy);
-function openDummyGuide() {
-  const t = dummyTerr(); if (!t) { if (dummyCards().length) toast('区域Z1はありません。留守宅カードのダミーだけ残っています'); return; }
+function openDummyGuide(tid) {
+  const ts = dummyTerrs();
+  if (!ts.length) { if (dummyCards().length) toast('検証用の区域はありません。留守宅カードの見本だけ残っています'); return; }
+  const mineT = ts.find(t => t.id === tid) || ts.find(t => t.holder === me().id);
+  const shared = ts.find(t => !t.holder);
   const cur = slotShort(slotOf(new Date()));
-  setSheet(headHtml(t, '検証用データの確かめ方', `今は${cur}です（おすすめは時間帯で変わります）`) + `
-    <div class="notice info">区域Z1は、あなたが20日前に受け取った区域として入れてあります。家の目印に「検証01」などの番号が付いています。</div>
-    <h3 class="sub">地図（区域Z1をひらく）</h3>
-    <p>・白い丸：01・02（はじめての家）ほか<br>・緑のチェック：12（会えた）・13（留守）${LIVE ? '' : '・16'}<br>・青いチェック：11（受け取る前の30日以内に会えた）<br>・赤い「拒」：14　・「再」の札：09・10<br>・四角の「集」：アパート（数字はまだの部屋）</p>
-    <p>・「おすすめ順」では、★の家（06・09・10・アパート）と03（留守・今の時間はまだ）が上位に入り、04（今の時間は留守だった）や15（どの時間帯も留守）は入りにくくなります。番号の順は、近い順につないだ回り方です。</p>
-    ${LIVE ? '' : '<p>・16をタップすると「10分前に、ほかの人が記録しています」と出ます。</p>'}
-    <h3 class="sub">区域カード画面</h3>
-    <p>・「あなたの再訪問」：09（しばらく訪問なし）・10（確認が必要）</p>
+  setSheet(headHtml(mineT || null, '検証用データの確かめ方', `今は${cur}です（おすすめは時間帯で変わります）`) + `
+    ${isAdmin() ? `<h3 class="sub">作った区域</h3><p>${ts.map(t => `・区域${esc(t.no)}：${t.holder ? `${esc(uname(t.holder))}さんの担当` : 'だれでも留守宅カードを受け取れる共通の区域'}`).join('<br>')}</p>` : ''}
+    <div class="notice info">${mineT ? `あなたの検証用の区域は<b>区域${esc(mineT.no)}</b>です（20日前に受け取った区域として入れてあります）。` : 'あなたの検証用の区域はありません。共通の区域Z0で留守宅カードを確かめられます。'}家の目印に「検証01」などの番号が付いています。</div>
     <h3 class="sub">おすすめ画面</h3>
-    <p>・引き継ぎを待っている家：08<br>・★ また訪ねたい家：06、アパート203<br>・若い世代：07<br>・留守宅カード：区域Z1（今の時間帯なら03・アパート102など）</p>
-    <h3 class="sub">留守宅カード（ダミー）</h3>
-    ${dummyCards().length ? `<p>${dummyCards().map(c => { const tt = terrById(c.terrId); return `・${esc(uname(c.by))}さん：区域${tt ? esc(tt.no) : '-'}　${slotText(c.slot)}（${c.keys.length}軒）`; }).join('<br>')}</p>
-      <p>自分の分は「区域カード」画面の「留守宅カード」にあります。「地図をひらく」で、カードの家が目立って表示されます。${LIVE ? '' : '1枚目には、訪ねた家（緑のチェック）が2件入っています。ほかの人の分は、上の「使う人」を切りかえると見られます。'}</p>`
-      : '<p class="muted">今の区域には、留守宅カードにできる家がありませんでした。</p>'}
-    <h3 class="sub">係の画面</h3>
-    <p>・なかなか会えない家：15<br>・取り残し：06・08・アパート203<br>・確認が必要な受け持ち：10<br>・留守宅の状況：区域ごとの「使用中のカード」</p>
-    <p class="hint">確かめ終わったら、係の画面の「データ」にある「ダミーを消す」で、区域Z1と家・記録をまとめて消せます。</p>
-    <div class="actions"><button class="btn primary" id="dgMap">区域Z1の地図をひらく</button><button class="btn" id="dgReco">おすすめを見る</button></div>
+    <p>・留守宅カード：<b>どの時間帯でも</b>、自分の区域と区域Z0のカードが出ます（行ける時間を全部にすると、時間帯ごとに並びます）。受け取れるのは2枚までで、見本が1枚入っています。</p>
+    <p>・引き継ぎを待っている家：各区域の08（だれにでも表示）<br>・★ また訪ねたい家：自分の区域の06・アパート203<br>・若い世代：自分の区域の07<br>
+      <span class="muted">★や年代は、区域の担当者にしか見えません。ほかの人の区域の06・07は、ほかの人には出ません。</span></p>
+    <h3 class="sub">地図（自分の区域をひらく）</h3>
+    <p>・白い丸：01・02ほか　・緑のチェック：12・13・16（今回訪ねた家）<br>・青いチェック：11　・赤い「拒」：14　・「再」の札：09・10<br>・16をタップすると「10分前に、ほかの人が記録しています」と出ます${LIVE && isAdmin() ? '（区域係が作った記録なので、区域係本人には出ません）' : ''}。</p>
+    <h3 class="sub">区域カード画面</h3>
+    <p>・あなたの再訪問：09（しばらく訪問なし）・10（確認が必要）。「地図で見る」で、目印の動きと、記録とメモの確認画面を確かめられます。</p>
+    ${isAdmin() ? `<h3 class="sub">係の画面</h3><p>・なかなか会えない家：各区域の15<br>・取り残し：06・08・アパート203<br>・確認が必要な受け持ち：各区域の10<br>・留守宅の状況：区域ごとの「使用中のカード」</p>
+      <p class="hint">確かめ終わったら、係の画面の「データ」にある「ダミーを消す」で、検証用の区域・家・記録・留守宅カードをまとめて消せます。</p>` : ''}
+    <div class="actions">${mineT ? `<button class="btn primary" id="dgMap">区域${esc(mineT.no)}の地図をひらく</button>` : ''}<button class="btn" id="dgReco">おすすめを見る</button></div>
     <button class="btn block" data-close>閉じる</button>`);
-  $('#dgMap').onclick = () => { closeSheet(); openTerr(t.id); };
+  if ($('#dgMap')) $('#dgMap').onclick = () => { closeSheet(); openTerr(mineT.id); };
   $('#dgReco').onclick = () => { closeSheet(); showView('reco'); };
 }
 function delDummy() {
-  const t = dummyTerr(), cards = dummyCards();
-  if (!t && !cards.length) return;
-  if (!confirm('検証用の区域Z1と、家・訪問記録・留守宅カードのダミーをすべて消します。よろしいですか？')) return;
+  const ts = dummyTerrs(), cards = dummyCards();
+  if (!ts.length && !cards.length) return;
+  if (!confirm(`検証用の区域 ${ts.length}つと、家・訪問記録・留守宅カードのダミーをすべて消します。よろしいですか？`)) return;
   commit('検証用のデータを消しました', () => {
     const dv = new Set(cards.flatMap(c => c.dv || []));
     if (dv.size) D().visits = D().visits.filter(v => !dv.has(v.id));
     D().awayCards = D().awayCards.filter(c => !c.dummy);
-    if (t) deleteTerrData(t.id, true);
+    ts.forEach(t => deleteTerrData(t.id, true));
   });
 }
 function renderDummy() {
-  const t = dummyTerr();
-  $('#adDummy').innerHTML = `<div class="setrow"><span>検証用のダミーデータ<br><small class="hint">おすすめや地図の印の出かたを確かめるため、区域1つ（Z1）と家17件ほど、留守・会えた・★・受け持ち・拒否などの記録と、留守宅カード数枚を入れます。${LIVE ? '<b>本番のデータに入ります。</b>確かめ終わったら消してください。' : ''}</small></span>
-    <div class="actions">${t || dummyCards().length
+  const has = dummyTerrs().length || dummyCards().length;
+  $('#adDummy').innerHTML = `<div class="setrow"><span>検証用のダミーデータ<br><small class="hint">おすすめ・留守宅カード・地図の印の出かたを、何人かで確かめるためのデータです。えらんだ人ごとに検証用の区域を作り、だれでも使える共通の区域も作ります。${LIVE ? '<b>本番のデータに入ります。</b>確かめ終わったら消してください。' : ''}</small></span>
+    <div class="actions">${has
       ? '<button type="button" class="btn small" data-dummy="guide">確かめ方を見る</button><button type="button" class="btn small danger" data-dummy="del">ダミーを消す</button>'
       : '<button type="button" class="btn small primary" data-dummy="add">ダミーを入れる</button>'}</div></div>`;
 }
@@ -4827,6 +4858,7 @@ function bindStatic() {
     }
     else if ((x = q('[data-return]'))) openReturnSheet(x.dataset.return);
     else if ((x = q('[data-helpers]'))) openHelpers(x.dataset.helpers);
+    else if ((x = q('[data-dguide]'))) openDummyGuide(x.dataset.dguide);
     else if ((x = q('[data-awayopen]'))) openAwayCard(x.dataset.awayopen);
     else if ((x = q('[data-awayend]'))) endAwayCard(x.dataset.awayend);
   });
