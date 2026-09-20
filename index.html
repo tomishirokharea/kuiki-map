@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
+<meta name="theme-color" content="#17324D">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
@@ -18,7 +19,8 @@
   --met:#1565C0; --away:#E8AE00; --ref:#C62828; --ref-bg:#FDECEC; --dnc:#3A3A3A;
   --young:#7B3FA0; --follow:#AD1457; --draw:#C2410C; --warn-bg:#FFF4D6; --danger:#B3261E;
   --r:14px; color-scheme:light;
-  --ok:#0E7C66; /* 訪ねた家の緑のチェック（テーマの色を変えても変わらない） */
+  --ok:#0E7C66;
+  --brand:#17324D; /* テーマの色（濃いほう）：上の帯・主なボタン・選んでいる項目 */ /* 訪ねた家の緑のチェック（テーマの色を変えても変わらない） */
   --font:"BIZ UDPGothic","Hiragino Sans","Yu Gothic",Meiryo,sans-serif; --z:1; --pin:1;
 }
 *{box-sizing:border-box}
@@ -38,7 +40,7 @@ h2,h3,p{margin:0}
 
 /* ===== 画面の骨組み ===== */
 .app{display:flex;flex-direction:column;height:100vh;height:100dvh}
-header.top{display:flex;align-items:center;gap:10px;padding:8px 14px;padding-top:calc(8px + env(safe-area-inset-top));background:var(--ink);color:#fff}
+header.top{display:flex;align-items:center;gap:10px;padding:8px 14px;padding-top:calc(8px + env(safe-area-inset-top));background:var(--brand);color:#fff}
 header.top h1{font-size:20px;margin:0;letter-spacing:.04em}
 .pill{font-size:13px;border:1px solid #ffffff80;border-radius:99px;padding:0 10px}
 .who{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:15px}
@@ -56,7 +58,7 @@ nav.tabs button[aria-current="page"]{color:var(--ink);font-weight:700;border-top
 
 /* ===== ボタン ===== */
 .btn{min-height:52px;padding:0 18px;border-radius:12px;border:2px solid var(--ink);background:#fff;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;color:var(--ink);white-space:nowrap}
-.btn.primary{background:var(--ink);color:#fff}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
 .btn.small{min-height:46px;padding:0 12px;font-size:16px}
 .btn.danger{border-color:var(--danger);color:var(--danger)}
 .btn.block{width:100%;margin-top:10px}
@@ -93,10 +95,10 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .maptools{position:absolute;top:10px;left:10px;right:10px;z-index:500;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
 .maptools>*{pointer-events:auto;box-shadow:0 2px 6px #0003}
 .maptools select{min-height:52px;border-radius:12px;border:2px solid var(--ink);background:#fff;padding:0 8px;font-weight:700;max-width:44vw}
-.zoomhint{position:absolute;top:130px;left:50%;transform:translateX(-50%);z-index:500;background:var(--ink);color:#fff;border:0;border-radius:99px;padding:6px 16px;font-size:16px;font-weight:700;min-height:48px;max-width:calc(100% - 20px);display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px #0005}
+.zoomhint{position:absolute;top:130px;left:50%;transform:translateX(-50%);z-index:500;background:var(--brand);color:#fff;border:0;border-radius:99px;padding:6px 16px;font-size:16px;font-weight:700;min-height:48px;max-width:calc(100% - 20px);display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px #0005}
 .zoomhint span{font-size:22px;line-height:1}
 .helpbtn{position:absolute;right:10px;bottom:104px;z-index:520;width:48px;height:48px;border-radius:50%;border:2px solid var(--ink);background:#fff;color:var(--ink);font-size:26px;font-weight:700;line-height:1;box-shadow:0 2px 6px #0003}
-.helpbtn[aria-expanded="true"]{background:var(--ink);color:#fff}
+.helpbtn[aria-expanded="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
 .legend{position:absolute;left:10px;right:10px;bottom:22px;z-index:700;background:var(--paper);border:2px solid var(--ink);border-radius:var(--r);padding:10px 12px;box-shadow:0 4px 14px #0005;max-height:62%;overflow:auto}
 .legendhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;font-size:18px}
 .legendgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px 14px;font-size:16px}
@@ -139,7 +141,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .choices.two{grid-template-columns:repeat(2,1fr)}
 .choice{min-height:88px;border-radius:14px;border:3px solid var(--line);background:#fff;font-size:19px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;line-height:1.3}
 .choice.wide{grid-column:1/-1;min-height:64px}
-.choice.on{border-color:var(--ink);background:var(--terr-soft)}
+.choice.on{border-color:var(--brand);background:var(--terr-soft)}
 .c-met{border-color:var(--met)} .c-away{border-color:var(--away)}
 .refbtn{width:100%;min-height:60px;margin-top:22px;flex-direction:row;gap:10px;border-color:var(--ref);color:var(--ref);background:var(--ref-bg)}
 .refhead{display:flex;align-items:center;gap:10px;background:var(--ref-bg);border:3px solid var(--ref);color:var(--ref);border-radius:12px;padding:10px 12px;margin-top:12px;font-size:20px}
@@ -164,7 +166,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .check input{width:26px;height:26px}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}
 .chip{min-height:48px;border-radius:99px;border:2px solid var(--ink);background:#fff;padding:0 16px;font-weight:700;font-size:16px}
-.chip[aria-pressed="true"]{background:var(--ink);color:#fff}
+.chip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
 .ritem{background:#fff;border:2px solid var(--line);border-left:10px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center}
 .ritem .rt{font-weight:700;font-size:19px}
 .k-handoff{border-left-color:var(--follow)}
@@ -244,7 +246,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .seg{display:inline-flex;border:2px solid var(--ink);border-radius:12px;overflow:hidden;margin:8px 0 2px}
 .seg button{min-height:46px;padding:0 16px;border:0;background:#fff;font-weight:700;font-size:16px}
 .seg button+button{border-left:2px solid var(--ink)}
-.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.seg button[aria-pressed="true"]{background:var(--brand);color:#fff}
 ol.plan{list-style:none;padding:0;margin:8px 0}
 ol.plan li{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
 ol.plan p{margin:0}
@@ -305,14 +307,14 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .unit.hl{outline:4px solid var(--draw);outline-offset:2px}
 .cardbar{position:absolute;left:10px;right:64px;bottom:22px;z-index:500;background:var(--paper);border:3px solid var(--draw);border-radius:var(--r);padding:8px 12px;box-shadow:0 4px 12px #0004}
 .cardbar p{margin:0}
-.nowtag{display:inline-block;background:var(--ink);color:#fff;border-radius:6px;padding:0 6px;font-size:14px;vertical-align:middle}
+.nowtag{display:inline-block;background:var(--brand);color:#fff;border-radius:6px;padding:0 6px;font-size:14px;vertical-align:middle}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .slotpick{width:100%;border-collapse:collapse;text-align:center;margin:8px 0}
 .slotpick th{font-size:15px;padding:4px 2px;font-weight:700}
 .slotpick th small{font-weight:400;font-size:11px}
 .slotpick td{padding:3px}
 .slotbtn{width:100%;min-width:44px;height:54px;border-radius:10px;border:2px solid var(--ink2);background:#fff;font-size:24px;font-weight:700}
-.slotbtn[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.slotbtn[aria-pressed="true"]{background:var(--brand);color:#fff;border-color:var(--brand)}
 .slots td.thin{background:var(--warn-bg);outline:3px solid var(--away);outline-offset:-3px}
 .tag-warn{background:var(--warn-bg);color:#6B4200;border-radius:8px;padding:0 8px;font-weight:700}
 
@@ -347,7 +349,22 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
 .swatch{min-height:56px;border-radius:12px;border:3px solid var(--line);background:#fff;font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;padding:0 10px}
 .swatch i{width:26px;height:26px;border-radius:50%;background:var(--c);flex:none}
-.swatch[aria-pressed="true"]{border-color:var(--ink);background:var(--terr-soft)}
+.swatch[aria-pressed="true"]{border-color:var(--brand);background:var(--terr-soft);box-shadow:0 0 0 2px var(--brand)}
+.swatch.custom i{background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red)}
+.wheelbox{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.wheel{position:relative;width:220px;height:220px;border-radius:50%;touch-action:none;cursor:crosshair;flex:none;
+  background:radial-gradient(circle closest-side,#fff 0%,rgba(255,255,255,0) 100%),conic-gradient(hsl(0,100%,50%),hsl(60,100%,50%),hsl(120,100%,50%),hsl(180,100%,50%),hsl(240,100%,50%),hsl(300,100%,50%),hsl(360,100%,50%));
+  box-shadow:0 0 0 3px #fff,0 0 0 5px var(--line)}
+.wheel b{position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:4px solid #fff;box-shadow:0 0 0 2px #0008,0 2px 4px #0006;pointer-events:none}
+.wheelprev{flex:1;min-width:150px}
+.wheelprev .bar{height:46px;border-radius:12px;color:#fff;font-weight:700;display:flex;align-items:center;padding:0 12px;margin-bottom:8px}
+.wheelprev .soft{height:40px;border-radius:12px;display:flex;align-items:center;padding:0 12px;border:2px solid var(--line)}
+.fontgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px}
+.fontbtn{min-height:74px;border-radius:12px;border:3px solid var(--line);background:#fff;padding:6px 10px;text-align:left;display:flex;flex-direction:column;justify-content:center;gap:2px;line-height:1.3}
+.fontbtn span{font-size:21px}
+.fontbtn small{font-size:12px;color:var(--ink2);font-family:"BIZ UDPGothic",sans-serif}
+.fontbtn[aria-pressed="true"]{border-color:var(--brand);background:var(--terr-soft);box-shadow:0 0 0 2px var(--brand)}
+body.simple .adv{display:none!important}
 /* 文字の大きさ：地図そのもの（家の印のタップ位置）には影響させず、文字と操作部分だけを拡大する */
 header.top,nav.tabs,.view>.wrap,#sheet,.joinbox,.blockbox,.maptools,.cardbar,.modebar,.legend{zoom:var(--z,1)}
 #toast{font-size:calc(17px * var(--z,1))}
@@ -363,7 +380,7 @@ body.strong{--ink2:#26394B;--line:#8C9C95}
 body.strong .pin.st-plain{border-width:4px}
 
 /* ===== お知らせ ===== */
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--ink);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--brand);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
 #toast button{min-height:46px;border-radius:10px;border:2px solid #fff;background:transparent;color:#fff;font-weight:700;padding:0 14px;flex:none}
 @media (max-width:420px){ body{font-size:17px} .choice{font-size:17px} }
 </style>
@@ -403,7 +420,7 @@ body.strong .pin.st-plain{border-width:4px}
       <div id="map"></div>
       <div class="maptools" id="mapTools">
         <select id="terrJump" aria-label="区域をえらぶ"></select>
-        <button class="btn primary" id="btnAdd">＋ 家を追加</button>
+        <button class="btn primary adv" id="btnAdd">＋ 家を追加</button>
         <button class="btn" id="btnLocate">現在地</button>
         <button class="btn" id="btnBase">写真</button>
       </div>
@@ -1523,7 +1540,8 @@ let map, terrLayer, houseLayer, baseLayers, baseName = 'pale', mode = 'normal';
 let tmpMarker = null, draw = null, myPos = null, posMarker = null, firstMapShow = true;
 
 function initMap() {
-  map = L.map('map', { zoomControl: false, zoomSnap: 0.125, zoomDelta: 1, wheelPxPerZoomLevel: 120 }).setView(HOME_VIEW, 17);
+  map = L.map('map', { zoomControl: false, zoomSnap: 0.125, zoomDelta: 1, wheelPxPerZoomLevel: 120, doubleClickZoom: false }).setView(HOME_VIEW, 17);
+  bindDoubleTap();
   map.createPane('cardPane'); // 古いカードの写真（地図の下）
   map.getPane('cardPane').style.zIndex = 150;
   map.getPane('cardPane').style.pointerEvents = 'none';
@@ -1554,6 +1572,24 @@ function pinState(k, since) {
 /* 集合住宅で、今回まだ訪ねていない部屋の数 */
 function aptTodo(h, since) {
   return h.units.filter(u => { const k = K(h.id, u); return !D().dnc[k] && pinState(k, since) === 'plain' && !recentMet(k); }).length;
+}
+/* 地図をダブルタップすると、その場所を中心に1段階ズームする（線引き・家の追加の最中は使わない） */
+function bindDoubleTap() {
+  const el = map.getContainer();
+  let down = null, last = null;
+  el.addEventListener('pointerdown', e => { down = e.isPrimary ? { x: e.clientX, y: e.clientY } : null; }, true);
+  el.addEventListener('pointerup', e => {
+    if (!e.isPrimary || !down || mode !== 'normal') { last = null; return; }
+    if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 12) { last = null; return; } // 地図を動かしたときは数えない
+    const now = Date.now();
+    if (last && now - last.t < 350 && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 40) {
+      last = null;
+      const r = el.getBoundingClientRect();
+      map.setZoomAround(L.point(e.clientX - r.left, e.clientY - r.top), Math.min(map.getMaxZoom(), Math.round(map.getZoom()) + 1));
+      return;
+    }
+    last = { t: now, x: e.clientX, y: e.clientY };
+  }, true);
 }
 function houseIcon(h, ff, locked) {
   const since = periodStart(h), lk = locked ? ' locked' : '';
@@ -1930,7 +1966,7 @@ function openTarget(hid, unit, fromBuilding) {
 
     b += navLink(h);
     if (!unit) {
-      b += `<details class="more"><summary>この家の編集</summary>
+      b += `<details class="more adv"><summary>この家の編集</summary>
         <label class="field"><span>目印を変える</span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="${esc(h.label)}"><button class="btn small" id="fLabelSave">保存</button></span>
         <small class="hint">住んでいる人の名前は書かないでください。</small></label>
         ${canDelHouse(h) ? '<button class="btn small danger" id="fDel">この家を削除する</button>' : ''}</details>`;
@@ -2167,7 +2203,7 @@ function openBuilding(hid) {
     <p class="hint">部屋をタップすると、その部屋の記録をくわしく見られます。</p>
     <div class="units">${cells || '<p class="muted">部屋がありません。下の「建物の編集」から追加してください。</p>'}</div>
     ${navLink(h)}
-    <details class="more"><summary>建物の編集</summary>
+    <details class="more adv"><summary>建物の編集</summary>
       <label class="field"><span>部屋を追加</span><span class="inline"><input type="text" id="fUnit" placeholder="例：305　（空白で区切ると複数）"><button class="btn small" id="fUnitAdd">追加</button></span></label>
       ${canDelHouse(h) ? `<label class="field"><span>部屋を削除</span><span class="inline"><input type="text" id="fUnitDel" placeholder="例：104"><button class="btn small danger" id="fUnitDelBtn">削除</button></span>
         <small class="hint">部屋番号がまちがっていたときに使います。</small></label>` : ''}
@@ -3823,17 +3859,75 @@ function locate(after) {
 
 /* ---------- 表示の設定（このスマホ・この人だけ。サーバーには送らない） ----------
    かんたん：文字の大きさだけ　くわしく：色・文字の種類・こさ・間隔・説明文・最初の画面・地図 */
-const UI_DEFAULT = { mode: 'simple', size: 'normal', font: 'ud', theme: 'green', contrast: 'normal', density: 'normal', hints: 'show', start: 'cards', pin: 'normal', base: 'pale' };
+const UI_DEFAULT = { mode: 'simple', size: 'normal', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'cards', pin: 'normal', base: 'pale' };
+/* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
-  green: ['#0E7C66', '#E5F2EE', 'みどり'], blue: ['#1D5FA8', '#E6EFF9', 'あお'], purple: ['#6B3FA0', '#F0EAF7', 'むらさき'],
-  orange: ['#B45309', '#FDF0E3', 'オレンジ'], pink: ['#B83268', '#FBE9F0', 'ピンク'], gray: ['#37474F', '#ECEFF1', 'グレー']
+  standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
+  green: ['#0B5E4E', '#0E7C66', '#E5F2EE', 'みどり'], blue: ['#174A85', '#1D5FA8', '#E6EFF9', 'あお'],
+  purple: ['#4E2A7A', '#6B3FA0', '#F0EAF7', 'むらさき'], orange: ['#8A3F06', '#B45309', '#FDF0E3', 'オレンジ'],
+  pink: ['#8E2350', '#B83268', '#FBE9F0', 'ピンク'], gray: ['#263238', '#37474F', '#ECEFF1', 'グレー']
 };
+/* 円形のカラーから、白い文字が読める濃さの色を作る */
+function hslHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return '#' + [f(0), f(8), f(4)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
+}
+function lum(hex) {
+  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+const onWhite = hex => 1.05 / (lum(hex) + 0.05); // 白い文字とのコントラスト
+function customTheme(hs) {
+  const m = String(hs || '').match(/^(\d+),(\d+)$/);
+  if (!m) return THEMES.standard;
+  const h = +m[1], sat = +m[2];
+  let l = 50, accent, brand;
+  while (l > 12 && onWhite(accent = hslHex(h, sat, l)) < 3.2) l -= 2;
+  while (l > 8 && onWhite(brand = hslHex(h, sat, l)) < 7) l -= 2;
+  return [brand, accent, hslHex(h, Math.min(sat, 70), 94), 'じぶんの色'];
+}
+const themeOf = e => (e.theme === 'custom' ? customTheme(e.custom) : THEMES[e.theme] || THEMES.standard);
 const SIZES = { small: [0.9, '小さめ'], normal: [1, '標準'], large: [1.15, '大きく'], xlarge: [1.3, 'とても大きく'] };
+/* 文字の種類：[Google Fontsの名前（なし＝読み込まない）, 表示名, 太さ, 分類] */
 const FONTS = {
-  ud: ['"BIZ UDPGothic","Hiragino Sans","Yu Gothic",Meiryo,sans-serif', '見やすいゴシック'],
-  maru: ['"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","BIZ UDPGothic",sans-serif', '丸ゴシック'],
-  system: ['system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif', 'スマホの文字']
+  ud: ['', '見やすいゴシック', '', '標準'],
+  system: ['', 'スマホの文字', '', '標準'],
+  maru: ['M PLUS Rounded 1c', 'まるゴシック', ':wght@400;700', 'まる'],
+  zenmaru: ['Zen Maru Gothic', 'やさしいまる', ':wght@400;700', 'まる'],
+  kosugi: ['Kosugi Maru', 'すっきりまる', '', 'まる'],
+  kiwi: ['Kiwi Maru', 'キウイまる', ':wght@400;500', 'かわいい'],
+  mochiy: ['Mochiy Pop One', 'もちっとポップ', '', 'かわいい'],
+  hachi: ['Hachi Maru Pop', 'はちまるポップ', '', 'かわいい'],
+  yusei: ['Yusei Magic', 'マジックペン', '', '手書き'],
+  klee: ['Klee One', 'えんぴつ手書き', ':wght@400;600', '手書き'],
+  yomogi: ['Yomogi', 'よもぎ手書き', '', '手書き'],
+  kurenaido: ['Zen Kurenaido', 'ふで手書き', '', '手書き'],
+  rocknroll: ['RocknRoll One', 'ロックンロール', '', 'ポップ'],
+  potta: ['Potta One', 'ぽってり筆', '', 'ポップ'],
+  dot: ['DotGothic16', 'ドット（ゲーム風）', '', 'ポップ'],
+  mincho: ['Zen Old Mincho', 'きれいな明朝', ':wght@400;700', 'きれい']
 };
+const FONT_BASE = '"BIZ UDPGothic","Hiragino Sans","Yu Gothic",Meiryo,sans-serif';
+const fontStack = k => {
+  const f = FONTS[k] || FONTS.ud;
+  if (k === 'system') return 'system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif';
+  return f[0] ? `"${f[0]}",${FONT_BASE}` : FONT_BASE;
+};
+const fontUrl = (k, text) => {
+  const f = FONTS[k];
+  return 'https://fonts.googleapis.com/css2?family=' + f[0].replace(/ /g, '+') + (text ? '' : f[2]) + '&display=swap' + (text ? '&text=' + encodeURIComponent(text) : '');
+};
+const fontFull = new Set(), fontPrev = new Set();
+function loadFont(k, previewText) {
+  const f = FONTS[k];
+  if (!f || !f[0] || fontFull.has(k)) return;
+  if (previewText) { if (fontPrev.has(k)) return; fontPrev.add(k); } else fontFull.add(k);
+  const l = document.createElement('link');
+  l.rel = 'stylesheet'; l.href = fontUrl(k, previewText); // 見本は使う文字だけ（軽い）、えらんだら全部の文字
+  document.head.appendChild(l);
+}
 const PINS = { small: [0.85, '小さめ'], normal: [1, '標準'], large: [1.25, '大きく'] };
 let UI = Object.assign({}, UI_DEFAULT);
 const uiKey = () => 'kuiki_ui_' + (Store.data ? me().id : 'guest');
@@ -3846,24 +3940,52 @@ function uiEff() {
   if (UI.mode === 'detail') return UI;
   return Object.assign({}, UI_DEFAULT, { size: UI.size === 'small' ? 'normal' : UI.size });
 }
-const accentColor = () => (THEMES[uiEff().theme] || THEMES.green)[0];
-let maruLoaded = false;
+const accentColor = () => themeOf(uiEff())[1];
+function setThemeVars(th) {
+  const r = document.documentElement.style;
+  r.setProperty('--brand', th[0]); r.setProperty('--terr', th[1]); r.setProperty('--terr-soft', th[2]);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = th[0];
+}
 function applyUi() {
-  const e = uiEff(), r = document.documentElement.style, th = THEMES[e.theme] || THEMES.green;
-  r.setProperty('--terr', th[0]); r.setProperty('--terr-soft', th[1]);
+  const e = uiEff(), r = document.documentElement.style;
+  setThemeVars(themeOf(e));
   r.setProperty('--z', String((SIZES[e.size] || SIZES.normal)[0]));
   r.setProperty('--pin', String((PINS[e.pin] || PINS.normal)[0]));
-  r.setProperty('--font', (FONTS[e.font] || FONTS.ud)[0]);
-  if (e.font === 'maru' && !maruLoaded) { // 丸ゴシックは使うときだけ読み込む
-    maruLoaded = true;
-    const l = document.createElement('link');
-    l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap';
-    document.head.appendChild(l);
-  }
+  r.setProperty('--font', fontStack(e.font));
+  loadFont(e.font); // 標準以外の文字は、使うときだけ読み込む
+  document.body.classList.toggle('simple', UI.mode !== 'detail');
   document.body.classList.toggle('compact', e.density === 'compact');
   document.body.classList.toggle('nohints', e.hints === 'hide');
   document.body.classList.toggle('strong', e.contrast === 'strong');
   if (map) { renderTerrs(); setTimeout(() => map.invalidateSize(), 30); }
+}
+/* 円形のカラー：角度で色あい、中心からの距離であざやかさ */
+function bindWheel() {
+  const w = $('#wheel'), dot = $('#wheelDot');
+  const show = (h, sat) => {
+    const R = w.clientWidth / 2, a = h * Math.PI / 180, d = R * sat / 100;
+    dot.style.left = (R + Math.sin(a) * d) + 'px'; dot.style.top = (R - Math.cos(a) * d) + 'px';
+    const th = customTheme(`${h},${sat}`);
+    dot.style.background = th[1];
+    $('#wpBar').style.background = th[0];
+    $('#wpSoft').style.background = th[2];
+    return th;
+  };
+  const m = String(UI.custom || '200,70').split(',');
+  show(+m[0] || 0, +m[1] || 0);
+  let dragging = false;
+  const pick = e => {
+    const r = w.getBoundingClientRect(), R = r.width / 2;
+    const dx = e.clientX - r.left - R, dy = e.clientY - r.top - R;
+    const h = Math.round((Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360);
+    const sat = Math.round(Math.min(1, Math.hypot(dx, dy) / R) * 100);
+    UI.custom = `${h},${sat}`;
+    setThemeVars(show(h, sat)); // なぞっている間は色だけ変える（軽く）
+  };
+  w.onpointerdown = e => { dragging = true; w.setPointerCapture(e.pointerId); pick(e); };
+  w.onpointermove = e => { if (dragging) pick(e); };
+  w.onpointerup = w.onpointercancel = () => { if (!dragging) return; dragging = false; uiSave(); applyUi(); };
 }
 function setBase(name) {
   if (!map || baseName === name) return;
@@ -3879,8 +4001,13 @@ function openUiSheet() {
     const seg = (key, opts, cur) => `<div class="seg uiseg" role="group">${opts.map(([v, l]) =>
       `<button type="button" data-ui="${key}" data-v="${v}" aria-pressed="${(cur === undefined ? UI[key] : cur) === v}">${l}</button>`).join('')}</div>`;
     const sizeOpts = (det ? ['small', 'normal', 'large', 'xlarge'] : ['normal', 'large', 'xlarge']).map(k => [k, SIZES[k][1]]);
+    const SAMPLE = 'あいう 区域マップ';
+    if (det) Object.keys(FONTS).forEach(k => loadFont(k, SAMPLE + FONTS[k][1]));
     const S_TEXT = `<h3 class="sub">文字</h3><p class="q">文字の大きさ</p>${seg('size', sizeOpts, uiEff().size)}` + (det
-      ? `<p class="q">文字の種類</p>${seg('font', Object.entries(FONTS).map(([k, v]) => [k, v[1]]))}
+      ? `<p class="q">文字の種類</p>
+         <div class="fontgrid">${Object.entries(FONTS).map(([k, v]) =>
+           `<button type="button" class="fontbtn" data-ui="font" data-v="${k}" aria-pressed="${UI.font === k}" style="font-family:${esc(fontStack(k))}"><span>${SAMPLE}</span><small>${v[1]}（${v[3]}）</small></button>`).join('')}</div>
+         <p class="hint">手書きやポップの文字は、かわいい反面、読みにくいことがあります。数字や小さい文字が読みにくいときは「見やすいゴシック」にもどしてください。</p>
          <p class="q">文字や線のこさ</p>${seg('contrast', [['normal', '標準'], ['strong', 'くっきり']])}` : '');
     let b = headHtml(null, '表示の設定', 'このスマホで、あなたにだけ使われる設定です') + `
       <div class="choices two">
@@ -3890,8 +4017,17 @@ function openUiSheet() {
     if (!det) {
       b += S_TEXT + `<p class="hint">「くわしく」にすると、テーマの色・文字の種類・地図の印の大きさなども、自分の好みに変えられます。</p>`;
     } else {
-      const S_COLOR = `<h3 class="sub">テーマの色</h3><div class="swatches">${Object.entries(THEMES).map(([k, v]) =>
-        `<button type="button" class="swatch" data-ui="theme" data-v="${k}" aria-pressed="${UI.theme === k}" style="--c:${v[0]}"><i></i>${v[2]}</button>`).join('')}</div>
+      const cm = String(UI.custom || '').match(/^(\d+),(\d+)$/), ch = cm ? +cm[1] : 200, cs = cm ? +cm[2] : 70;
+      const S_COLOR = `<h3 class="sub">テーマの色</h3>
+        <p class="hint">上の帯・ボタン・区域の線や番号など、画面ぜんぶの色が変わります。</p>
+        <div class="swatches">${Object.entries(THEMES).map(([k, v]) =>
+          `<button type="button" class="swatch" data-ui="theme" data-v="${k}" aria-pressed="${UI.theme === k}" style="--c:${v[1]}"><i style="background:linear-gradient(135deg,${v[0]} 50%,${v[1]} 50%)"></i>${v[3]}</button>`).join('')}
+          <button type="button" class="swatch custom" data-ui="theme" data-v="custom" aria-pressed="${UI.theme === 'custom'}"><i></i>じぶんの色</button></div>
+        ${UI.theme === 'custom' ? `<div class="wheelbox">
+          <div class="wheel" id="wheel" role="slider" aria-label="色をえらぶ円"><b id="wheelDot"></b></div>
+          <div class="wheelprev"><div class="bar" id="wpBar">区域マップ</div><div class="soft" id="wpSoft">えらんでいる項目</div>
+            <p class="hint">円の中を指でなぞって色をえらびます。外側ほどあざやか、真ん中ほどおだやかな色です。白い文字が読める濃さに自動で調整します。</p></div>
+        </div>` : ''}
         <p class="hint">地図の緑のチェック（訪ねた家）と、会えた・留守・拒否の色は変わりません。</p>`;
       const S_SCREEN = `<h3 class="sub">画面</h3>
         <p class="q">ボタンの間隔</p>${seg('density', [['normal', 'ゆったり'], ['compact', 'コンパクト']])}
@@ -3906,10 +4042,12 @@ function openUiSheet() {
     b += `<button class="btn block" id="uiReset">最初の設定にもどす</button><button class="btn primary block" data-close>閉じる</button>`;
     setSheet(b);
     if (keep) $('#sheet').scrollTop = top;
+    if ($('#wheel')) bindWheel();
     $$('[data-ui]', $('#sheet')).forEach(x => x.onclick = () => {
       const k = x.dataset.ui, v = x.dataset.v;
       if (k === 'round') { me().roundMode = v; Store.save(); renderHouses(); paint(true); return; }
       UI[k] = v;
+      if (k === 'theme' && v === 'custom' && !UI.custom) UI.custom = '200,70';
       uiSave(); applyUi();
       if (k === 'base') setBase(v);
       paint(k !== 'mode');
