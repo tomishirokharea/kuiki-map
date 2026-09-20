@@ -1413,11 +1413,12 @@ function applyInbox() {
 async function flush() {
   if (!LIVE || flushing || !Store.queue.length) { updateSyncBadge(); return; }
   flushing = true; updateSyncBadge();
-  let rejected = 0;
+  let rejected = 0, rejectedList = [];
   try {
     while (Store.queue.length) {
       const j = await api('sync', { changes: Store.queue[0], since: Store.seq });
       rejected += (j.rejected || []).length;
+      rejectedList = rejectedList.concat(j.rejected || []);
       Store.queue.shift();
       Store.persistQueue();
       if (j.mode === 'stale') Store.needFull = true;            // 差分では追いつけない → 全部を読み直す
@@ -1431,7 +1432,9 @@ async function flush() {
   }
   if (rejected) {
     // 手元だけに残った変更を消すため、全部を読み直す
-    toast('一部の変更は反映できませんでした。最新の情報に更新します');
+    const NAME = { requests: '区域カードの申し込み', territories: '区域', houses: '家', visits: '訪問の記録', follows: '再訪問の受け持ち', awayCards: '留守宅カード', settings: '設定' };
+    const kinds = [...new Set(rejectedList.map(r => NAME[r.c] || r.c))];
+    toast(`${kinds.join('・')}は受け付けられませんでした。最新の情報に更新します`);
     Store.needFull = true;
   }
   applyInbox();
@@ -1639,7 +1642,7 @@ function terrStats(t, sinceMs) {
 
 /* ---------- 起動のあいさつ ---------- */
 const SPLASH_OFF = 'kuiki_splash_off';
-const splashAt = Date.now();
+let splashAt = Date.now();
 let splashDone = false;
 if (lsGet(SPLASH_OFF)) { const el = document.getElementById('splash'); if (el) el.hidden = true; splashDone = true; }
 function hideSplash(now) {
@@ -1648,6 +1651,24 @@ function hideSplash(now) {
   splashDone = true;
   const wait = now ? 0 : Math.max(0, 1800 - (Date.now() - splashAt));
   setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.hidden = true; }, 500); }, wait);
+}
+/* iPhoneでは、アプリを閉じても画面がそのまま残っていることがあり、開き直しても読み込みが起きない。
+   そのため、30分以上あけて戻ってきたときは、もう一度あいさつを出す */
+let hiddenAt = 0;
+function splashAgain() {
+  const el = $('#splash');
+  if (!el || lsGet(SPLASH_OFF) || !Store.data) return;
+  splashDone = false; splashAt = Date.now();
+  el.classList.remove('out'); el.hidden = false;
+  splashGreeting();
+  hideSplash();
+}
+function watchResume() {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { hiddenAt = Date.now(); return; }
+    if (hiddenAt && Date.now() - hiddenAt > 30 * 60000) splashAgain();
+  });
+  window.addEventListener('pageshow', e => { if (e.persisted) splashAgain(); });
 }
 function splashGreeting() {
   if (splashDone || !Store.data) return;
@@ -3527,6 +3548,9 @@ function renderRequestArea() {
       <p><b>区域カードを申し込み中です</b></p>
       <p class="muted">希望：${t ? `区域${t.no}` : 'どこでもよい'}　${fmtDay(p.at)}に申し込み</p>
       <p class="muted">係が決めると、上の「あなたの区域カード」に加わります。</p>
+      ${LIVE ? (Store.queue.length
+        ? '<p class="tag-warn">まだ係に送れていません。電波のよい場所でこの画面を開くと、自動で送ります。</p>'
+        : '<p class="muted">係に送信ずみです。</p>') : ''}
       <div class="actions"><button class="btn small" data-reqcancel="${p.id}">申し込みを取り消す</button></div></div>`;
   } else {
     $('#reqArea').innerHTML = `<button class="btn block wideadd" data-reqopen>＋ 区域カードをもう1枚ほしい</button>`;
@@ -3624,7 +3648,17 @@ function renderInbox() {
         <p class="muted">${esc(uname(t.holder))}さん　${fmtDay(t.selfTakenAt)}に受け取り（今 ${heldCount(t.holder)}枚）</p>
       </div><button class="btn small" data-takenseen="${t.id}">確認した</button></article>`).join('');
   }
+  if (!LIVE) html = `<div class="notice warn"><b>この画面は「試作版」です。</b>この端末の中だけのデータで動いていて、ほかの人の申し込みは届きません。<br>
+    本番で使うときは、区域係から配られたリンク（GitHub Pagesのアドレス）を開いてください。</div>` + html;
+  if (LIVE) html = `<div class="setrow"><span>最後に確認した時刻：<b>${Store.syncAt ? fmtTime(new Date(Store.syncAt)) : 'まだ'}</b>${Store.queue.length ? `<br><span class="tag-warn">未送信 ${Store.queue.length}件</span>` : ''}</span>
+    <button type="button" class="btn small primary" id="adSync">今すぐ確認する</button></div>` + html;
   $('#adInbox').innerHTML = html;
+  if ($('#adSync')) $('#adSync').onclick = async () => {
+    const b = $('#adSync'); b.disabled = true; b.textContent = '確認しています…';
+    try { if (Store.queue.length) await flush(); await refresh(true); await fetchDevices(true); toast('最新の状態にしました'); }
+    catch (e) { toast('通信できませんでした。電波を確認してください'); }
+    renderAll();
+  };
   updateAdminBadge();
 
   const st = D().settings;
@@ -5003,7 +5037,7 @@ function showView(name) {
   }
   if (name === 'cards') renderCards();
   if (name === 'reco') renderReco();
-  if (name === 'admin') { renderAdmin(); fetchDevices(true); }
+  if (name === 'admin') { renderAdmin(); fetchDevices(true); if (LIVE && !Store.queue.length) refresh(true).catch(() => {}); }
 }
 function updateTabs() {
   $('#tabAdmin').hidden = !isAdmin();
@@ -5042,6 +5076,7 @@ function bindStatic() {
   $$('#tabs button').forEach(b => b.onclick = () => showView(b.dataset.view));
   $('#cardTabs').addEventListener('click', e => { const b = e.target.closest('[data-ctab]'); if (b) setCardTab(b.dataset.ctab); });
   $('#splash').addEventListener('click', () => hideSplash(true));
+  watchResume();
   $('#whoSel').onchange = e => {
     D().currentUser = e.target.value; Store.save();
     uiLoad(); applyUi();
