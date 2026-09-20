@@ -436,7 +436,7 @@ body.strong .pin.st-plain{border-width:4px}
         <h2 class="sec" id="followsHead">あなたの再訪問</h2>
         <div id="myFollows"></div>
         <details class="all" id="allDetails"><summary>ほかの区域を見る</summary><div id="allCards"></div></details>
-        <div class="row" id="liveTools" hidden><button class="btn small" id="btnLogout">この端末から消す</button>
+        <div class="row" id="liveTools" hidden><button class="btn small" id="btnHome">ホーム画面に追加する方法</button><button class="btn small" id="btnLogout">この端末から消す</button>
           <span class="muted">端末を人に渡すときや、使わなくなったときに押してください。</span></div>
         <div class="notice info">記録に残すのは「会えた・留守・拒否」「年代（若い世代かそれ以外か）」「また訪ねたいか」だけです。住んでいる人の名前・電話番号・家族のこと・会話の内容は書かないでください。<br>再訪問の「メモ」だけは、あなたのスマホの中にだけ保存され、係やほかの人には送られません。</div>
       </div>
@@ -1112,6 +1112,61 @@ async function apiRaw(body) {
   if (!res.ok) throw new Error('通信エラー ' + res.status);
   return res.json();
 }
+/* ホーム画面のアイコンから開いているか（iPhoneでは、Safariとデータの置き場所が分かれる） */
+const isStandalone = () => window.navigator.standalone === true ||
+  (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+const cleanUrl = () => {
+  const u = new URL(location.href);
+  u.searchParams.delete('t'); u.searchParams.delete('j');
+  history.replaceState(null, '', u.pathname + u.search + u.hash);
+};
+let homeUrlDirty = false;
+/* ホーム画面に追加する手順：
+   iPhoneでは、ホーム画面のアイコンとSafariで、保存した情報が別々に扱われます。
+   そのため、URLにコードを戻した状態で「ホーム画面に追加」してもらい、追加後にURLからコードを消します。 */
+function openHomeGuide() {
+  const tk = lsGet(TOKEN_KEY);
+  setSheet(headHtml(null, 'ホーム画面に追加する', 'アプリのように開けます') + `
+    <div class="notice warn"><b>そのまま「ホーム画面に追加」すると、あなたのコードが引き継がれず、次に開いたとき「このリンクでは開けません」と出ます。</b>下の順に行ってください。</div>
+    <ol class="plan" style="list-style:decimal;padding-left:26px">
+      <li style="display:list-item">下の「URLにコードを戻す」を押します。</li>
+      <li style="display:list-item">iPhone（Safari）は、画面の下の共有ボタン（□に↑）→「ホーム画面に追加」→「追加」。<br>Androidは、右上の「︙」→「ホーム画面に追加」。</li>
+      <li style="display:list-item">この画面にもどって「終わりました」を押します。</li>
+    </ol>
+    <button class="btn primary block" id="hgSet">URLにコードを戻す</button>
+    <p class="hint" id="hgState"></p>
+    <button class="btn block" id="hgDone">終わりました（URLからコードを消す）</button>
+    <button class="btn block" data-close>閉じる</button>
+    <p class="hint">ホーム画面のアイコンには、あなた専用のコードが入ります。かならずスマホに画面ロックを設定し、人に渡すスマホでは追加しないでください。<br>
+      すでに「開けません」と出るアイコンがあるときは、それを長押しして削除してから、この手順で追加し直してください。</p>`);
+  $('#hgSet').onclick = () => {
+    if (!tk) { toast('このスマホにはコードがありません'); return; }
+    const u = new URL(location.href);
+    u.searchParams.set('t', tk);
+    history.replaceState(null, '', u.pathname + u.search + u.hash);
+    homeUrlDirty = true;
+    $('#hgState').textContent = 'URLにコードを戻しました。このまま「ホーム画面に追加」してください。';
+    toast('この画面を閉じずに、ホーム画面に追加してください');
+  };
+  $('#hgDone').onclick = () => {
+    cleanUrl(); homeUrlDirty = false;
+    closeSheet();
+    toast('URLからコードを消しました');
+  };
+}
+/* ホーム画面のアイコンから開いたのに、コードが引き継がれていないとき */
+function openHomeHelp() {
+  hideBlocking();
+  joinPaint(`<h2>ホーム画面のアイコンからは開けません</h2>
+    <p>このアイコンには、あなたのコードが入っていません。iPhoneでは、ホーム画面のアイコンとSafariで、保存した情報が別々に扱われるためです。</p>
+    <p>次のように直してください。</p>
+    <ol style="padding-left:24px">
+      <li>このアイコンを長押しして削除します。</li>
+      <li>下の「ブラウザで開く」を押すか、区域係からもらったリンクをもう一度開きます。</li>
+      <li>使えるようになったら、「区域カード」画面の下にある<b>「ホーム画面に追加する方法」</b>の手順で追加し直します。</li>
+    </ol>
+    <a class="btn primary block" href="${esc(location.href)}" target="_blank" rel="noopener">ブラウザで開く</a>`);
+}
 function deviceLabel() {
   const ua = navigator.userAgent || '';
   if (/iPhone/.test(ua)) return 'iPhone';
@@ -1554,6 +1609,7 @@ function setSheet(html) {
   const h = s.querySelector('h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
 }
 function closeSheet() {
+  if (homeUrlDirty) { cleanUrl(); homeUrlDirty = false; } // URLに戻したコードは、画面を閉じたら消す
   $('#sheet').hidden = true; $('#backdrop').hidden = true;
   $('#sheet').dataset.swipe = ''; $('#sheet').style.transform = '';
   if (tmpMarker && map) { map.removeLayer(tmpMarker); tmpMarker = null; }
@@ -5010,6 +5066,7 @@ async function init() {
     const tk = readToken();
     if (!tk.token) {
       if (lsGet(JOIN_KEY)) { openJoin(); return; }          // 共通リンク：名前をえらぶ
+      if (isStandalone()) { openHomeHelp(); return; }       // ホーム画面のアイコンから開いた（コードが引き継がれていない）
       showBlocking('このリンクでは開けません', '区域係からもらったリンクを開いてください。');
       return;
     }
@@ -5042,6 +5099,7 @@ async function init() {
     $('#liveTools').hidden = false;
     $('#adReset').hidden = true;
     $('#btnLogout').onclick = logout;
+    $('#btnHome').onclick = openHomeGuide;
     // ふだんは約1分ごと、一緒に回っている間は約15秒ごとに、ほかの人の記録を取りに行く
     const again = () => {
       if (document.hidden || checkExpiry() || Store.authLost) return;
