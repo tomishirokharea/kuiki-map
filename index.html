@@ -302,6 +302,16 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .slots td.thin{background:var(--warn-bg);outline:3px solid var(--away);outline-offset:-3px}
 .tag-warn{background:var(--warn-bg);color:#6B4200;border-radius:8px;padding:0 8px;font-weight:700}
 
+/* ===== 取り込み・PDF ===== */
+.improw{background:#fff;border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;display:grid;grid-template-columns:120px 1fr;gap:6px 10px}
+.improw label>span{display:block;font-weight:700;font-size:15px}
+.improw input,.improw select{width:100%;min-height:50px;border-radius:10px;border:2px solid var(--ink2);padding:0 10px;background:#fff;font-size:18px}
+.improw .span{grid-column:1/-1;margin:0}
+.improw.skip{opacity:.55;background:#F6F8F7}
+@media (max-width:420px){.improw{grid-template-columns:1fr}}
+.pdfbox{border:2px solid var(--line);border-radius:12px;padding:6px;background:#F6F8F7;text-align:center;margin:10px 0}
+.pdfbox canvas{max-width:100%;height:auto;display:block;margin:0 auto;background:#fff}
+
 /* ===== お知らせ ===== */
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--ink);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
 #toast button{min-height:46px;border-radius:10px;border:2px solid #fff;background:transparent;color:#fff;font-weight:700;padding:0 14px;flex:none}
@@ -381,7 +391,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
         <div class="fold">
           <p class="muted" id="drawHelp"></p>
           <div class="row">
-            <label class="btn small">古いカードの写真を重ねる<input type="file" accept="image/*" id="ovFile" hidden></label>
+            <label class="btn small">古いカード（写真・PDF）を重ねる<input type="file" accept="image/*,application/pdf,.pdf" id="ovFile" hidden></label>
             <label class="check"><input type="checkbox" id="drawHouses">家の印を表示</label>
             <label class="check"><input type="checkbox" id="drawSnap" checked>隣の区域の点・線にくっつける</label>
             <button class="btn small" id="drawRestart" hidden>最初から引き直す</button>
@@ -390,7 +400,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
             <div class="row"><label>地図の濃さ <input type="range" class="wide" id="ovRange" min="0" max="100" value="50"></label></div>
             <div class="row" id="ovRotRow"><label>写真の回転 <input type="range" class="wide" id="ovRot" min="-45" max="45" step="0.5" value="0"></label>
               <span id="ovRotVal">0°</span></div>
-            <div class="row"><button class="btn small primary" id="ovPin">写真を地図に固定する</button><button class="btn small" id="ovClear">写真を消す</button></div>
+            <div class="row"><button class="btn small primary" id="ovPin">写真を地図に固定する</button><button class="btn small" id="ovPage" hidden>PDFのページを変える</button><button class="btn small" id="ovClear">写真を消す</button></div>
             <p class="hint" id="ovHint"></p>
           </div>
         </div>
@@ -423,7 +433,10 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
         <p class="hint">枠で囲んだ欄が、いちばん会えている時間帯です（10件以上の記録がある欄のみ）。</p>
         <div class="scroll"><table class="slots" id="adSlots"></table></div>
         <h2 class="sec">区域の一覧</h2>
-        <div class="row"><button class="btn primary" id="adNewTerr">＋ 新しい区域の線を引く</button></div>
+        <div class="row"><button class="btn primary" id="adNewTerr">＋ 新しい区域の線を引く</button>
+          <!-- iPhoneでは accept に .kml を書くとファイルを選べないことがあるため、あえて指定しない（中身で判定する） -->
+          <label class="btn">マイマップから区域を取り込む<input type="file" id="adKml" hidden></label></div>
+        <p class="hint">Googleマイマップで「KML/KMZにエクスポート」したファイルを選びます。区域の線だけを取り込み、ピン（家の印）は取り込みません。</p>
         <div id="adTakeSet"></div>
         <div id="adTerrs"></div>
         <h2 class="sec">留守宅の状況</h2>
@@ -562,6 +575,26 @@ const HOME_VIEW = [26.1771, 127.6811]; // 区域がまだ無いときの表示�
 const TILE_PALE = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png';
 const TILE_PHOTO = 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg';
 const GSI_ATTR = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>';
+
+/* 必要になったときだけ読み込む部品（ふだんの起動は軽いまま） */
+const LIB = {
+  pdf: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+  pdfWorker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
+  zip: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+};
+const libLoading = {};
+function loadScript(url) {
+  if (!libLoading[url]) {
+    libLoading[url] = new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = url;
+      s.onload = res;
+      s.onerror = () => { delete libLoading[url]; s.remove(); rej(new Error('load ' + url)); };
+      document.head.appendChild(s);
+    });
+  }
+  return libLoading[url];
+}
 
 /* ---------- 時間帯 ---------- */
 function bandOf(d) { const h = d.getHours(); return h < 11 ? '朝' : h < 14 ? '昼' : h < 17 ? '午後' : h < 19 ? '夕方' : '夜'; }
@@ -1123,6 +1156,7 @@ function normNo(v) {
     .replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[－ー―‐−–—]/g, '-').replace(/\s+/g, '');
 }
+const NO_RE = /^[0-9A-Za-z]+(-[0-9A-Za-z]+)*$/;
 /* 最近会えた家（区域を回るときは、とばしてよい） */
 const skipDays = () => Number(D().settings.skipDays || 0);
 function recentMet(k) {
@@ -1219,8 +1253,25 @@ function inPoly(lat, lng, poly) {
   }
   return c;
 }
+function bboxOf(poly) {
+  let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity;
+  for (const p of poly) { if (p[0] < a) a = p[0]; if (p[0] > b) b = p[0]; if (p[1] < c) c = p[1]; if (p[1] > d) d = p[1]; }
+  return [a, b, c, d];
+}
 function terrOf(lat, lng) { const t = D().territories.find(t => inPoly(lat, lng, t.polygon)); return t ? t.id : null; }
-function reassign() { D().houses.forEach(h => { h.terrId = terrOf(h.lat, h.lng); }); }
+/* 家がどの区域に入るかを決め直す（3万件でも速いように、先に四角の範囲で絞る） */
+function reassign() {
+  const bx = D().territories.map(t => ({ t, b: bboxOf(t.polygon) }));
+  for (const h of D().houses) {
+    let id = null;
+    for (const x of bx) {
+      const b = x.b;
+      if (h.lat < b[0] || h.lat > b[1] || h.lng < b[2] || h.lng > b[3]) continue;
+      if (inPoly(h.lat, h.lng, x.t.polygon)) { id = x.t.id; break; }
+    }
+    if (h.terrId !== id) h.terrId = id;
+  }
+}
 function center(poly) { return [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length]; }
 function distM(a, b) {
   const R = 6371000, toR = x => x * Math.PI / 180;
@@ -1270,6 +1321,10 @@ function closeSheet() {
   $('#sheet').hidden = true; $('#backdrop').hidden = true;
   if (tmpMarker && map) { map.removeLayer(tmpMarker); tmpMarker = null; }
   if (LIVE && Store.inbox.length) setTimeout(applyInbox, 0);
+}
+/* 長い説明は、すぐ消えるお知らせではなく画面で見せる */
+function infoSheet(title, html) {
+  setSheet(headHtml(null, title, '') + `<div class="notice warn">${html}</div><button class="btn primary block" data-close>わかりました</button>`);
 }
 const headHtml = (t, title, sub) => `<div class="sheet-head">${t ? `<span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>` : ''}<div><h2 id="sheetTitle">${title}</h2>${sub ? `<p class="muted">${sub}</p>` : ''}</div><button class="icon-btn" data-close aria-label="閉じる">×</button></div>`;
 const navLink = h => `<a class="btn block" href="https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}" target="_blank" rel="noopener">Googleマップで道順を見る</a>`;
@@ -2230,7 +2285,7 @@ function openTerrForm({ pts = null, terr = null }) {
     <button class="btn block" data-close>もどる</button>`);
   $('#fSave').onclick = () => {
     const no = normNo($('#fNo').value), name = $('#fName').value.trim();
-    if (!/^[0-9A-Za-z]+(-[0-9A-Za-z]+)*$/.test(no)) { toast('区域番号は「53」「53-1」のように入力してください'); return; }
+    if (!NO_RE.test(no)) { toast('区域番号は「53」「53-1」のように入力してください'); return; }
     if (D().territories.some(t => String(t.no) === no && t !== terr)) { toast(`区域${no}はすでにあります`); return; }
     closeSheet();
     if (terr) {
@@ -2245,10 +2300,11 @@ function openTerrForm({ pts = null, terr = null }) {
   };
 }
 
-/* 古いカードの写真を重ねる
+/* 古いカードの写真・PDFを重ねる
    ・合わせるとき：写真は画面に固定。地図を動かして道を重ねる（回転も調整できる）
-   ・固定したあと：写真は地図にくっつき、地図を動かすと一緒に動く */
-let ovState = null; // { url, pinned, rot, center, refZoom, w, h, el }
+   ・固定したあと：写真は地図にくっつき、地図を動かすと一緒に動く
+   ・PDFは、えらんだ1ページだけを画像にして重ねる（ファイルは端末の中だけで使い、どこにも送らない） */
+let ovState = null; // { url, pinned, rot, center, refZoom, w, h, el, pdf }
 let drawShowHouses = false, drawTap = 'line';
 const DRAW_HELP = {
   line: '区域の角を順番にタップします。隣の区域の点（緑の○）の近くをタップすると、その点にくっつきます。点はドラッグで動かせ、タップで選ぶと消せます。',
@@ -2283,15 +2339,18 @@ function applyRot() {
   placeOverlay();
 }
 function loadOverlay(file) {
+  if (/pdf/i.test(file.type || '') || /\.pdf$/i.test(file.name || '')) { openPdf(file); return; }
+  setOverlayUrl(URL.createObjectURL(file), false);
+}
+function setOverlayUrl(url, fromPdf) {
   clearOverlay();
-  const url = URL.createObjectURL(file);
-  ovState = { url, pinned: false, rot: 0 };
+  ovState = { url, pinned: false, rot: 0, pdf: !!fromPdf };
   const img = $('#overlayImg');
   img.src = url; img.hidden = false;
   $('#ovRot').value = 0;
   $('#map').classList.add('see-through');
   applyOv(); applyRot(); updateOvUi();
-  toast('地図を動かして、写真の道と地図の道を重ねてください');
+  toast('地図を動かして、カードの道と地図の道を重ねてください');
 }
 function updateOvUi() {
   $('#ovCtl').hidden = !ovState;
@@ -2299,6 +2358,8 @@ function updateOvUi() {
   const p = ovState.pinned;
   $('#ovPin').textContent = p ? '写真の位置を合わせ直す' : '写真を地図に固定する';
   $('#ovPin').classList.toggle('primary', !p);
+  $('#ovPage').hidden = !(ovState.pdf && pdfDoc);
+  $('#ovPage').textContent = `PDFのページを変える（今 ${pdfPage}ページ目）`;
   $('#ovRotRow').hidden = p;
   $('#ovHint').textContent = p
     ? '写真は地図に固定されています。地図を動かしたり拡大・縮小しても、写真が一緒に動きます。'
@@ -2354,6 +2415,318 @@ function clearOverlay() {
   $('#ovCtl').hidden = true;
   $('#map').classList.remove('see-through');
   if (map) map.getPane('tilePane').style.opacity = '';
+}
+
+/* ---------- PDFのカード（60ページのPDFでも、使うページだけを画像にする） ---------- */
+let pdfDoc = null, pdfName = '', pdfPage = 1, pdfJob = 0;
+async function openPdf(file) {
+  toast('PDFを開いています…');
+  try {
+    await loadScript(LIB.pdf);
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = LIB.pdfWorker;
+    const data = new Uint8Array(await file.arrayBuffer());
+    if (pdfDoc) { try { pdfDoc.destroy(); } catch (e) { /* 何もしない */ } }
+    pdfDoc = await window.pdfjsLib.getDocument({ data }).promise;
+    pdfName = file.name || 'PDF';
+    pdfPage = 1;
+    openPdfPicker();
+  } catch (e) {
+    pdfDoc = null;
+    infoSheet('PDFを開けませんでした', 'インターネットにつながっているか、ファイルが壊れていないかを確認して、もう一度えらんでください。パスワード付きのPDFは開けません。');
+  }
+}
+async function renderPdfPage(num, maxPx) {
+  const page = await pdfDoc.getPage(num);
+  const v1 = page.getViewport({ scale: 1 });
+  const vp = page.getViewport({ scale: maxPx / Math.max(v1.width, v1.height) });
+  const c = document.createElement('canvas');
+  c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  page.cleanup();
+  return c;
+}
+function openPdfPicker() {
+  if (!pdfDoc) return;
+  const n = pdfDoc.numPages;
+  const go = p => { pdfPage = Math.min(n, Math.max(1, Math.round(p) || 1)); paint(); };
+  const paint = () => {
+    setSheet(headHtml(null, '重ねるページをえらぶ', `${esc(pdfName)}　全${n}ページ`) + `
+      <div class="field"><span>ページ</span><div class="stepper">
+        <button type="button" data-pg="-1" aria-label="前のページ">−</button>
+        <output class="wide">${pdfPage} / ${n}</output>
+        <button type="button" data-pg="1" aria-label="次のページ">＋</button></div></div>
+      <label class="field"><span>ページ番号を入れて移動</span><span class="inline">
+        <input type="number" id="pgNum" min="1" max="${n}" value="${pdfPage}" inputmode="numeric"><button class="btn small" id="pgGo">移動</button></span></label>
+      <div class="pdfbox"><canvas id="pdfPrev" width="10" height="10" aria-label="${pdfPage}ページ目の見本"></canvas><p class="muted" id="pdfWait">表示しています…</p></div>
+      <button class="btn primary block" id="pgUse">このページを地図に重ねる</button>
+      <button class="btn block" data-close>やめる</button>`);
+    const S = $('#sheet');
+    $$('[data-pg]', S).forEach(x => x.onclick = () => go(pdfPage + Number(x.dataset.pg)));
+    $('#pgGo').onclick = () => go(Number($('#pgNum').value));
+    $('#pgUse').onclick = usePdfPage;
+    const job = ++pdfJob;
+    renderPdfPage(pdfPage, 900).then(c => {
+      const pv = $('#pdfPrev');
+      if (job !== pdfJob || !pv) return;
+      pv.width = c.width; pv.height = c.height;
+      pv.getContext('2d').drawImage(c, 0, 0);
+      $('#pdfWait').hidden = true;
+    }).catch(() => { const w = $('#pdfWait'); if (w && job === pdfJob) w.textContent = 'このページは表示できませんでした'; });
+  };
+  paint();
+}
+async function usePdfPage() {
+  const btn = $('#pgUse');
+  if (btn) { btn.disabled = true; btn.textContent = '準備しています…'; }
+  try {
+    const c = await renderPdfPage(pdfPage, 2400); // 拡大しても道が読める細かさ
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    if (!blob) throw new Error('blob');
+    closeSheet();
+    setOverlayUrl(URL.createObjectURL(blob), true);
+  } catch (e) {
+    toast('このページを画像にできませんでした');
+    if (btn) { btn.disabled = false; btn.textContent = 'このページを地図に重ねる'; }
+  }
+}
+
+/* ---------- マイマップ（KML・KMZ）から区域を取り込む ----------
+   ・区域の線（図形・閉じた線）だけを取り込む。ピン（家の印）は、個人情報を含むことがあるので取り込まない
+   ・説明欄も読まない。取り込むのは「名前」と「線の位置」だけ
+   ・ファイルはこの端末の中で読むだけで、「取り込む」を押すまでどこにも送らない */
+const IMPORT_SNAP_M = 3, SIMPLIFY_M = 1;
+const mXY = (p, cosLat) => [p[1] * 111320 * cosLat, p[0] * 110540];
+function segDist(p, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+  let t = l2 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  const x = a[0] + t * dx - p[0], y = a[1] + t * dy - p[1];
+  return Math.sqrt(x * x + y * y);
+}
+/* 形を変えない程度に点を減らす（線を直すときに点が多すぎると操作しにくいため） */
+function simplifyRing(pts, tol) {
+  if (pts.length <= 4) return pts;
+  const cosLat = Math.cos(pts[0][0] * Math.PI / 180), xy = pts.map(p => mXY(p, cosLat));
+  const keep = new Uint8Array(pts.length), last = pts.length - 1;
+  let far = 0, fd = -1;
+  xy.forEach((q, i) => { const d = (q[0] - xy[0][0]) ** 2 + (q[1] - xy[0][1]) ** 2; if (d > fd) { fd = d; far = i; } });
+  keep[0] = keep[far] = keep[last] = 1;
+  const stack = [[0, far], [far, last]];
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    let mi = -1, md = tol;
+    for (let i = a + 1; i < b; i++) { const d = segDist(xy[i], xy[a], xy[b]); if (d > md) { md = d; mi = i; } }
+    if (mi >= 0) { keep[mi] = 1; stack.push([a, mi], [mi, b]); }
+  }
+  const out = pts.filter((_, i) => keep[i]);
+  return out.length >= 3 ? out : pts;
+}
+function ringAreaM2(pts) {
+  const cosLat = Math.cos(pts[0][0] * Math.PI / 180), xy = pts.map(p => mXY(p, cosLat));
+  let a = 0;
+  for (let i = 0, j = xy.length - 1; i < xy.length; j = i++) a += (xy[j][0] + xy[i][0]) * (xy[j][1] - xy[i][1]);
+  return Math.abs(a / 2);
+}
+/* 同じ位置の点が続いていたら1つにする（始めと終わりが同じ点も1つに） */
+function dropDup(pts) {
+  const out = [];
+  pts.forEach(p => { if (!out.length || distM(out[out.length - 1], p) > 0.2) out.push(p); });
+  while (out.length > 1 && distM(out[0], out[out.length - 1]) <= 0.2) out.pop();
+  return out;
+}
+function kmlCoords(el) {
+  const c = el && el.getElementsByTagNameNS('*', 'coordinates')[0];
+  if (!c) return [];
+  return c.textContent.trim().split(/\s+/).map(s => s.split(',').map(Number))
+    .filter(a => a.length >= 2 && isFinite(a[0]) && isFinite(a[1]) && Math.abs(a[1]) <= 90 && Math.abs(a[0]) <= 180)
+    .map(a => [a[1], a[0]]);
+}
+/* マイマップの名前から、区域番号と名前を分ける（例：「区域12 〇〇公園」→ 12 と 〇〇公園） */
+function splitName(raw) {
+  const s = String(raw || '').trim();
+  const m = s.match(/[0-9０-９]+(?:\s*[-－ー―‐−–—]\s*[0-9０-９]+)*/);
+  const no = m ? normNo(m[0]) : '';
+  let name = m ? s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length) : s;
+  name = name.replace(/区域|番号|No\.?|№|＃|#/gi, ' ')
+    .replace(/^[\s・:：\-_、。()（）「」]+|[\s・:：\-_、。()（）「」]+$/g, '')
+    .replace(/\s+/g, ' ').trim();
+  return { no, name: (name || (no ? `区域${no}` : '')).slice(0, 30) };
+}
+function parseKml(text) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('xml');
+  const out = { rows: [], pins: 0, network: doc.getElementsByTagNameNS('*', 'NetworkLink').length > 0 };
+  for (const pm of doc.getElementsByTagNameNS('*', 'Placemark')) {
+    const nameEl = [...pm.children].find(c => c.localName === 'name');
+    const raw = nameEl ? nameEl.textContent.trim() : '';
+    const cands = [];
+    for (const p of pm.getElementsByTagNameNS('*', 'Polygon')) {
+      const ob = p.getElementsByTagNameNS('*', 'outerBoundaryIs')[0] || p;
+      const pts = dropDup(kmlCoords(ob));
+      if (pts.length >= 3) cands.push({ pts, open: false });
+    }
+    for (const l of pm.getElementsByTagNameNS('*', 'LineString')) {
+      const orig = kmlCoords(l), pts = dropDup(orig);
+      if (pts.length >= 3) cands.push({ pts, open: distM(orig[0], orig[orig.length - 1]) > 15 });
+    }
+    if (!cands.length) {
+      if (pm.getElementsByTagNameNS('*', 'Point').length) out.pins++;
+      continue;
+    }
+    cands.forEach(c => { c.area = ringAreaM2(c.pts); });
+    cands.sort((a, b) => b.area - a.area);
+    const c = cands[0], notes = [];
+    if (cands.length > 1) notes.push(`${cands.length}つに分かれていたので、いちばん大きい部分を使います`);
+    if (c.open) notes.push('線の始めと終わりが離れていたので、つないで区域にしました');
+    const { no, name } = splitName(raw);
+    out.rows.push({ raw, no, name, poly: simplifyRing(c.pts, SIMPLIFY_M), notes, act: 'new' });
+  }
+  return out;
+}
+const conflictOf = r => (r.no ? D().territories.find(t => String(t.no) === normNo(r.no)) : null);
+async function readKmlFile(file) {
+  try {
+    const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+    let text;
+    if (head[0] === 0x50 && head[1] === 0x4B) { // KMZ（圧縮されたKML）
+      toast('KMZファイルを開いています…');
+      await loadScript(LIB.zip);
+      const zip = await window.JSZip.loadAsync(file);
+      const f = zip.file('doc.kml') || zip.file(/\.kml$/i)[0];
+      if (!f) throw new Error('nokml');
+      text = await f.async('string');
+    } else {
+      text = await file.text();
+    }
+    const parsed = parseKml(text);
+    if (!parsed.rows.length) {
+      infoSheet('区域の線が見つかりませんでした', parsed.network
+        ? 'このファイルには地図の中身が入っていません。マイマップで書き出すときに「ネットワーク リンク」のチェックを外して、もう一度書き出してください。'
+        : 'マイマップで区域を「線」または「図形」で描いているか確認してください。ピンだけの地図は取り込めません。');
+      return;
+    }
+    const seen = new Set();
+    parsed.rows.sort((a, b) => (a.no ? 0 : 1) - (b.no ? 0 : 1) || cmpNo(a.no, b.no));
+    parsed.rows.forEach(r => {
+      if (r.no && seen.has(r.no)) { r.act = 'skip'; r.notes.push('同じ番号がファイルの中にもう1つあります'); }
+      else if (conflictOf(r)) r.act = 'skip'; // すでにある区域は、はじめは取り込まない
+      if (r.no) seen.add(r.no);
+    });
+    openImportSheet(parsed, file.name || '');
+  } catch (e) {
+    infoSheet('ファイルを読み込めませんでした', 'Googleマイマップの「KML/KMZにエクスポート」で書き出したファイルを選んでください。KMZのときは、インターネットにつながっている必要があります。');
+  }
+}
+function openImportSheet(parsed, fileName) {
+  const rows = parsed.rows;
+  const opt = { snap: true };
+  const rowHtml = (r, i) => {
+    const ex = conflictOf(r);
+    if (ex && r.act === 'new') r.act = 'skip';
+    if (!ex && r.act === 'replace') r.act = 'new';
+    const opts = ex
+      ? [['replace', `区域${ex.no}の線を置き換える`], ['skip', '取り込まない']]
+      : [['new', '新しい区域として取り込む'], ['skip', '取り込まない']];
+    return `<article class="improw${r.act === 'skip' ? ' skip' : ''}" data-i="${i}">
+      <label><span>区域番号</span><input type="text" data-f="no" maxlength="10" autocomplete="off" value="${esc(r.no)}" placeholder="例：12"></label>
+      <label><span>名前</span><input type="text" data-f="name" maxlength="30" value="${esc(r.name)}"></label>
+      <label class="span"><select data-f="act" aria-label="この区域をどうするか">${opts.map(([v, l]) => `<option value="${v}"${v === r.act ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      <p class="muted span">マイマップでの名前：${esc(r.raw || '（名前なし）')}　角 ${r.poly.length}か所${ex ? '　<b>同じ番号の区域があります</b>' : ''}</p>
+      ${r.notes.map(n => `<p class="muted span">※ ${esc(n)}</p>`).join('')}
+    </article>`;
+  };
+  const updateCount = () => {
+    const n = rows.filter(r => r.act !== 'skip').length, b = $('#imGo');
+    if (!b) return;
+    b.textContent = n ? `${n}件を取り込む` : '取り込む区域がありません';
+    b.disabled = !n;
+  };
+  const paint = keepScroll => {
+    const top = keepScroll ? $('#sheet').scrollTop : 0;
+    const nCon = rows.filter(r => conflictOf(r)).length;
+    setSheet(headHtml(null, 'マイマップから区域を取り込む', esc(fileName)) + `
+      <div class="notice info"><b>区域の線が ${rows.length}件見つかりました。</b>${parsed.pins
+        ? `<br>ピン（家の印など）${parsed.pins}件は取り込みません。拒否の家など、個人情報が入っていることがあるためです。必要な家は、係が確認してから地図で追加してください。` : ''}</div>
+      <p class="hint">区域番号と名前を確認してください。名前に住んでいる人の名前が入っていないかも確認してください。<br>「取り込む」を押すまで、どこにも送りません。</p>
+      ${nCon ? `<div class="notice warn">すでにある区域と番号が同じものが ${nCon}件あります。はじめは「取り込まない」にしています。
+        <span class="actions"><button class="btn small" id="imAllRep">同じ番号の区域は、すべて線を置き換える</button></span></div>` : ''}
+      <label class="check"><input type="checkbox" id="imSnap"${opt.snap ? ' checked' : ''}>隣の区域と近い角（${IMPORT_SNAP_M}m以内）を、同じ点にそろえる</label>
+      <p class="hint">そろえると、あとで線を直すときに、隣の区域と一緒に動かせます。</p>
+      <div id="imRows">${rows.map(rowHtml).join('')}</div>
+      <button class="btn primary block" id="imGo"></button>
+      <button class="btn block" data-close>やめる</button>`);
+    if (keepScroll) $('#sheet').scrollTop = top;
+    updateCount();
+    const box = $('#imRows');
+    box.addEventListener('input', e => {
+      const x = e.target, r = rows[Number(x.closest('[data-i]').dataset.i)];
+      if (x.dataset.f === 'name') r.name = x.value;
+    });
+    box.addEventListener('change', e => {
+      const x = e.target, row = x.closest('[data-i]'), r = rows[Number(row.dataset.i)];
+      if (x.dataset.f === 'no') { r.no = normNo(x.value); paint(true); }
+      else if (x.dataset.f === 'act') { r.act = x.value; row.classList.toggle('skip', r.act === 'skip'); updateCount(); }
+    });
+    $('#imSnap').onchange = e => { opt.snap = e.target.checked; };
+    if ($('#imAllRep')) $('#imAllRep').onclick = () => { rows.forEach(r => { if (conflictOf(r)) r.act = 'replace'; }); paint(true); };
+    $('#imGo').onclick = () => doImport(rows, opt.snap);
+  };
+  paint(false);
+}
+/* 近い点をそろえる：すでにある区域の角と、先に取り込んだ区域の角に合わせる */
+function snapToPool(pts, pool) {
+  return pts.map(p => {
+    const cosLat = Math.cos(p[0] * Math.PI / 180);
+    let best = null, bd = IMPORT_SNAP_M;
+    for (const q of pool) {
+      const dy = (q[0] - p[0]) * 110540;
+      if (dy > bd || dy < -bd) continue;
+      const dx = (q[1] - p[1]) * 111320 * cosLat;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < bd) { bd = d; best = q; }
+    }
+    if (best) return [best[0], best[1]];
+    pool.push(p);
+    return p;
+  });
+}
+function doImport(rows, snap) {
+  const use = rows.filter(r => r.act !== 'skip');
+  if (!use.length) return;
+  const nos = new Set();
+  for (const r of use) {
+    r.no = normNo(r.no);
+    const label = r.raw || r.name || '名前なし';
+    if (!NO_RE.test(r.no)) { toast(`「${label}」の区域番号を入れてください（例：12、12-1）`); return; }
+    if (nos.has(r.no)) { toast(`区域番号${r.no}が2つあります。どちらかを直すか「取り込まない」にしてください`); return; }
+    nos.add(r.no);
+    r.target = r.act === 'replace' ? conflictOf(r) : null;
+    if (r.act === 'new' && conflictOf(r)) { toast(`区域${r.no}はすでにあります`); return; }
+    if (r.act === 'replace' && !r.target) { toast(`区域${r.no}が見つかりません`); return; }
+  }
+  const replaced = new Set(use.filter(r => r.target).map(r => r.target.id));
+  const pool = [];
+  if (snap) D().territories.forEach(t => { if (!replaced.has(t.id)) t.polygon.forEach(p => pool.push(p)); });
+  const polys = use.map(r => {
+    const base = r.poly.map(p => p.slice());
+    if (!snap) return base;
+    const s = dropDup(snapToPool(base, pool));
+    return s.length >= 3 ? s : base;
+  });
+  const nNew = use.filter(r => !r.target).length, nRep = use.length - nNew;
+  closeSheet();
+  commit(`区域を取り込みました（新しく${nNew}件${nRep ? `・線の置き換え${nRep}件` : ''}）`, () => {
+    use.forEach((r, i) => {
+      if (r.target) r.target.polygon = polys[i];
+      else D().territories.push({ id: 't' + uid(), no: r.no, name: r.name.trim() || `区域${r.no}`, polygon: polys[i], holder: null, lentAt: null });
+    });
+    reassign();
+  });
+  firstMapShow = false;
+  showView('map');
+  setTimeout(fitAll, 120);
 }
 
 /* ---------- 区域カード画面 ---------- */
@@ -3390,6 +3763,7 @@ function bindStatic() {
   $('#ovRange').oninput = applyOv;
   $('#ovRot').oninput = e => { if (ovState) { ovState.rot = Number(e.target.value); applyRot(); } };
   $('#ovPin').onclick = () => { if (ovState && ovState.pinned) unpinOverlay(); else pinOverlay(); };
+  $('#ovPage').onclick = openPdfPicker;
   $('#ovClear').onclick = clearOverlay;
   $('#drawHouses').onchange = e => { drawShowHouses = e.target.checked; renderHouses(); };
   $('#drawFold').onclick = () => setDrawFold(!$('#drawBar').classList.contains('mini'));
@@ -3408,6 +3782,11 @@ function bindStatic() {
 
   // 係の画面
   $('#adNewTerr').onclick = () => startDraw(null);
+  $('#adKml').onchange = e => {
+    const file = e.target.files[0]; if (!file) return;
+    readKmlFile(file);
+    e.target.value = '';
+  };
   $('#adCsv').onclick = exportCsv;
   $('#adReset').onclick = () => {
     if (!confirm('この端末の試作データを最初の状態に戻します。よろしいですか？')) return;
