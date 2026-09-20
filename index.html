@@ -1133,7 +1133,7 @@ const Store = {
       this.setServer({ seq: cache.seq, state: cache.state }); // すぐ表示して、あとで差分を取りに行く
       return 'cache';
     }
-    const j = await loadAll(p => showBlocking('読み込んでいます…', `初めて開くときは少し時間がかかります（${p}%）`));
+    const j = await loadAll(p => showBlocking('読み込んでいます…', `初めて開くときは少し時間がかかります（${p}%）`, true));
     this.setServer(j);
     this.saveCacheSoon();
     return 'server';
@@ -1454,8 +1454,8 @@ function updateSyncBadge(text) {
   el.hidden = !LIVE || (!n && !flushing && !text);
   el.textContent = text || (flushing ? '送信中…' : `未送信 ${n}件`);
 }
-function showBlocking(title, msg) {
-  hideSplash(true);
+function showBlocking(title, msg, keepSplash) {
+  if (!keepSplash) hideSplash(true); // 読み込み中は、あいさつの画面をそのまま出しておく
   $('#blockTitle').textContent = title;
   $('#blockMsg').textContent = msg;
   $('#blocker').hidden = false;
@@ -1646,7 +1646,7 @@ function hideSplash(now) {
   const el = $('#splash');
   if (!el || splashDone) return;
   splashDone = true;
-  const wait = now ? 0 : Math.max(0, 1500 - (Date.now() - splashAt));
+  const wait = now ? 0 : Math.max(0, 1800 - (Date.now() - splashAt));
   setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.hidden = true; }, 500); }, wait);
 }
 function splashGreeting() {
@@ -2287,18 +2287,30 @@ function openMemo(k, back) {
   const h = houseById(hid); if (!h) return;
   const f = fol(k);
   if (!f || f.by !== me().id) { toast('メモは、自分が受け持っている再訪問にだけ書けます'); return; }
-  const m = memoOf(k);
+  const m = memoOf(k), met = sum(k).met, last = sum(k).last;
   const done = () => { if (back) back(); else { closeSheet(); renderAll(); } };
+  const keepMemo = () => { // 書きかけのメモを保存してから次へ進む
+    const el = $('#memoText');
+    if (!el) return;
+    const text = el.value.trim(), o = memoAll();
+    if (text) o[k] = { text, at: new Date().toISOString() }; else delete o[k];
+    memoSaveAll(o);
+  };
   setSheet(headHtml(terrById(h.terrId), '再訪問のメモ', targetName(h, unit)) + `
     <div class="notice info">このメモは<b>このスマホの中だけ</b>に保存されます。係やほかの人には送られず、ほかのスマホでは見られません。</div>
     <label class="field"><span>メモ</span><textarea id="memoText" rows="7" maxlength="1000" placeholder="例：次は土曜の午前に。前回の話の続きから">${esc(m ? m.text : '')}</textarea></label>
     <p class="hint">次の訪問に必要なことだけを短く書いてください。住んでいる人の名前・電話番号は書かないでください。<br>受け持ちが終わると、メモも自動で消えます。スマホを替えると、メモは引き継がれません。</p>
     ${m ? `<p class="muted">最後に保存：${fmtDate(m.at)}</p>` : ''}
-    <button class="btn primary block" id="memoSave">保存する</button>
+    <button class="btn block" id="memoSave">メモを保存する</button>
+    <h3 class="sub">この家の記録</h3>
+    ${met ? `<p class="metline">前回 会えた日：${fmtDate(met.at)}（${slotShort(slotOf(new Date(met.at)))}）</p>` : '<p class="muted">まだ会えた記録はありません。</p>'}
+    ${last ? `<p class="muted">前回の記録：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}</p>` : ''}
+    <button class="btn primary block" id="memoRec">訪問の結果を記録する<small>（メモも保存します）</small></button>
     ${m ? shareButtonsHtml(true) : ''}
     ${m ? '<button class="btn danger block" id="memoDel">メモを消す</button>' : ''}
     <button class="btn block" id="memoBack">もどる</button>`);
-  $$('[data-share]', $('#sheet')).forEach(x => x.onclick = () => shareMemo(k, x.dataset.share, () => openMemo(k, back)));
+  $$('[data-share]', $('#sheet')).forEach(x => x.onclick = () => { keepMemo(); shareMemo(k, x.dataset.share, () => openMemo(k, back)); });
+  $('#memoRec').onclick = () => { keepMemo(); openTarget(hid, unit, false); }; // そのまま「会えた・留守」の画面へ
   $('#memoSave').onclick = () => {
     const text = $('#memoText').value.trim(), o = memoAll();
     if (text) o[k] = { text, at: new Date().toISOString() }; else delete o[k];
@@ -2457,7 +2469,7 @@ function followItem(k, f, mode) {
   let acts = '';
   const memo = mode === 'mine' ? memoOf(k) : null;
   if (mode === 'mine') {
-    acts += A('record', 'ここで記録する', 'primary') + A('memo', memo ? 'メモを見る・直す' : 'メモを書く');
+    acts += A('record', 'ここで記録する', 'primary') + A('memo', memo ? 'メモ・記録を開く' : 'メモを書く');
     if (stg >= 1) acts += A('continue', '続ける', 'primary');
     if (stg === 2) acts += A('handoff', 'ほかの人に引き継ぐ') + A('stop', 'やめる');
   } else {
@@ -5215,7 +5227,8 @@ async function init() {
       return;
     }
     if (lsGet(PENDING_KEY)) { openWaiting(); return; }       // 係の承認待ち
-    showBlocking('読み込んでいます…', '初めて開くときは、少し時間がかかります。');
+    showBlocking('読み込んでいます…', '初めて開くときは、少し時間がかかります。', true);
+    if ($('#spSub')) $('#spSub').textContent = '読み込んでいます…';
     try {
       from = await Store.loadLive(tk);
     } catch (e) {
