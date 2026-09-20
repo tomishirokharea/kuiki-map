@@ -208,7 +208,9 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .stamp.away{border-color:var(--draw);color:var(--draw)}
 .pin.hl{box-shadow:0 0 0 4px var(--draw),0 1px 3px #0006}
 .pin.dim{opacity:.3}
-.pin.done,.unit.done,.uchip.donec,.pin.prev,.unit.prev{background-image:linear-gradient(rgba(255,255,255,.55),rgba(255,255,255,.55));color:#37474F;border-color:#dfe5e2;box-shadow:none}
+.pin.done,.unit.done,.uchip.donec,.pin.prev,.unit.prev{background-image:linear-gradient(rgba(255,255,255,.68),rgba(255,255,255,.68));color:#5E6E77;border-color:#E3E8E6;box-shadow:none}
+/* 訪ねた家は、印そのものを薄くして「終わった」ことがひと目でわかるように（チェックだけは濃いまま） */
+.pin.done,.pin.prev{font-weight:400}
 .pin u.b,.unit u.b{background:var(--met)}
 .pin.locked{filter:grayscale(1);opacity:.35;box-shadow:none}
 .pin b.rc{position:absolute;right:-13px;top:-13px;min-width:22px;height:22px;border-radius:99px;background:#00796B;color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;border:2px solid #fff;padding:0 3px;line-height:1}
@@ -216,13 +218,13 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .pin b.rj{position:absolute;right:-14px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:99px;background:var(--ref);color:#fff;font-size:11px;display:grid;place-items:center;border:2px solid #fff}
 .refnote{background:var(--ref-bg);border:2px solid var(--ref);color:#7f1d1d}
 .btn.refok{background:var(--ref);border-color:var(--ref);color:#fff}
-.pin.later{opacity:.6}
+.pin.later{opacity:1} /* まだ訪ねていない家は薄くしない（薄い＝訪ねた家、と見分けるため） */
 .memoline{background:#FFFBEF;border-left:5px solid var(--away);border-radius:6px;padding:6px 10px;margin-top:6px;font-size:16px;white-space:pre-wrap;word-break:break-word;color:var(--ink)}
 .field textarea{width:100%;border-radius:12px;border:2px solid var(--ink2);padding:10px 12px;font-size:18px;line-height:1.6;background:#fff;resize:vertical}
 .pin u,.unit u{position:absolute;left:-9px;top:-9px;width:20px;height:20px;border-radius:99px;background:var(--ok);color:#fff;text-decoration:none;font-size:12px;font-weight:700;display:grid;place-items:center;border:2px solid #fff;line-height:1}
 .unit u{left:auto;right:4px;top:4px}
 .unit.dim{opacity:.45}
-.unit.later{opacity:.65}
+.unit.later{opacity:1}
 .pin.mini{width:22px;height:22px;font-size:11px;border-width:2px;vertical-align:middle;box-shadow:none}
 .pin.mini.hl{box-shadow:0 0 0 3px var(--draw)}
 .pin.mini u{width:14px;height:14px;font-size:9px;left:-6px;top:-6px;border-width:1px}
@@ -1591,7 +1593,7 @@ function initMap() {
 const PIN_CHAR = { plain: '', met: '会', away: '留', refused: '拒', dnc: '拒' };
 function periodStart(h) {
   const t = h.terrId ? terrById(h.terrId) : null;
-  return t ? (t.lentAt || t.returnedAt || '') : '';
+  return t ? (t.lentAt || t.returnedAt || t.completedAt || '') : ''; // 担当者のいない区域は、返却・回り終えた日から
 }
 function pinState(k, since) {
   if (D().dnc[k]) return 'dnc';
@@ -1629,13 +1631,18 @@ function houseIcon(h, ff, locked) {
     if (ff && !locked) {
       const arr = targets(h).map(u => ff(K(h.id, u))).sort((a, b) => FOCUS_RANK.indexOf(a) - FOCUS_RANK.indexOf(b));
       st = arr.length ? arr[0] : 'dim';
+    } else if (!locked && h.units.length) {
+      // すべての部屋を今回訪ねた（拒否の部屋はのぞく）ら、建物の印も薄く＋緑のチェック
+      const ks = targets(h).map(u => K(h.id, u)).filter(k => !D().dnc[k]);
+      if (ks.length && ks.every(k => pinState(k, since) !== 'plain')) st = 'done';
     }
     const left = aptTodo(h, since);
     const rj = targets(h).some(u => D().dnc[K(h.id, u)]) ? '<b class="rj">拒</b>' : '';
     return L.divIcon({ className: '', html: `<div class="pin apt${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
   }
   const k = K(h.id, ''), s = pinState(k, since), fo = fol(k) && !locked ? '<em>再</em>' : '';
-  const st = locked ? null : ff ? ff(k) : (s === 'plain' && recentMet(k) ? 'prev' : null);
+  // 選んでいないときも、今回訪ねた家（会えた・留守）は薄く＋緑のチェックにする
+  const st = locked ? null : ff ? ff(k) : (s === 'met' || s === 'away') ? 'done' : (s === 'plain' && recentMet(k) ? 'prev' : null);
   return L.divIcon({ className: '', html: `<div class="pin st-${s}${focusCls(st)}${lk}">${PIN_CHAR[s]}${fo}${doneMark(st)}${nb}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
 }
 /* ---------- 一緒に回る人（グループ） ----------
