@@ -527,6 +527,14 @@ body.strong .pin.st-plain{border-width:4px}
 .atabs button:not(:nth-child(3n+1)){border-left:2px solid var(--ink)!important}
 .atabs .cnt{position:static;display:inline-grid;margin-left:4px;vertical-align:middle}
 
+/* ===== 左にスワイプして編集・削除 ===== */
+.swipe{position:relative;overflow:hidden;border-radius:12px;margin-bottom:10px}
+.swipe>.ritem{margin-bottom:0;position:relative;z-index:1;transition:transform .2s ease;touch-action:pan-y}
+.swipe.open>.ritem{transform:translateX(-176px)}
+.swipe-acts{position:absolute;top:0;right:0;bottom:0;display:flex;z-index:0}
+.swipe-acts button{width:88px;border:0;font-weight:700;font-size:17px;color:#fff;background:var(--brand)}
+.swipe-acts .del{background:var(--danger)}
+
 /* ===== お知らせ ===== */
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--brand);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
 #toast button{min-height:46px;border-radius:10px;border:2px solid #fff;background:transparent;color:#fff;font-weight:700;padding:0 14px;flex:none}
@@ -1016,6 +1024,7 @@ const API_URL = (function () {
 const LIVE = !!API_URL;
 const JOIN_KEY = 'kuiki_join', PENDING_KEY = 'kuiki_pending';
 const TOKEN_KEY = 'kuiki_token', QUEUE_KEY = 'kuiki_queue', OLD_CACHE_KEY = 'kuiki_cache', SYNC_KEY = 'kuiki_sync_at', LOCK_KEY = 'kuiki_lock_ok';
+const DATA_VER = 2; // データの種類が増えたら上げる（端末が一度だけ全部を読み直す）
 const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'schedules', 'users'];
 const MAP_COLS = ['dnc', 'follows', 'released'];
 const RES_NAME = { m: 'met', a: 'away', r: 'refused' };
@@ -1231,6 +1240,9 @@ const Store = {
       else m.set(id, d[c].push(v) - 1);
     }
     Object.keys(dels).forEach(c => { if (dels[c].size) d[c] = d[c].filter(x => !dels[c].has(x.id)); });
+    const oldMe = (d.users || []).find(u => u.id === d.currentUser);
+    const newMe = (j.users || []).find(u => u.id === j.currentUser);
+    if (oldMe && newMe && (oldMe.group || '') !== (newMe.group || '')) this.needFull = true; // グループが変わった
     d.users = j.users; d.settings = j.settings; d.currentUser = j.currentUser;
     this.migrate();
     this.seq = j.seq;
@@ -1242,7 +1254,7 @@ const Store = {
     if (!LIVE) return;
     clearTimeout(this.cacheTimer);
     this.cacheTimer = setTimeout(() => {
-      IDB.set('cache', { tag: this.token.slice(0, 12), seq: this.seq, state: this.data, savedAt: Date.now() })
+      IDB.set('cache', { tag: this.token.slice(0, 12), seq: this.seq, state: this.data, savedAt: Date.now(), dataVer: DATA_VER })
         .catch(() => { /* 保存できなくても、次に開いたとき読み直す */ });
     }, 2000);
   },
@@ -1265,6 +1277,8 @@ const Store = {
         clearAllMemos();
       }
     }
+    // 古い版のアプリで保存したデータは使わない（その版が知らなかった「予定」などを、受け取りそこねているため）
+    if (cache && cache.dataVer !== DATA_VER) cache = null;
     if (cache && cache.tag === this.token.slice(0, 12) && cache.state) {
       this.setServer({ seq: cache.seq, state: cache.state }); // すぐ表示して、あとで差分を取りに行く
       return 'cache';
@@ -1565,6 +1579,7 @@ function applyInbox() {
   Store.inbox = [];
   list.forEach(j => { if (j.mode === 'full') Store.setServer(j); else Store.applyDelta(j); });
   Store.saveCacheSoon();
+  if (Store.needFull && !reloading) setTimeout(() => reloadAll().catch(() => {}), 0);
   updateTabs();
   renderAll();
   checkPermGain();
@@ -1841,8 +1856,13 @@ function terrStats(t, sinceMs) {
 }
 
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
-const APP_VERSION = '2026.09.22';
+const APP_VERSION = '2026.09.23';
 const CHANGELOG = [
+  { v: '2026.09.23', items: [
+    ['予', '奉仕の集まりの予定を左にスワイプすると、「編集」「削除」ができます（予定を入れた監督・区域係だけ）'],
+    ['届', '予定が一部の人に届かないことがあったのを直しました。更新後はじめて開いたとき、一度だけ全部を読み直します'],
+    ['G', 'グループ名の空白や全角・半角のちがいを、同じグループとしてあつかうようにしました']
+  ] },
   { v: '2026.09.22', items: [
     ['家', '「おすすめ」が「ホーム」に変わりました。奉仕の集まりの予定（カレンダーと一覧）が見られます'],
     ['時', 'ホームで奉仕の時間をはかれます（スタート・一時停止・終了）。終わると自動でカレンダーに入ります'],
@@ -1935,6 +1955,7 @@ function toast(msg, undoFn, action) {
 /* ---------- 下から出る画面 ---------- */
 function setSheet(html) {
   const s = $('#sheet');
+  if (typeof dayCtx !== 'undefined') dayCtx = null;
   s.dataset.swipe = ''; // 下にスワイプで閉じるのは、表示の設定のときだけ
   s.style.transform = '';
   $('#sheetBody').innerHTML = html;
@@ -5613,6 +5634,7 @@ function exportCsv() {
    ・奉仕時間と自分の予定は、本人のスマホの中だけに保存（サーバーには送らない）
    ・奉仕の集まりの予定は、グループ監督・区域係が入れ、グループの人に届く
    ========================================================= */
+const normGroup = g => String(g || '').normalize('NFKC').replace(/\s+/g, '').slice(0, 30);
 const isOverseer = () => !!me().overseer && !!me().group;
 const myGroup = () => me().group || '';
 const groupsAll = () => [...new Set(D().users.filter(u => !u.inactive && u.group).map(u => u.group))].sort((a, b) => a.localeCompare(b, 'ja'));
@@ -5771,6 +5793,19 @@ function gcalUrl(title, date, time, end, place, note) {
   return 'https://calendar.google.com/calendar/render?action=TEMPLATE&ctz=Asia%2FTokyo&text=' + encodeURIComponent(title) +
     '&dates=' + dates + (place ? '&location=' + encodeURIComponent(place) : '') + (note ? '&details=' + encodeURIComponent(note) : '');
 }
+const canEditSched = s => isAdmin() || (isOverseer() && s.group === myGroup());
+/* 予定の1行。直せる人には、左にスワイプすると「編集」「削除」が出る形にする */
+function schedRow(s, withDate) {
+  const body = `<article class="ritem k-new swipe-body"><div>
+      ${withDate ? `<p class="rt">${fmtYmd(s.date)}</p><p>${schedLine(s)}</p>` : `<p class="rt">${schedLine(s)}</p>`}
+      <p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
+      <a class="btn small" href="${gcalUrl('奉仕の集まり', s.date, s.time, s.end, s.place, s.note)}" target="_blank" rel="noopener">Googleカレンダーへ</a></article>`;
+  if (!canEditSched(s)) return body.replace(' swipe-body', '');
+  return `<div class="swipe" data-sid="${s.id}"><div class="swipe-acts" aria-label="この予定の操作">
+      <button type="button" data-scact="edit" data-sid="${s.id}">編集</button><button type="button" class="del" data-scact="del" data-sid="${s.id}">削除</button></div>${body}</div>`;
+}
+const swipeHint = list => (list.some(canEditSched) ? '<p class="hint">予定を<b>左にスワイプ</b>すると、「編集」「削除」が出ます。</p>' : '');
+let dayCtx = null; // いま開いている日（予定を直したあと、その日の画面にもどるため）
 const schedLine = s => `${s.time ? `${s.time}${s.end ? '〜' + s.end : ''}` : '時間未定'}　${esc(s.place || '場所未定')}`;
 function calHtml(o) {
   const base = calMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -5794,10 +5829,7 @@ function schedListHtml() {
   const list = D().schedules.filter(s => s.date >= today && s.date <= ymd(until) && (!s.group || s.group === myGroup() || isAdmin()))
     .sort((a, b) => (a.date + (a.time || '')) < (b.date + (b.time || '')) ? -1 : 1);
   if (!list.length) return '<div class="empty">これから60日の、奉仕の集まりの予定はありません。</div>';
-  return list.map(s => `<article class="ritem k-new"><div>
-      <p class="rt">${fmtYmd(s.date)}</p><p>${schedLine(s)}</p>
-      <p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
-      <a class="btn small" href="${gcalUrl('奉仕の集まり', s.date, s.time, s.end, s.place, s.note)}" target="_blank" rel="noopener">Googleカレンダーへ</a></article>`).join('');
+  return swipeHint(list) + list.map(s => schedRow(s, true)).join('');
 }
 function openDay(date) {
   const paint = () => {
@@ -5805,8 +5837,7 @@ function openDay(date) {
     let min = o.log[date] || 0;
     setSheet(headHtml(null, fmtYmd(date), '') + `
       <h3 class="sub">奉仕の集まり</h3>
-      ${sc.length ? sc.map(s => `<article class="ritem k-new"><div><p class="rt">${schedLine(s)}</p><p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
-        <a class="btn small" href="${gcalUrl('奉仕の集まり', s.date, s.time, s.end, s.place, s.note)}" target="_blank" rel="noopener">Googleカレンダーへ</a></article>`).join('')
+      ${sc.length ? swipeHint(sc) + sc.map(s => schedRow(s, false)).join('')
         : '<p class="muted">この日の集まりはありません。</p>'}
       ${isOverseer() || isAdmin() ? `<button class="btn small" id="dAddSched">＋ この日に集まりを入れる</button>` : ''}
       <h3 class="sub">自分の予定 <span class="muted" style="font-size:14px">（このスマホだけ）</span></h3>
@@ -5821,6 +5852,7 @@ function openDay(date) {
         <output class="wide" style="min-width:160px" id="dMin">${fmtMin(min)}</output><button type="button" data-dm="15" aria-label="15分ふやす">＋</button></div>
       <button class="btn primary block" id="dMinSave">奉仕時間を保存する</button>
       <button class="btn block" data-close>閉じる</button>`);
+    dayCtx = date;
     const S = $('#sheet');
     $$('[data-dm]', S).forEach(b => b.onclick = () => { min = Math.max(0, min + Number(b.dataset.dm)); $('#dMin').textContent = fmtMin(min); });
     $('#dMinSave').onclick = () => { const x = myData(); if (min) x.log[date] = min; else delete x.log[date]; mySave(x); toast('奉仕時間を保存しました'); renderHome(); paint(); };
@@ -5857,6 +5889,47 @@ function renderHome() {
   $$('#calMode [data-calmode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.calmode === calMode)));
   $('#homeCal').innerHTML = calMode === 'cal' ? calHtml(o) : schedListHtml();
 }
+/* スワイプの動き（指でもマウスでも）：左に半分以上ずらすと開き、ほかをさわると閉じる */
+const SWIPE_W = 176;
+function bindSwipe() {
+  let cur = null, sx = 0, sy = 0, dx = 0, moved = false;
+  document.addEventListener('pointerdown', e => {
+    const body = e.target.closest('.swipe-body');
+    $$('.swipe.open').forEach(x => { if (!body || x !== body.parentNode) x.classList.remove('open'); });
+    if (!body || e.target.closest('a, button')) { cur = null; return; }
+    cur = body; sx = e.clientX; sy = e.clientY; dx = 0; moved = false;
+  }, true);
+  document.addEventListener('pointermove', e => {
+    if (!cur) return;
+    const x = e.clientX - sx, y = e.clientY - sy;
+    if (!moved) {
+      if (Math.abs(x) < 8 && Math.abs(y) < 8) return;
+      if (Math.abs(y) > Math.abs(x)) { cur = null; return; } // たてのスクロールは邪魔しない
+      moved = true; cur.style.transition = 'none';
+    }
+    const base = cur.parentNode.classList.contains('open') ? -SWIPE_W : 0;
+    dx = Math.min(0, Math.max(-SWIPE_W - 24, base + x));
+    cur.style.transform = `translateX(${dx}px)`;
+  }, true);
+  const end = () => {
+    if (!cur) return;
+    const b = cur; cur = null;
+    b.style.transition = ''; b.style.transform = '';
+    if (moved) b.parentNode.classList.toggle('open', dx < -SWIPE_W / 2);
+  };
+  document.addEventListener('pointerup', end, true);
+  document.addEventListener('pointercancel', end, true);
+  // 「編集」「削除」
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-scact]'); if (!b) return;
+    const s = D().schedules.find(x => x.id === b.dataset.sid); if (!s) return;
+    const day = !$('#sheet').hidden ? dayCtx : null, back = day ? () => openDay(day) : null;
+    if (b.dataset.scact === 'edit') { openSchedForm(s, null, back); return; }
+    if (!confirm(`${fmtYmd(s.date)}　${s.time || ''} ${s.place || '場所未定'} の予定を消します。よろしいですか？`)) return;
+    commit('集まりの予定を消しました', () => { D().schedules = D().schedules.filter(x => x.id !== s.id); });
+    if (back) back();
+  });
+}
 function bindHome() {
   $('#view-home').addEventListener('click', e => {
     const q = sel => e.target.closest(sel);
@@ -5882,7 +5955,7 @@ function openSchedForm(s, date, back) {
     <label class="field"><span>ひとこと（なくてもよい）</span><input type="text" id="scNote" maxlength="160" value="${esc(s ? s.note : '')}" placeholder="例：区域12を回ります"></label>
     ${admin ? `<label class="field"><span>どのグループの予定か</span><select id="scGroup" style="width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 8px;font-size:18px;background:#fff">
       <option value=""${!g0 ? ' selected' : ''}>全体（会衆の全員）</option>${groups.map(g => `<option value="${esc(g)}"${g === g0 ? ' selected' : ''}>${esc(g)}グループ</option>`).join('')}</select></label>`
-      : `<p class="muted">${esc(myGroup())}グループの予定として入れます。</p>`}
+      : `<p class="muted">${esc(myGroup())}グループの予定として入れます（${groupMembers(myGroup()).length}人に届きます）。</p>`}
     ${s ? '' : `<label class="check"><input type="checkbox" id="scRepeat">同じ曜日・同じ時間で、4週ぶん入れる</label>`}
     <button class="btn primary block" id="scSave">保存する</button>
     ${s ? '<button class="btn danger block" id="scDel">この予定を消す</button>' : ''}
@@ -5917,12 +5990,8 @@ function renderSchedAdmin() {
   box.innerHTML = `<h2 class="sec">奉仕の集まりの予定</h2>
     <p class="hint">${admin ? 'どのグループの予定も入れられます。「全体」は会衆の全員に表示されます。' : `${esc(myGroup())}グループの予定を入れられます。グループの人のホーム画面に表示されます。`}</p>
     <button class="btn primary block" id="scNew">＋ 集まりの予定を入れる</button>
-    ${list.length ? list.map(s => `<article class="ritem k-new"><div>
-        <p class="rt">${fmtYmd(s.date)}　${schedLine(s)}</p>
-        <p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
-        <button class="btn small" data-scedit="${s.id}">直す</button></article>`).join('') : '<div class="empty">これからの予定はありません。</div>'}`;
+    ${list.length ? swipeHint(list) + list.map(s => schedRow(s, true)).join('') : '<div class="empty">これからの予定はありません。</div>'}`;
   $('#scNew').onclick = () => openSchedForm(null, null, null);
-  $$('[data-scedit]', box).forEach(b => b.onclick = () => openSchedForm(D().schedules.find(x => x.id === b.dataset.scedit), null, null));
 }
 
 /* ---- 人とグループ（区域係は変更できる。監督は自分のグループの人を見るだけ） ---- */
@@ -5942,7 +6011,9 @@ function renderPeople() {
   const admin = isAdmin(), groups = groupsAll();
   const users = D().users.filter(u => !u.inactive && (admin || u.group === myGroup())).slice()
     .sort((a, b) => (a.group || '～').localeCompare(b.group || '～', 'ja') || a.name.localeCompare(b.name, 'ja'));
+  const noGroup = admin ? D().users.filter(u => !u.inactive && !u.group).length : 0;
   box.innerHTML = `<h2 class="sec">${admin ? '人とグループ' : `${esc(myGroup())}グループの人`}</h2>
+    ${noGroup ? `<div class="notice warn"><b>グループが決まっていない人が ${noGroup}人 います。</b>この人たちには、グループの集まりの予定は届きません（「全体」の予定だけが届きます）。</div>` : ''}
     ${admin ? `<p class="hint">グループの名前（例：A、北）と、グループ監督かどうかを決めます。監督は、自分のグループの集まりの予定を入れたり、グループ用の区域を申し込んだり、グループ全員で区域を共有したりできます。</p>
       <datalist id="groupList">${groups.map(g => `<option value="${esc(g)}">`).join('')}</datalist>` : ''}
     ${users.map(u => `<article class="trow"><span class="stamp sm" style="font-size:16px">${esc(u.group || '—')}</span>
@@ -5952,7 +6023,7 @@ function renderPeople() {
         <button class="btn small" data-usave="${u.id}">保存</button></div>` : ''}</article>`).join('')}`;
   if (admin) $$('[data-usave]', box).forEach(b => b.onclick = () => {
     const u = userById(b.dataset.usave); if (!u) return;
-    setUserGroup(u, $(`[data-ugroup="${u.id}"]`).value.trim(), $(`[data-uover="${u.id}"]`).checked);
+    setUserGroup(u, normGroup($(`[data-ugroup="${u.id}"]`).value), $(`[data-uover="${u.id}"]`).checked);
   });
 }
 
@@ -6048,6 +6119,7 @@ function bindStatic() {
   $$('#tabs button').forEach(b => b.onclick = () => showView(b.dataset.view));
   $('#adTabs').addEventListener('click', e => { const b = e.target.closest('[data-ap]'); if (b) { setAdPane(b.dataset.ap); $('#view-admin').scrollTop = 0; } });
   bindHome();
+  bindSwipe();
   $('#cardTabs').addEventListener('click', e => { const b = e.target.closest('[data-ctab]'); if (b) setCardTab(b.dataset.ctab); });
   $('#splash').addEventListener('click', () => hideSplash(true));
   watchResume();
