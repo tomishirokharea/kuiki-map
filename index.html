@@ -1133,7 +1133,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1 }, d.settings || {});
   },
   /* 控えを作り直す（訪問記録は件数が多いので、idだけ覚える） */
   buildFp() {
@@ -1529,7 +1529,30 @@ async function reloadAll() {
   } finally { reloading = false; updateSyncBadge(); }
 }
 let flushing = false, lastRefresh = 0;
-const isBusy = () => !$('#sheet').hidden || mode !== 'normal';
+/* 取りに行く間隔（係の画面で調整できる）。
+   ・みんなが同じ時刻に取りに行かないよう、毎回すこしずらす（集まりで一斉に開いても、サーバーが混まないように）
+   ・通信に失敗したら、間隔をのばして様子を見る（最大1分） */
+let nextPollAt = 0, pollFail = 0;
+function pollGap() {
+  const st = D().settings;
+  const base = groupActive() ? (st.syncGroupSec || 7) * 1000
+    : (currentView === 'cards' || currentView === 'map') ? (st.syncNormalSec || 20) * 1000 : 45000;
+  return Math.min(60000, base * Math.pow(2, pollFail));
+}
+function schedulePoll() { nextPollAt = Date.now() + pollGap() * (0.85 + Math.random() * 0.3); }
+/* 一緒に回っているとき、案内の帯に「〇秒前に更新」を出す */
+function updateSyncAge() {
+  const el = $('#barAge'); if (!el || !LIVE) return;
+  const sec = Store.syncAt ? Math.round((Date.now() - Store.syncAt) / 1000) : null;
+  el.textContent = sec == null ? '' : sec < 5 ? 'さっき更新' : `${sec}秒前に更新`;
+}
+/* 受け取った変更を反映するのを待つのは、線引き・家の追加の最中と、文字を入力している最中だけ
+   （記録の画面を開いているだけなら、すぐ反映して、ほかの人のチェックが早く見えるようにする） */
+const isBusy = () => {
+  if (mode !== 'normal') return true;
+  const a = document.activeElement;
+  return !$('#sheet').hidden && !!a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && $('#sheet').contains(a);
+};
 /* 受け取った変更は、入力中でなければすぐ、入力中なら終わってから反映する */
 function receive(j) {
   if (j.mode === 'full') Store.inbox = [j];
@@ -1579,7 +1602,7 @@ async function flush() {
 /* 最新の変更を取りに行く */
 async function refresh(force) {
   if (!LIVE || flushing || Store.queue.length) return;
-  if (!force && Date.now() - lastRefresh < (groupActive() ? 12000 : 20000)) return; // 一緒に回っている間は速く
+  if (!force && Date.now() - lastRefresh < 5000) return;
   lastRefresh = Date.now();
   if (Store.needFull) { await reloadAll(); return; }
   const j = await api('load', { since: Store.seq });
@@ -1648,22 +1671,57 @@ const recentMetHouse = h => targets(h).some(u => recentMet(K(h.id, u)));
 const canDelHouse = h => isAdmin() || h.createdBy === me().id;
 
 /* 変更 → 保存 → 再表示 → 「取り消す」付きのお知らせ */
+/* 変更 → 保存 → 再表示 → 「取り消す」付きのお知らせ
+   取り消しは「この操作で変わったものだけ」を元にもどす。
+   （そのあいだに届いた、ほかの人の記録や変更は消さない） */
 function commit(msg, fn, onUndo) {
-  const visits = D().visits.slice();
-  const rest = JSON.stringify(Object.assign({}, D(), { visits: undefined }));
+  const snapOf = () => JSON.stringify(Object.assign({}, D(), { visits: undefined, currentUser: undefined }));
+  const preJson = snapOf(), preVisits = D().visits.slice();
   fn(); Store.save(); renderAll();
+  const postJson = snapOf(), postIds = new Set(D().visits.map(v => v.id));
   toast(msg, () => {
     closeSheet();
     if (onUndo) onUndo();
-    const o = JSON.parse(rest); o.visits = visits;
-    Store.data = o; Store.save(); renderAll(); toast('取り消しました');
+    undoChange(JSON.parse(preJson), JSON.parse(postJson), preVisits, postIds);
+    Store.save(); renderAll(); toast('取り消しました');
   });
+}
+function undoChange(pre, post, preVisits, postIds) {
+  const d = D(), same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  ARR_COLS.forEach(c => {
+    if (c === 'visits') return;
+    const a = new Map((pre[c] || []).map(x => [x.id, x])), b = new Map((post[c] || []).map(x => [x.id, x])), changed = new Set();
+    a.forEach((x, id) => { if (!b.has(id) || !same(x, b.get(id))) changed.add(id); });
+    b.forEach((x, id) => { if (!a.has(id)) changed.add(id); });
+    if (!changed.size) return;
+    const keep = (d[c] || []).filter(x => !changed.has(x.id));
+    changed.forEach(id => { if (a.has(id)) keep.push(a.get(id)); });
+    d[c] = keep;
+  });
+  MAP_COLS.forEach(c => {
+    const a = pre[c] || {}, b = post[c] || {};
+    new Set(Object.keys(a).concat(Object.keys(b))).forEach(k => {
+      if (same(a[k], b[k])) return;
+      if (k in a) d[c][k] = a[k]; else delete d[c][k];
+    });
+  });
+  if (!same(pre.settings, post.settings)) d.settings = pre.settings;
+  const preIds = new Set(preVisits.map(v => v.id));
+  const added = new Set([...postIds].filter(id => !preIds.has(id)));
+  const removed = preVisits.filter(v => !postIds.has(v.id));
+  d.visits = d.visits.filter(v => !added.has(v.id)).concat(removed);
 }
 
 /* ---------- 記録の索引 ---------- */
 let IDX = new Map(), HBT = new Map(), SUM = new Map();
 const EMPTY_SUM = { n: 0, last: null, met: null, awayN: 0, slots: 0, metSlots: 0, awaySlots: 0, unmet: false, bestSlot: null };
 const sum = k => SUM.get(k) || EMPTY_SUM;
+const SLOT_MEMO = new WeakMap();
+function slotOfVisit(v) {
+  let s = SLOT_MEMO.get(v);
+  if (!s) { s = slotOf(new Date(v.at)); SLOT_MEMO.set(v, s); }
+  return s;
+}
 function buildIndex() {
   IDX = new Map(); HBT = new Map(); SUM = new Map(); HID = new Map(); TID = new Map();
   for (const t of D().territories) TID.set(t.id, t);
@@ -1682,7 +1740,7 @@ function buildIndex() {
     const s = { n: a.length, last: a[0], met: null, awayN: 0, slots: 0, metSlots: 0, awaySlots: 0, unmet: true, bestSlot: null };
     let cnt = null;
     for (let i = 0; i < a.length; i++) {
-      const v = a[i], sl = slotOf(new Date(v.at)), bit = SLOT_BIT[sl]; // 日時の読み取りはここで1回だけ
+      const v = a[i], sl = slotOfVisit(v), bit = SLOT_BIT[sl]; // 時間帯は記録ごとに1回だけ計算して覚えておく
       s.slots |= bit;
       if (v.result === 'met') {
         if (!s.met) s.met = v;
@@ -1734,14 +1792,15 @@ function inPoly(lat, lng, poly) {
   return c;
 }
 function bboxOf(poly) {
+  if (!okPoly(poly)) return [Infinity, -Infinity, Infinity, -Infinity];
   let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity;
   for (const p of poly) { if (p[0] < a) a = p[0]; if (p[0] > b) b = p[0]; if (p[1] < c) c = p[1]; if (p[1] > d) d = p[1]; }
   return [a, b, c, d];
 }
-function terrOf(lat, lng) { const t = D().territories.find(t => inPoly(lat, lng, t.polygon)); return t ? t.id : null; }
+function terrOf(lat, lng) { const t = polyTerrs().find(t => inPoly(lat, lng, t.polygon)); return t ? t.id : null; }
 /* 家がどの区域に入るかを決め直す（3万件でも速いように、先に四角の範囲で絞る） */
 function reassign() {
-  const bx = D().territories.map(t => ({ t, b: bboxOf(t.polygon) }));
+  const bx = polyTerrs().map(t => ({ t, b: bboxOf(t.polygon) }));
   for (const h of D().houses) {
     let id = null;
     for (const x of bx) {
@@ -1752,7 +1811,11 @@ function reassign() {
     if (h.terrId !== id) h.terrId = id;
   }
 }
-function center(poly) { return [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length]; }
+/* 線が3点未満・壊れている区域は、地図の計算からはずす（サーバーのデータが壊れていても画面を止めない） */
+const okPoly = p => Array.isArray(p) && p.length >= 3 && p.every(v => Array.isArray(v) && isFinite(v[0]) && isFinite(v[1]));
+const polyTerrs = () => D().territories.filter(t => okPoly(t.polygon));
+function center(poly) {
+  if (!okPoly(poly)) return HOME_VIEW.slice(); return [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length]; }
 function distM(a, b) {
   const R = 6371000, toR = x => x * Math.PI / 180;
   const dLa = toR(b[0] - a[0]), dLn = toR(b[1] - a[1]);
@@ -2115,7 +2178,7 @@ function renderTerrs() {
   const cur = selTerrId();
   const tapOk = mode === 'normal'; // 線引き・家の追加のときは、地図のタップを区域の選択に使わない
   const lock = lockOn(), okT = lock ? openTerrIds() : null;
-  for (const t of D().territories) {
+  for (const t of polyTerrs()) {
     const on = t.id === cur, dim = !!cur && !on; // えらんだ区域以外は薄く
     const gray = lock && !okT.has(t.id);          // 選べない区域は灰色
     const col = gray ? '#9AA5A0' : accentColor();
@@ -2154,6 +2217,7 @@ function selTerrId() {
 }
 /* 画面上での区域の広さ（ピクセル） */
 function terrScreenArea(t) {
+  if (!okPoly(t.polygon)) return 0;
   const p = t.polygon.map(v => map.latLngToContainerPoint(v));
   let a = 0;
   for (let i = 0, j = p.length - 1; i < p.length; j = i++) a += (p[j].x + p[i].x) * (p[j].y - p[i].y);
@@ -2168,7 +2232,7 @@ function iconFade() {
   let ref;
   if (st) ref = terrScreenArea(st); // えらんでいる区域を基準にする
   else {
-    const areas = D().territories
+    const areas = polyTerrs()
       .filter(t => b.intersects(L.latLngBounds(t.polygon)))
       .map(terrScreenArea).filter(a => a > 0);
     if (!areas.length) return 1;
@@ -2231,7 +2295,7 @@ function myPlaces() {
 }
 const isMyHouse = (h, mine) => mine.terrs.has(h.terrId) || targets(h).some(u => mine.keys.has(K(h.id, u)));
 function fitTerr(id) {
-  const t = terrById(id); if (!t) return;
+  const t = terrById(id); if (!t || !okPoly(t.polygon)) return;
   // 上の操作ボタンと下の案内に隠れない範囲で、区域をできるだけ大きく表示する
   const bar = $('#cardBar'), tools = $('#mapTools');
   const top = tools && !tools.hidden ? tools.offsetHeight + 12 : 16;
@@ -2239,7 +2303,7 @@ function fitTerr(id) {
   map.fitBounds(L.latLngBounds(t.polygon), { paddingTopLeft: [12, top], paddingBottomRight: [12, bottom] });
 }
 function fitAll() {
-  const pts = D().territories.flatMap(t => t.polygon);
+  const pts = polyTerrs().flatMap(t => t.polygon);
   if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [30, 30] });
 }
 /* 自分の区域カード以外で記録するときの確認（区域ごとに1回。画面を開き直すとまた出る） */
@@ -3063,11 +3127,12 @@ function startDraw(targetId) {
   addCount = 0; updateAddBar();
   setDrawFold(false);
   const t = targetId ? terrById(targetId) : null;
+  const tp = t && okPoly(t.polygon) ? t.polygon : null; // 線が壊れている区域は、引き直しにする
   draw = {
-    points: t ? t.polygon.map(p => [p[0], p[1]]) : [],
-    snaps: t ? t.polygon.map(v => sharedSnap(v, t.id)) : [],
-    origs: t ? t.polygon.map(v => v.slice()) : [], // 直す前の位置（隣の区域の同じ点も動かすため）
-    edit: !!t, targetId, sel: -1, hist: [],
+    points: tp ? tp.map(p => [p[0], p[1]]) : [],
+    snaps: tp ? tp.map(v => sharedSnap(v, t.id)) : [],
+    origs: tp ? tp.map(v => v.slice()) : [], // 直す前の位置（隣の区域の同じ点も動かすため）
+    edit: !!tp, targetId, sel: -1, hist: [],
     line: L.polyline([], { color: '#C2410C', weight: 4, dashArray: '8 6', interactive: false }).addTo(map),
     hints: L.layerGroup().addTo(map),
     handles: L.layerGroup().addTo(map)
@@ -3083,7 +3148,7 @@ function startDraw(targetId) {
 const samePt = (a, b) => Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9;
 /* 隣の区域と同じ位置にある点（共有している点） */
 function sharedSnap(v, selfId) {
-  for (const t of D().territories) {
+  for (const t of polyTerrs()) {
     if (t.id === selfId) continue;
     const i = t.polygon.findIndex(w => samePt(w, v));
     if (i >= 0) return { ll: v.slice(), tid: t.id, idx: i };
@@ -3094,7 +3159,7 @@ function sharedSnap(v, selfId) {
 function drawHints() {
   draw.hints.clearLayers();
   if (!drawSnapOn) return;
-  D().territories.forEach(t => {
+  polyTerrs().forEach(t => {
     if (t.id === draw.targetId) return;
     t.polygon.forEach(v => L.circleMarker(v, { radius: 4, color: '#0E7C66', weight: 2, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(draw.hints));
   });
@@ -3105,13 +3170,13 @@ function snapPoint(ll) {
   if (!drawSnapOn) return null;
   const p = cpt(ll);
   let best = null, bd = SNAP_PX;
-  D().territories.forEach(t => {
+  polyTerrs().forEach(t => {
     if (t.id === draw.targetId) return;
     t.polygon.forEach((v, i) => { const d = p.distanceTo(cpt(v)); if (d < bd) { bd = d; best = { ll: [v[0], v[1]], tid: t.id, idx: i }; } });
   });
   if (best) return best;
   let ed = EDGE_PX;
-  D().territories.forEach(t => {
+  polyTerrs().forEach(t => {
     if (t.id === draw.targetId) return;
     const n = t.polygon.length;
     for (let i = 0; i < n; i++) {
@@ -3127,6 +3192,7 @@ function pushHist() {
   if (draw.hist.length > 60) draw.hist.shift();
 }
 function drawUndo() {
+  if (!draw) return;
   const h = draw.hist.pop();
   if (!h) { toast('戻せる操作はありません'); return; }
   draw.points = h.points; draw.snaps = h.snaps; draw.origs = h.origs; draw.sel = -1;
@@ -3258,6 +3324,7 @@ function endDraw() {
   draw = null; setMode('normal');
 }
 function finishDraw() {
+  if (!draw) return;
   if (draw.points.length < 3) { toast('角を3か所以上にしてください'); return; }
   const pts = draw.points.map(p => p.slice());
   if (draw.targetId) {
@@ -3267,7 +3334,7 @@ function finishDraw() {
     draw.points.forEach((p, i) => {
       const o = draw.origs[i];
       if (!o || samePt(o, p)) return;
-      D().territories.forEach(tt => {
+      polyTerrs().forEach(tt => {
         if (tt.id === t.id) return;
         tt.polygon.forEach((v, vi) => {
           if (!samePt(v, o)) return;
@@ -3303,6 +3370,7 @@ function openTerrForm({ pts = null, terr = null }) {
     <button class="btn block" data-close>もどる</button>`);
   $('#fSave').onclick = () => {
     const no = normNo($('#fNo').value), name = $('#fName').value.trim();
+    if (!terr && !okPoly(pts)) { closeSheet(); toast('区域の線がありません。線を引き直してください'); return; }
     if (!NO_RE.test(no)) { toast('区域番号は「53」「53-1」のように入力してください'); return; }
     if (D().territories.some(t => String(t.no) === no && t !== terr)) { toast(`区域${no}はすでにあります`); return; }
     closeSheet();
@@ -3727,7 +3795,7 @@ function doImport(rows, snap) {
   }
   const replaced = new Set(use.filter(r => r.target).map(r => r.target.id));
   const pool = [];
-  if (snap) D().territories.forEach(t => { if (!replaced.has(t.id)) t.polygon.forEach(p => pool.push(p)); });
+  if (snap) polyTerrs().forEach(t => { if (!replaced.has(t.id)) t.polygon.forEach(p => pool.push(p)); });
   const polys = use.map(r => {
     const base = r.poly.map(p => p.slice());
     if (!snap) return base;
@@ -3904,27 +3972,33 @@ function stampFollow(k, res, curText, after) {
 }
 
 /* ---------- 区域カードの申し込み・受け取り ---------- */
-const myPending = () => D().requests.find(r => !r.type && r.by === me().id && r.status === 'pending');
+/* 区域カードの申し込み中：個人用とグループ用を別々に数える（上限は区域係が決める） */
+const myPendings = () => D().requests.filter(r => !r.type && r.by === me().id && r.status === 'pending' && Date.now() - Date.parse(r.at) < 30 * DAY);
+const reqLimit = forGroup => Number(forGroup ? D().settings.reqMaxGroup : D().settings.reqMaxPersonal) || 1;
+const pendingOf = forGroup => myPendings().filter(r => !!r.forGroup === !!forGroup);
+const canAsk = forGroup => pendingOf(forGroup).length < reqLimit(forGroup);
+const myPending = () => myPendings()[0];
 const freeTerrs = () => D().territories.filter(t => !t.holder);
 const heldCount = uid => D().territories.filter(t => t.holder === uid).length;
 const agoLabel = iso => { const d = daysSince(iso); return d === 0 ? '今日' : `${d}日前`; };
 const byLongest = (a, b) => ((a.last || '') < (b.last || '') ? -1 : 1); // 長く回っていない順（記録なしが先）
 
 function renderRequestArea() {
-  const p = myPending();
-  if (p) {
+  const ps = myPendings().sort((a, b) => (a.at < b.at ? -1 : 1));
+  const sent = LIVE ? (Store.queue.length
+    ? '<p class="tag-warn">まだ係に送れていません。電波のよい場所でこの画面を開くと、自動で送ります。</p>'
+    : '<p class="muted">係に送信ずみです。</p>') : '';
+  const boxes = ps.map(p => {
     const t = p.terrId ? terrById(p.terrId) : null;
-    $('#reqArea').innerHTML = `<div class="reqbox">
-      <p><b>区域カードを申し込み中です</b></p>
+    return `<div class="reqbox">
+      <p><b>${p.forGroup ? `${esc(p.forGroup)}グループの区域を` : '区域カードを'}申し込み中です</b></p>
       <p class="muted">希望：${t ? `区域${t.no}` : 'どこでもよい'}　${fmtDay(p.at)}に申し込み</p>
-      <p class="muted">係が決めると、上の「あなたの区域カード」に加わります。</p>
-      ${LIVE ? (Store.queue.length
-        ? '<p class="tag-warn">まだ係に送れていません。電波のよい場所でこの画面を開くと、自動で送ります。</p>'
-        : '<p class="muted">係に送信ずみです。</p>') : ''}
+      <p class="muted">係が決めると、上の「あなたの区域カード」に加わります。</p>${sent}
       <div class="actions"><button class="btn small" data-reqcancel="${p.id}">申し込みを取り消す</button></div></div>`;
-  } else {
-    $('#reqArea').innerHTML = `<button class="btn block wideadd" data-reqopen>＋ 区域カードをもう1枚ほしい</button>`;
-  }
+  }).join('');
+  // まだ申し込める枠があるときだけ「もう1枚ほしい」を出す（監督はグループ用の枠も数える）
+  const room = canAsk(false) || (isOverseer() && canAsk(true));
+  $('#reqArea').innerHTML = boxes + (room ? `<button class="btn block wideadd" data-reqopen>＋ 区域カードをもう1枚ほしい</button>` : '');
   const done = D().requests.filter(r => r.by === me().id && (r.status === 'approved' || r.status === 'declined') && !r.seen);
   $('#reqNotice').innerHTML = done.map(r => {
     const t = terrById(r.terrId);
@@ -3958,7 +4032,8 @@ function openRequestSheet() {
       <button type="button" data-rg="0" aria-pressed="${!reqForGroup}">自分の区域</button>
       <button type="button" data-rg="1" aria-pressed="${reqForGroup}">${esc(myGroup())}グループの区域</button></div>
       <p class="hint">グループの区域は、奉仕の集まりのときに、グループ全員で共有して回れます。</p>` : ''}
-    <p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。</p>
+    <p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。
+      （係に頼めるのは${reqForGroup && isOverseer() ? 'グループ用' : '個人'}で${reqLimit(reqForGroup && isOverseer())}件まで・いま申し込み中 ${pendingOf(reqForGroup && isOverseer()).length}件）</p>
     ${!canTake && list.some(x => x.t.free) ? `<div class="notice warn">自分で受け取れるのは${max}枚までです（今 ${held}枚）。係に頼むことはできます。</div>` : ''}
     <div class="row"><button class="btn small" id="reqNear">${myPos ? '現在地を更新する' : '現在地から近い順にする'}</button>
       <span class="muted">${myPos ? '近い順' : '長く回っていない順'}に並んでいます</span></div>
@@ -3985,7 +4060,8 @@ function takeTerr(id) {
   });
 }
 function askTerr(id) {
-  if (myPending()) { toast('すでに申し込み中です'); return; }
+  const g = !!(reqForGroup && isOverseer());
+  if (!canAsk(g)) { toast(`${g ? 'グループ用' : '個人'}の申し込みは、${reqLimit(g)}件までです。係の返事を待ってください`); return; }
   const t = id ? terrById(id) : null;
   closeSheet();
   commit(t ? `区域${t.no}を係に申し込みました` : '区域カードを係に申し込みました', () => {
@@ -4070,6 +4146,16 @@ function renderInbox() {
     <span>「自由に受け取ってよい」区域を、1人が自分で受け取れる枚数<br><small class="hint">すでに持っているカードも数えます</small></span>
     <div class="stepper"><button type="button" data-takemax="-1" aria-label="枚数を減らす">−</button><output class="wide">${st.selfTakeMax}枚まで</output>
     <button type="button" data-takemax="1" aria-label="枚数を増やす">＋</button></div></div>
+    <div class="setrow">
+      <span>1人が同時に「係に頼める」申し込み（個人の区域）<br><small class="hint">係の返事を待っている申し込みの数です</small></span>
+      <div class="stepper"><button type="button" data-kset="reqMaxPersonal" data-d="-1" aria-label="件数を減らす">−</button>
+        <output class="wide">${st.reqMaxPersonal}件まで</output>
+        <button type="button" data-kset="reqMaxPersonal" data-d="1" aria-label="件数を増やす">＋</button></div></div>
+    <div class="setrow">
+      <span>監督が同時に「係に頼める」申し込み（グループの区域）<br><small class="hint">個人の申し込みとは別に数えます</small></span>
+      <div class="stepper"><button type="button" data-kset="reqMaxGroup" data-d="-1" aria-label="件数を減らす">−</button>
+        <output class="wide">${st.reqMaxGroup}件まで</output>
+        <button type="button" data-kset="reqMaxGroup" data-d="1" aria-label="件数を増やす">＋</button></div></div>
     <div class="setrow">
     <span>区域カードを「完了」にできる目安<br><small class="hint">訪ねた家の割合。目安に届くと、本人の画面に「返却して完了にできます」と出ます</small></span>
     <div class="stepper"><button type="button" data-donepct="-5" aria-label="目安を下げる">−</button><output class="wide">${st.donePct}%</output>
@@ -4436,12 +4522,13 @@ function renderCardBar() {
           <button data-rmode="progress" aria-pressed="${mode === 'progress'}">進み具合</button>
         </div>
         ${body}
-        <div class="row">${extra}${closeBtn}</div>
+        <div class="row">${extra}${closeBtn}${LIVE && (helpersOf(r.t).length || isHelper(r.t)) ? `<button class="btn small" id="barSync">最新にする</button><span class="muted" id="barAge"></span>` : ''}</div>
       </div>`;
     $('#barFold').onclick = () => { barMini = !barMini; renderCardBar(); };
     $$('[data-rmode]', bar).forEach(x => x.onclick = () => { me().roundMode = x.dataset.rmode; Store.save(); renderHouses(); });
     if ($('#barList')) $('#barList').onclick = openPlanSheet;
     if ($('#barReturn')) $('#barReturn').onclick = () => openReturnSheet(r.t.id);
+    if ($('#barSync')) { updateSyncAge(); $('#barSync').onclick = () => { $('#barAge').textContent = '更新しています…'; (Store.queue.length ? flush() : refresh(true)).catch(() => {}).then(updateSyncAge); }; }
   }
   $('#cardBarClose').onclick = () => { focusCard = null; roundTerr = null; followMap = false; renderHouses(); };
 }
@@ -5049,7 +5136,7 @@ function createDummy(testers) {
   const now = Date.now(), iso = ms => new Date(ms).toISOString(), mine = me().id;
   const cur = slotOf(new Date()), others = SLOTS.filter(x => x !== cur), o1 = others[0], o2 = others[4];
   // 場所：今ある区域の東どなりに、3列で並べる（家を区域に入れ直さないので、ほかの家には影響しない）
-  const all = D().territories.filter(t => !t.dummy).flatMap(t => t.polygon);
+  const all = polyTerrs().filter(t => !t.dummy).flatMap(t => t.polygon);
   const lat0 = all.length ? Math.max(...all.map(q => q[0])) - 0.0036 : HOME_VIEW[0] - 0.0018;
   const lng0 = all.length ? Math.max(...all.map(q => q[1])) + 0.0008 : HOME_VIEW[1] - 0.0022;
   const H = 0.0036, W = 0.0045, G = 0.0004;
@@ -5299,7 +5386,9 @@ function renderDataSet() {
         <button type="button" data-sset="memoShare" data-v="0" aria-pressed="${st.memoShare === 0}">使えない</button></div></div>`;
   $('#adDataSet').innerHTML =
     row('keepMonths', '訪問記録を残す期間', 'か月', 6, 'これより古い記録は、家ごとの最後の1件を残して、毎月整理します（自動整理を設定したとき）') +
-    row('cacheDays', '通信がない端末にデータを残す期間', '日', 5, 'この日数のあいだ通信できなかった端末は、保存した区域の情報を自動で消します');
+    row('cacheDays', '通信がない端末にデータを残す期間', '日', 5, 'この日数のあいだ通信できなかった端末は、保存した区域の情報を自動で消します') +
+    row('syncGroupSec', '一緒に回っているとき、ほかの人の記録を取りに行く間隔', '秒', 1, '短いほど早く反映されますが、サーバーが混みます。80人が同時に使っても、7秒なら余裕があります') +
+    row('syncNormalSec', '区域カード・地図を見ているとき、取りに行く間隔', '秒', 5, 'ふだんの間隔です。混むときは長くしてください');
 }
 function renderAdmin() {
   renderSchedAdmin(); renderPeople();
@@ -5902,6 +5991,7 @@ function showView(name) {
   }
   if (name === 'cards') renderCards();
   if (name === 'home') renderHome();
+  if (LIVE && (name === 'cards' || name === 'map') && !Store.queue.length && Date.now() - lastRefresh > 5000) refresh(true).catch(() => {});
   if (name === 'admin') {
     if (isAdmin()) { renderAdmin(); fetchDevices(true); } else renderOverseer();
     if (LIVE && !Store.queue.length) refresh(true).catch(() => {});
@@ -6073,7 +6163,7 @@ function bindStatic() {
     let x;
     if ((x = q('[data-open]'))) openTerr(x.dataset.open);
     else if ((x = q('[data-redraw]'))) startDraw(x.dataset.redraw);
-    else if ((x = q('[data-rename]'))) openTerrForm({ terr: terrById(x.dataset.rename) });
+    else if ((x = q('[data-rename]'))) { const t = terrById(x.dataset.rename); if (t) openTerrForm({ terr: t }); else toast('この区域は、もうありません'); }
     else if ((x = q('[data-delterr]'))) openDeleteTerr(x.dataset.delterr);
     else if ((x = q('[data-dummy]'))) { const a = x.dataset.dummy; if (a === 'add') addDummy(); else if (a === 'del') delDummy(); else openDummyGuide(); }
     else if ((x = q('[data-go]'))) goTo(x.dataset.go, x.dataset.unit);
@@ -6086,7 +6176,9 @@ function bindStatic() {
     }
     else if ((x = q('[data-kset]'))) {
       const st = D().settings, key = x.dataset.kset;
-      const lim = key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 180] : key === 'groupMax' ? [1, 10] : [5, 60];
+      const lim = key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 180] : key === 'groupMax' ? [1, 10]
+        : key === 'syncGroupSec' ? [5, 30] : key === 'syncNormalSec' ? [10, 120]
+        : key === 'reqMaxPersonal' || key === 'reqMaxGroup' ? [1, 5] : [5, 60];
       st[key] = Math.min(lim[1], Math.max(lim[0], st[key] + Number(x.dataset.d)));
       Store.save(); renderAll(); toast('設定を変えました');
     }
@@ -6193,16 +6285,20 @@ async function init() {
     $('#adReset').hidden = true;
     $('#btnLogout').onclick = logout;
     $('#btnHome').onclick = openHomeGuide;
-    // ふだんは約1分ごと、一緒に回っている間は約15秒ごとに、ほかの人の記録を取りに行く
+    // ほかの人の記録を取りに行く間隔：一緒に回っている間は約7秒、区域カード・地図を見ている間は約20秒、そのほかは約45秒
     const again = () => {
       if (document.hidden || checkExpiry() || Store.authLost) return;
       fetchDevices(false); // 区域係のとき、スマホの申し込みを1分ごとに確認
-      if (Store.queue.length) flush();
-      else if (groupActive() || Date.now() - lastRefresh >= 55000) refresh().catch(() => {});
+      updateSyncAge();
+      if (Store.queue.length) { if (!flushing) flush(); return; }
+      if (Date.now() >= nextPollAt) {
+        schedulePoll(); // 返事を待つ間に、もう一度取りに行かないように先に次の時刻を決める
+        refresh(true).then(() => { pollFail = 0; }).catch(() => { pollFail = Math.min(3, pollFail + 1); }).then(schedulePoll);
+      }
     };
-    setInterval(again, 15000);
+    setInterval(again, 3000);
     window.addEventListener('online', flush);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) { lastRefresh = 0; again(); } });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { lastRefresh = 0; nextPollAt = 0; again(); } });
     fetchDevices(true);
     if (Store.queue.length) flush();
     else if (from === 'cache') refresh(true).catch(() => toast('インターネットにつながっていません。前回の情報を表示しています'));
