@@ -484,6 +484,49 @@ body.strong .pin.st-plain{border-width:4px}
 /* ===== 家の削除の申請 ===== */
 .delreq .who{font-size:22px;font-weight:700;color:var(--danger)}
 
+/* ===== ホーム ===== */
+.homehello{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin:2px 0 10px}
+.homehello p{margin:0;width:100%;color:var(--ink2)}
+.homehello b{font-size:22px}
+.homecard{margin:10px 0}
+.gbadge{display:inline-block;background:#F0EAF7;color:#5B2E8C;border:2px solid #9C6BD1;border-radius:99px;padding:0 10px;font-size:14px;font-weight:700;vertical-align:middle}
+.timer{background:linear-gradient(150deg,var(--brand),var(--terr));color:#fff;border-radius:18px;padding:16px;text-align:center;margin:10px 0}
+.timer.pause{background:linear-gradient(150deg,#5E6E77,#8A979E)}
+.timer .tlabel{margin:0;opacity:.9;font-size:16px}
+.timer .tclock{margin:4px 0 10px;font-size:46px;font-weight:700;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.timer.idle .tclock{opacity:.45}
+.timer .tbtns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.timer .btn{min-width:130px;border-color:#fff}
+.timer .btn.primary{background:#fff;color:var(--brand)}
+.timer .btn.danger{background:transparent;color:#fff;border-color:#fff}
+.timer .btn:not(.primary):not(.danger){background:transparent;color:#fff}
+.timer .tbig{min-height:64px;font-size:21px;min-width:220px}
+.timer .muted{color:#ffffffd0;margin:10px 0 0}
+.calhead{display:flex;align-items:center;justify-content:space-between;margin:6px 0}
+.calhead b{font-size:20px}
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cw{text-align:center;font-size:14px;font-weight:700;color:var(--ink2)}
+.cw.sun,.cd.sun .dn{color:#C62828}.cw.sat,.cd.sat .dn{color:#1565C0}
+.cd{min-height:58px;border-radius:10px;border:2px solid var(--line);background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:4px 0;gap:2px;font-weight:700}
+.cd.empty{border:0;background:transparent}
+.cd.today{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand)}
+.cd .dots{display:flex;gap:3px;min-height:9px}
+.cd small,.calkeys small{font-size:11px;color:var(--terr);font-weight:700}
+.dg,.dp{display:inline-block;width:9px;height:9px;border-radius:50%}
+.dg{background:var(--draw)}.dp{background:var(--met)}
+.calkeys{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--ink2);margin-top:6px}
+.calkeys span{display:inline-flex;align-items:center;gap:4px}
+/* グループの区域 */
+.stamp.grp{border-color:#9C6BD1;color:#5B2E8C;background:#F7F2FC}
+.terr-label.grp span{border-color:#9C6BD1;color:#5B2E8C;background:#F7F2FCee}
+.tcard.grp{border-color:#C9B2E6}
+/* 係の画面の中のタブ */
+.atabs{display:grid!important;grid-template-columns:repeat(3,1fr);gap:0}
+.atabs button{min-height:50px;font-size:15px;border-left:0!important;border-top:2px solid var(--ink)}
+.atabs button:nth-child(-n+3){border-top:0}
+.atabs button:not(:nth-child(3n+1)){border-left:2px solid var(--ink)!important}
+.atabs .cnt{position:static;display:inline-grid;margin-left:4px;vertical-align:middle}
+
 /* ===== お知らせ ===== */
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--brand);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
 #toast button{min-height:46px;border-radius:10px;border:2px solid #fff;background:transparent;color:#fff;font-weight:700;padding:0 14px;flex:none}
@@ -499,8 +542,25 @@ body.strong .pin.st-plain{border-width:4px}
   </header>
 
   <main>
+    <!-- ホーム -->
+    <section class="view" id="view-home" hidden>
+      <div class="wrap">
+        <div id="homeHello"></div>
+        <div id="homeTimer"></div>
+        <div id="homeGoal"></div>
+        <div id="homeMonthEnd"></div>
+        <h2 class="sec">奉仕の予定</h2>
+        <div class="seg subtabs" id="calMode" role="group" aria-label="予定の見かた">
+          <button type="button" data-calmode="cal" aria-pressed="true">カレンダー</button>
+          <button type="button" data-calmode="list" aria-pressed="false">集まりの一覧</button>
+        </div>
+        <div id="homeCal"></div>
+        <p class="hint">自分の予定と奉仕時間は、このスマホの中だけに保存されます。係やほかの人には送られません。</p>
+      </div>
+    </section>
+
     <!-- 区域カード -->
-    <section class="view" id="view-cards">
+    <section class="view" id="view-cards" hidden>
       <div class="wrap">
         <div id="todayBox"></div>
         <div id="reqNotice"></div>
@@ -614,13 +674,29 @@ body.strong .pin.st-plain{border-width:4px}
     <!-- 係の画面 -->
     <section class="view" id="view-admin" hidden>
       <div class="wrap">
-        <div id="adDevices"></div>
-        <div id="adInbox"></div>
+        <div class="seg subtabs atabs" id="adTabs" role="group" aria-label="係の画面の切りかえ">
+          <button type="button" data-ap="inbox" aria-pressed="true">申請・承認<b class="cnt" id="apCnt" hidden>0</b></button>
+          <button type="button" data-ap="terr" aria-pressed="false">区域</button>
+          <button type="button" data-ap="sched" aria-pressed="false">予定</button>
+          <button type="button" data-ap="status" aria-pressed="false">状況</button>
+          <button type="button" data-ap="people" aria-pressed="false">人・グループ</button>
+          <button type="button" data-ap="set" aria-pressed="false">設定・データ</button>
+        </div>
+        <div class="apane" data-apane="inbox">
+          <div id="adDevices"></div>
+          <div id="adInbox"></div>
+          <div id="adInboxEmpty"></div>
+        </div>
+        <div class="apane" data-apane="sched" hidden><div id="adSched"></div></div>
+        <div class="apane" data-apane="people" hidden><div id="adPeople"></div></div>
+        <div class="apane" data-apane="status" hidden>
         <h2 class="sec">全体の状況</h2>
         <div class="tiles" id="adTiles"></div>
         <h2 class="sec">時間帯ごとの「会えた」割合（直近180日）</h2>
         <p class="hint">枠で囲んだ欄が、いちばん会えている時間帯です（10件以上の記録がある欄のみ）。</p>
         <div class="scroll"><table class="slots" id="adSlots"></table></div>
+        </div>
+        <div class="apane" data-apane="terr" hidden>
         <h2 class="sec">区域の一覧</h2>
         <div class="row"><button class="btn primary" id="adNewTerr">＋ 新しい区域の線を引く</button>
           <!-- iPhoneでは accept に .kml を書くとファイルを選べないことがあるため、あえて指定しない（中身で判定する） -->
@@ -628,6 +704,8 @@ body.strong .pin.st-plain{border-width:4px}
         <p class="hint">Googleマイマップで「KML/KMZにエクスポート」したファイルを選びます。区域の線だけを取り込み、ピン（家の印）は取り込みません。</p>
         <div id="adTakeSet"></div>
         <div id="adTerrs"></div>
+        </div>
+        <div class="apane" data-apane="status2" hidden>
         <h2 class="sec">留守宅の状況</h2>
         <div id="adAwaySet"></div>
         <h3 class="sub">まだ試していない家の数（時間帯ごと）</h3>
@@ -653,6 +731,8 @@ body.strong .pin.st-plain{border-width:4px}
         <h3 class="sub">まとめて引き継ぎ</h3>
         <p class="hint">奉仕が難しくなった人の受け持ちを、まとめて別の人に移します。</p>
         <div class="actions" id="adBulk"></div>
+        </div>
+        <div class="apane" data-apane="set" hidden>
         <h2 class="sec">記録する項目</h2>
         <p class="hint">会衆で記録する項目を決められます。記録しない項目は、入力画面にも出ません。</p>
         <div id="adRecSet"></div>
@@ -663,15 +743,16 @@ body.strong .pin.st-plain{border-width:4px}
           <button class="btn" id="adCsv">訪問記録をCSVで書き出す</button>
           <button class="btn danger" id="adReset">試作データに戻す</button>
         </div>
+        </div>
       </div>
     </section>
   </main>
 
   <nav class="tabs" id="tabs" aria-label="画面の切りかえ">
+    <button data-view="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5h4v5"/></svg>ホーム</button>
     <button data-view="cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h6M7 14h10"/></svg>区域カード</button>
     <button data-view="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>地図</button>
-    <button data-view="reco"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>おすすめ</button>
-    <button data-view="admin" id="tabAdmin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 20h18M6 17v-6M11 17V6M16 17v-9"/></svg>係の画面<b class="tabbadge" id="tabBadge" hidden>0</b></button>
+    <button data-view="admin" id="tabAdmin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 20h18M6 17v-6M11 17V6M16 17v-9"/></svg><span id="tabAdminLabel">係の画面</span><b class="tabbadge" id="tabBadge" hidden>0</b></button>
   </nav>
 </div>
 
@@ -823,9 +904,11 @@ function makeDemo() {
   const r = rng(20260917), now = Date.now();
   const iso = ms => new Date(ms).toISOString();
   const users = [
-    { id: 'u1', name: '伝道者A', role: 'pub' },
-    { id: 'u2', name: '伝道者B', role: 'pub' },
-    { id: 'u3', name: '区域係C', role: 'admin' }
+    { id: 'u1', name: '伝道者A', role: 'pub', group: '北' },
+    { id: 'u2', name: '伝道者B', role: 'pub', group: '北', overseer: true },
+    { id: 'u3', name: '区域係C', role: 'admin', group: '南' },
+    { id: 'u4', name: '伝道者D', role: 'pub', group: '北' },
+    { id: 'u5', name: '伝道者E', role: 'pub', group: '南', overseer: true }
   ];
   const rect = (a, b, c, d) => [[a, c], [a, d], [b, d], [b, c]];
   const territories = [
@@ -906,7 +989,17 @@ function makeDemo() {
     if (last && last.result === 'refused') { const k = K(h.id, unit); dnc[k] = true; delete follows[k]; delete released[k]; }
   }));
   const requests = [{ id: 'r1', by: 'u2', terrId: 't4', at: iso(now - 2 * DAY), status: 'pending' }];
-  return { version: 4, users, territories, houses, visits, dnc, follows, released, requests, awayCards: [], returns: [],
+  // 奉仕の集まりの予定（試作）：今週と来週の土曜・水曜
+  const schedules = [];
+  for (let w = 0; w < 3; w++) {
+    const sat = new Date(now); sat.setDate(sat.getDate() + ((6 - sat.getDay() + 7) % 7) + 7 * w);
+    const wed = new Date(now); wed.setDate(wed.getDate() + ((3 - wed.getDay() + 7) % 7) + 7 * w);
+    const f = x => `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
+    schedules.push({ id: 'sN' + w, group: '北', date: f(sat), time: '09:30', end: '11:30', place: '北公民館の前', note: '区域1を回ります', by: 'u2', at: iso(now) });
+    schedules.push({ id: 'sS' + w, group: '南', date: f(sat), time: '10:00', end: '12:00', place: '会館', note: '', by: 'u5', at: iso(now) });
+    schedules.push({ id: 'sA' + w, group: '', date: f(wed), time: '19:00', end: '', place: '会館', note: '全体の集まり', by: 'u3', at: iso(now) });
+  }
+  return { version: 4, users, territories, houses, visits, dnc, follows, released, requests, awayCards: [], returns: [], schedules,
     settings: { remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90 }, currentUser: 'u1' };
 }
 
@@ -923,7 +1016,7 @@ const API_URL = (function () {
 const LIVE = !!API_URL;
 const JOIN_KEY = 'kuiki_join', PENDING_KEY = 'kuiki_pending';
 const TOKEN_KEY = 'kuiki_token', QUEUE_KEY = 'kuiki_queue', OLD_CACHE_KEY = 'kuiki_cache', SYNC_KEY = 'kuiki_sync_at', LOCK_KEY = 'kuiki_lock_ok';
-const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'users'];
+const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'schedules', 'users'];
 const MAP_COLS = ['dnc', 'follows', 'released'];
 const RES_NAME = { m: 'met', a: 'away', r: 'refused' };
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -1019,7 +1112,7 @@ function applyDiff(st, ch) {
 }
 
 const Store = {
-  key: 'kuiki_demo_v7',
+  key: 'kuiki_demo_v8',
   data: null,
   fp: null,      // 本番：サーバーに伝え済み（または送信待ち）の内容の控え
   seq: null,     // 本番：受け取り済みの変更番号
@@ -1038,7 +1131,7 @@ const Store = {
   migrate() {
     const d = this.data;
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
-    d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || [];
+    d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
     d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0 }, d.settings || {});
   },
@@ -1511,10 +1604,10 @@ function logout() {
   const n = Store.queue.length;
   const q = n
     ? `まだ送っていない記録が${n}件あります。消すと送られません。それでもこの端末から消しますか？`
-    : 'この端末から、区域マップの情報と招待リンクを消します。よろしいですか？';
+    : 'この端末から、区域マップの情報と招待リンクを消します。再訪問のメモ、奉仕時間、自分の予定（このスマホだけの記録）も消えます。よろしいですか？';
   if (!confirm(q)) return;
   [TOKEN_KEY, QUEUE_KEY, OLD_CACHE_KEY, SYNC_KEY, PENDING_KEY, JOIN_KEY].forEach(lsDel);
-  clearAllMemos();
+  clearAllMemos(true);
   clearTimeout(Store.cacheTimer);
   IDB.del('cache').catch(() => {});
   showBlocking('この端末から消しました', 'もう一度使うときは、区域係からもらったリンクを開いてください（共通リンクのときは、もう一度、係の承認が必要です）。');
@@ -1685,8 +1778,16 @@ function terrStats(t, sinceMs) {
 }
 
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
-const APP_VERSION = '2026.09.21';
+const APP_VERSION = '2026.09.22';
 const CHANGELOG = [
+  { v: '2026.09.22', items: [
+    ['家', '「おすすめ」が「ホーム」に変わりました。奉仕の集まりの予定（カレンダーと一覧）が見られます'],
+    ['時', 'ホームで奉仕の時間をはかれます（スタート・一時停止・終了）。終わると自動でカレンダーに入ります'],
+    ['目', '今月の目標を決めると、残りの時間と、よく行く曜日への配分を提案します。月末には自動でまとめます'],
+    ['予', '自分の予定も入れられ、Googleカレンダーにも追加できます（自分の予定と時間は、このスマホの中だけ）'],
+    ['G', 'グループの区域ができました。監督は、グループ全員とまとめて区域を共有できます'],
+    ['係', '係の画面を「申請・承認／区域／予定／状況／人・グループ／設定・データ」に分けました。引き継ぎ待ちの家は、再訪問のタブの下に出ます']
+  ] },
   { v: '2026.09.21', items: [
     ['再', '再訪問に「リスト」と「地図で見る」ができました。並び順・ピン留め（📌）・虫めがねの検索が使えます'],
     ['会', '再訪問の一覧とメモの画面に「会えた」「留守」のボタン。押すと記録され、メモに日時と結果が入ります'],
@@ -1901,11 +2002,13 @@ function openHelpers(tid) {
   const t = terrById(tid);
   if (!t || t.holder !== me().id) return;
   if (D().settings.groupOn === 0) { toast('今は「一緒に回る」は使えない設定です'); return; }
-  const max = D().settings.groupMax, cur = helpersOf(t), curIds = new Set(cur.map(h => h.uid));
+  const max = t.group ? 40 : D().settings.groupMax, cur = helpersOf(t), curIds = new Set(cur.map(h => h.uid));
+  const gm = t.group ? groupMembers(t.group).filter(u => u.id !== me().id && !curIds.has(u.id)) : [];
   const room = max - cur.length;
   const cand = D().users.filter(u => u.id !== me().id && !curIds.has(u.id)).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
   setSheet(headHtml(t, '一緒に回る人', `${fmtDay(new Date().toISOString())}の終わりまで`) + `
     ${cur.length ? `<p class="q">今日一緒に回る人</p>` + cur.map(h => `<div class="setrow"><b>${esc(uname(h.uid))}さん</b><button class="btn small danger" data-hdel="${h.uid}">外す</button></div>`).join('') : ''}
+    ${t.group && gm.length ? `<button class="btn primary block" id="hGroup">${esc(t.group)}グループ全員（${gm.length}人）を今日だけ加える</button>` : ''}
     ${room > 0 ? `<p class="q">加える人をえらぶ</p>
       <label class="field"><span>名前でさがす</span><input type="text" id="hQ" placeholder="名前の一部を入れる" autocomplete="off"></label>
       <div id="hList">${cand.map(u => `<label class="check" data-name="${esc(u.name)}"><input type="checkbox" data-hadd="${u.id}">${esc(u.name)}</label>`).join('') || '<p class="muted">加えられる人がいません。</p>'}</div>
@@ -1920,6 +2023,13 @@ function openHelpers(tid) {
     commit(`${uname(uid)}さんを外しました`, () => { t.helpers = helpersOf(t).filter(h => h.uid !== uid); });
     openHelpers(tid);
   });
+  if ($('#hGroup')) $('#hGroup').onclick = () => {
+    const now = new Date().toISOString(), until = endOfToday();
+    commit(`${t.group}グループの${gm.length}人と、今日この区域を共有しました`, () => {
+      t.helpers = helpersOf(t).concat(gm.map(u => ({ uid: u.id, until, by: me().id, at: now })));
+    });
+    openHelpers(tid);
+  };
   if (!$('#hSave')) return;
   $('#hQ').oninput = e => {
     const q = e.target.value.trim();
@@ -2016,7 +2126,7 @@ function renderTerrs() {
     }).addTo(terrLayer);
     if (tapOk && !gray) poly.on('click', () => selectTerr(t.id === cur ? null : t.id, { toast: t.id !== cur }));
     L.marker(center(t.polygon), {
-      icon: L.divIcon({ className: `terr-label${dim ? ' faint' : ''}${gray ? ' gray' : ''}`, html: `<span>${esc(t.no)}</span>`, iconSize: [0, 0] }),
+      icon: L.divIcon({ className: `terr-label${dim ? ' faint' : ''}${gray ? ' gray' : ''}${t.group && !gray ? ' grp' : ''}`, html: `<span>${t.group ? 'G ' : ''}${esc(t.no)}</span>`, iconSize: [0, 0] }),
       interactive: false, keyboard: false
     }).addTo(terrLayer);
   }
@@ -2455,8 +2565,11 @@ function purgeMemos() {
   [...p].forEach(k => { const f = fol(k); if (!f || f.by !== me().id) { p.delete(k); pc = true; } });
   if (pc) lsSet(pinKey(), JSON.stringify([...p]));
 }
-function clearAllMemos() {
-  try { Object.keys(localStorage).filter(x => x.indexOf(MEMO_PREFIX) === 0).forEach(lsDel); } catch (e) { /* 何もしない */ }
+/* メモ・ピン留めを消す（住んでいる人に関わる記録）。
+   withMine のときは、奉仕時間・自分の予定（本人だけの記録）も消す（「この端末から消す」のとき） */
+function clearAllMemos(withMine) {
+  const pre = [MEMO_PREFIX, 'kuiki_pins_'].concat(withMine ? ['kuiki_my_'] : []);
+  try { Object.keys(localStorage).filter(x => pre.some(p => x.indexOf(p) === 0)).forEach(lsDel); } catch (e) { /* 何もしない */ }
 }
 const memoShort = m => { const t = m.text.split('\n')[0]; return t.length > 40 || m.text.includes('\n') ? t.slice(0, 40) + '…' : t; };
 function openMemo(k, back) {
@@ -3658,14 +3771,14 @@ function cardHtml(t, own, helper) {
   const who = own ? `受け取ってから ${daysSince(t.lentAt)}日`
     : helper ? `${esc(uname(t.holder))}さんの区域を、一緒に回ります（今日まで）`
     : (holder ? `担当：${esc(holder.name)}さん` : '担当者なし');
-  return `<article class="tcard">
-    <span class="stamp${noCls(t.no)}"><small>区域</small>${esc(t.no)}</span>
-    <div><h3>${esc(t.name)}</h3><p class="muted">${who}</p>
+  return `<article class="tcard${t.group ? ' grp' : ''}">
+    <span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${t.group ? 'グループ' : '区域'}</small>${esc(t.no)}</span>
+    <div><h3>${esc(t.name)}</h3>${t.group ? `<span class="gbadge">${esc(t.group)}グループの区域</span>` : ''}<p class="muted">${who}</p>
       <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪問の進み具合"><i style="width:${pct}%"></i></div>
       <p class="muted">${t.lentAt ? '受け取ってから' : 'この90日で'}訪問した家・部屋 ${s.visited} / ${s.n}</p>
       ${own && hs.length ? `<p class="muted"><b>今日一緒に回る人：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : ''}
       ${own || helper ? roundHint(t) : ''}</div>
-    <div class="actions"><button class="btn primary" data-open="${t.id}">地図をひらく</button>${own && groupOk ? `<button class="btn" data-helpers="${t.id}">一緒に回る人</button>` : ''}${own ? `<button class="btn" data-return="${t.id}">返却する</button>` : ''}</div>
+    <div class="actions"><button class="btn primary" data-open="${t.id}">地図をひらく</button>${own && groupOk ? `<button class="btn" data-helpers="${t.id}">${t.group ? 'グループで共有' : '一緒に回る人'}</button>` : ''}${own ? `<button class="btn" data-return="${t.id}">返却する</button>` : ''}</div>
   </article>`;
 }
 let cardTab = 'mine';
@@ -3747,9 +3860,9 @@ function renderFollowList() {
     terr: (a, b) => cmpNo((terrById(houseById(parseKey(a[0])[0]).terrId) || {}).no || '', (terrById(houseById(parseKey(b[0])[0]).terrId) || {}).no || '')
   };
   list.sort((a, b) => (pins.has(b[0]) ? 1 : 0) - (pins.has(a[0]) ? 1 : 0) || (cmp[sort] || cmp.idle)(a, b)); // ピン留めはいつも上
-  box.innerHTML = list.length ? list.map(([k, f]) => followCard(k, f, pins.has(k))).join('')
+  box.innerHTML = (list.length ? list.map(([k, f]) => followCard(k, f, pins.has(k))).join('')
     : (followQ ? '<div class="empty">見つかりませんでした。</div>'
-      : '<div class="empty">受け持っている再訪問はありません。<br>また訪ねたい方に会えたら、記録のときに「私が再訪問します」を選べます。</div>');
+      : '<div class="empty">受け持っている再訪問はありません。<br>また訪ねたい方に会えたら、記録のときに「私が再訪問します」を選べます。</div>')) + (followQ ? '' : handoffHtml());
 }
 function followCard(k, f, pinned) {
   const [hid, unit] = parseKey(k), h = houseById(hid), t = terrById(h.terrId);
@@ -3824,8 +3937,10 @@ function renderRequestArea() {
   }).join('');
 }
 
+let reqForGroup = false; // 監督が「グループ用」として申し込むとき
 function openRequestSheet() {
   const max = D().settings.selfTakeMax, held = heldCount(me().id), canTake = held < max;
+  if (!isOverseer()) reqForGroup = false;
   const list = freeTerrs().map(t => {
     return { t, last: t.completedAt, n: terrStats(t, 0).n, dist: myPos ? distM(myPos, center(t.polygon)) : null };
   });
@@ -3839,6 +3954,10 @@ function openRequestSheet() {
         : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
     </article>`).join('');
   setSheet(headHtml(null, '区域カードをもう1枚', '') + `
+    ${isOverseer() ? `<div class="seg uiseg" role="group" aria-label="だれの区域か">
+      <button type="button" data-rg="0" aria-pressed="${!reqForGroup}">自分の区域</button>
+      <button type="button" data-rg="1" aria-pressed="${reqForGroup}">${esc(myGroup())}グループの区域</button></div>
+      <p class="hint">グループの区域は、奉仕の集まりのときに、グループ全員で共有して回れます。</p>` : ''}
     <p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。</p>
     ${!canTake && list.some(x => x.t.free) ? `<div class="notice warn">自分で受け取れるのは${max}枚までです（今 ${held}枚）。係に頼むことはできます。</div>` : ''}
     <div class="row"><button class="btn small" id="reqNear">${myPos ? '現在地を更新する' : '現在地から近い順にする'}</button>
@@ -3848,6 +3967,7 @@ function openRequestSheet() {
     <button class="btn block" data-close>もどる</button>`);
   const S = $('#sheet');
   $('#reqNear').onclick = () => locate(openRequestSheet);
+  $$('[data-rg]', S).forEach(x => x.onclick = () => { reqForGroup = x.dataset.rg === '1'; openRequestSheet(); });
   $$('[data-take]', S).forEach(x => x.onclick = () => takeTerr(x.dataset.take));
   $$('[data-ask]', S).forEach(x => x.onclick = () => askTerr(x.dataset.ask || null));
 }
@@ -3860,6 +3980,7 @@ function takeTerr(id) {
   commit(`区域${t.no}を受け取りました`, () => {
     const now = new Date().toISOString();
     t.holder = me().id; t.lentAt = now; t.selfTakenAt = now; t.selfSeen = false; t.helpers = [];
+    t.group = reqForGroup && isOverseer() ? myGroup() : null;
     D().requests = D().requests.filter(r => !(r.status === 'pending' && r.by === me().id && r.terrId === id));
   });
 }
@@ -3868,7 +3989,9 @@ function askTerr(id) {
   const t = id ? terrById(id) : null;
   closeSheet();
   commit(t ? `区域${t.no}を係に申し込みました` : '区域カードを係に申し込みました', () => {
-    D().requests.push({ id: 'r' + uid(), by: me().id, terrId: id || null, at: new Date().toISOString(), status: 'pending' });
+    const r = { id: 'r' + uid(), by: me().id, terrId: id || null, at: new Date().toISOString(), status: 'pending' };
+    if (reqForGroup && isOverseer()) r.forGroup = myGroup();
+    D().requests.push(r);
   });
 }
 
@@ -3907,7 +4030,7 @@ function renderInbox() {
       const opts = free.map(({ t, last }) =>
         `<option value="${t.id}"${t.id === def ? ' selected' : ''}>区域${t.no}（${last ? `前回 ${fmtDay(last)}` : '回り終えた記録なし'}）</option>`).join('');
       return `<article class="ritem k-new"><div>
-          <p class="rt">${esc(uname(r.by))}さん</p>
+          <p class="rt">${esc(uname(r.by))}さん${r.forGroup ? ` <span class="gbadge">${esc(r.forGroup)}グループ用</span>` : ''}</p>
           <p class="muted">希望：${want ? `区域${want.no}${wantFree ? '' : '（すでに貸出中）'}` : 'どこでもよい'}　${fmtDay(r.at)}</p>
           <p class="muted">今持っているカード ${held.length}枚${over ? `<span class="tag-warn">4か月超 ${over}枚</span>` : ''}</p>
         </div><span></span>
@@ -3931,6 +4054,9 @@ function renderInbox() {
   if (LIVE) html = `<div class="setrow"><span>最後に確認した時刻：<b>${Store.syncAt ? fmtTime(new Date(Store.syncAt)) : 'まだ'}</b>${Store.queue.length ? `<br><span class="tag-warn">未送信 ${Store.queue.length}件</span>` : ''}</span>
     <button type="button" class="btn small primary" id="adSync">今すぐ確認する</button></div>` + html;
   $('#adInbox').innerHTML = html;
+  const pendN = reqs.length + taken.length + dels.length + devPending().length;
+  $('#adInboxEmpty').innerHTML = pendN ? '' : '<div class="empty">今、承認や申し込みを待っているものはありません。</div>';
+  $('#apCnt').textContent = pendN; $('#apCnt').hidden = !pendN;
   if ($('#adSync')) $('#adSync').onclick = async () => {
     const b = $('#adSync'); b.disabled = true; b.textContent = '確認しています…';
     try { if (Store.queue.length) await flush(); await refresh(true); await fetchDevices(true); toast('最新の状態にしました'); }
@@ -3981,6 +4107,7 @@ function approveReq(id) {
   commit(`区域${t.no}を${uname(r.by)}さんに貸し出しました`, () => {
     const now = new Date().toISOString();
     t.holder = r.by; t.lentAt = now; t.helpers = [];
+    t.group = r.forGroup || null; // グループ用の申し込みなら、グループの区域にする
     Object.assign(r, { status: 'approved', terrId: t.id, decidedAt: now, seen: false });
   });
 }
@@ -4022,7 +4149,7 @@ function returnTerr(tid, completed) {
     const now = new Date().toISOString();
     D().returns.push({ id: 'x' + uid(), terrId: tid, by: t.holder, lentAt: t.lentAt, at: now, completed, pct });
     if (completed) { t.completedAt = now; t.completedPct = pct; }
-    t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = [];
+    t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null;
   });
 }
 
@@ -4580,7 +4707,7 @@ function locate(after) {
 /* ---------- 表示の設定（このスマホ・この人だけ。サーバーには送らない） ----------
    かんたん：文字の大きさだけ　くわしく：色・文字の種類・こさ・間隔・説明文・最初の画面・地図 */
 const ICONS = ['区', '家', '図', '心', '🏠', '🗺️', '📖', '🚪', '✅', '⭐', '🚶', '☀️'];
-const UI_DEFAULT = { mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'cards', pin: 'normal', base: 'pale' };
+const UI_DEFAULT = { mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
 /* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
   standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
@@ -4823,7 +4950,7 @@ function openUiSheet() {
         <p class="q">はじめの案内（「拡大すると家の印が出ます」など）</p>${seg('guide', [['auto', '最初の5日だけ'], ['on', 'いつも出す'], ['off', '出さない']])}
         <p class="q">ボタンの間隔</p>${seg('density', [['normal', 'ゆったり'], ['compact', 'コンパクト']])}
         <p class="q">説明の文</p>${seg('hints', [['show', '表示する'], ['hide', 'かくす']])}
-        <p class="q">開いたときの画面</p>${seg('start', [['cards', '区域カード'], ['map', '地図'], ['reco', 'おすすめ']])}`;
+        <p class="q">開いたときの画面</p>${seg('start', [['home', 'ホーム'], ['cards', '区域カード'], ['map', '地図']])}`;
       const S_MAP = `<h3 class="sub">地図</h3>
         <p class="q">家の印の大きさ</p>${seg('pin', Object.entries(PINS).map(([k, v]) => [k, v[1]]))}
         <p class="q">はじめに表示する地図</p>${seg('base', [['pale', '地図'], ['photo', '写真']])}
@@ -5175,6 +5302,8 @@ function renderDataSet() {
     row('cacheDays', '通信がない端末にデータを残す期間', '日', 5, 'この日数のあいだ通信できなかった端末は、保存した区域の情報を自動で消します');
 }
 function renderAdmin() {
+  renderSchedAdmin(); renderPeople();
+  setAdPane(adPane);
   renderDevices();
   renderInbox();
   renderDataSet();
@@ -5220,7 +5349,7 @@ function renderAdmin() {
   $('#adTerrs').innerHTML = ts.map(t => {
     const s = stats.get(t.id), d = t.lentAt ? daysSince(t.lentAt) : 0;
     return `<article class="trow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
-      <div><b>${esc(t.name)}</b><div class="meta">
+      <div><b>${esc(t.name)}</b>${t.group ? ` <span class="gbadge">${esc(t.group)}グループ</span>` : ''}<div class="meta">
         <span>家・部屋 ${s.n}</span><span>90日以内に訪問 ${s.visited}</span>
         <span>前回回り終えた日 ${t.completedAt ? fmtDay(t.completedAt) + (t.completedPct != null && t.completedPct < 100 ? `（${t.completedPct}%）` : '') : '記録なし'}</span>
         <span>最終記録 ${s.last ? fmtDate(s.last) : 'なし'}</span>
@@ -5234,6 +5363,7 @@ function renderAdmin() {
         <button class="btn small" data-rename="${t.id}">番号・名前</button>
         <button class="btn small danger" data-delterr="${t.id}">削除</button>
         <label class="check"><input type="checkbox" data-free="${t.id}"${t.free ? ' checked' : ''}>自由に受け取ってよい</label>
+        ${t.holder && (userById(t.holder) || {}).group ? `<label class="check"><input type="checkbox" data-grp="${t.id}"${t.group ? ' checked' : ''}>${esc(userById(t.holder).group)}グループの区域にする</label>` : ''}
       </div></article>`;
   }).join('');
 }
@@ -5389,10 +5519,374 @@ function exportCsv() {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
+/* =========================================================
+   ホーム：奉仕の集まりの予定・自分の予定・奉仕時間
+   ・奉仕時間と自分の予定は、本人のスマホの中だけに保存（サーバーには送らない）
+   ・奉仕の集まりの予定は、グループ監督・区域係が入れ、グループの人に届く
+   ========================================================= */
+const isOverseer = () => !!me().overseer && !!me().group;
+const myGroup = () => me().group || '';
+const groupsAll = () => [...new Set(D().users.filter(u => !u.inactive && u.group).map(u => u.group))].sort((a, b) => a.localeCompare(b, 'ja'));
+const groupMembers = g => D().users.filter(u => !u.inactive && u.group === g);
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const ymOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+const parseYmd = s => { const [y, m, dd] = s.split('-').map(Number); return new Date(y, m - 1, dd); };
+const WD = ['日', '月', '火', '水', '木', '金', '土'];
+const fmtYmd = s => { const d = parseYmd(s); return `${d.getMonth() + 1}月${d.getDate()}日（${WD[d.getDay()]}）`; };
+const fmtMin = m => { m = Math.max(0, Math.round(m)); const h = Math.floor(m / 60), r = m % 60; return h ? (r ? `${h}時間${r}分` : `${h}時間`) : `${r}分`; };
+const fmtHM = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 3600)}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`; };
+
+/* 本人のスマホの中の記録 */
+const myKey = () => 'kuiki_my_' + me().id;
+function myData() {
+  let o;
+  try { o = JSON.parse(lsGet(myKey()) || '{}') || {}; } catch (e) { o = {}; }
+  o.log = o.log || {}; o.events = o.events || []; o.goals = o.goals || {}; o.days = o.days || [0, 6]; o.timer = o.timer || null;
+  return o;
+}
+const mySave = o => { if (!lsSet(myKey(), JSON.stringify(o))) toast('このスマホに保存できませんでした'); };
+const monthMin = (o, ym) => Object.entries(o.log).filter(([d]) => d.startsWith(ym)).reduce((a, [, m]) => a + m, 0);
+const monthDays = (o, ym) => Object.entries(o.log).filter(([d, m]) => d.startsWith(ym) && m > 0).length;
+
+/* ---- 奉仕タイマー ---- */
+let timerTick = null;
+function timerMs(t) { return !t ? 0 : t.acc + (t.state === 'run' ? Date.now() - t.startAt : 0); }
+function timerAction(act) {
+  const o = myData(), t = o.timer;
+  if (act === 'start') o.timer = { state: 'run', startAt: Date.now(), acc: 0, day: ymd(new Date()) };
+  else if (act === 'pause' && t && t.state === 'run') { t.acc += Date.now() - t.startAt; t.state = 'pause'; }
+  else if (act === 'resume' && t && t.state === 'pause') { t.startAt = Date.now(); t.state = 'run'; }
+  else if (act === 'stop' && t) { openTimerStop(); return; }
+  mySave(o); renderHome();
+}
+function openTimerStop() {
+  const o = myData(), t = o.timer; if (!t) return;
+  let min = Math.round(timerMs(t) / 60000);
+  const paint = () => {
+    setSheet(headHtml(null, '奉仕を終わります', fmtYmd(t.day)) + `
+      <p class="q">この時間を記録します</p>
+      <div class="stepper" style="justify-content:center"><button type="button" data-tm="-5" aria-label="5分へらす">−</button>
+        <output class="wide" style="min-width:170px">${fmtMin(min)}</output><button type="button" data-tm="5" aria-label="5分ふやす">＋</button></div>
+      <p class="hint">記録は、このスマホの中だけに保存されます。ホームのカレンダーの${fmtYmd(t.day)}に足されます。</p>
+      <button class="btn primary block" id="tmSave">記録して終わる</button>
+      <button class="btn block" id="tmDiscard">記録しないで終わる</button>
+      <button class="btn block" data-close>もどる（続ける）</button>`);
+    $$('[data-tm]', $('#sheet')).forEach(b => b.onclick = () => { min = Math.max(0, min + Number(b.dataset.tm)); paint(); });
+    $('#tmSave').onclick = () => {
+      const x = myData();
+      x.log[t.day] = (x.log[t.day] || 0) + min; x.timer = null; mySave(x);
+      closeSheet(); renderHome(); toast(`奉仕時間 ${fmtMin(min)} を記録しました。おつかれさまでした！`);
+    };
+    $('#tmDiscard').onclick = () => {
+      if (!confirm('この時間は記録しません。よろしいですか？')) return;
+      const x = myData(); x.timer = null; mySave(x); closeSheet(); renderHome();
+    };
+  };
+  paint();
+}
+
+/* ---- 目標と提案 ---- */
+function goalHtml(o) {
+  const now = new Date(), ym = ymOf(now), goal = o.goals[ym] || 0, done = monthMin(o, ym);
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  let body = `<div class="row" style="justify-content:space-between"><b style="font-size:20px">${now.getMonth() + 1}月の奉仕 ${fmtMin(done)}</b>
+    <button class="btn small" id="goalEdit">${goal ? '目標を変える' : '目標を決める'}</button></div>`;
+  if (goal) {
+    const pct = Math.min(100, Math.round(done / goal * 100)), rest = goal - done;
+    body += `<div class="progress big" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="目標までの進み具合"><i style="width:${pct}%"></i></div>
+      <p class="muted">目標 ${fmtMin(goal)}（${pct}%）</p>`;
+    if (rest <= 0) body += `<p class="okmsg"><b>目標を達成しました！</b>すばらしいですね。</p>`;
+    else {
+      // よく行く曜日のうち、今日から月末までの日数で配分する（今日すでに記録がある日は、今日を数えない）
+      const days = [];
+      for (let d = now.getDate(); d <= last; d++) {
+        const dt = new Date(now.getFullYear(), now.getMonth(), d);
+        if (d === now.getDate() && (o.log[ymd(dt)] || 0) > 0) continue;
+        if (!o.days.length || o.days.includes(dt.getDay())) days.push(dt);
+      }
+      if (!days.length) body += `<p class="muted">あと ${fmtMin(rest)}。今月の「よく行く曜日」は、もうありません。</p>`;
+      else {
+        const per = Math.ceil(rest / days.length / 15) * 15;
+        body += `<p class="hint-strong">あと ${fmtMin(rest)}。よく行く曜日（${o.days.length ? o.days.map(x => WD[x]).join('・') : '毎日'}）の残り${days.length}日で、1日あたり約 <b>${fmtMin(per)}</b></p>
+          <p class="muted">次の予定の目安：${days.slice(0, 4).map(dt => `${dt.getMonth() + 1}/${dt.getDate()}（${WD[dt.getDay()]}）${fmtMin(per)}`).join('、')}</p>`;
+      }
+    }
+  }
+  return `<div class="today homecard">${body}</div>`;
+}
+function openGoalSheet() {
+  const o = myData(), ym = ymOf(new Date());
+  let goal = o.goals[ym] || 0;
+  const days = new Set(o.days);
+  const paint = () => {
+    setSheet(headHtml(null, '今月の目標', `${new Date().getMonth() + 1}月`) + `
+      <p class="q">目標の時間</p>
+      <div class="stepper" style="justify-content:center"><button type="button" data-g="-60" aria-label="1時間へらす">−</button>
+        <output class="wide" style="min-width:150px">${goal ? fmtMin(goal) : 'なし'}</output><button type="button" data-g="60" aria-label="1時間ふやす">＋</button></div>
+      <p class="q">よく奉仕に行く曜日</p>
+      <div class="chips">${WD.map((w, i) => `<button type="button" class="chip" data-wd="${i}" aria-pressed="${days.has(i)}">${w}</button>`).join('')}</div>
+      <p class="hint">目標までの残りの時間を、この曜日に分けて提案します。目標と記録は、このスマホの中だけに保存されます。</p>
+      <button class="btn primary block" id="gSave">保存する</button>
+      <button class="btn block" data-close>もどる</button>`);
+    $$('[data-g]', $('#sheet')).forEach(b => b.onclick = () => { goal = Math.max(0, Math.min(200 * 60, goal + Number(b.dataset.g))); paint(); });
+    $$('[data-wd]', $('#sheet')).forEach(b => b.onclick = () => { const i = Number(b.dataset.wd); if (days.has(i)) days.delete(i); else days.add(i); paint(); });
+    $('#gSave').onclick = () => {
+      const x = myData(); if (goal) x.goals[ym] = goal; else delete x.goals[ym];
+      x.days = [...days].sort(); mySave(x); closeSheet(); renderHome(); toast('目標を保存しました');
+    };
+  };
+  paint();
+}
+/* 月の最終日（と翌月のはじめの1週間）は、自動でまとめを出す */
+function monthEndHtml(o) {
+  const now = new Date(), last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  let ym = null, label = '';
+  if (now.getDate() === last) { ym = ymOf(now); label = '今月のまとめ'; }
+  else if (now.getDate() <= 7) { const p = new Date(now.getFullYear(), now.getMonth() - 1, 1); ym = ymOf(p); label = `${p.getMonth() + 1}月のまとめ`; }
+  if (!ym) return '';
+  const m = monthMin(o, ym), g = o.goals[ym] || 0;
+  if (!m && !g) return '';
+  return `<div class="notice info homecard"><b style="font-size:19px">${label}</b><br>
+    奉仕時間 <b>${fmtMin(m)}</b>（${monthDays(o, ym)}日）${g ? `　目標 ${fmtMin(g)}（${Math.round(m / g * 100)}%）` : ''}
+    <span class="actions"><button class="btn small" id="monthHist">月ごとの記録を見る</button></span></div>`;
+}
+function openMonthHist() {
+  const o = myData();
+  const yms = [...new Set(Object.keys(o.log).map(d => d.slice(0, 7)).concat(Object.keys(o.goals)))].sort().reverse();
+  setSheet(headHtml(null, '月ごとの奉仕時間', 'このスマホの記録') + (yms.length
+    ? `<table class="slots narrow"><tr><th>月</th><th>時間</th><th>日数</th><th>目標</th></tr>${yms.map(ym => {
+        const m = monthMin(o, ym), g = o.goals[ym] || 0;
+        return `<tr><th>${Number(ym.slice(0, 4))}年${Number(ym.slice(5))}月</th><td><b>${fmtMin(m)}</b></td><td>${monthDays(o, ym)}日</td><td>${g ? `${fmtMin(g)}（${Math.round(m / g * 100)}%）` : '—'}</td></tr>`;
+      }).join('')}</table>`
+    : '<div class="empty">まだ記録はありません。</div>') + '<button class="btn block" data-close>閉じる</button>');
+}
+
+/* ---- カレンダー ---- */
+let calMonth = null, calMode = 'cal';
+const schedsOn = date => D().schedules.filter(s => s.date === date && (!s.group || s.group === myGroup() || isAdmin()))
+  .sort((a, b) => (a.time || '') < (b.time || '') ? -1 : 1);
+const schedGroupName = g => (g ? `${g}グループ` : '全体');
+/* Googleカレンダーに追加するリンク（アプリから直接書きこむのではなく、Googleカレンダーの追加画面を開く） */
+function gcalUrl(title, date, time, end, place, note) {
+  const d = date.replace(/-/g, '');
+  let dates;
+  if (time) {
+    const t1 = time.replace(':', '') + '00';
+    let t2 = end ? end.replace(':', '') + '00' : null;
+    if (!t2) { const [h, m] = time.split(':').map(Number); t2 = pad((h + 1) % 24) + pad(m) + '00'; }
+    dates = `${d}T${t1.padStart(6, '0')}/${d}T${t2.padStart(6, '0')}`;
+  } else {
+    const nx = parseYmd(date); nx.setDate(nx.getDate() + 1);
+    dates = `${d}/${ymd(nx).replace(/-/g, '')}`;
+  }
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE&ctz=Asia%2FTokyo&text=' + encodeURIComponent(title) +
+    '&dates=' + dates + (place ? '&location=' + encodeURIComponent(place) : '') + (note ? '&details=' + encodeURIComponent(note) : '');
+}
+const schedLine = s => `${s.time ? `${s.time}${s.end ? '〜' + s.end : ''}` : '時間未定'}　${esc(s.place || '場所未定')}`;
+function calHtml(o) {
+  const base = calMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const y = base.getFullYear(), m = base.getMonth(), first = new Date(y, m, 1).getDay(), last = new Date(y, m + 1, 0).getDate();
+  const today = ymd(new Date());
+  let cells = '';
+  for (let i = 0; i < first; i++) cells += '<span class="cd empty"></span>';
+  for (let d = 1; d <= last; d++) {
+    const key = ymd(new Date(y, m, d)), sc = schedsOn(key).length, ev = o.events.filter(e => e.date === key).length, mn = o.log[key] || 0;
+    const wd = new Date(y, m, d).getDay();
+    cells += `<button type="button" class="cd${key === today ? ' today' : ''}${wd === 0 ? ' sun' : wd === 6 ? ' sat' : ''}" data-day="${key}" aria-label="${m + 1}月${d}日">
+      <span class="dn">${d}</span><span class="dots">${sc ? '<i class="dg"></i>' : ''}${ev ? '<i class="dp"></i>' : ''}</span>${mn ? `<small>${(mn / 60).toFixed(mn % 60 ? 1 : 0)}h</small>` : ''}</button>`;
+  }
+  return `<div class="calhead"><button type="button" class="btn small" data-cm="-1" aria-label="前の月">‹</button><b>${y}年${m + 1}月</b>
+      <button type="button" class="btn small" data-cm="1" aria-label="次の月">›</button></div>
+    <div class="calgrid">${WD.map((w, i) => `<span class="cw${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</span>`).join('')}${cells}</div>
+    <p class="calkeys"><span><i class="dg"></i>奉仕の集まり</span><span><i class="dp"></i>自分の予定</span><span><small>1.5h</small> 奉仕した時間</span></p>`;
+}
+function schedListHtml() {
+  const today = ymd(new Date()), until = new Date(); until.setDate(until.getDate() + 60);
+  const list = D().schedules.filter(s => s.date >= today && s.date <= ymd(until) && (!s.group || s.group === myGroup() || isAdmin()))
+    .sort((a, b) => (a.date + (a.time || '')) < (b.date + (b.time || '')) ? -1 : 1);
+  if (!list.length) return '<div class="empty">これから60日の、奉仕の集まりの予定はありません。</div>';
+  return list.map(s => `<article class="ritem k-new"><div>
+      <p class="rt">${fmtYmd(s.date)}</p><p>${schedLine(s)}</p>
+      <p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
+      <a class="btn small" href="${gcalUrl('奉仕の集まり', s.date, s.time, s.end, s.place, s.note)}" target="_blank" rel="noopener">Googleカレンダーへ</a></article>`).join('');
+}
+function openDay(date) {
+  const paint = () => {
+    const o = myData(), sc = schedsOn(date), ev = o.events.filter(e => e.date === date).sort((a, b) => (a.time || '') < (b.time || '') ? -1 : 1);
+    let min = o.log[date] || 0;
+    setSheet(headHtml(null, fmtYmd(date), '') + `
+      <h3 class="sub">奉仕の集まり</h3>
+      ${sc.length ? sc.map(s => `<article class="ritem k-new"><div><p class="rt">${schedLine(s)}</p><p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
+        <a class="btn small" href="${gcalUrl('奉仕の集まり', s.date, s.time, s.end, s.place, s.note)}" target="_blank" rel="noopener">Googleカレンダーへ</a></article>`).join('')
+        : '<p class="muted">この日の集まりはありません。</p>'}
+      ${isOverseer() || isAdmin() ? `<button class="btn small" id="dAddSched">＋ この日に集まりを入れる</button>` : ''}
+      <h3 class="sub">自分の予定 <span class="muted" style="font-size:14px">（このスマホだけ）</span></h3>
+      ${ev.length ? ev.map(e => `<article class="ritem k-young"><div><p class="rt">${e.time ? esc(e.time) + '　' : ''}${esc(e.title)}</p></div>
+        <span class="actions" style="margin:0"><a class="btn small" href="${gcalUrl(e.title, e.date, e.time, '', '', '')}" target="_blank" rel="noopener">Googleカレンダーへ</a>
+        <button class="btn small danger" data-evdel="${e.id}">消す</button></span></article>`).join('') : '<p class="muted">予定はありません。</p>'}
+      <div class="inline" style="margin-top:8px"><input type="time" id="evTime" aria-label="時刻" style="min-height:52px;border-radius:12px;border:2px solid var(--ink2);padding:0 8px;max-width:130px">
+        <input type="text" id="evTitle" maxlength="40" placeholder="例：〇〇さんと再訪問" style="min-height:52px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:18px"></div>
+      <button class="btn block" id="evAdd">予定を入れる</button>
+      <h3 class="sub">この日の奉仕時間 <span class="muted" style="font-size:14px">（このスマホだけ）</span></h3>
+      <div class="stepper" style="justify-content:center"><button type="button" data-dm="-15" aria-label="15分へらす">−</button>
+        <output class="wide" style="min-width:160px" id="dMin">${fmtMin(min)}</output><button type="button" data-dm="15" aria-label="15分ふやす">＋</button></div>
+      <button class="btn primary block" id="dMinSave">奉仕時間を保存する</button>
+      <button class="btn block" data-close>閉じる</button>`);
+    const S = $('#sheet');
+    $$('[data-dm]', S).forEach(b => b.onclick = () => { min = Math.max(0, min + Number(b.dataset.dm)); $('#dMin').textContent = fmtMin(min); });
+    $('#dMinSave').onclick = () => { const x = myData(); if (min) x.log[date] = min; else delete x.log[date]; mySave(x); toast('奉仕時間を保存しました'); renderHome(); paint(); };
+    $('#evAdd').onclick = () => {
+      const title = $('#evTitle').value.trim(); if (!title) { toast('予定の内容を入れてください'); return; }
+      const x = myData(); x.events.push({ id: uid(), date, time: $('#evTime').value || '', title }); mySave(x); renderHome(); paint();
+    };
+    $$('[data-evdel]', S).forEach(b => b.onclick = () => { const x = myData(); x.events = x.events.filter(e => e.id !== b.dataset.evdel); mySave(x); renderHome(); paint(); });
+    if ($('#dAddSched')) $('#dAddSched').onclick = () => openSchedForm(null, date, () => openDay(date));
+  };
+  paint();
+}
+
+function renderHome() {
+  const box = $('#view-home'); if (!box || box.hidden) return;
+  const o = myData(), t = o.timer, h = new Date().getHours();
+  const hi = h < 5 ? 'こんばんは' : h < 10 ? 'おはようございます' : h < 17 ? 'こんにちは' : 'こんばんは';
+  const todays = schedsOn(ymd(new Date()));
+  $('#homeHello').innerHTML = `<div class="homehello"><p>${esc(me().name)}さん、${hi}</p><b>${fmtYmd(ymd(new Date()))}</b>
+    ${me().group ? `<span class="gbadge">${esc(me().group)}グループ${isOverseer() ? '・監督' : ''}</span>` : ''}</div>
+    ${todays.length ? `<div class="notice info homecard"><b>今日の奉仕の集まり</b><br>${todays.map(s => schedLine(s) + `（${schedGroupName(s.group)}）`).join('<br>')}</div>` : ''}`;
+  const ms = timerMs(t);
+  $('#homeTimer').innerHTML = `<div class="timer ${t ? t.state : 'idle'}">
+    <p class="tlabel">${!t ? '奉仕の時間をはかる' : t.state === 'run' ? '奉仕中' : '一時停止中'}</p>
+    <p class="tclock" id="tClock">${fmtHM(ms)}</p>
+    <div class="tbtns">${!t ? '<button class="btn primary tbig" data-timer="start">奉仕スタート</button>'
+      : `${t.state === 'run' ? '<button class="btn" data-timer="pause">一時停止</button>' : '<button class="btn primary" data-timer="resume">再開</button>'}
+         <button class="btn danger" data-timer="stop">奉仕終了</button>`}</div>
+    <p class="muted">今日の記録：${fmtMin(o.log[ymd(new Date())] || 0)}</p></div>`;
+  clearInterval(timerTick);
+  if (t && t.state === 'run') timerTick = setInterval(() => { const el = $('#tClock'); if (el && !$('#view-home').hidden) el.textContent = fmtHM(timerMs(myData().timer)); }, 1000);
+  $('#homeGoal').innerHTML = goalHtml(o);
+  $('#homeMonthEnd').innerHTML = monthEndHtml(o);
+  $$('#calMode [data-calmode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.calmode === calMode)));
+  $('#homeCal').innerHTML = calMode === 'cal' ? calHtml(o) : schedListHtml();
+}
+function bindHome() {
+  $('#view-home').addEventListener('click', e => {
+    const q = sel => e.target.closest(sel);
+    let x;
+    if ((x = q('[data-timer]'))) timerAction(x.dataset.timer);
+    else if (q('#goalEdit')) openGoalSheet();
+    else if (q('#monthHist')) openMonthHist();
+    else if ((x = q('[data-cm]'))) { const b = calMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1); calMonth = new Date(b.getFullYear(), b.getMonth() + Number(x.dataset.cm), 1); renderHome(); }
+    else if ((x = q('[data-day]'))) openDay(x.dataset.day);
+    else if ((x = q('[data-calmode]'))) { calMode = x.dataset.calmode; renderHome(); }
+  });
+}
+
+/* ---- 奉仕の集まりの予定を入れる（グループ監督・区域係） ---- */
+function openSchedForm(s, date, back) {
+  const admin = isAdmin(), groups = groupsAll();
+  const g0 = s ? s.group : (admin ? (groups[0] || '') : myGroup());
+  setSheet(headHtml(null, s ? '集まりの予定を直す' : '集まりの予定を入れる', '') + `
+    <label class="field"><span>日にち</span><input type="date" id="scDate" value="${esc(s ? s.date : (date || ymd(new Date())))}" style="width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 12px;font-size:19px"></label>
+    <div class="inline"><label class="field" style="flex:1"><span>はじまり</span><input type="time" id="scTime" value="${esc(s ? s.time : '09:30')}" style="width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 8px;font-size:19px"></label>
+      <label class="field" style="flex:1"><span>おわり（なくてもよい）</span><input type="time" id="scEnd" value="${esc(s ? s.end : '')}" style="width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 8px;font-size:19px"></label></div>
+    <label class="field"><span>場所</span><input type="text" id="scPlace" maxlength="60" value="${esc(s ? s.place : '')}" placeholder="例：〇〇さん宅、会館"></label>
+    <label class="field"><span>ひとこと（なくてもよい）</span><input type="text" id="scNote" maxlength="160" value="${esc(s ? s.note : '')}" placeholder="例：区域12を回ります"></label>
+    ${admin ? `<label class="field"><span>どのグループの予定か</span><select id="scGroup" style="width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 8px;font-size:18px;background:#fff">
+      <option value=""${!g0 ? ' selected' : ''}>全体（会衆の全員）</option>${groups.map(g => `<option value="${esc(g)}"${g === g0 ? ' selected' : ''}>${esc(g)}グループ</option>`).join('')}</select></label>`
+      : `<p class="muted">${esc(myGroup())}グループの予定として入れます。</p>`}
+    ${s ? '' : `<label class="check"><input type="checkbox" id="scRepeat">同じ曜日・同じ時間で、4週ぶん入れる</label>`}
+    <button class="btn primary block" id="scSave">保存する</button>
+    ${s ? '<button class="btn danger block" id="scDel">この予定を消す</button>' : ''}
+    <button class="btn block" id="scBack">もどる</button>`);
+  const done = () => (back ? back() : closeSheet());
+  $('#scBack').onclick = done;
+  $('#scSave').onclick = () => {
+    const date2 = $('#scDate').value, group = admin ? $('#scGroup').value : myGroup();
+    if (!date2) { toast('日にちを入れてください'); return; }
+    const base = { time: $('#scTime').value || '', end: $('#scEnd').value || '', place: $('#scPlace').value.trim(), note: $('#scNote').value.trim(), group };
+    const n = !s && $('#scRepeat') && $('#scRepeat').checked ? 4 : 1;
+    commit(s ? '集まりの予定を直しました' : `集まりの予定を${n}件入れました`, () => {
+      if (s) Object.assign(s, base, { date: date2, at: new Date().toISOString() });
+      else for (let i = 0; i < n; i++) {
+        const d = parseYmd(date2); d.setDate(d.getDate() + 7 * i);
+        D().schedules.push(Object.assign({ id: 's' + uid() + i, date: ymd(d), by: me().id, at: new Date().toISOString() }, base));
+      }
+    });
+    done();
+  };
+  if ($('#scDel')) $('#scDel').onclick = () => {
+    if (!confirm('この予定を消します。よろしいですか？')) return;
+    commit('集まりの予定を消しました', () => { D().schedules = D().schedules.filter(x => x.id !== s.id); });
+    done();
+  };
+}
+function renderSchedAdmin() {
+  const box = $('#adSched'); if (!box) return;
+  const admin = isAdmin(), today = ymd(new Date());
+  const list = D().schedules.filter(s => s.date >= today && (admin || s.group === myGroup()))
+    .sort((a, b) => (a.date + (a.time || '')) < (b.date + (b.time || '')) ? -1 : 1);
+  box.innerHTML = `<h2 class="sec">奉仕の集まりの予定</h2>
+    <p class="hint">${admin ? 'どのグループの予定も入れられます。「全体」は会衆の全員に表示されます。' : `${esc(myGroup())}グループの予定を入れられます。グループの人のホーム画面に表示されます。`}</p>
+    <button class="btn primary block" id="scNew">＋ 集まりの予定を入れる</button>
+    ${list.length ? list.map(s => `<article class="ritem k-new"><div>
+        <p class="rt">${fmtYmd(s.date)}　${schedLine(s)}</p>
+        <p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
+        <button class="btn small" data-scedit="${s.id}">直す</button></article>`).join('') : '<div class="empty">これからの予定はありません。</div>'}`;
+  $('#scNew').onclick = () => openSchedForm(null, null, null);
+  $$('[data-scedit]', box).forEach(b => b.onclick = () => openSchedForm(D().schedules.find(x => x.id === b.dataset.scedit), null, null));
+}
+
+/* ---- 人とグループ（区域係は変更できる。監督は自分のグループの人を見るだけ） ---- */
+async function setUserGroup(u, group, overseer) {
+  if (LIVE) {
+    try { await api('user_set', { id: u.id, group, overseer }); } catch (e) { toast('保存できませんでした。通信を確認してください'); return; }
+    u.group = group || undefined; u.overseer = !!overseer || undefined;
+    toast(`${u.name}さんのグループを保存しました`);
+    refresh(true).catch(() => {});
+  } else {
+    u.group = group || undefined; u.overseer = !!overseer || undefined; Store.save(); toast(`${u.name}さんのグループを保存しました`);
+  }
+  renderAll();
+}
+function renderPeople() {
+  const box = $('#adPeople'); if (!box) return;
+  const admin = isAdmin(), groups = groupsAll();
+  const users = D().users.filter(u => !u.inactive && (admin || u.group === myGroup())).slice()
+    .sort((a, b) => (a.group || '～').localeCompare(b.group || '～', 'ja') || a.name.localeCompare(b.name, 'ja'));
+  box.innerHTML = `<h2 class="sec">${admin ? '人とグループ' : `${esc(myGroup())}グループの人`}</h2>
+    ${admin ? `<p class="hint">グループの名前（例：A、北）と、グループ監督かどうかを決めます。監督は、自分のグループの集まりの予定を入れたり、グループ用の区域を申し込んだり、グループ全員で区域を共有したりできます。</p>
+      <datalist id="groupList">${groups.map(g => `<option value="${esc(g)}">`).join('')}</datalist>` : ''}
+    ${users.map(u => `<article class="trow"><span class="stamp sm" style="font-size:16px">${esc(u.group || '—')}</span>
+      <div><b>${esc(u.name)}</b>${u.role === 'admin' ? '（区域係）' : ''}${u.overseer ? ' <span class="gbadge">監督</span>' : ''}</div>
+      ${admin ? `<div class="actions"><label>グループ <input type="text" list="groupList" maxlength="30" data-ugroup="${u.id}" value="${esc(u.group || '')}" style="min-height:46px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;width:120px"></label>
+        <label class="check"><input type="checkbox" data-uover="${u.id}"${u.overseer ? ' checked' : ''}>監督</label>
+        <button class="btn small" data-usave="${u.id}">保存</button></div>` : ''}</article>`).join('')}`;
+  if (admin) $$('[data-usave]', box).forEach(b => b.onclick = () => {
+    const u = userById(b.dataset.usave); if (!u) return;
+    setUserGroup(u, $(`[data-ugroup="${u.id}"]`).value.trim(), $(`[data-uover="${u.id}"]`).checked);
+  });
+}
+
+/* ---- 引き継ぎを待っている家（再訪問の一覧の下に出す） ---- */
+function handoffHtml() {
+  const items = Object.keys(D().released).filter(k => { const [hid] = parseKey(k); return houseById(hid) && !D().dnc[k] && !D().follows[k]; });
+  if (!items.length) return '';
+  return `<h2 class="sec">引き継ぎを待っている家（${items.length}件）</h2><p class="hint">受け持てる方は「私が受け持つ」を押してください。</p>` +
+    items.slice(0, 20).map(k => {
+      const [hid, unit] = parseKey(k), h = houseById(hid), t = terrById(h.terrId), m = sum(k).met;
+      return `<article class="ritem k-handoff"><div>
+        <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(h, unit)}</p>
+        ${m ? `<p class="muted">前回 会えた日：${fmtDate(m.at)}</p>` : ''}</div>
+        <button class="btn small" data-go="${hid}" data-unit="${esc(unit)}">地図で見る</button>
+        <div class="actions span"><button class="btn small primary" data-fact="take" data-key="${esc(k)}">私が受け持つ</button></div></article>`;
+    }).join('');
+}
+
 /* ---------- 画面の切りかえ ---------- */
 let currentView = 'cards';
 function showView(name) {
-  if (name === 'admin' && !isAdmin()) name = 'cards';
+  if (name === 'reco') name = 'home'; // おすすめはホームに変わりました
+  if (name === 'admin' && !isAdmin() && !isOverseer()) name = 'cards';
   if (currentView === 'map' && name !== 'map' && mode !== 'normal') { if (draw) endDraw(); else setMode('normal'); }
   if (name !== 'map') { clearTarget(); followMap = false; }
   currentView = name;
@@ -5407,12 +5901,29 @@ function showView(name) {
     }, 30);
   }
   if (name === 'cards') renderCards();
-  if (name === 'reco') renderReco();
-  if (name === 'admin') { renderAdmin(); fetchDevices(true); if (LIVE && !Store.queue.length) refresh(true).catch(() => {}); }
+  if (name === 'home') renderHome();
+  if (name === 'admin') {
+    if (isAdmin()) { renderAdmin(); fetchDevices(true); } else renderOverseer();
+    if (LIVE && !Store.queue.length) refresh(true).catch(() => {});
+  }
+}
+/* 係の画面の中のタブ（監督は「予定」と「人・グループ」だけ） */
+let adPane = 'inbox';
+function setAdPane(v) {
+  const allowed = isAdmin() ? ['inbox', 'terr', 'sched', 'status', 'people', 'set'] : ['sched', 'people'];
+  adPane = allowed.includes(v) ? v : allowed[0];
+  $$('#adTabs [data-ap]').forEach(b => { b.hidden = !allowed.includes(b.dataset.ap); b.setAttribute('aria-pressed', String(b.dataset.ap === adPane)); });
+  $('#adTabs').style.gridTemplateColumns = allowed.length === 2 ? 'repeat(2,1fr)' : '';
+  $$('#view-admin .apane').forEach(p => { const k = p.dataset.apane; p.hidden = !(k === adPane || (adPane === 'status' && k === 'status2')); });
+}
+function renderOverseer() {
+  renderSchedAdmin(); renderPeople(); setAdPane(adPane);
 }
 function updateTabs() {
-  $('#tabAdmin').hidden = !isAdmin();
-  $('#tabs').classList.toggle('three', !isAdmin());
+  const show = isAdmin() || isOverseer();
+  $('#tabAdmin').hidden = !show;
+  $('#tabAdminLabel').textContent = isAdmin() ? '係の画面' : 'グループ';
+  $('#tabs').classList.toggle('three', !show);
 }
 function fillWho() {
   $('#whoSel').innerHTML = D().users.map(u => `<option value="${u.id}"${u.id === D().currentUser ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
@@ -5423,8 +5934,8 @@ function renderAll() {
   fillTerrJump();
   if (currentView === 'cards') renderCards();
   if (map && currentView === 'map') { renderTerrs(); renderHouses(); }
-  if (currentView === 'reco') renderReco();
-  if (currentView === 'admin' && isAdmin()) renderAdmin();
+  if (currentView === 'home') renderHome();
+  if (currentView === 'admin') { if (isAdmin()) renderAdmin(); else if (isOverseer()) renderOverseer(); }
   updateAdminBadge();
 }
 function updateAdminBadge() {
@@ -5445,6 +5956,8 @@ function openTerr(id) {
 /* ---------- ボタンの動き ---------- */
 function bindStatic() {
   $$('#tabs button').forEach(b => b.onclick = () => showView(b.dataset.view));
+  $('#adTabs').addEventListener('click', e => { const b = e.target.closest('[data-ap]'); if (b) { setAdPane(b.dataset.ap); $('#view-admin').scrollTop = 0; } });
+  bindHome();
   $('#cardTabs').addEventListener('click', e => { const b = e.target.closest('[data-ctab]'); if (b) setCardTab(b.dataset.ctab); });
   $('#splash').addEventListener('click', () => hideSplash(true));
   watchResume();
@@ -5608,6 +6121,12 @@ function bindStatic() {
     commit(`${uname(v)}さんが再訪問を受け持ちます`, () => startFollow(k, v));
   });
   $('#adTerrs').addEventListener('change', e => {
+    const gp = e.target.closest('[data-grp]');
+    if (gp) {
+      const t = terrById(gp.dataset.grp), g = (userById(t.holder) || {}).group || null;
+      commit(gp.checked ? `区域${t.no}を${g}グループの区域にしました` : `区域${t.no}を個人の区域にしました`, () => { t.group = gp.checked ? g : null; });
+      return;
+    }
     const fr = e.target.closest('[data-free]');
     if (fr) {
       const t = terrById(fr.dataset.free);
@@ -5621,7 +6140,7 @@ function bindStatic() {
     commit(`区域${t.no}を${uname(val)}さんに貸し出しました`, () => {
       t.holder = val;
       t.lentAt = new Date().toISOString();
-      t.helpers = [];
+      t.helpers = []; t.group = null;
     });
   });
 }
