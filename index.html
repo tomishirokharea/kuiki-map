@@ -29,6 +29,11 @@
   --font:"BIZ UDPGothic","Hiragino Sans","Yu Gothic",Meiryo,sans-serif; --z:1; --pin:1;
 }
 *{box-sizing:border-box}
+/* ボタンを続けてタップしても、画面が拡大されないようにする（2本指で広げる拡大はそのまま使える）。
+   地図・色の輪・スワイプの行は、下のほうで個別に指定しているので、そちらが優先される */
+*{touch-action:manipulation}
+button,.btn,.choice,.chip,.unit,.uchip,.slotbtn,.namebtn,.swatch,.fontbtn,.stepper output{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+button,a,label,summary{-webkit-tap-highlight-color:rgba(23,50,77,.12)}
 [hidden]{display:none!important}
 html,body{margin:0;height:100%}
 body{font-family:var(--font);font-size:18px;line-height:1.6;color:var(--ink);background:var(--bg);-webkit-text-size-adjust:100%}
@@ -350,7 +355,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .devrow{background:#fff;border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px}
 .devrow .actions{margin-top:8px}
 .linkbox{display:flex;gap:8px;flex-wrap:wrap}
-.linkbox input{flex:1;min-width:200px;min-height:48px;border-radius:10px;border:2px solid var(--ink2);padding:0 10px;font-size:14px;background:#F6F8F7}
+.linkbox input{flex:1;min-width:200px;min-height:48px;border-radius:10px;border:2px solid var(--ink2);padding:0 10px;font-size:16px;background:#F6F8F7}
 
 /* ===== 表示の設定（歯車） ===== */
 .gearbtn{flex:none;width:46px;height:46px;border-radius:12px;border:2px solid #ffffff80;background:transparent;color:#fff;display:grid;place-items:center;padding:0}
@@ -539,6 +544,118 @@ body.strong .pin.st-plain{border-width:4px}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--brand);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
 #toast button{min-height:46px;border-radius:10px;border:2px solid #fff;background:transparent;color:#fff;font-weight:700;padding:0 14px;flex:none}
 @media (max-width:420px){ body{font-size:17px} .choice{font-size:17px} }
+
+/* =========================================================
+   画面の大きさに合わせる（レスポンシブ）
+   ・小さいスマホ（〜374px）：＋−などがはみ出さないように詰める
+   ・スマホの横向き（高さが低い）：上の帯と下のタブを薄くして、地図や入力欄を広く
+   ・タブレット（768px〜）：区域カードを2列に
+   ・パソコン・横向きタブレット（1024px〜）：タブを左に縦並び、係の画面を広く
+   ========================================================= */
+input,select,textarea{font-size:max(16px,1em)}
+.stepper{flex-wrap:nowrap}
+.stepper button{flex:none}
+.stepper output{flex:0 1 auto}
+header.top{min-width:0}
+header.top h1{white-space:nowrap}
+.who{min-width:0}
+.who select{min-width:0;text-overflow:ellipsis}
+img,canvas,video{max-width:100%}
+@media (hover:hover) and (pointer:fine){
+  .btn:hover,.chip:hover,.choice:hover,.seg button:hover,.namebtn:hover{filter:brightness(.96)}
+  nav.tabs button:hover{background:var(--terr-soft)}
+}
+
+/* --- 小さいスマホ --- */
+@media (max-width:374px){
+  body{font-size:16px}
+  .view{padding:12px 10px 24px}
+  #sheet{padding-left:12px;padding-right:12px}
+  header.top{gap:6px;padding-left:10px;padding-right:10px}
+  header.top h1{font-size:18px}
+  .pill{font-size:12px;padding:0 6px}
+  #whoLabel{display:none}
+  .gearbtn{width:42px;height:42px}
+  .stepper{gap:8px}
+  .stepper button{width:52px;height:52px;font-size:26px}
+  .stepper output{font-size:22px}
+  .stepper output.wide{min-width:0!important;flex:1 1 auto;font-size:19px}
+  .floorrow{gap:8px;padding:6px 8px}
+  .floorrow b{min-width:40px;font-size:18px}
+  .choice{font-size:16px;min-height:80px}
+  .choices.three{gap:6px}
+  .btn{padding:0 12px}
+  .timer .tclock{font-size:40px}
+  .timer .tbig{min-width:0;width:100%}
+  .swatches{grid-template-columns:repeat(2,1fr)}
+  .iconpick{grid-template-columns:repeat(4,1fr)}
+  nav.tabs button{font-size:13px}
+  .atabs button{font-size:14px}
+  .cd{min-height:52px}
+}
+
+/* --- スマホの横向き（高さが低い画面） --- */
+@media (orientation:landscape) and (max-height:540px){
+  header.top{padding-top:calc(4px + env(safe-area-inset-top));padding-bottom:4px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
+  header.top h1{font-size:18px}
+  .gearbtn{width:40px;height:40px}
+  .who select{min-height:38px}
+  nav.tabs{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  nav.tabs button{min-height:48px;flex-direction:row;gap:8px;border-top-width:3px}
+  nav.tabs svg{width:22px;height:22px}
+  .tabbadge{top:2px}
+  .view{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+  #sheet{max-height:94vh;max-height:94dvh;bottom:6px}
+  .cardbar{max-height:58vh;right:max(64px,calc(env(safe-area-inset-right) + 64px));left:max(10px,env(safe-area-inset-left));bottom:10px}
+  .helpbtn{bottom:70px}
+  .legend{max-height:80%;bottom:10px}
+  .modebar{max-height:70vh;overflow:auto}
+  #toast{bottom:calc(60px + env(safe-area-inset-bottom))}
+  .choice{min-height:64px}
+}
+
+/* --- タブレット以上 --- */
+@media (min-width:768px){
+  .view{padding:20px 24px 32px}
+  .cardbar{right:auto;width:min(560px,calc(100% - 84px))}
+  .modebar{right:auto;width:min(680px,calc(100% - 20px))}
+  .legend{right:auto;width:min(720px,calc(100% - 20px))}
+  /* 区域カード・区域の一覧を2列に（お知らせなどは横いっぱい） */
+  #view-cards .wrap,#view-admin .wrap{max-width:1180px}
+  #myCards,#allCards,#adTerrs{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:stretch}
+  #myCards>*,#allCards>*,#adTerrs>*{margin-bottom:0}
+  #myCards>:not(.tcard),#allCards>:not(.tcard),#adTerrs>:not(.trow){grid-column:1/-1}
+  /* 地図の上のボタンが横に並びきるように */
+  .maptools select{max-width:320px}
+}
+
+/* --- パソコン・横向きタブレット --- */
+@media (min-width:1024px) and (min-height:541px){
+  /* 下のタブを、左の縦並びに */
+  .app{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  header.top{grid-column:1/-1;grid-row:1}
+  main{grid-column:2;grid-row:2}
+  nav.tabs,nav.tabs.three{grid-column:1;grid-row:2;display:flex;flex-direction:column;width:112px;border-top:0;border-right:2px solid var(--line);padding:8px 0 env(safe-area-inset-bottom);overflow:auto}
+  nav.tabs button{min-height:84px;border-top:0;border-left:5px solid transparent;font-size:15px;gap:4px}
+  nav.tabs button[aria-current="page"]{border-left-color:var(--terr)}
+  .tabbadge{top:8px;left:calc(50% + 10px)}
+  #toast{bottom:calc(24px + env(safe-area-inset-bottom))}
+  /* 入力画面は、画面のまん中あたりに浮かせる */
+  #sheet{max-height:calc(100dvh - 48px);bottom:24px;left:calc(50% - 320px + 56px)}
+  /* ホームは左右2段に（左：時間と目標、右：予定） */
+  #view-home .wrap{max-width:1180px}
+  .homegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:0 28px;align-items:start}
+  .homegrid .homeside .timer,.homegrid .homeside .homecard{margin-top:0}
+  .homegrid .homemain>.sec:first-child{margin-top:0}
+  /* 係の「状況」のタイルを多めに並べる */
+  .tiles{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+  .atabs{grid-template-columns:repeat(6,1fr)}
+  .atabs button{border-top:0}
+  .atabs button:not(:first-child){border-left:2px solid var(--ink)!important}
+}
+@media (min-width:1400px){
+  #myCards,#allCards,#adTerrs{grid-template-columns:repeat(3,1fr)}
+}
 </style>
 </head>
 <body>
@@ -554,9 +671,11 @@ body.strong .pin.st-plain{border-width:4px}
     <section class="view" id="view-home" hidden>
       <div class="wrap">
         <div id="homeHello"></div>
+        <div class="homegrid"><div class="homeside">
         <div id="homeTimer"></div>
         <div id="homeGoal"></div>
         <div id="homeMonthEnd"></div>
+        </div><div class="homemain">
         <h2 class="sec">奉仕の予定</h2>
         <div class="seg subtabs" id="calMode" role="group" aria-label="予定の見かた">
           <button type="button" data-calmode="cal" aria-pressed="true">カレンダー</button>
@@ -564,6 +683,7 @@ body.strong .pin.st-plain{border-width:4px}
         </div>
         <div id="homeCal"></div>
         <p class="hint">自分の予定と奉仕時間は、このスマホの中だけに保存されます。係やほかの人には送られません。</p>
+        </div></div>
       </div>
     </section>
 
@@ -1856,8 +1976,12 @@ function terrStats(t, sinceMs) {
 }
 
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
-const APP_VERSION = '2026.09.23';
+const APP_VERSION = '2026.09.24';
 const CHANGELOG = [
+  { v: '2026.09.24', items: [
+    ['＋', '時間などの「＋」「−」を続けて押しても、画面が拡大されないようにしました。押したあとに画面がいちばん上へ戻ることもなくなりました'],
+    ['画', 'スマホの横向き・タブレット・パソコンで、画面の広さに合わせて見やすく並ぶようにしました']
+  ] },
   { v: '2026.09.23', items: [
     ['予', '奉仕の集まりの予定を左にスワイプすると、「編集」「削除」ができます（予定を入れた監督・区域係だけ）'],
     ['届', '予定が一部の人に届かないことがあったのを直しました。更新後はじめて開いたとき、一度だけ全部を読み直します'],
@@ -1953,14 +2077,34 @@ function toast(msg, undoFn, action) {
 }
 
 /* ---------- 下から出る画面 ---------- */
+/* ＋−や選択ボタンで同じ画面を描き直すときは、見ていた位置と押したボタンをそのままにする */
+let sheetKeep = false;
+document.addEventListener('click', e => {
+  const t = e.target.closest && e.target.closest('#sheet .stepper button, #sheet .chips button, #sheet [data-type], #sheet [data-wd], #sheet #evAdd, #sheet #dMinSave, #sheet #fPreview, #sheet #pgGo');
+  if (t) { sheetKeep = true; setTimeout(() => { sheetKeep = false; }, 0); }
+}, true);
 function setSheet(html) {
   const s = $('#sheet');
+  const keep = sheetKeep && !s.hidden; sheetKeep = false;
+  const top = s.scrollTop;
+  let focusSel = '';
+  const a = document.activeElement;
+  if (keep && a && a !== s && s.contains(a)) {
+    const attrs = [...a.attributes].filter(x => x.name === 'id' || x.name.startsWith('data-'));
+    if (attrs.length) focusSel = a.tagName.toLowerCase() + attrs.map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join('');
+  }
   if (typeof dayCtx !== 'undefined') dayCtx = null;
   s.dataset.swipe = ''; // 下にスワイプで閉じるのは、表示の設定のときだけ
   s.style.transform = '';
   $('#sheetBody').innerHTML = html;
-  s.hidden = false; $('#backdrop').hidden = false; s.scrollTop = 0;
+  s.hidden = false; $('#backdrop').hidden = false;
   $$('[data-close]', s).forEach(b => { b.onclick = closeSheet; });
+  if (keep) {
+    s.scrollTop = top;
+    const f = focusSel && s.querySelector(focusSel); if (f) f.focus({ preventScroll: true });
+    return;
+  }
+  s.scrollTop = 0;
   const h = s.querySelector('h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
 }
 function closeSheet() {
