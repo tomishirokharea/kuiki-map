@@ -1704,16 +1704,37 @@ function applyInbox() {
   renderAll();
   checkPermGain();
 }
+/* 送信待ちをまとめて送る（家を続けて190件追加しても、1件ずつ190回ではなく数回で送り終える）。
+   あとの変更が前の変更を上書きする順番は、そのまま守る */
+const SEND_BATCH = 50; // 1回に送る件数の目安（GASの処理時間が長くなりすぎないように）
+const changeCount = ch => Object.keys(ch).reduce((n, c) => n + (c === 'settings' ? 1 : (ch[c].up.length + ch[c].del.length)), 0);
+function mergeChanges(list) {
+  const acc = {}, out = {};
+  let settings;
+  list.forEach(ch => {
+    Object.keys(ch).forEach(c => {
+      if (c === 'settings') { settings = ch.settings; return; }
+      const o = acc[c] || (acc[c] = { up: new Map(), del: new Set() });
+      ch[c].up.forEach(x => { o.del.delete(x.id); o.up.set(x.id, x); });
+      ch[c].del.forEach(id => { o.up.delete(id); o.del.add(id); });
+    });
+  });
+  Object.keys(acc).forEach(c => { out[c] = { up: [...acc[c].up.values()], del: [...acc[c].del] }; });
+  if (settings !== undefined) out.settings = settings;
+  return out;
+}
 async function flush() {
   if (!LIVE || flushing || !Store.queue.length) { updateSyncBadge(); return; }
   flushing = true; updateSyncBadge();
   let rejected = 0, rejectedList = [];
   try {
     while (Store.queue.length) {
-      const j = await api('sync', { changes: Store.queue[0], since: Store.seq });
+      let take = 1, n = changeCount(Store.queue[0]);
+      while (take < Store.queue.length && n + changeCount(Store.queue[take]) <= SEND_BATCH) n += changeCount(Store.queue[take++]);
+      const j = await api('sync', { changes: take === 1 ? Store.queue[0] : mergeChanges(Store.queue.slice(0, take)), since: Store.seq });
       rejected += (j.rejected || []).length;
       rejectedList = rejectedList.concat(j.rejected || []);
-      Store.queue.shift();
+      Store.queue.splice(0, take);
       Store.persistQueue();
       if (j.mode === 'stale') Store.needFull = true;            // 差分では追いつけない → 全部を読み直す
       else Store.inbox = Store.inbox.filter(x => x.mode === 'full').concat([j]);
@@ -1976,8 +1997,11 @@ function terrStats(t, sinceMs) {
 }
 
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
-const APP_VERSION = '2026.09.24';
+const APP_VERSION = '2026.09.25';
 const CHANGELOG = [
+  { v: '2026.09.25', items: [
+    ['送', '家をたくさん続けて追加したときも、まとめて送るので、すぐに係やほかの人に届くようになりました']
+  ] },
   { v: '2026.09.24', items: [
     ['＋', '時間などの「＋」「−」を続けて押しても、画面が拡大されないようにしました。押したあとに画面がいちばん上へ戻ることもなくなりました'],
     ['画', 'スマホの横向き・タブレット・パソコンで、画面の広さに合わせて見やすく並ぶようにしました']
@@ -6321,7 +6345,13 @@ function bindStatic() {
     if (b.dataset.addmode === 'del' && simpleBlock('家を消すことは')) return;
     addMode = b.dataset.addmode; closeSheet(); updateAddBar();
   });
-  $('#addCancel').onclick = () => { closeSheet(); setMode('normal'); };
+  $('#addCancel').onclick = () => {
+    closeSheet(); setMode('normal');
+    if (LIVE && Store.queue.length) {
+      toast('追加した家を送っています。上の「未送信」の表示が消えるまで、アプリを閉じないでください');
+      if (!flushing) flush();
+    }
+  };
   $('#btnLocate').onclick = () => locate(() => map.setView(myPos, 18));
   $('#zoomHint').onclick = () => { clearTimeout(zoomHintTimer); $('#zoomHint').hidden = true; };
   $('#legendBtn').onclick = () => toggleLegend();
@@ -6514,7 +6544,10 @@ async function init() {
     };
     setInterval(again, 3000);
     window.addEventListener('online', flush);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) { lastRefresh = 0; nextPollAt = 0; again(); } });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { if (Store.queue.length && !flushing) flush(); return; }
+      lastRefresh = 0; nextPollAt = 0; again();
+    });
     fetchDevices(true);
     if (Store.queue.length) flush();
     else if (from === 'cache') refresh(true).catch(() => toast('インターネットにつながっていません。前回の情報を表示しています'));
