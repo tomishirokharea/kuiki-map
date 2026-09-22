@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.09.30"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.01"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -988,7 +988,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
 </div></div>
 <div id="news" hidden></div>
 <div id="joinScreen" hidden></div>
-<div id="blocker" hidden><div class="blockbox" role="alert"><h2 id="blockTitle"></h2><p id="blockMsg"></p></div></div>
+<div id="blocker" hidden><div class="blockbox" role="alert"><h2 id="blockTitle"></h2><p id="blockMsg"></p><p class="muted" id="blockDetail" hidden></p><button type="button" class="btn primary block" id="blockRetry" hidden>もう一度読み込む</button></div></div>
 
 <script>
 'use strict';
@@ -1302,6 +1302,7 @@ const IDB = {
       r.onupgradeneeded = () => r.result.createObjectStore('kv');
       r.onsuccess = () => { this.db = r.result; res(this.db); };
       r.onerror = () => rej(r.error);
+      r.onblocked = () => rej(new Error('idb blocked'));
     });
   },
   async run(mode, fn) {
@@ -1481,10 +1482,11 @@ const Store = {
     try { this.queue = JSON.parse(lsGet(QUEUE_KEY) || '[]'); } catch (e) { this.queue = []; }
     if (!this.token) throw Object.assign(new Error('no token'), { code: 'auth' });
     let cache = null;
+    const within = (pr, ms) => Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej(new Error('idb timeout')), ms))]);
     try {
-      if (tk.changed) await IDB.del('cache');
-      else cache = await IDB.get('cache');
-    } catch (e) { cache = null; }
+      if (tk.changed) await within(IDB.del('cache'), 5000);
+      else cache = await within(IDB.get('cache'), 5000);
+    } catch (e) { cache = null; if (String(e.message) === 'idb timeout') IDB.db = null; }
     this.syncAt = Number(lsGet(SYNC_KEY) || 0) || (cache && cache.savedAt) || 0;
     if (cache) {
       const days = (cache.state && cache.state.settings && cache.state.settings.cacheDays) || 30;
@@ -1500,7 +1502,10 @@ const Store = {
       this.setServer({ seq: cache.seq, state: cache.state }); // すぐ表示して、あとで差分を取りに行く
       return 'cache';
     }
-    const j = await loadAll(p => showBlocking('読み込んでいます…', `初めて開くときは少し時間がかかります（${p}%）`, true));
+    let pct = 0;
+    const j = await loadAll(
+      p => { pct = p; showBlocking('読み込んでいます…', `初めて開くときは少し時間がかかります（${p}%）`, true); },
+      n => showBlocking('読み込んでいます…', `通信が混み合っています。もう一度ためしています（${n}回目・${pct}%）`, true));
     this.setServer(j);
     this.saveCacheSoon();
     return 'server';
@@ -1701,17 +1706,50 @@ function openWaiting() {
   };
   check();
 }
-async function api(action, extra) {
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(Object.assign({ action, token: Store.token }, extra || {}))
-  });
-  if (!res.ok) throw new Error('通信エラー ' + res.status);
-  const j = await res.json();
+/* 通信の失敗を、原因ごとに見分ける
+   timeout … 返事が来ないまま時間切れ（サーバーの処理が長すぎる・電波が弱い）
+   network … つながらなかった
+   nonjson … Google側のエラー画面が返ってきた（混み合い・同時に動かせる数の上限など）
+   http●●● … 通信のエラー番号
+   server  … サーバーの処理の中でエラー
+   もう一度ためせば直る見込みのあるものには retry をつける */
+const LASTERR_KEY = 'kuiki_last_error';
+function noteError(action, e) {
+  try { lsSet(LASTERR_KEY, JSON.stringify({ at: new Date().toISOString(), action, code: e.code || e.message, sample: e.sample || '' })); } catch (x) { /* 何もしない */ }
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function api(action, extra, opt) {
+  const o = opt || {};
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), o.timeout || 60000) : null;
+  let res, text;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ action, token: Store.token }, extra || {})),
+      signal: ctl ? ctl.signal : undefined
+    });
+    text = await res.text();
+  } catch (err) {
+    const code = err && err.name === 'AbortError' ? 'timeout' : 'network';
+    const e = Object.assign(new Error(code), { code, retry: true });
+    noteError(action, e); throw e;
+  } finally { clearTimeout(timer); }
+  if (!res.ok) {
+    const e = Object.assign(new Error('http' + res.status), { code: 'http' + res.status, retry: res.status >= 429 });
+    noteError(action, e); throw e;
+  }
+  let j;
+  try { j = JSON.parse(text); } catch (err) {
+    const e = Object.assign(new Error('nonjson'), { code: 'nonjson', retry: true, sample: String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) });
+    noteError(action, e); throw e;
+  }
   if (!j.ok) {
     if (j.error === 'auth') authLost();
-    throw Object.assign(new Error(j.error || 'error'), { code: j.error });
+    const e = Object.assign(new Error(j.error || 'error'), { code: j.error, retry: j.error === 'server' });
+    if (j.error !== 'auth') noteError(action, e);
+    throw e;
   }
   Store.syncAt = Date.now();
   lsSet(SYNC_KEY, String(Store.syncAt));
@@ -1726,8 +1764,18 @@ function expandHouse(a) {
     createdAt: new Date((a[8] || 0) * 1000).toISOString(), createdBy: a[7] || ''
   };
 }
-async function loadAll(onProgress) {
-  const meta = await api('load', { part: 'meta' });
+async function apiRetry(action, extra, onRetry) {
+  const waits = [2000, 5000, 10000];
+  for (let i = 0; ; i++) {
+    try { return await api(action, extra, { timeout: 120000 }); } catch (e) {
+      if (!e.retry || i >= waits.length) throw e;
+      if (onRetry) onRetry(i + 1, e);
+      await wait(waits[i] + Math.random() * 1500); // みんなが同時にやり直さないよう、少しずらす
+    }
+  }
+}
+async function loadAll(onProgress, onRetry) {
+  const meta = await apiRetry('load', { part: 'meta' }, onRetry);
   const st = meta.state;
   st.houses = [];
   const vis = [];
@@ -1736,7 +1784,7 @@ async function loadAll(onProgress) {
   for (const part of ['houses', 'visits']) {
     let off = 0;
     while (off !== null) {
-      const r = await api('load', { part, offset: off });
+      const r = await apiRetry('load', { part, offset: off }, onRetry);
       if (part === 'houses') r.rows.forEach(a => st.houses.push(expandHouse(a)));
       else r.rows.forEach(a => vis.push(a));
       done += r.rows.length;
@@ -1876,6 +1924,20 @@ function showBlocking(title, msg, keepSplash) {
   $('#blocker').hidden = false;
 }
 function hideBlocking() { $('#blocker').hidden = true; }
+const ERR_TEXT = {
+  timeout: 'サーバーの返事が遅く、時間切れになりました。',
+  network: 'サーバーにつながりませんでした。',
+  nonjson: 'サーバーが混み合っていて、正しい返事が来ませんでした。',
+  server: 'サーバーの中でエラーが起きました。'
+};
+function showLoadError(e) {
+  showBlocking('読み込めませんでした', (ERR_TEXT[e && e.code] || '通信がうまくいきませんでした。') + '少し時間をおいて「もう一度読み込む」を押してください。');
+  const d = $('#blockDetail');
+  d.textContent = `続くときは、区域係にこの番号を伝えてください：${(e && (e.code || e.message)) || 'unknown'}` + (e && e.sample ? `（${e.sample}）` : '');
+  d.hidden = false;
+  $('#blockRetry').hidden = false;
+  $('#blockRetry').onclick = () => location.reload();
+}
 function logout() {
   const n = Store.queue.length;
   const q = n
@@ -2102,6 +2164,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.01', items: [
+    ['読', '開くときの読み込みが混み合っても、自動でやり直すようにしました。読み込めなかったときは、原因と「もう一度読み込む」ボタンが出ます']
+  ] },
   { v: '2026.09.30', items: [
     ['地', '地図の下の案内（訪ねた家など）は、押すと隠れます。右下の「?」で、また出せます'],
     ['道', '地図で行きたい場所を長押しすると、そこまでの道順をGoogleマップで見られます'],
@@ -6799,7 +6864,7 @@ async function init() {
     } catch (e) {
       if (e.code === 'auth') authLost();
       else if (Store.expired) showBlocking('端末の情報を消しました', 'しばらく通信できなかったため、区域の情報をこのスマホから消しました。通信できる場所で開き直すと、また使えます。');
-      else showBlocking('読み込めませんでした', 'インターネットにつながっているか確認して、もう一度開いてください。');
+      else showLoadError(e);
       return;
     }
     hideBlocking();
