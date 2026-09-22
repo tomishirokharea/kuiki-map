@@ -539,6 +539,13 @@ body.strong .pin.st-plain{border-width:4px}
 .swipe-acts{position:absolute;top:0;right:0;bottom:0;display:flex;z-index:0}
 .swipe-acts button{width:88px;border:0;font-weight:700;font-size:17px;color:#fff;background:var(--brand)}
 .swipe-acts .del{background:var(--danger)}
+/* 予定の行：行全体が押せる */
+.schedrow{cursor:pointer;grid-template-columns:1fr auto}
+.schedrow .chev{font-size:34px;line-height:1;color:var(--ink2);padding:0 2px 0 6px}
+.schedrow:active{background:var(--terr-soft)}
+.schedbox{background:#F6F8F7;border-radius:12px;padding:12px 14px;margin:4px 0 6px}
+.schedbox .rt{font-size:20px;font-weight:700}
+.btn.scdel{margin-top:22px}
 
 /* ===== お知らせ ===== */
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--brand);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
@@ -2038,8 +2045,11 @@ function terrStats(t, sinceMs) {
 }
 
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
-const APP_VERSION = '2026.09.26';
+const APP_VERSION = '2026.09.27';
 const CHANGELOG = [
+  { v: '2026.09.27', items: [
+    ['予', '奉仕の集まりの予定は、行を押すだけで「Googleカレンダーに入れる」「直す」「消す」が選べるようになりました']
+  ] },
   { v: '2026.09.26', items: [
     ['⚙', '歯車の設定に「使う機能」ができました。「奉仕時間」と「再訪問」は、使いたい人だけ「使う」にできます'],
     ['会', '「再訪問」を使わない人は、記録が「会えた・留守」だけになり、押す回数が少なくなりました'],
@@ -6045,16 +6055,39 @@ function gcalUrl(title, date, time, end, place, note) {
 }
 const canEditSched = s => isAdmin() || (isOverseer() && s.group === myGroup());
 /* 予定の1行。直せる人には、左にスワイプすると「編集」「削除」が出る形にする */
+/* 予定の行：押すと「Googleカレンダーに入れる・直す・消す」の画面が出る（行の中にボタンを置かず、行全体を押せるように） */
 function schedRow(s, withDate) {
-  const body = `<article class="ritem k-new swipe-body"><div>
+  const body = `<article class="ritem k-new schedrow swipe-body" data-sopen="${s.id}" role="button" tabindex="0" aria-label="${esc(fmtYmd(s.date))} ${esc(s.time || '')} ${esc(s.place || '場所未定')}の予定。押すと操作が出ます"><div>
       ${withDate ? `<p class="rt">${fmtYmd(s.date)}</p><p>${schedLine(s)}</p>` : `<p class="rt">${schedLine(s)}</p>`}
       <p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
-      <a class="btn small" href="${gcalUrl('奉仕の集まり', s.date, s.time, s.end, s.place, s.note)}" target="_blank" rel="noopener">Googleカレンダーへ</a></article>`;
+      <span class="chev" aria-hidden="true">›</span></article>`;
   if (!canEditSched(s)) return body.replace(' swipe-body', '');
   return `<div class="swipe" data-sid="${s.id}"><div class="swipe-acts" aria-label="この予定の操作">
       <button type="button" data-scact="edit" data-sid="${s.id}">編集</button><button type="button" class="del" data-scact="del" data-sid="${s.id}">削除</button></div>${body}</div>`;
 }
-const swipeHint = list => (list.some(canEditSched) ? '<p class="hint">予定を<b>左にスワイプ</b>すると、「編集」「削除」が出ます。</p>' : '');
+const swipeHint = list => (list.some(canEditSched)
+  ? '<p class="hint">予定を<b>押す</b>と、Googleカレンダーに入れたり、直したり消したりできます。</p>'
+  : '<p class="hint">予定を<b>押す</b>と、Googleカレンダーに入れられます。</p>');
+/* 予定を押したときの画面 */
+function openSchedActions(s, back) {
+  const can = canEditSched(s);
+  setSheet(headHtml(null, esc(fmtYmd(s.date)), '奉仕の集まり') + `
+    <div class="schedbox"><p class="rt">${schedLine(s)}</p>
+      <p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
+    <a class="btn primary block" id="scCal" href="${gcalUrl('奉仕の集まり', s.date, s.time, s.end, s.place, s.note)}" target="_blank" rel="noopener">Googleカレンダーに入れる</a>
+    ${can ? `<button class="btn block" id="scEdit">この予定を直す</button>
+      <button class="btn block danger scdel" id="scDel">この予定を消す</button>` : ''}
+    <button class="btn block" id="scBack">${back ? '← もどる' : '閉じる'}</button>`);
+  const done = () => { if (back) back(); else closeSheet(); };
+  $('#scBack').onclick = done;
+  if (!can) return;
+  $('#scEdit').onclick = () => openSchedForm(s, null, back);
+  $('#scDel').onclick = () => {
+    if (!confirm(`${fmtYmd(s.date)}　${s.time || ''} ${s.place || '場所未定'} の予定を消します。よろしいですか？`)) return;
+    commit('集まりの予定を消しました', () => { D().schedules = D().schedules.filter(x => x.id !== s.id); });
+    done();
+  };
+}
 let dayCtx = null; // いま開いている日（予定を直したあと、その日の画面にもどるため）
 const schedLine = s => `${s.time ? `${s.time}${s.end ? '〜' + s.end : ''}` : '時間未定'}　${esc(s.place || '場所未定')}`;
 function calHtml(o) {
@@ -6146,6 +6179,7 @@ function renderHome() {
 }
 /* スワイプの動き（指でもマウスでも）：左に半分以上ずらすと開き、ほかをさわると閉じる */
 const SWIPE_W = 176;
+let swipedAt = 0; // スワイプした直後の「押した」は、画面を開かない
 function bindSwipe() {
   let cur = null, sx = 0, sy = 0, dx = 0, moved = false;
   document.addEventListener('pointerdown', e => {
@@ -6170,11 +6204,26 @@ function bindSwipe() {
     if (!cur) return;
     const b = cur; cur = null;
     b.style.transition = ''; b.style.transform = '';
-    if (moved) b.parentNode.classList.toggle('open', dx < -SWIPE_W / 2);
+    if (moved) { swipedAt = Date.now(); b.parentNode.classList.toggle('open', dx < -SWIPE_W / 2); }
   };
   document.addEventListener('pointerup', end, true);
   document.addEventListener('pointercancel', end, true);
-  // 「編集」「削除」
+  // 予定の行を押したとき
+  const openRow = r => {
+    if (Date.now() - swipedAt < 500) return;
+    const sw = r.parentNode;
+    if (sw && sw.classList.contains('open')) { sw.classList.remove('open'); return; } // 開いていたら閉じるだけ
+    const s = D().schedules.find(x => x.id === r.dataset.sopen); if (!s) return;
+    const day = !$('#sheet').hidden ? dayCtx : null;
+    openSchedActions(s, day ? () => openDay(day) : null);
+  };
+  document.addEventListener('click', e => { const r = e.target.closest('[data-sopen]'); if (r) openRow(r); });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const r = e.target.closest && e.target.closest('[data-sopen]'); if (!r || r !== e.target) return;
+    e.preventDefault(); openRow(r);
+  });
+  // 「編集」「削除」（スワイプで出るボタン）
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-scact]'); if (!b) return;
     const s = D().schedules.find(x => x.id === b.dataset.sid); if (!s) return;
