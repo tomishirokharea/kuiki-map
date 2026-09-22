@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
+<meta name="app-version" content="2026.09.29"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -360,6 +361,13 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 /* ===== 表示の設定（歯車） ===== */
 .gearbtn{flex:none;width:46px;height:46px;border-radius:12px;border:2px solid #ffffff80;background:transparent;color:#fff;display:grid;place-items:center;padding:0}
 .gearbtn svg{width:26px;height:26px}
+/* 新しい版があるときの更新マーク（青い丸・白い矢印） */
+.updbtn{flex:none;width:46px;height:46px;border-radius:50%;border:2px solid #fff;background:#1A73E8;color:#fff;display:grid;place-items:center;padding:0;box-shadow:0 0 0 0 #1A73E8aa;animation:updPulse 2s ease-out infinite}
+.updbtn svg{width:26px;height:26px}
+.updbtn.busy svg{animation:updSpin .9s linear infinite}
+@keyframes updPulse{0%{box-shadow:0 0 0 0 #8AB4F8cc}70%{box-shadow:0 0 0 10px #8AB4F800}100%{box-shadow:0 0 0 0 #8AB4F800}}
+@keyframes updSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.updbtn,.updbtn.busy svg{animation:none}}
 .uiseg{display:flex;flex-wrap:wrap;width:100%;margin:4px 0 6px}
 .uiseg button{flex:1;min-width:84px}
 .swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
@@ -613,7 +621,7 @@ img,canvas,video{max-width:100%}
   header.top h1{font-size:18px}
   .pill{font-size:12px;padding:0 6px}
   #whoLabel{display:none}
-  .gearbtn{width:42px;height:42px}
+  .gearbtn,.updbtn{width:42px;height:42px}
   .stepper{gap:8px}
   .stepper button{width:52px;height:52px;font-size:26px}
   .stepper output{font-size:22px}
@@ -730,6 +738,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
   <header class="top">
     <h1>区域マップ</h1><span class="pill" id="modePill">試作版</span><span class="pill sync" id="syncState" hidden></span>
     <label class="who"><span id="whoLabel">使う人</span><select id="whoSel"></select><b id="whoName" hidden></b></label>
+    <button type="button" class="updbtn" id="btnUpd" hidden aria-label="新しい版があります。押すと更新します"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
     <button type="button" class="gearbtn" id="btnUi" aria-label="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </header>
 
@@ -2076,8 +2085,11 @@ function terrStats(t, sinceMs) {
 }
 
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
-const APP_VERSION = '2026.09.28';
+const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.09.29', items: [
+    ['↻', '新しい版ができると、右上の歯車のとなりに青い更新マークが出ます。押すと新しい版になります']
+  ] },
   { v: '2026.09.28', items: [
     ['地', '区域カードの番号か名前を押すと、地図がひらくようになりました'],
     ['◎', '地図の現在地は、右下の丸いボタンになりました。拡大・縮小は指で行います'],
@@ -2122,6 +2134,42 @@ const CHANGELOG = [
   ] }
 ];
 const SEEN_VER = 'kuiki_seen_ver';
+/* ---------- 新しい版があるか確かめる ----------
+   ・開いたとき、ほかのアプリから戻ったとき（5分に1回まで）、開きっぱなしなら30分ごと
+   ・ファイルの先頭（版の番号の meta）だけを読むので、通信はわずか
+   ・新しい版があれば、歯車のとなりに青い更新マークを出す。押すと、送っていない記録を送ってから読み直す */
+let updChecked = 0, updFound = '';
+async function checkUpdate(force) {
+  if (updFound || location.protocol === 'file:') return;
+  if (!force && Date.now() - updChecked < 5 * 60000) return;
+  updChecked = Date.now();
+  try {
+    const u = location.pathname + '?vcheck=' + Date.now();
+    const res = await fetch(u, { cache: 'no-store', headers: { Range: 'bytes=0-1023' } });
+    if (!res.ok && res.status !== 206) return;
+    const head = (await res.text()).slice(0, 4096);
+    const m = head.match(/<meta name="app-version" content="([^"]+)"/);
+    if (m && m[1] > APP_VERSION) { updFound = m[1]; $('#btnUpd').hidden = false; }
+  } catch (e) { /* 通信できないときは、次の機会にまた確かめる */ }
+}
+async function doUpdate() {
+  const b = $('#btnUpd');
+  if (b.classList.contains('busy')) return;
+  b.classList.add('busy');
+  try {
+    if (LIVE && Store.queue.length) { toast('記録を送ってから更新します…'); await flush(); }
+    // 新しいファイルを取り直してから読み直す（スマホに残っている古いファイルを使わないように）
+    await fetch(location.pathname, { cache: 'reload' }).catch(() => {});
+  } finally {
+    location.reload();
+  }
+}
+function watchUpdate() {
+  $('#btnUpd').onclick = doUpdate;
+  setTimeout(() => checkUpdate(true), 3000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(false); });
+  setInterval(() => { if (!document.hidden) checkUpdate(true); }, 30 * 60000);
+}
 function showNewsIfAny(then) {
   const seen = lsGet(SEEN_VER);
   lsSet(SEEN_VER, APP_VERSION);
@@ -6492,6 +6540,7 @@ function bindStatic() {
   $('#cardTabs').addEventListener('click', e => { const b = e.target.closest('[data-ctab]'); if (b) setCardTab(b.dataset.ctab); });
   $('#splash').addEventListener('click', () => hideSplash(true));
   watchResume();
+  watchUpdate();
   $('#whoSel').onchange = e => {
     D().currentUser = e.target.value; Store.save();
     uiLoad(); applyUi();
