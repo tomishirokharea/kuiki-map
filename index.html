@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.09.29"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.09.30"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -472,7 +472,12 @@ body.strong .pin.st-plain{border-width:4px}
 .newslist i{flex:none;width:34px;height:34px;border-radius:10px;background:var(--terr-soft);color:var(--terr);display:grid;place-items:center;font-style:normal;font-weight:700}
 .newsgo{margin:6px 16px 18px;width:calc(100% - 32px);min-height:60px;font-size:19px}
 /* ===== 再訪問の一覧 ===== */
-.ftools{display:grid;gap:8px;margin-bottom:12px}
+.ftools{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin-bottom:12px}
+/* 文字を大きくしても、並び順の長い文字などで画面が横にはみ出さないように */
+.ftools .seg button{min-width:0}
+.fsearch input,.fsort select{min-width:0;width:100%}
+.fsort select{text-overflow:ellipsis}
+#view-cards{overflow-x:hidden}
 .ftools .seg{display:flex;width:100%;margin:0}
 .ftools .seg button{flex:1}
 .fsearch{display:flex;align-items:center;gap:8px;background:#fff;border:2px solid var(--ink2);border-radius:12px;padding:0 12px;min-height:52px}
@@ -552,6 +557,15 @@ body.strong .pin.st-plain{border-width:4px}
 .schedrow .chev{font-size:34px;line-height:1;color:var(--ink2);padding:0 2px 0 6px}
 .schedrow:active{background:var(--terr-soft)}
 /* 地図：現在地のボタン（右下） */
+.helpbtn.hasbar{background:var(--terr);color:#fff;border-color:#fff}
+#map{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.cardbar{cursor:pointer}
+.dirpop .leaflet-popup-content{margin:14px 16px 12px;font-size:16px;zoom:var(--z,1)}
+.dirpop .dirtitle{margin:0 0 10px;font-weight:700;font-size:18px;color:var(--ink)}
+.dirpop .btn{display:flex;align-items:center;justify-content:center;gap:6px;color:#fff;min-height:52px;font-size:17px;white-space:nowrap}
+.dirpop .btn svg{width:22px;height:22px}
+.leaflet-container .dirpop a.leaflet-popup-close-button{width:40px;height:40px;font:400 28px/38px sans-serif;color:var(--ink2)}
+.dirpop .dirtitle{padding-right:28px}
 .locbtn{position:absolute;right:10px;bottom:24px;z-index:520;width:56px;height:56px;border-radius:50%;border:0;background:#fff;color:#5F6368;box-shadow:0 2px 8px #0005;display:grid;place-items:center;padding:0}
 .locbtn svg{width:30px;height:30px}
 .locbtn.on{color:#1A73E8}
@@ -817,6 +831,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
           <span><i class="pin st-plain locked"></i>自分の区域以外（選べません）</span>
         </div>
         <p class="hint">色と文字は、この区域を受け取ってからの結果です。それより前の記録は、家をタップすると見られます。</p>
+        <p class="hint">行きたい場所を<b>長押し</b>すると、そこまでの道順をGoogleマップで見られます。</p>
       </div>
       <div class="modebar" id="addBar" hidden>
         <p><b>家を追加：</b><span id="addMsg"></span></p>
@@ -2087,6 +2102,11 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.09.30', items: [
+    ['地', '地図の下の案内（訪ねた家など）は、押すと隠れます。右下の「?」で、また出せます'],
+    ['道', '地図で行きたい場所を長押しすると、そこまでの道順をGoogleマップで見られます'],
+    ['再', '文字を大きくしているときに、再訪問の画面が横にずれていたのを直しました']
+  ] },
   { v: '2026.09.29', items: [
     ['↻', '新しい版ができると、右上の歯車のとなりに青い更新マークが出ます。押すと新しい版になります']
   ] },
@@ -2308,6 +2328,16 @@ function initMap() {
     else if (mode === 'add') addAt(e.latlng, false);
   });
   map.on('moveend', renderHouses);
+  // 長押し（パソコンは右クリック）した場所への道順を、Googleマップで開けるようにする
+  map.on('contextmenu', e => {
+    if (mode !== 'normal') return; // 線を引く・家を追加するときは使わない
+    const { lat, lng } = e.latlng, ll = lat.toFixed(6) + ',' + lng.toFixed(6);
+    L.popup({ className: 'dirpop', closeButton: true, autoPanPadding: [20, 80], maxWidth: 260 })
+      .setLatLng(e.latlng)
+      .setContent(`<p class="dirtitle">ここへの道順</p>
+        <a class="btn primary block" href="https://www.google.com/maps/dir/?api=1&destination=${ll}" target="_blank" rel="noopener">${MAP_ICON}Googleマップで行く</a>`)
+      .openOn(map);
+  });
 }
 /* 地図の印：この区域の「今回」（受け取ってから）の結果だけを色で見せる。まだの家は白い丸で統一 */
 const PIN_CHAR = { plain: '', met: '会', away: '留', refused: '拒', dnc: '拒' };
@@ -4590,6 +4620,7 @@ function returnTerr(tid, completed) {
 
 /* ---------- 留守宅カード ---------- */
 let focusCard = null, roundTerr = null, roundNums = null, barMini = false, curTerr = null;
+let barHidden = false; // 下の案内を、押して隠したか（「?」を押すと、また出る）
 const slotText = s => { const [dt, b] = s.split('・'); return `${dt}の${b}（${BAND_HINT[b]}）`; };
 const slotShort = s => s.replace('・', 'の');
 const activeCards = () => { const now = Date.now(); return D().awayCards.filter(c => !c.endedAt && Date.parse(c.expiresAt) > now); };
@@ -4814,6 +4845,9 @@ function openPlanSheet() {
 }
 function renderCardBar() {
   const bar = $('#cardBar');
+  const hasBar = followMap || !!focusCard || !!roundTerr;
+  $('#legendBtn').classList.toggle('hasbar', barHidden && hasBar);
+  if (barHidden && hasBar) { bar.hidden = true; return; }
   if (followMap) {
     const n = myFollowKeys().length;
     $('#legendBtn').hidden = false;
@@ -6605,7 +6639,17 @@ function bindStatic() {
   $('#btnLocate').onclick = () => locate(() => { map.setView(myPos, Math.max(map.getZoom(), 18)); $('#btnLocate').classList.add('on'); });
   map.on('dragstart', () => $('#btnLocate').classList.remove('on')); // 地図を動かしたら、青い（追いかけ中の）表示をやめる
   $('#zoomHint').onclick = () => { clearTimeout(zoomHintTimer); $('#zoomHint').hidden = true; };
-  $('#legendBtn').onclick = () => toggleLegend();
+  // 「?」：下の案内を隠しているときは、まず案内をもう一度出す。出ているときは印の見かたを開く
+  $('#legendBtn').onclick = () => {
+    if (barHidden && (followMap || focusCard || roundTerr)) { barHidden = false; renderCardBar(); return; }
+    toggleLegend();
+  };
+  // 下の案内を押すと隠す（中のボタンを押したときは、そのボタンの動きだけ）
+  $('#cardBar').addEventListener('click', e => {
+    if (e.target.closest('button, a, input, select, label, .seg')) return;
+    barHidden = true; renderCardBar();
+    toast('右下の「?」を押すと、また表示されます');
+  });
   $('#legendClose').onclick = () => { toggleLegend(false); $('#legendBtn').focus(); };
   $('#btnUi').onclick = openUiSheet;
   bindSheetSwipe();
