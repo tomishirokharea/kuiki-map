@@ -543,6 +543,37 @@ body.strong .pin.st-plain{border-width:4px}
 .schedrow{cursor:pointer;grid-template-columns:1fr auto}
 .schedrow .chev{font-size:34px;line-height:1;color:var(--ink2);padding:0 2px 0 6px}
 .schedrow:active{background:var(--terr-soft)}
+/* 地図：現在地のボタン（右下） */
+.locbtn{position:absolute;right:10px;bottom:24px;z-index:520;width:56px;height:56px;border-radius:50%;border:0;background:#fff;color:#5F6368;box-shadow:0 2px 8px #0005;display:grid;place-items:center;padding:0}
+.locbtn svg{width:30px;height:30px}
+.locbtn.on{color:#1A73E8}
+.locbtn.busy svg{animation:locBusy 1s ease-in-out infinite}
+@keyframes locBusy{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.locbtn.busy svg{animation:none;opacity:.5}}
+.helpbtn{bottom:92px}
+.cardbar{right:76px}
+/* 設定：地図の見た目 */
+.basepick .choice{min-height:96px}
+.bprev{width:64px;height:34px;border-radius:8px;border:2px solid var(--line)}
+.bprev.pale{background:linear-gradient(135deg,#F4F1EA 0 40%,#fff 40% 46%,#E8EFE6 46% 70%,#fff 70% 75%,#F4F1EA 75%)}
+.bprev.photo{background:linear-gradient(135deg,#4B6B3C 0 35%,#8C8C84 35% 42%,#6E8B55 42% 68%,#9A9A90 68% 74%,#3F5E36 74%)}
+/* 区域カード：上の部分を押すと地図 */
+.tcard.tc2{display:block}
+.topen{display:flex;align-items:center;gap:12px;width:100%;margin:0;padding:4px;border:0;border-radius:12px;background:none;color:inherit;text-align:left;font:inherit}
+.topen:active{background:var(--terr-soft)}
+.topen .tname{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.topen .tname b{font-size:21px;line-height:1.35;overflow-wrap:anywhere}
+.topen .tname small{font-size:15px;color:var(--ink2);font-weight:400;line-height:1.4}
+.tgo{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:62px;min-height:60px;border:2px solid var(--terr);border-radius:14px;background:var(--terr-soft);color:var(--terr);font-weight:700;font-size:14px;line-height:1.2;white-space:nowrap}
+.tgo svg{width:26px;height:26px}
+.tcard.tc2 .stamp:not(.xs){width:58px;height:58px;font-size:27px}
+.tcard.away .tgo{border-color:var(--draw);color:var(--draw);background:#FFF1E8}
+.tcard.tc2 .tbody{margin-top:10px}
+.tcard.tc2 .actions{margin-top:12px}
+.tcard.tc2 .actions:empty{display:none}
+.taphint{margin:0 0 8px}
+@media (max-width:374px){.tgo{width:56px}.topen{gap:8px}.topen .tname b{font-size:19px}}
+@media (hover:hover) and (pointer:fine){.topen:hover{background:var(--terr-soft)}}
 .schedbox{background:#F6F8F7;border-radius:12px;padding:12px 14px;margin:4px 0 6px}
 .schedbox .rt{font-size:20px;font-weight:700}
 .btn.scdel{margin-top:22px}
@@ -613,8 +644,9 @@ img,canvas,video{max-width:100%}
   .tabbadge{top:2px}
   .view{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
   #sheet{max-height:94vh;max-height:94dvh;bottom:6px}
-  .cardbar{max-height:58vh;right:max(64px,calc(env(safe-area-inset-right) + 64px));left:max(10px,env(safe-area-inset-left));bottom:10px}
-  .helpbtn{bottom:70px}
+  .cardbar{max-height:58vh;right:max(76px,calc(env(safe-area-inset-right) + 76px));left:max(10px,env(safe-area-inset-left));bottom:10px}
+  .helpbtn{bottom:76px}
+  .locbtn{bottom:12px}
   .legend{max-height:80%;bottom:10px}
   .modebar{max-height:70vh;overflow:auto}
   #toast{bottom:calc(60px + env(safe-area-inset-bottom))}
@@ -757,11 +789,10 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
       <div class="maptools" id="mapTools">
         <select id="terrJump" aria-label="区域をえらぶ"></select>
         <button class="btn primary adv" id="btnAdd">＋ 家を追加</button>
-        <button class="btn" id="btnLocate">現在地</button>
-        <button class="btn" id="btnBase">写真</button>
       </div>
       <button type="button" class="zoomhint" id="zoomHint" hidden>地図を拡大すると家の印が出ます<span aria-hidden="true">×</span></button>
       <div class="cardbar" id="cardBar" hidden></div>
+      <button type="button" class="locbtn" id="btnLocate" aria-label="現在地を表示"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></button>
       <button type="button" class="helpbtn" id="legendBtn" aria-label="印の見かたを表示" aria-expanded="false" aria-controls="legend">?</button>
       <div class="legend" id="legend" hidden role="dialog" aria-labelledby="legendTitle">
         <div class="legendhead"><b id="legendTitle">印の見かた</b><button type="button" class="foldbtn" id="legendClose">閉じる</button></div>
@@ -2045,8 +2076,14 @@ function terrStats(t, sinceMs) {
 }
 
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
-const APP_VERSION = '2026.09.27';
+const APP_VERSION = '2026.09.28';
 const CHANGELOG = [
+  { v: '2026.09.28', items: [
+    ['地', '区域カードの番号か名前を押すと、地図がひらくようになりました'],
+    ['◎', '地図の現在地は、右下の丸いボタンになりました。拡大・縮小は指で行います'],
+    ['写', '写真の地図への切りかえは、地図の画面で歯車の設定をひらくと、いちばん上にあります'],
+    ['⚙', '区域カードの「進み具合」「今のおすすめ」は、設定で出すかどうかを選べます（はじめは出しません）']
+  ] },
   { v: '2026.09.27', items: [
     ['予', '奉仕の集まりの予定は、行を押すだけで「Googleカレンダーに入れる」「直す」「消す」が選べるようになりました']
   ] },
@@ -2203,7 +2240,7 @@ const navLink = h => `<a class="btn block" href="https://www.google.com/maps/dir
 
 /* ---------- 地図 ---------- */
 let map, terrLayer, houseLayer, baseLayers, baseName = 'pale', mode = 'normal';
-let tmpMarker = null, draw = null, myPos = null, posMarker = null, firstMapShow = true;
+let tmpMarker = null, draw = null, myPos = null, posMarker = null, firstMapShow = true, zoomCtl = null;
 
 function initMap() {
   map = L.map('map', { zoomControl: false, zoomSnap: 0.125, zoomDelta: 1, wheelPxPerZoomLevel: 120, doubleClickZoom: false }).setView(HOME_VIEW, 17);
@@ -2212,7 +2249,7 @@ function initMap() {
   map.getPane('cardPane').style.zIndex = 150;
   map.getPane('cardPane').style.pointerEvents = 'none';
   map.on('zoom viewreset zoomend', placeOverlay);
-  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  zoomCtl = L.control.zoom({ position: 'bottomright' }); // ＋−は、線を引く・家を追加するときだけ出す
   const opt = { maxZoom: 20, maxNativeZoom: 18, attribution: GSI_ATTR };
   baseLayers = { pale: L.tileLayer(TILE_PALE, opt), photo: L.tileLayer(TILE_PHOTO, opt) };
   baseLayers.pale.addTo(map);
@@ -2625,7 +2662,9 @@ function setMode(m) {
   document.body.classList.toggle('focusmode', m !== 'normal'); // 作業中は上下の帯を隠して地図を広く
   toggleLegend(false);
   $('#legendBtn').hidden = m === 'draw';
+  $('#btnLocate').hidden = m !== 'normal';
   if (map) {
+    if (m === 'normal') zoomCtl.remove(); else zoomCtl.addTo(map); // ふだんは指で拡大・縮小。作業中だけ＋−を出す
     map.options.zoomDelta = m === 'draw' ? 0.25 : 1;
     renderHouses();
     setTimeout(() => map.invalidateSize(), 30);
@@ -4083,6 +4122,11 @@ function renderToday() {
   }
   $('#todayBox').innerHTML = `<div class="today">${html}</div>`;
 }
+/* カードの上の部分：番号・名前・「地図 ›」をまとめて1つの大きなボタンにする（押すと地図がひらく） */
+const MAP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>';
+const openHead = (attr, label, stamp, name, sub) => `<button type="button" class="topen" ${attr} aria-label="${label}の地図をひらく">
+      ${stamp}<span class="tname"><b>${name}</b>${sub ? `<small>${sub}</small>` : ''}</span>
+      <span class="tgo">${MAP_ICON}<span>地図 ›</span></span></button>`;
 function cardHtml(t, own, helper) {
   const since = t.lentAt ? Date.parse(t.lentAt) : Date.now() - 90 * DAY;
   const s = terrStats(t, since);
@@ -4092,29 +4136,33 @@ function cardHtml(t, own, helper) {
   const who = own ? `受け取ってから ${daysSince(t.lentAt)}日`
     : helper ? `${esc(uname(t.holder))}さんの区域を、一緒に回ります（今日まで）`
     : (holder ? `担当：${esc(holder.name)}さん` : '担当者なし');
-  return `<article class="tcard${t.group ? ' grp' : ''}">
-    <span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${t.group ? 'グループ' : '区域'}</small>${esc(t.no)}</span>
-    <div><h3>${esc(t.name)}</h3>${t.group ? `<span class="gbadge">${esc(t.group)}グループの区域</span>` : ''}<p class="muted">${who}</p>
-      <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪問の進み具合"><i style="width:${pct}%"></i></div>
-      <p class="muted">${t.lentAt ? '受け取ってから' : 'この90日で'}訪問した家・部屋 ${s.visited} / ${s.n}</p>
-      ${own && hs.length ? `<p class="muted"><b>今日一緒に回る人：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : ''}
-      ${own || helper ? roundHint(t) : ''}</div>
-    <div class="actions"><button class="btn primary" data-open="${t.id}">地図をひらく</button>${own && groupOk ? `<button class="btn" data-helpers="${t.id}">${t.group ? 'グループで共有' : '一緒に回る人'}</button>` : ''}${own ? `<button class="btn" data-return="${t.id}">返却する</button>` : ''}</div>
+  const extra = (UI.cProg === 'on'
+      ? `<div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪問の進み具合"><i style="width:${pct}%"></i></div>
+      <p class="muted">${t.lentAt ? '受け取ってから' : 'この90日で'}訪問した家・部屋 ${s.visited} / ${s.n}</p>` : '') +
+    (own && hs.length ? `<p class="muted"><b>今日一緒に回る人：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : '') +
+    ((own || helper) && UI.cReco === 'on' ? roundHint(t) : '');
+  return `<article class="tcard tc2${t.group ? ' grp' : ''}">
+    ${openHead(`data-open="${t.id}"`, `区域${esc(t.no)} ${esc(t.name)}`,
+      `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${t.group ? 'グループ' : '区域'}</small>${esc(t.no)}</span>`,
+      esc(t.name), (t.group ? `<span class="gbadge">${esc(t.group)}グループの区域</span> ` : '') + who)}
+    ${extra ? `<div class="tbody">${extra}</div>` : ''}
+    <div class="actions">${own && groupOk ? `<button class="btn" data-helpers="${t.id}">${t.group ? 'グループで共有' : '一緒に回る人'}</button>` : ''}${own ? `<button class="btn" data-return="${t.id}">返却する</button>` : ''}</div>
   </article>`;
 }
 let cardTab = 'mine';
 function setCardTab(v) {
+  const prev = cardTab;
   cardTab = v === 'follow' && featFollow() ? 'follow' : 'mine';
   $('#paneMine').hidden = cardTab !== 'mine';
   $('#paneFollow').hidden = cardTab !== 'follow';
   $$('#cardTabs [data-ctab]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ctab === cardTab)));
-  $('#view-cards').scrollTop = 0;
+  if (prev !== cardTab) $('#view-cards').scrollTop = 0; // タブを切りかえたときだけ上にもどす（記録の更新では動かさない）
 }
 function renderCards() {
   renderToday();
   const ts = D().territories.slice().sort(byNo);
   const mine = ts.filter(t => t.holder === me().id);
-  $('#myCards').innerHTML = mine.length ? mine.map(t => cardHtml(t, true)).join('')
+  $('#myCards').innerHTML = mine.length ? '<p class="hint taphint">区域の番号か名前を押すと、地図がひらきます。</p>' + mine.map(t => cardHtml(t, true)).join('')
     : '<div class="empty">受け取っている区域カードはありません。<br>下のボタンから申し込めます。</div>';
   const helping = ts.filter(t => t.holder !== me().id && isHelper(t));
   const myDummy = ts.find(t => t.dummy && t.holder === me().id);
@@ -4672,7 +4720,7 @@ function roundHint(t) {
   const plan = roundPlan(r);
   if (!plan.length) return near;
   const intr = plan.filter(s => s.reasons.some(y => y.includes('★'))).length;
-  return near + `<p class="hint-strong">今（${slotShort(r.cur)}）のおすすめ ${plan.length}か所${intr && featFollow() ? `（★ ${intr}か所）` : ''}。「地図をひらく」で番号順に回れます。</p>`;
+  return near + `<p class="hint-strong">今（${slotShort(r.cur)}）のおすすめ ${plan.length}か所${intr && featFollow() ? `（★ ${intr}か所）` : ''}。地図をひらくと、番号順に回れます。</p>`;
 }
 /* 家ごとの表示を返す関数（目立たせていないときは null） */
 function focusFn() {
@@ -4789,13 +4837,15 @@ function awayCardHtml(c) {
   const t = terrById(c.terrId), p = cardProgress(c);
   const pct = p.total ? Math.round(p.done / p.total * 100) : 0;
   const left = Math.max(0, Math.ceil((Date.parse(c.expiresAt) - Date.now()) / DAY));
-  return `<article class="tcard away">
-    <span class="stamp away${t ? noCls(t.no) : ''}"><small>留守宅</small>${t ? esc(t.no) : '-'}</span>
-    <div><h3>${slotText(c.slot)}</h3><p class="muted">区域${t ? t.no : '-'}　${t ? esc(t.name) : ''}</p>
+  return `<article class="tcard tc2 away">
+    ${openHead(`data-awayopen="${c.id}"`, `留守宅カード ${esc(slotText(c.slot))}`,
+      `<span class="stamp away${t ? noCls(t.no) : ''}"><small>留守宅</small>${t ? esc(t.no) : '-'}</span>`,
+      slotText(c.slot), `区域${t ? esc(t.no) : '-'}　${t ? esc(t.name) : ''}`)}
+    <div class="tbody">
       <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪ねた割合"><i style="width:${pct}%"></i></div>
       <p class="muted">訪ねた家 ${p.done} / ${p.total}　あと${left}日で自動的に終わります</p>
       ${p.total && p.done === p.total ? '<p><b>すべて訪ねました。「終える」を押してください。</b></p>' : ''}</div>
-    <div class="actions"><button class="btn primary" data-awayopen="${c.id}">地図をひらく</button><button class="btn" data-awayend="${c.id}">終える</button></div>
+    <div class="actions"><button class="btn" data-awayend="${c.id}">終える</button></div>
   </article>`;
 }
 function renderMyAwayCards() {
@@ -5032,22 +5082,29 @@ function goTo(hid, unit, route) {
 }
 function locate(after) {
   if (!navigator.geolocation) { toast('この端末では現在地を使えません'); return; }
-  toast('現在地を調べています…');
+  const lb = $('#btnLocate');
+  if (lb) lb.classList.add('busy');
   navigator.geolocation.getCurrentPosition(p => {
+    if (lb) lb.classList.remove('busy');
     myPos = [p.coords.latitude, p.coords.longitude];
-    if (map) {
+    if (map) { // Googleマップのような、青い点と、だいたいの範囲の薄い円
       if (posMarker) map.removeLayer(posMarker);
-      posMarker = L.circleMarker(myPos, { radius: 10, color: '#fff', weight: 3, fillColor: '#1565C0', fillOpacity: 1, interactive: false }).addTo(map);
+      posMarker = L.layerGroup([
+        L.circle(myPos, { radius: Math.min(p.coords.accuracy || 30, 300), color: '#1A73E8', weight: 1, opacity: 0.35, fillColor: '#1A73E8', fillOpacity: 0.12, interactive: false }),
+        L.circleMarker(myPos, { radius: 9, color: '#fff', weight: 3, fillColor: '#1A73E8', fillOpacity: 1, interactive: false })
+      ]).addTo(map);
     }
     after && after();
-    toast('現在地がわかりました');
-  }, () => toast('現在地を取得できませんでした。端末の位置情報の設定を確認してください'), { enableHighAccuracy: true, timeout: 10000 });
+  }, () => {
+    if (lb) lb.classList.remove('busy', 'on');
+    toast('現在地を取得できませんでした。端末の位置情報の設定を確認してください');
+  }, { enableHighAccuracy: true, timeout: 10000 });
 }
 
 /* ---------- 表示の設定（このスマホ・この人だけ。サーバーには送らない） ----------
    かんたん：文字の大きさだけ　くわしく：色・文字の種類・こさ・間隔・説明文・最初の画面・地図 */
 const ICONS = ['区', '家', '図', '心', '🏠', '🗺️', '📖', '🚪', '✅', '⭐', '🚶', '☀️'];
-const UI_DEFAULT = { fTime: 'off', fFollow: 'off', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
+const UI_DEFAULT = { fTime: 'off', fFollow: 'off', cProg: 'off', cReco: 'off', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
 /* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
   standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
@@ -5245,7 +5302,6 @@ function setBase(name) {
   map.removeLayer(baseLayers[baseName]);
   baseName = name;
   baseLayers[baseName].addTo(map);
-  $('#btnBase').textContent = baseName === 'pale' ? '写真' : '地図';
 }
 function openUiSheet() {
   const tab = currentView;
@@ -5273,8 +5329,17 @@ function openUiSheet() {
       <p class="hint">はじめは、区域を回って「会えた・留守」を記録するだけの、かんたんな形です。必要な機能だけ「使う」にしてください。</p>
       <div class="featrow"><p><b>奉仕時間</b><small>時間をはかる・今月の目標・カレンダーに時間を残す</small></p>${seg('fTime', [['off', '使わない'], ['on', '使う']])}</div>
       <div class="featrow"><p><b>再訪問</b><small>会えた方の年代と「また訪ねたいか」を記録し、自分の再訪問のリストを持つ</small></p>${seg('fFollow', [['off', '使わない'], ['on', '使う']])}</div>
+      <h3 class="sub">区域カードに出すもの</h3>
+      <div class="featrow"><p><b>進み具合</b><small>受け取ってから訪ねた家・部屋の数と、横のバー</small></p>${seg('cProg', [['off', '出さない'], ['on', '出す']])}</div>
+      <div class="featrow"><p><b>今のおすすめ</b><small>今の時間帯に訪ねるとよい家の数</small></p>${seg('cReco', [['off', '出さない'], ['on', '出す']])}</div>
       <h3 class="sub">画面の見え方</h3>`;
-    let b = headHtml(null, '設定', 'このスマホで、あなたにだけ使われる設定です') + S_FEAT + `
+    // 地図の画面から開いたときは、地図の見た目（ふつうの地図／写真）をいちばん上に出す
+    const S_BASE = tab === 'map' ? `<h3 class="sub feathead">地図の見た目</h3>
+      <div class="choices two basepick">
+        <button class="choice${baseName === 'pale' ? ' on' : ''}" data-ui="base" data-v="pale" aria-pressed="${baseName === 'pale'}"><i class="bprev pale"></i>地図</button>
+        <button class="choice${baseName === 'photo' ? ' on' : ''}" data-ui="base" data-v="photo" aria-pressed="${baseName === 'photo'}"><i class="bprev photo"></i>写真<small>空から見た写真</small></button>
+      </div>` : '';
+    let b = headHtml(null, '設定', 'このスマホで、あなたにだけ使われる設定です') + S_BASE + S_FEAT + `
       <div class="choices two">
         <button class="choice${det ? '' : ' on'}" data-ui="mode" data-v="simple" aria-pressed="${!det}">かんたん<small>文字の大きさだけ</small></button>
         <button class="choice${det ? ' on' : ''}" data-ui="mode" data-v="detail" aria-pressed="${det}">くわしく<small>色・文字・地図など</small></button>
@@ -5311,7 +5376,6 @@ function openUiSheet() {
         <p class="q">開いたときの画面</p>${seg('start', [['home', 'ホーム'], ['cards', '区域カード'], ['map', '地図']])}`;
       const S_MAP = `<h3 class="sub">地図</h3>
         <p class="q">家の印の大きさ</p>${seg('pin', Object.entries(PINS).map(([k, v]) => [k, v[1]]))}
-        <p class="q">はじめに表示する地図</p>${seg('base', [['pale', '地図'], ['photo', '写真']])}
         <p class="q">自分の区域を回るときの表示</p>${seg('round', [['reco', 'おすすめ順'], ['progress', '進み具合']], me().roundMode || 'reco')}`;
       b += (tab === 'map' ? [S_MAP, S_TEXT, S_COLOR, S_SCREEN, S_ICON] : tab === 'reco' || tab === 'cards' ? [S_TEXT, S_COLOR, S_SCREEN, S_ICON, S_MAP] : [S_TEXT, S_SCREEN, S_COLOR, S_ICON, S_MAP]).join('');
     }
@@ -5362,11 +5426,12 @@ function openUiSheet() {
       if (k === 'theme' && v === 'custom' && !UI.custom) UI.custom = '200,70';
       uiSave(); applyUi();
       if (k === 'base') setBase(v);
+      if (k === 'cProg' || k === 'cReco') renderAll();
       paint(k !== 'mode');
     });
     $('#uiReset').onclick = () => {
       if (!confirm('画面の見え方を、最初の状態にもどします（「使う機能」はそのままです）。よろしいですか？')) return;
-      UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fFollow: UI.fFollow }); uiSave(); applyUi(); setBase('pale'); // 使う機能はそのまま
+      UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fFollow: UI.fFollow, cProg: UI.cProg, cReco: UI.cReco }); uiSave(); applyUi(); setBase('pale'); // 使う機能・区域カードに出すものはそのまま
       toast('表示の設定を最初にもどしました');
       paint(false);
     };
@@ -6488,11 +6553,11 @@ function bindStatic() {
       if (!flushing) flush();
     }
   };
-  $('#btnLocate').onclick = () => locate(() => map.setView(myPos, 18));
+  $('#btnLocate').onclick = () => locate(() => { map.setView(myPos, Math.max(map.getZoom(), 18)); $('#btnLocate').classList.add('on'); });
+  map.on('dragstart', () => $('#btnLocate').classList.remove('on')); // 地図を動かしたら、青い（追いかけ中の）表示をやめる
   $('#zoomHint').onclick = () => { clearTimeout(zoomHintTimer); $('#zoomHint').hidden = true; };
   $('#legendBtn').onclick = () => toggleLegend();
   $('#legendClose').onclick = () => { toggleLegend(false); $('#legendBtn').focus(); };
-  $('#btnBase').onclick = () => setBase(baseName === 'pale' ? 'photo' : 'pale');
   $('#btnUi').onclick = openUiSheet;
   bindSheetSwipe();
   $('#drawUndo').onclick = drawUndo;
