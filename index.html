@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.01"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.02"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -596,6 +596,10 @@ body.strong .pin.st-plain{border-width:4px}
 .taphint{margin:0 0 8px}
 @media (max-width:374px){.tgo{width:56px}.topen{gap:8px}.topen .tname b{font-size:19px}}
 @media (hover:hover) and (pointer:fine){.topen:hover{background:var(--terr-soft)}}
+.gsec .gbadge{vertical-align:middle}
+.emptyline{margin:4px 0 10px}
+.capnote{margin:6px 0 14px}
+.hgrp{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 6px;padding:6px 10px;background:var(--terr-soft);border-radius:10px}
 .schedbox{background:#F6F8F7;border-radius:12px;padding:12px 14px;margin:4px 0 6px}
 .schedbox .rt{font-size:20px;font-weight:700}
 .btn.scdel{margin-top:22px}
@@ -787,8 +791,8 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
           <button type="button" data-ctab="follow" aria-pressed="false">再訪問<b class="cnt" id="ctabCnt" hidden>0</b></button>
         </div>
         <div id="paneMine">
-          <div id="myCards"></div>
           <div id="myHelp"></div>
+          <div id="myCards"></div>
           <div id="reqArea"></div>
           <div id="myAway"></div>
           <details class="all" id="allDetails"><summary>ほかの区域を見る</summary><div id="allCards"></div></details>
@@ -1129,7 +1133,7 @@ function makeDemo() {
   const r = rng(20260917), now = Date.now();
   const iso = ms => new Date(ms).toISOString();
   const users = [
-    { id: 'u1', name: '伝道者A', role: 'pub', group: '北' },
+    { id: 'u1', name: '伝道者A', role: 'pub', group: '北', leader: true },
     { id: 'u2', name: '伝道者B', role: 'pub', group: '北', overseer: true },
     { id: 'u3', name: '区域係C', role: 'admin', group: '南' },
     { id: 'u4', name: '伝道者D', role: 'pub', group: '北' },
@@ -1360,7 +1364,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1 }, d.settings || {});
   },
   /* 控えを作り直す（訪問記録は件数が多いので、idだけ覚える） */
   buildFp() {
@@ -2164,6 +2168,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.02', items: [
+    ['G', 'グループ監督・司会者の区域カードの画面は「グループ奉仕の区域」「個人の区域」「留守宅カード」に分かれ、それぞれ受け取れるようになりました'],
+    ['人', 'グループ奉仕の区域では「今日回る人」をえらべます。えらばれた人の画面には、その区域が今日だけ出て、記録できます']
+  ] },
   { v: '2026.10.01', items: [
     ['読', '開くときの読み込みが混み合っても、自動でやり直すようにしました。読み込めなかったときは、原因と「もう一度読み込む」ボタンが出ます']
   ] },
@@ -2493,13 +2501,18 @@ function openHelpers(tid) {
   const max = t.group ? 40 : D().settings.groupMax, cur = helpersOf(t), curIds = new Set(cur.map(h => h.uid));
   const gm = t.group ? groupMembers(t.group).filter(u => u.id !== me().id && !curIds.has(u.id)) : [];
   const room = max - cur.length;
-  const cand = D().users.filter(u => u.id !== me().id && !curIds.has(u.id)).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-  setSheet(headHtml(t, '一緒に回る人', `${fmtDay(new Date().toISOString())}の終わりまで`) + `
-    ${cur.length ? `<p class="q">今日一緒に回る人</p>` + cur.map(h => `<div class="setrow"><b>${esc(uname(h.uid))}さん</b><button class="btn small danger" data-hdel="${h.uid}">外す</button></div>`).join('') : ''}
-    ${t.group && gm.length ? `<button class="btn primary block" id="hGroup">${esc(t.group)}グループ全員（${gm.length}人）を今日だけ加える</button>` : ''}
+  const cand = D().users.filter(u => !u.inactive && u.id !== me().id && !curIds.has(u.id)).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  const row = u => `<label class="check" data-name="${esc(u.name)}"><input type="checkbox" data-hadd="${u.id}"${t.group && u.group === t.group ? ' data-ing="1"' : ''}>${esc(u.name)}</label>`;
+  const others = t.group ? cand.filter(u => u.group !== t.group) : cand;
+  setSheet(headHtml(t, t.group ? '今日回る人をえらぶ' : '一緒に回る人', `${fmtDay(new Date().toISOString())}の終わりまで`) + `
+    ${cur.length ? `<p class="q">${t.group ? '今日回る人' : '今日一緒に回る人'}（${cur.length}人）</p>` + cur.map(h => `<div class="setrow"><b>${esc(uname(h.uid))}さん</b><button class="btn small danger" data-hdel="${h.uid}">外す</button></div>`).join('') : ''}
     ${room > 0 ? `<p class="q">加える人をえらぶ</p>
       <label class="field"><span>名前でさがす</span><input type="text" id="hQ" placeholder="名前の一部を入れる" autocomplete="off"></label>
-      <div id="hList">${cand.map(u => `<label class="check" data-name="${esc(u.name)}"><input type="checkbox" data-hadd="${u.id}">${esc(u.name)}</label>`).join('') || '<p class="muted">加えられる人がいません。</p>'}</div>
+      <div id="hList">
+        ${gm.length ? `<div class="hgrp"><b>${esc(t.group)}グループ（${gm.length}人）</b><button type="button" class="btn small" id="hAllG">全員えらぶ</button></div>${gm.map(row).join('')}` : ''}
+        ${others.length ? (gm.length ? '<div class="hgrp"><b>ほかの人</b></div>' : '') + others.map(row).join('') : ''}
+        ${!cand.length ? '<p class="muted">加えられる人がいません。</p>' : ''}
+      </div>
       <p class="hint">あと${room}人まで加えられます。</p>
       <button class="btn primary block" id="hSave">えらんだ人を加える</button>`
       : `<div class="notice warn">1つの区域に加えられるのは${max}人までです。</div>`}
@@ -2511,14 +2524,17 @@ function openHelpers(tid) {
     commit(`${uname(uid)}さんを外しました`, () => { t.helpers = helpersOf(t).filter(h => h.uid !== uid); });
     openHelpers(tid);
   });
-  if ($('#hGroup')) $('#hGroup').onclick = () => {
-    const now = new Date().toISOString(), until = endOfToday();
-    commit(`${t.group}グループの${gm.length}人と、今日この区域を共有しました`, () => {
-      t.helpers = helpersOf(t).concat(gm.map(u => ({ uid: u.id, until, by: me().id, at: now })));
-    });
-    openHelpers(tid);
-  };
   if (!$('#hSave')) return;
+  if ($('#hAllG')) $('#hAllG').onclick = () => {
+    const boxes = $$('#hList input[data-ing]'), all = boxes.every(b => b.checked);
+    let n = $$('#hList input:checked').length;
+    boxes.forEach(b => {
+      if (all) { b.checked = false; return; }
+      if (!b.checked && n < room) { b.checked = true; n++; }
+    });
+    $('#hAllG').textContent = boxes.every(b => b.checked) ? 'えらぶのをやめる' : '全員えらぶ';
+    if (!all && boxes.some(b => !b.checked)) toast(`あと${room}人までです`);
+  };
   $('#hQ').oninput = e => {
     const q = e.target.value.trim();
     $$('#hList [data-name]').forEach(l => { l.hidden = !!q && !l.dataset.name.includes(q); });
@@ -2531,7 +2547,7 @@ function openHelpers(tid) {
     const ids = $$('#hList input:checked').map(x => x.dataset.hadd);
     if (!ids.length) { toast('加える人をえらんでください'); return; }
     const now = new Date().toISOString(), until = endOfToday();
-    commit(`${ids.length}人を「一緒に回る人」に加えました（今日まで）`, () => {
+    commit(`${ids.length}人を「${t.group ? '今日回る人' : '一緒に回る人'}」に加えました（今日まで）`, () => {
       t.helpers = helpersOf(t).concat(ids.map(uid => ({ uid, until, by: me().id, at: now })));
     });
     openHelpers(tid);
@@ -4282,14 +4298,14 @@ function cardHtml(t, own, helper) {
   const extra = (UI.cProg === 'on'
       ? `<div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪問の進み具合"><i style="width:${pct}%"></i></div>
       <p class="muted">${t.lentAt ? '受け取ってから' : 'この90日で'}訪問した家・部屋 ${s.visited} / ${s.n}</p>` : '') +
-    (own && hs.length ? `<p class="muted"><b>今日一緒に回る人：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : '') +
+    (own && hs.length ? `<p class="muted"><b>${t.group ? '今日回る人' : '今日一緒に回る人'}（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : '') +
     ((own || helper) && UI.cReco === 'on' ? roundHint(t) : '');
   return `<article class="tcard tc2${t.group ? ' grp' : ''}">
     ${openHead(`data-open="${t.id}"`, `区域${esc(t.no)} ${esc(t.name)}`,
       `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${t.group ? 'グループ' : '区域'}</small>${esc(t.no)}</span>`,
       esc(t.name), (t.group ? `<span class="gbadge">${esc(t.group)}グループの区域</span> ` : '') + who)}
     ${extra ? `<div class="tbody">${extra}</div>` : ''}
-    <div class="actions">${own && groupOk ? `<button class="btn" data-helpers="${t.id}">${t.group ? 'グループで共有' : '一緒に回る人'}</button>` : ''}${own ? `<button class="btn" data-return="${t.id}">返却する</button>` : ''}</div>
+    <div class="actions">${own && groupOk ? `<button class="btn${t.group ? ' primary' : ''}" data-helpers="${t.id}">${t.group ? '今日回る人をえらぶ' : '一緒に回る人'}</button>` : ''}${own ? `<button class="btn" data-return="${t.id}">返却する</button>` : ''}</div>
   </article>`;
 }
 let cardTab = 'mine';
@@ -4305,12 +4321,25 @@ function renderCards() {
   renderToday();
   const ts = D().territories.slice().sort(byNo);
   const mine = ts.filter(t => t.holder === me().id);
-  $('#myCards').innerHTML = mine.length ? '<p class="hint taphint">区域の番号か名前を押すと、地図がひらきます。</p>' + mine.map(t => cardHtml(t, true)).join('')
-    : '<div class="empty">受け取っている区域カードはありません。<br>下のボタンから申し込めます。</div>';
+  const tap = '<p class="hint taphint">区域の番号か名前を押すと、地図がひらきます。</p>';
+  if (canGroupTerr()) {
+    const gC = mine.filter(t => t.group), pC = mine.filter(t => !t.group);
+    $('#myCards').innerHTML = (mine.length ? tap : '') +
+      `<h2 class="sec gsec"><span class="gbadge">${esc(myGroup())}グループ</span> グループ奉仕の区域</h2>
+       <p class="hint">奉仕の集まりで使う区域です。「今日回る人」をえらぶと、その人たちも今日だけ記録できます。</p>` +
+      (gC.length ? gC.map(t => cardHtml(t, true)).join('') : '<p class="muted emptyline">まだありません。</p>') +
+      reqBoxesHtml(true) + addBtnHtml(true) +
+      `<h2 class="sec">個人の区域</h2>` +
+      (pC.length ? pC.map(t => cardHtml(t, true)).join('') : '<p class="muted emptyline">まだありません。</p>') +
+      reqBoxesHtml(false) + addBtnHtml(false);
+  } else {
+    $('#myCards').innerHTML = mine.length ? tap + mine.map(t => cardHtml(t, true)).join('')
+      : '<div class="empty">受け取っている区域カードはありません。<br>下のボタンから申し込めます。</div>';
+  }
   const helping = ts.filter(t => t.holder !== me().id && isHelper(t));
   const myDummy = ts.find(t => t.dummy && t.holder === me().id);
   $('#myCards').insertAdjacentHTML('afterbegin', myDummy ? `<div class="notice info"><b>検証用の区域${esc(myDummy.no)}を受け取っています。</b>おすすめや地図の出かたを確かめるための、ダミーの区域です。<span class="actions"><button class="btn small" data-dguide="${myDummy.id}">確かめ方を見る</button></span></div>` : '');
-  $('#myHelp').innerHTML = helping.length ? `<h2 class="sec">一緒に回る区域（今日まで）</h2>` + helping.map(t => cardHtml(t, false, true)).join('') : '';
+  $('#myHelp').innerHTML = helping.length ? `<h2 class="sec">今日回る区域</h2><p class="hint">今日の終わりまで、この区域の家を記録できます。</p>` + helping.map(t => cardHtml(t, false, true)).join('') : '';
   renderRequestArea();
   renderMyAwayCards();
   $('#allCards').innerHTML = $('#allDetails').open ? ts.filter(t => !myTerr(t)).map(t => cardHtml(t, false)).join('') : '';
@@ -4421,28 +4450,55 @@ const myPendings = () => D().requests.filter(r => !r.type && r.by === me().id &&
 const reqLimit = forGroup => Number(forGroup ? D().settings.reqMaxGroup : D().settings.reqMaxPersonal) || 1;
 const pendingOf = forGroup => myPendings().filter(r => !!r.forGroup === !!forGroup);
 const canAsk = forGroup => pendingOf(forGroup).length < reqLimit(forGroup);
+/* 1人が持てる区域カードの枚数（区域係が決める）。グループ奉仕の区域と個人の区域を、別々に数える。申し込み中もふくむ */
+const holdMax = g => Number(g ? D().settings.holdMaxGroup : D().settings.holdMaxPersonal) || 2;
+const heldOf = g => D().territories.filter(t => t.holder === me().id && !!t.group === !!g).length;
+const hasRoom = g => heldOf(g) + pendingOf(g).length < holdMax(g);
+const canTakeFree = g => hasRoom(g) && (g || heldOf(false) < D().settings.selfTakeMax);
 const myPending = () => myPendings()[0];
 const freeTerrs = () => D().territories.filter(t => !t.holder);
 const heldCount = uid => D().territories.filter(t => t.holder === uid).length;
 const agoLabel = iso => { const d = daysSince(iso); return d === 0 ? '今日' : `${d}日前`; };
 const byLongest = (a, b) => ((a.last || '') < (b.last || '') ? -1 : 1); // 長く回っていない順（記録なしが先）
 
+/* 「もう1枚」のボタン（上限に届いていたら、そのことを小さく出す） */
+function addBtnHtml(g) {
+  const label = g ? `＋ ${esc(myGroup())}グループの区域をもらう` : (canGroupTerr() ? '＋ 個人の区域をもらう' : '＋ 区域カードをもう1枚ほしい');
+  if (hasRoom(g) && canAsk(g)) return `<button class="btn block wideadd" data-reqopen="${g ? 'g' : 'p'}">${label}</button>`;
+  return `<p class="muted capnote">${g ? 'グループの区域' : '個人の区域'}は${holdMax(g)}枚までです（申し込み中もふくみます）。</p>`;
+}
+function reqBoxesHtml(g) {
+  const sent = LIVE ? (Store.queue.length
+    ? '<p class="tag-warn">まだ係に送れていません。電波のよい場所でこの画面を開くと、自動で送ります。</p>'
+    : '<p class="muted">係に送信ずみです。</p>') : '';
+  return myPendings().filter(p => !!p.forGroup === !!g).sort((a, b) => (a.at < b.at ? -1 : 1)).map(p => {
+    const t = p.terrId ? terrById(p.terrId) : null;
+    return `<div class="reqbox">
+      <p><b>${p.forGroup ? `${esc(p.forGroup)}グループの区域を` : '区域カードを'}申し込み中です</b></p>
+      <p class="muted">希望：${t ? `区域${t.no}` : 'どこでもよい'}　${fmtDay(p.at)}に申し込み</p>
+      <p class="muted">係が決めると、ここに加わります。</p>${sent}
+      <div class="actions"><button class="btn small" data-reqcancel="${p.id}">申し込みを取り消す</button></div></div>`;
+  }).join('');
+}
 function renderRequestArea() {
   const ps = myPendings().sort((a, b) => (a.at < b.at ? -1 : 1));
   const sent = LIVE ? (Store.queue.length
     ? '<p class="tag-warn">まだ係に送れていません。電波のよい場所でこの画面を開くと、自動で送ります。</p>'
     : '<p class="muted">係に送信ずみです。</p>') : '';
-  const boxes = ps.map(p => {
+  const boxOf = p => {
     const t = p.terrId ? terrById(p.terrId) : null;
     return `<div class="reqbox">
       <p><b>${p.forGroup ? `${esc(p.forGroup)}グループの区域を` : '区域カードを'}申し込み中です</b></p>
       <p class="muted">希望：${t ? `区域${t.no}` : 'どこでもよい'}　${fmtDay(p.at)}に申し込み</p>
       <p class="muted">係が決めると、上の区域カードの一覧に加わります。</p>${sent}
       <div class="actions"><button class="btn small" data-reqcancel="${p.id}">申し込みを取り消す</button></div></div>`;
-  }).join('');
-  // まだ申し込める枠があるときだけ「もう1枚ほしい」を出す（監督はグループ用の枠も数える）
-  const room = canAsk(false) || (isOverseer() && canAsk(true));
-  $('#reqArea').innerHTML = boxes + (room ? `<button class="btn block wideadd" data-reqopen>＋ 区域カードをもう1枚ほしい</button>` : '');
+  };
+  // グループの区域を受け取れる人は、グループ・個人それぞれの見出しの中に出す（renderCards）
+  if (canGroupTerr()) { $('#reqArea').innerHTML = ''; }
+  else {
+    const boxes = ps.filter(p => !p.forGroup).map(boxOf).join('');
+    $('#reqArea').innerHTML = boxes + addBtnHtml(false);
+  }
   const done = D().requests.filter(r => r.by === me().id && (r.status === 'approved' || r.status === 'declined') && !r.seen);
   $('#reqNotice').innerHTML = done.map(r => {
     const t = terrById(r.terrId);
@@ -4455,10 +4511,11 @@ function renderRequestArea() {
   }).join('');
 }
 
-let reqForGroup = false; // 監督が「グループ用」として申し込むとき
-function openRequestSheet() {
-  const max = D().settings.selfTakeMax, held = heldCount(me().id), canTake = held < max;
-  if (!isOverseer()) reqForGroup = false;
+let reqForGroup = false; // 監督・司会者が「グループ奉仕の区域」として申し込むとき
+function openRequestSheet(g) {
+  if (g !== undefined) reqForGroup = !!g;
+  if (!canGroupTerr()) reqForGroup = false;
+  const G = reqForGroup, canTake = canTakeFree(G);
   const list = freeTerrs().map(t => {
     return { t, last: t.completedAt, n: terrStats(t, 0).n, dist: myPos ? distM(myPos, center(t.polygon)) : null };
   });
@@ -4471,14 +4528,11 @@ function openRequestSheet() {
         ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
         : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
     </article>`).join('');
-  setSheet(headHtml(null, '区域カードをもう1枚', '') + `
-    ${isOverseer() ? `<div class="seg uiseg" role="group" aria-label="だれの区域か">
-      <button type="button" data-rg="0" aria-pressed="${!reqForGroup}">自分の区域</button>
-      <button type="button" data-rg="1" aria-pressed="${reqForGroup}">${esc(myGroup())}グループの区域</button></div>
-      <p class="hint">グループの区域は、奉仕の集まりのときに、グループ全員で共有して回れます。</p>` : ''}
-    <p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。
-      （係に頼めるのは${reqForGroup && isOverseer() ? 'グループ用' : '個人'}で${reqLimit(reqForGroup && isOverseer())}件まで・いま申し込み中 ${pendingOf(reqForGroup && isOverseer()).length}件）</p>
-    ${!canTake && list.some(x => x.t.free) ? `<div class="notice warn">自分で受け取れるのは${max}枚までです（今 ${held}枚）。係に頼むことはできます。</div>` : ''}
+  setSheet(headHtml(null, G ? `${esc(myGroup())}グループの区域をもらう` : (canGroupTerr() ? '個人の区域をもらう' : '区域カードをもう1枚'),
+      `持てるのは${holdMax(G)}枚まで（今 ${heldOf(G)}枚・申し込み中 ${pendingOf(G).length}件）`) + `
+    ${G ? '<p class="hint">グループの区域は、奉仕の集まりで使います。受け取ったら「今日回る人をえらぶ」で、回る人を決められます。</p>' : ''}
+    <p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。</p>
+    ${!canTake && list.some(x => x.t.free) ? `<div class="notice warn">この区域は自分では受け取れません（${G ? '' : `自分で受け取れるのは${D().settings.selfTakeMax}枚まで・`}上限に届いています）。係に頼むことはできます。</div>` : ''}
     <div class="row"><button class="btn small" id="reqNear">${myPos ? '現在地を更新する' : '現在地から近い順にする'}</button>
       <span class="muted">${myPos ? '近い順' : '長く回っていない順'}に並んでいます</span></div>
     ${rows || '<div class="empty">今、空いている区域はありません。</div>'}
@@ -4486,31 +4540,31 @@ function openRequestSheet() {
     <button class="btn block" data-close>もどる</button>`);
   const S = $('#sheet');
   $('#reqNear').onclick = () => locate(openRequestSheet);
-  $$('[data-rg]', S).forEach(x => x.onclick = () => { reqForGroup = x.dataset.rg === '1'; openRequestSheet(); });
   $$('[data-take]', S).forEach(x => x.onclick = () => takeTerr(x.dataset.take));
   $$('[data-ask]', S).forEach(x => x.onclick = () => askTerr(x.dataset.ask || null));
 }
 function takeTerr(id) {
   const t = terrById(id);
   if (!t || t.holder) { toast('この区域はすでに貸し出されています'); return; }
-  if (!t.free || heldCount(me().id) >= D().settings.selfTakeMax) { toast('この区域は係に頼んでください'); return; }
+  if (!t.free || !canTakeFree(reqForGroup && canGroupTerr())) { toast('この区域は係に頼んでください'); return; }
   if (!confirm(`区域${t.no}を受け取ります。よろしいですか？`)) return;
   closeSheet();
   commit(`区域${t.no}を受け取りました`, () => {
     const now = new Date().toISOString();
     t.holder = me().id; t.lentAt = now; t.selfTakenAt = now; t.selfSeen = false; t.helpers = [];
-    t.group = reqForGroup && isOverseer() ? myGroup() : null;
+    t.group = reqForGroup && canGroupTerr() ? myGroup() : null;
     D().requests = D().requests.filter(r => !(r.status === 'pending' && r.by === me().id && r.terrId === id));
   });
 }
 function askTerr(id) {
-  const g = !!(reqForGroup && isOverseer());
+  const g = !!(reqForGroup && canGroupTerr());
+  if (!hasRoom(g)) { toast(`${g ? 'グループの区域' : '個人の区域'}は${holdMax(g)}枚までです（申し込み中もふくみます）`); return; }
   if (!canAsk(g)) { toast(`${g ? 'グループ用' : '個人'}の申し込みは、${reqLimit(g)}件までです。係の返事を待ってください`); return; }
   const t = id ? terrById(id) : null;
   closeSheet();
   commit(t ? `区域${t.no}を係に申し込みました` : '区域カードを係に申し込みました', () => {
     const r = { id: 'r' + uid(), by: me().id, terrId: id || null, at: new Date().toISOString(), status: 'pending' };
-    if (reqForGroup && isOverseer()) r.forGroup = myGroup();
+    if (g) r.forGroup = myGroup();
     D().requests.push(r);
   });
 }
@@ -4591,12 +4645,22 @@ function renderInbox() {
     <div class="stepper"><button type="button" data-takemax="-1" aria-label="枚数を減らす">−</button><output class="wide">${st.selfTakeMax}枚まで</output>
     <button type="button" data-takemax="1" aria-label="枚数を増やす">＋</button></div></div>
     <div class="setrow">
+      <span>1人が持てる区域カード（個人の区域）<br><small class="hint">持っているカードと、申し込み中をあわせた数です</small></span>
+      <div class="stepper"><button type="button" data-kset="holdMaxPersonal" data-d="-1" aria-label="枚数を減らす">−</button>
+        <output class="wide">${st.holdMaxPersonal || 2}枚まで</output>
+        <button type="button" data-kset="holdMaxPersonal" data-d="1" aria-label="枚数を増やす">＋</button></div></div>
+    <div class="setrow">
+      <span>監督・司会者が持てるグループ奉仕の区域<br><small class="hint">個人の区域とは別に数えます。申し込み中もふくみます</small></span>
+      <div class="stepper"><button type="button" data-kset="holdMaxGroup" data-d="-1" aria-label="枚数を減らす">−</button>
+        <output class="wide">${st.holdMaxGroup || 2}枚まで</output>
+        <button type="button" data-kset="holdMaxGroup" data-d="1" aria-label="枚数を増やす">＋</button></div></div>
+    <div class="setrow">
       <span>1人が同時に「係に頼める」申し込み（個人の区域）<br><small class="hint">係の返事を待っている申し込みの数です</small></span>
       <div class="stepper"><button type="button" data-kset="reqMaxPersonal" data-d="-1" aria-label="件数を減らす">−</button>
         <output class="wide">${st.reqMaxPersonal}件まで</output>
         <button type="button" data-kset="reqMaxPersonal" data-d="1" aria-label="件数を増やす">＋</button></div></div>
     <div class="setrow">
-      <span>監督が同時に「係に頼める」申し込み（グループの区域）<br><small class="hint">個人の申し込みとは別に数えます</small></span>
+      <span>監督・司会者が同時に「係に頼める」申し込み（グループの区域）<br><small class="hint">個人の申し込みとは別に数えます</small></span>
       <div class="stepper"><button type="button" data-kset="reqMaxGroup" data-d="-1" aria-label="件数を減らす">−</button>
         <output class="wide">${st.reqMaxGroup}件まで</output>
         <button type="button" data-kset="reqMaxGroup" data-d="1" aria-label="件数を増やす">＋</button></div></div>
@@ -6108,6 +6172,8 @@ function exportCsv() {
    ========================================================= */
 const normGroup = g => String(g || '').normalize('NFKC').replace(/\s+/g, '').slice(0, 30);
 const isOverseer = () => !!me().overseer && !!me().group;
+/* グループ奉仕の区域を受け取れる人：グループ監督と司会者 */
+const canGroupTerr = () => !!me().group && (!!me().overseer || !!me().leader);
 const myGroup = () => me().group || '';
 const groupsAll = () => [...new Set(D().users.filter(u => !u.inactive && u.group).map(u => u.group))].sort((a, b) => a.localeCompare(b, 'ja'));
 const groupMembers = g => D().users.filter(u => !u.inactive && u.group === g);
@@ -6367,7 +6433,7 @@ function renderHome() {
   const hi = h < 5 ? 'こんばんは' : h < 10 ? 'おはようございます' : h < 17 ? 'こんにちは' : 'こんばんは';
   const todays = schedsOn(ymd(new Date()));
   $('#homeHello').innerHTML = `<div class="homehello"><p>${esc(me().name)}さん、${hi}</p><b>${fmtYmd(ymd(new Date()))}</b>
-    ${me().group ? `<span class="gbadge">${esc(me().group)}グループ${isOverseer() ? '・監督' : ''}</span>` : ''}</div>
+    ${me().group ? `<span class="gbadge">${esc(me().group)}グループ${isOverseer() ? '・監督' : me().leader ? '・司会者' : ''}</span>` : ''}</div>
     ${todays.length ? `<div class="notice info homecard"><b>今日の奉仕の集まり</b><br>${todays.map(s => schedLine(s) + `（${schedGroupName(s.group)}）`).join('<br>')}</div>` : ''}`;
   clearInterval(timerTick);
   if (!featTime()) { // 奉仕時間を使わない人には、タイマー・目標・まとめを出さない
@@ -6511,14 +6577,14 @@ function renderSchedAdmin() {
 }
 
 /* ---- 人とグループ（区域係は変更できる。監督は自分のグループの人を見るだけ） ---- */
-async function setUserGroup(u, group, overseer) {
+async function setUserGroup(u, group, overseer, leader) {
   if (LIVE) {
-    try { await api('user_set', { id: u.id, group, overseer }); } catch (e) { toast('保存できませんでした。通信を確認してください'); return; }
-    u.group = group || undefined; u.overseer = !!overseer || undefined;
+    try { await api('user_set', { id: u.id, group, overseer, leader }); } catch (e) { toast('保存できませんでした。通信を確認してください'); return; }
+    u.group = group || undefined; u.overseer = !!overseer || undefined; u.leader = !!leader || undefined;
     toast(`${u.name}さんのグループを保存しました`);
     refresh(true).catch(() => {});
   } else {
-    u.group = group || undefined; u.overseer = !!overseer || undefined; Store.save(); toast(`${u.name}さんのグループを保存しました`);
+    u.group = group || undefined; u.overseer = !!overseer || undefined; u.leader = !!leader || undefined; Store.save(); toast(`${u.name}さんのグループを保存しました`);
   }
   renderAll();
 }
@@ -6530,16 +6596,17 @@ function renderPeople() {
   const noGroup = admin ? D().users.filter(u => !u.inactive && !u.group).length : 0;
   box.innerHTML = `<h2 class="sec">${admin ? '人とグループ' : `${esc(myGroup())}グループの人`}</h2>
     ${noGroup ? `<div class="notice warn"><b>グループが決まっていない人が ${noGroup}人 います。</b>この人たちには、グループの集まりの予定は届きません（「全体」の予定だけが届きます）。</div>` : ''}
-    ${admin ? `<p class="hint">グループの名前（例：A、北）と、グループ監督かどうかを決めます。監督は、自分のグループの集まりの予定を入れたり、グループ用の区域を申し込んだり、グループ全員で区域を共有したりできます。</p>
+    ${admin ? `<p class="hint">グループの名前（例：A、北）と、グループ監督・司会者かどうかを決めます。<br>監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>
       <datalist id="groupList">${groups.map(g => `<option value="${esc(g)}">`).join('')}</datalist>` : ''}
     ${users.map(u => `<article class="trow"><span class="stamp sm" style="font-size:16px">${esc(u.group || '—')}</span>
-      <div><b>${esc(u.name)}</b>${u.role === 'admin' ? '（区域係）' : ''}${u.overseer ? ' <span class="gbadge">監督</span>' : ''}</div>
+      <div><b>${esc(u.name)}</b>${u.role === 'admin' ? '（区域係）' : ''}${u.overseer ? ' <span class="gbadge">監督</span>' : ''}${u.leader ? ' <span class="gbadge">司会者</span>' : ''}</div>
       ${admin ? `<div class="actions"><label>グループ <input type="text" list="groupList" maxlength="30" data-ugroup="${u.id}" value="${esc(u.group || '')}" style="min-height:46px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;width:120px"></label>
         <label class="check"><input type="checkbox" data-uover="${u.id}"${u.overseer ? ' checked' : ''}>監督</label>
+        <label class="check"><input type="checkbox" data-ulead="${u.id}"${u.leader ? ' checked' : ''}>司会者</label>
         <button class="btn small" data-usave="${u.id}">保存</button></div>` : ''}</article>`).join('')}`;
   if (admin) $$('[data-usave]', box).forEach(b => b.onclick = () => {
     const u = userById(b.dataset.usave); if (!u) return;
-    setUserGroup(u, normGroup($(`[data-ugroup="${u.id}"]`).value), $(`[data-uover="${u.id}"]`).checked);
+    setUserGroup(u, normGroup($(`[data-ugroup="${u.id}"]`).value), $(`[data-uover="${u.id}"]`).checked, $(`[data-ulead="${u.id}"]`).checked);
   });
 }
 
@@ -6665,7 +6732,7 @@ function bindStatic() {
     else if ((x = q('[data-fact]'))) followAction(x.dataset.fact, x.dataset.key);
     else if ((x = q('[data-pin]'))) togglePin(x.dataset.pin);
     else if ((x = q('[data-fstamp]'))) stampFollow(x.dataset.key, x.dataset.fstamp, null, renderFollowList);
-    else if (q('[data-reqopen]')) openRequestSheet();
+    else if ((x = q('[data-reqopen]'))) openRequestSheet(x.dataset.reqopen === 'g');
     else if ((x = q('[data-reqcancel]'))) {
       const id = x.dataset.reqcancel;
       if (!confirm('申し込みを取り消します。よろしいですか？')) return;
@@ -6783,8 +6850,9 @@ function bindStatic() {
       const st = D().settings, key = x.dataset.kset;
       const lim = key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 180] : key === 'groupMax' ? [1, 10]
         : key === 'syncGroupSec' ? [5, 30] : key === 'syncNormalSec' ? [10, 120]
-        : key === 'reqMaxPersonal' || key === 'reqMaxGroup' ? [1, 5] : [5, 60];
-      st[key] = Math.min(lim[1], Math.max(lim[0], st[key] + Number(x.dataset.d)));
+        : key === 'reqMaxPersonal' || key === 'reqMaxGroup' ? [1, 5]
+        : key === 'holdMaxPersonal' || key === 'holdMaxGroup' ? [1, 10] : [5, 60];
+      st[key] = Math.min(lim[1], Math.max(lim[0], (Number(st[key]) || 2) + Number(x.dataset.d)));
       Store.save(); renderAll(); toast('設定を変えました');
     }
     else if ((x = q('[data-donepct]'))) {
