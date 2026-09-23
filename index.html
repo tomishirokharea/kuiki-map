@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.02"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.05"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -596,6 +596,34 @@ body.strong .pin.st-plain{border-width:4px}
 .taphint{margin:0 0 8px}
 @media (max-width:374px){.tgo{width:56px}.topen{gap:8px}.topen .tname b{font-size:19px}}
 @media (hover:hover) and (pointer:fine){.topen:hover{background:var(--terr-soft)}}
+.pin.biz{border-radius:9px}
+.pin .kb,.pin .lk{position:absolute;left:-11px;bottom:-10px;width:23px;height:23px;border-radius:7px;display:grid;place-items:center;border:2px solid #fff;color:#fff;font-style:normal;box-shadow:0 1px 3px #0006}
+.pin .kb.k-office{background:#1565C0}
+.pin .kb.k-shop{background:#E65100}
+.pin .kb.k-biz{background:#00695C}
+.pin .kb.k-factory{background:#5D4037}
+.pin .lk{background:#5B2E8C}
+.pin .kb ~ .lk{bottom:14px}
+.pin .kb svg,.pin .lk svg{width:15px;height:15px;stroke-width:2.4}
+.pin .aptname{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:4px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#ffffffe6;border:1px solid var(--ink2);border-radius:6px;padding:0 4px;font-size:12px;font-weight:700;color:var(--ink);font-style:normal}
+.kindpick{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.kchip{min-height:72px;border-radius:12px;border:2px solid var(--line);background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;font-weight:700;color:var(--ink);padding:4px 2px}
+.kchip svg{width:24px;height:24px}
+.kchip[aria-pressed="true"]{border-color:var(--ink);background:var(--terr-soft)}
+.locrow{min-height:52px;font-size:17px;font-weight:700}
+@media (max-width:374px){.kindpick{gap:4px}.kchip{min-height:64px;font-size:12px}.kchip svg{width:20px;height:20px}}
+.legend .keyhelp{margin-top:10px}
+.legend .keyhelp summary{font-size:16px}
+.lgtitle{margin:0 0 6px;font-size:17px;line-height:1.4}
+#legendInfo .progress.big{height:14px;margin:4px 0 8px}
+#legendInfo .seg{margin:8px 0}
+#legendInfo .keys{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:15px;margin:8px 0}
+#legendInfo .keys span{display:inline-flex;align-items:center;gap:5px}
+#legendInfo .next{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0 0}
+.linecolors{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.lcbtn{min-height:52px;border-radius:10px;border:2px solid var(--line);background:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px}
+.lcbtn[aria-pressed="true"]{border-color:var(--ink);background:var(--terr-soft)}
+.lcbtn i{width:26px;height:6px;border-radius:3px}
 .gsec .gbadge{vertical-align:middle}
 .emptyline{margin:4px 0 10px}
 .capnote{margin:6px 0 14px}
@@ -720,7 +748,7 @@ img,canvas,video{max-width:100%}
 }
 
 /* =========================================================
-   使う機能（奉仕時間・再訪問）と、かんたんな見た目
+   使う機能（奉仕時間）と、かんたんな見た目
    ========================================================= */
 .featrow{background:#fff;border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px}
 .featrow p{margin:0}
@@ -802,7 +830,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
           <div id="myFollows"></div>
         </div>
         <details class="more aboutbox"><summary>記録のきまり・このスマホの操作</summary>
-          <div class="notice info">記録に残すのは「会えた・留守・拒否」だけです（「再訪問」を使う人は、年代と「また訪ねたいか」も）。住んでいる人の名前・電話番号・家族のこと・会話の内容は書かないでください。<br>再訪問の「メモ」は、あなたのスマホの中にだけ保存され、係やほかの人には送られません。</div>
+          <div class="notice info">記録に残すのは「会えた・留守・拒否」だけです。住んでいる人の名前・電話番号・家族のこと・会話の内容は書かないでください。</div>
           <div class="row" id="liveTools" hidden><button class="btn small" id="btnHome">ホーム画面に追加する方法</button><button class="btn small" id="btnLogout">この端末から消す</button>
             <span class="muted">端末を人に渡すときや、使わなくなったときに押してください。</span></div>
         </details>
@@ -820,9 +848,11 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
       <button type="button" class="zoomhint" id="zoomHint" hidden>地図を拡大すると家の印が出ます<span aria-hidden="true">×</span></button>
       <div class="cardbar" id="cardBar" hidden></div>
       <button type="button" class="locbtn" id="btnLocate" aria-label="現在地を表示"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></button>
-      <button type="button" class="helpbtn" id="legendBtn" aria-label="印の見かたを表示" aria-expanded="false" aria-controls="legend">?</button>
+      <button type="button" class="helpbtn" id="legendBtn" aria-label="この区域のようすと、印の見かた" aria-expanded="false" aria-controls="legend">?</button>
       <div class="legend" id="legend" hidden role="dialog" aria-labelledby="legendTitle">
-        <div class="legendhead"><b id="legendTitle">印の見かた</b><button type="button" class="foldbtn" id="legendClose">閉じる</button></div>
+        <div class="legendhead"><b id="legendTitle">この区域のようす</b><button type="button" class="foldbtn" id="legendClose">閉じる</button></div>
+        <div id="legendInfo"></div>
+        <details class="keyhelp" id="legendKeys"><summary>印の見かた</summary>
         <div class="legendgrid">
           <span><i class="pin st-plain"></i>まだ訪ねていない家</span>
           <span><i class="pin st-met done">会<u>✓</u></i>訪ねて、会えた家</span>
@@ -830,12 +860,14 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
           <span><i class="pin st-plain prev"><u class="b">✓</u></i>最近会えた家（青いチェック。とばしてよい）</span>
           <span><i class="pin st-dnc">拒</i>拒否（訪問しない）</span>
           <span><i class="pin apt">集<i>3</i></i>集合住宅（数字はまだの部屋）</span>
-          <span><i class="pin st-plain"><em>再</em></i>再訪問の受け持ちがある家</span>
-          <span><i class="pin st-plain"><s>1</s></i>おすすめの順番</span>
+            <span><i class="pin st-plain"><s>1</s></i>おすすめの順番</span>
           <span><i class="pin st-plain locked"></i>自分の区域以外（選べません）</span>
+          <span><i class="pin st-plain biz">${kindBadge('office')}</i>住居でない建物（会社・店舗・事務所・工場）</span>
+          <span><i class="pin apt">集${LOCK_SVG ? '<b class="lk">' + LOCK_SVG + '</b>' : ''}</i>オートロックの集合住宅</span>
         </div>
         <p class="hint">色と文字は、この区域を受け取ってからの結果です。それより前の記録は、家をタップすると見られます。</p>
         <p class="hint">行きたい場所を<b>長押し</b>すると、そこまでの道順をGoogleマップで見られます。</p>
+        </details>
       </div>
       <div class="modebar" id="addBar" hidden>
         <p><b>家を追加：</b><span id="addMsg"></span></p>
@@ -940,26 +972,8 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
         <h3 class="sub">なかなか会えない家（すべての時間帯で留守）</h3>
         <p class="hint">手紙など、別の方法を検討してください。</p>
         <div id="adHard"></div>
-        <h2 class="sec">再訪問の受け持ち</h2>
-        <div class="tiles" id="adFollowTiles"></div>
-        <h3 class="sub">知らせるまでの日数</h3>
-        <p class="hint">受け持った人が記録を付けると、日数は0から数え直します。</p>
-        <div id="adFollowSet"></div>
-        <h3 class="sub">人ごとの件数</h3>
-        <div class="scroll" id="adFollowUsers"></div>
-        <h3 class="sub">確認が必要な受け持ち</h3>
-        <p class="hint">本人に声をかけてから、延長・引き継ぎ・解除を選んでください。</p>
-        <div id="adFollowCheck"></div>
-        <h3 class="sub">取り残し（★ また訪ねたい家なのに受け持ちがない家）</h3>
-        <div id="adLeft"></div>
-        <h3 class="sub">まとめて引き継ぎ</h3>
-        <p class="hint">奉仕が難しくなった人の受け持ちを、まとめて別の人に移します。</p>
-        <div class="actions" id="adBulk"></div>
         </div>
         <div class="apane" data-apane="set" hidden>
-        <h2 class="sec">記録する項目</h2>
-        <p class="hint">会衆で記録する項目を決められます。記録しない項目は、入力画面にも出ません。</p>
-        <div id="adRecSet"></div>
         <h2 class="sec">データ</h2>
         <div id="adDataSet"></div>
         <div id="adDummy"></div>
@@ -1020,7 +1034,9 @@ const INT_LABEL = { 再訪問したい: '★ また訪ねたい', 再訪問し�
 /* 会衆で決める「記録する項目」 */
 /* 各自の「使う機能」（歯車の設定・このスマホだけ）。はじめはどちらも「使わない」 */
 const featTime = () => UI.fTime === 'on';
-const featFollow = () => UI.fFollow === 'on';
+/* 再訪問・★・引き継ぎの機能は、画面から外しました（これまでのデータはサーバーに残っています）。
+   もどす場合は、ここを () => UI.fFollow === 'on' に戻し、設定の「使う機能」に再訪問の行を足します */
+const featFollow = () => false;
 /* 年代・「また訪ねたいか」は、会衆で記録する設定で、かつ本人が「再訪問」を使うときだけ聞く */
 const recAgeOn = () => featFollow() && D().settings.recAge !== 0;
 const recIntOn = () => featFollow() && D().settings.recInterest !== 0;
@@ -1765,7 +1781,9 @@ function expandHouse(a) {
     id: a[0], terrId: a[1] || null, type: a[2] === 'a' ? 'apt' : 'house',
     lat: a[3], lng: a[4], label: a[5] || '',
     units: a[6] ? String(a[6]).split('|') : [],
-    createdAt: new Date((a[8] || 0) * 1000).toISOString(), createdBy: a[7] || ''
+    createdAt: new Date((a[8] || 0) * 1000).toISOString(), createdBy: a[7] || '',
+    kind: a[9] || undefined, lock: a[10] ? true : undefined,
+    uk: a[11] ? (() => { try { return JSON.parse(a[11]); } catch (e) { return undefined; } })() : undefined
   };
 }
 async function apiRetry(action, extra, onRetry) {
@@ -1946,7 +1964,7 @@ function logout() {
   const n = Store.queue.length;
   const q = n
     ? `まだ送っていない記録が${n}件あります。消すと送られません。それでもこの端末から消しますか？`
-    : 'この端末から、区域マップの情報と招待リンクを消します。再訪問のメモ、奉仕時間、自分の予定（このスマホだけの記録）も消えます。よろしいですか？';
+    : 'この端末から、区域マップの情報と招待リンクを消します。奉仕時間、自分の予定（このスマホだけの記録）も消えます。よろしいですか？';
   if (!confirm(q)) return;
   [TOKEN_KEY, QUEUE_KEY, OLD_CACHE_KEY, SYNC_KEY, PENDING_KEY, JOIN_KEY].forEach(lsDel);
   clearAllMemos(true);
@@ -2168,6 +2186,22 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.05', items: [
+    ['種', '家・部屋・建物に「住居・会社・店舗・事務所・工場」の種別を付けられるようにしました（はじめは住居）'],
+    ['鍵', 'アパート・マンションに「オートロック」のチェックを付けられるようにしました'],
+    ['図', '住居でない建物と、オートロックの建物は、地図のしるしで見分けられます'],
+    ['名', '設定で、集合住宅の名前を地図に出すかどうかを選べます']
+  ] },
+  { v: '2026.10.04', items: [
+    ['?', '地図の下の案内をやめ、右下の「?」を押すと、その区域の進み具合・おすすめ順・印の見かたが見られるようにしました'],
+    ['留', '留守宅カードの表示が、ほかをタップしても消えないようにしました。左上にも「留守宅カード」と出ます'],
+    ['線', '区域の線の色と太さを、自分で選べるようにしました（地図の画面で歯車をひらく）'],
+    ['⚙', '設定は「画面の見え方」が上になりました。「これまで留守だった時間帯」の案内も、出す・出さないを選べます']
+  ] },
+  { v: '2026.10.03', items: [
+    ['整', '再訪問の受け持ち・★（また訪ねたい）・引き継ぎの機能を、画面から外しました。記録は「会えた・留守・拒否」だけになります'],
+    ['係', '係の画面から「再訪問の受け持ち」「取り残し」「まとめて引き継ぎ」を外しました']
+  ] },
   { v: '2026.10.02', items: [
     ['G', 'グループ監督・司会者の区域カードの画面は「グループ奉仕の区域」「個人の区域」「留守宅カード」に分かれ、それぞれ受け取れるようになりました'],
     ['人', 'グループ奉仕の区域では「今日回る人」をえらべます。えらばれた人の画面には、その区域が今日だけ出て、記録できます']
@@ -2315,10 +2349,8 @@ function splashGreeting() {
   const hi = h < 5 ? 'こんばんは' : h < 10 ? 'おはようございます' : h < 17 ? 'こんにちは' : 'こんばんは';
   $('#spHi').textContent = `${me().name}さん、${hi}`;
   const mineT = D().territories.filter(t => t.holder === me().id).length;
-  const fol = Object.values(D().follows).filter(f => f.by === me().id).length;
   const bits = [`今は ${slotShort(slotOf(new Date()))}`];
   if (mineT) bits.push(`区域カード ${mineT}枚`);
-  if (fol) bits.push(`再訪問 ${fol}件`);
   $('#spSub').textContent = bits.join('　・　');
 }
 
@@ -2414,6 +2446,30 @@ function initMap() {
 }
 /* 地図の印：この区域の「今回」（受け取ってから）の結果だけを色で見せる。まだの家は白い丸で統一 */
 const PIN_CHAR = { plain: '', met: '会', away: '留', refused: '拒', dnc: '拒' };
+/* 家・部屋の種別（住居がふつう）。地図では住居以外にアイコンを出す */
+const SVG = (d, extra) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}${extra || ''}</svg>`;
+const KINDS = {
+  home: ['住居', SVG('<path d="M4 11.5 12 5l8 6.5"/><path d="M6 10.5V19h12v-8.5"/>')],
+  office: ['会社', SVG('<path d="M4 21V5h8v16"/><path d="M12 10h8v11"/><path d="M7 9h2M7 13h2M15 14h2M15 18h2"/>')],
+  shop: ['店舗', SVG('<path d="M5 10h14v10H5z"/><path d="M3.5 10 5 5h14l1.5 5"/><path d="M10 20v-5h4v5"/>')],
+  biz: ['事務所', SVG('<path d="M13 3H7v18h11V8z"/><path d="M13 3v5h5"/><path d="M10 13h5M10 17h5"/>')],
+  factory: ['工場', SVG('<path d="M3 21V11l5 3.5V11l5 3.5V7.5l8 5V21z"/><path d="M7 17h1M12 17h1M17 17h1"/>')],
+};
+const LOCK_SVG = SVG('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/>');
+const kindOf = h => (h && KINDS[h.kind] ? h.kind : 'home');
+const unitKind = (h, u) => { const m = h && h.uk; const v = m && m[u]; return KINDS[v] ? v : 'home'; };
+const kindName = k => (KINDS[k] ? KINDS[k][0] : '住居');
+/* 集合住宅の印：居住の部屋が1つでもあれば住居あつかい。全部お店・会社などのときだけ、そのアイコンを出す */
+function aptKind(h) {
+  if (!h.units.length) return kindOf(h);
+  const ks = h.units.map(u => unitKind(h, u));
+  if (ks.some(k => k === 'home')) return 'home';
+  const cnt = {};
+  ks.forEach(k => { cnt[k] = (cnt[k] || 0) + 1; });
+  return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || 'home';
+}
+const kindBadge = k => (k && k !== 'home' ? `<b class="kb k-${k}" title="${KINDS[k][0]}">${KINDS[k][1]}</b>` : '');
+const lockBadge = h => (h.lock ? `<b class="lk" title="オートロック">${LOCK_SVG}</b>` : '');
 function periodStart(h) {
   const t = h.terrId ? terrById(h.terrId) : null;
   return t ? (t.lentAt || t.returnedAt || t.completedAt || '') : ''; // 担当者のいない区域は、返却・回り終えた日から
@@ -2445,11 +2501,41 @@ function bindDoubleTap() {
     last = { t: now, x: e.clientX, y: e.clientY };
   }, true);
 }
+/* 種別をえらぶボタン（住居・会社・店舗・事務所・工場） */
+function kindChips(cur, attr) {
+  return `<div class="kindpick">${Object.entries(KINDS).map(([k, v]) =>
+    `<button type="button" class="kchip" data-kind="${k}"${attr || ''} aria-pressed="${(cur || 'home') === k}">${v[1]}<span>${v[0]}</span></button>`).join('')}</div>`;
+}
+/* 建物・家の種別を保存する */
+function setHouseKind(hid, kind, after) {
+  const h = houseById(hid); if (!h) return;
+  commit(`種別を「${kindName(kind)}」にしました`, () => {
+    if (kind === 'home') delete h.kind; else h.kind = kind;
+  });
+  if (after) after();
+}
+/* 部屋ごとの種別を保存する */
+function setUnitKind(hid, unit, kind, after) {
+  const h = houseById(hid); if (!h) return;
+  commit(`${unit}号室を「${kindName(kind)}」にしました`, () => {
+    const m = Object.assign({}, h.uk || {});
+    if (kind === 'home') delete m[unit]; else m[unit] = kind;
+    if (Object.keys(m).length) h.uk = m; else delete h.uk;
+  });
+  if (after) after();
+}
+function setHouseLock(hid, on, after) {
+  const h = houseById(hid); if (!h) return;
+  commit(on ? 'オートロックの建物にしました' : 'オートロックを外しました', () => {
+    if (on) h.lock = true; else delete h.lock;
+  });
+  if (after) after();
+}
 function houseIcon(h, ff, locked) {
   const since = periodStart(h), lk = locked ? ' locked' : '';
   const nb = !locked && roundNums && roundNums.has(h.id) ? `<s>${roundNums.get(h.id)}</s>` : '';
   if (h.type === 'apt') {
-    const fo = hasFollowIn(h) ? '<em>再</em>' : '';
+    const fo = ''; // 再訪問の印は出しません
     let st = null;
     if (ff && !locked) {
       const arr = targets(h).map(u => ff(K(h.id, u))).sort((a, b) => FOCUS_RANK.indexOf(a) - FOCUS_RANK.indexOf(b));
@@ -2461,12 +2547,15 @@ function houseIcon(h, ff, locked) {
     }
     const left = aptTodo(h, since);
     const rj = targets(h).some(u => D().dnc[K(h.id, u)]) ? '<b class="rj">拒</b>' : '';
-    return L.divIcon({ className: '', html: `<div class="pin apt${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
+    const ak = aptKind(h);
+    const nameTag = UI.aptName === 'on' && h.label ? `<b class="aptname">${esc(h.label)}</b>` : '';
+    return L.divIcon({ className: '', html: `<div class="pin apt${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${locked ? '' : kindBadge(ak) + lockBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
   }
-  const k = K(h.id, ''), s = pinState(k, since), fo = fol(k) && !locked ? '<em>再</em>' : '';
+  const k = K(h.id, ''), s = pinState(k, since), fo = '';
   // 選んでいないときも、今回訪ねた家（会えた・留守）は薄く＋緑のチェックにする
   const st = locked ? null : ff ? ff(k) : (s === 'met' || s === 'away') ? 'done' : (s === 'plain' && recentMet(k) ? 'prev' : null);
-  return L.divIcon({ className: '', html: `<div class="pin st-${s}${focusCls(st)}${lk}">${PIN_CHAR[s]}${fo}${doneMark(st)}${nb}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
+  const hk = kindOf(h);
+  return L.divIcon({ className: '', html: `<div class="pin st-${s}${hk !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">${PIN_CHAR[s]}${fo}${doneMark(st)}${nb}${locked ? '' : kindBadge(hk)}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
 }
 /* ---------- 一緒に回る人（グループ） ----------
    区域の担当者が、今日の終わりまで仲間を加える。データは区域の helpers に入れる：
@@ -2611,8 +2700,50 @@ function setZoomHint(need) {
 }
 function toggleLegend(open) {
   const on = open === undefined ? $('#legend').hidden : open;
+  if (on) renderLegend();
   $('#legend').hidden = !on;
   $('#legendBtn').setAttribute('aria-expanded', String(on));
+}
+/* 「?」の中身：その区域の進み具合・おすすめ順・細かい数と、印の見かた */
+function renderLegend() {
+  const box = $('#legendInfo'); if (!box) return;
+  const r = roundTerr ? roundInfo(roundTerr) : null;
+  $('#legendTitle').textContent = r ? `区域${r.t.no}のようす` : '印の見かた';
+  if (!r) { box.innerHTML = ''; $('#legendKeys').open = true; return; }
+  const n = r.c, total = n.todo + n.done + n.recent, pct = r.pct, m = roundMode();
+  const own = r.t.holder === me().id;
+  const key = (cls, mark, label) => `<span><i class="pin mini st-plain${cls}">${mark}</i>${label}</span>`;
+  const plan = roundPlan(r), first = plan[0];
+  const planUnits = plan.reduce((a, x) => a + x.units.length, 0);
+  let body = '';
+  if (!n.todo) {
+    body = `<p class="okmsg"><b>すべての家に緑のチェックがつきました。</b>区域を回り終えました。</p>`;
+  } else if (m === 'progress') {
+    body = `<p class="keys">${key('', '', `まだ ${n.todo}`)}${key(' done', '<u>✓</u>', `済み ${n.done}`)}${n.recent ? key(' prev', '<u class="b">✓</u>', `最近会えた ${n.recent}`) : ''}</p>
+      <p class="muted">緑のチェックが全部の家につくと完了です。</p>`;
+  } else {
+    body = (first
+        ? `<p class="next"><span class="numbadge">1</span> 次は <b>${stopLabel(first)}</b><br><span class="muted">${first.reasons.slice(0, 2).join('・')}</span></p>`
+        : '<p class="muted">今の時間帯のおすすめはありません。「進み具合」で残りの家を確認してください。</p>') +
+      `<p class="keys"><span><span class="numbadge sm">1</span>おすすめ ${plan.length}か所</span>${key(' later', '', `ほかの家 ${n.todo - planUnits}`)}${key(' done', '<u>✓</u>', `済み ${n.done}`)}${n.recent ? key(' prev', '<u class="b">✓</u>', `最近会えた ${n.recent}`) : ''}</p>`;
+  }
+  if (n.todo && pct >= D().settings.donePct && own) {
+    body = `<p class="okmsg"><b>ほぼ回り終えました（${pct}%）。</b>返却して完了にできます。残りの家は、次に回る人のおすすめに出ます。</p>` + body;
+  }
+  const helpers = helpersOf(r.t).length;
+  box.innerHTML = `<p class="lgtitle"><b>区域${esc(r.t.no)} ${esc(r.t.name)}</b>${own ? '' : '（一緒に回る）'}${own && helpers ? `（${helpers + 1}人で回る）` : ''}<br>
+      <span class="muted">今は${slotShort(r.cur)}　訪ねた家 <b>${n.done} / ${total}</b>（${pct}%）</span></p>
+    <div class="progress big" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${pct}%"></i></div>
+    <div class="seg" role="group" aria-label="表示の切りかえ">
+      <button data-rmode="reco" aria-pressed="${m === 'reco'}">おすすめ順</button>
+      <button data-rmode="progress" aria-pressed="${m === 'progress'}">進み具合</button>
+    </div>
+    ${body}
+    <div class="row">${first ? '<button class="btn small primary" id="lgList">おすすめの一覧</button>' : ''}${own ? '<button class="btn small" id="lgReturn">返却する</button>' : ''}${LIVE && (helpers || isHelper(r.t)) ? `<button class="btn small" id="barSync">最新にする</button><span class="muted" id="barAge"></span>` : ''}</div>`;
+  $$('[data-rmode]', box).forEach(x => x.onclick = () => { me().roundMode = x.dataset.rmode; Store.save(); renderHouses(); renderLegend(); });
+  if ($('#lgList')) $('#lgList').onclick = () => { toggleLegend(false); openPlanSheet(); };
+  if ($('#lgReturn')) $('#lgReturn').onclick = () => { toggleLegend(false); openReturnSheet(r.t.id); };
+  if ($('#barSync')) { updateSyncAge(); $('#barSync').onclick = () => { $('#barAge').textContent = '更新しています…'; (Store.queue.length ? flush() : refresh(true)).catch(() => {}).then(updateSyncAge); }; }
 }
 function renderTerrs() {
   terrLayer.clearLayers();
@@ -2622,9 +2753,9 @@ function renderTerrs() {
   for (const t of polyTerrs()) {
     const on = t.id === cur, dim = !!cur && !on; // えらんだ区域以外は薄く
     const gray = lock && !okT.has(t.id);          // 選べない区域は灰色
-    const col = gray ? '#9AA5A0' : accentColor();
+    const col = gray ? '#9AA5A0' : terrLineColor();
     const poly = L.polygon(t.polygon, {
-      color: col, weight: on ? 5 : 3, opacity: dim ? 0.3 : 1,
+      color: col, weight: terrLineWidth(on), opacity: dim ? 0.3 : 1,
       fillColor: col, fillOpacity: gray ? 0.12 : on ? 0.07 : 0.02,
       interactive: tapOk && !gray, bubblingMouseEvents: false
     }).addTo(terrLayer);
@@ -2639,12 +2770,12 @@ function renderTerrs() {
 function selectTerr(id, opts) {
   const o = opts || {}, t = id ? terrById(id) : null;
   clearTarget(); followMap = false;
+  // 留守宅カードを見ているときは、ほかをタップしても表示を消さない（同じ区域のとき・区域をえらんでいないとき）
+  const card = focusCard ? activeCards().find(x => x.id === focusCard) : null;
+  if (!card || (id && id !== card.terrId)) focusCard = null;
   curTerr = t ? id : null;
-  focusCard = null;
-  roundTerr = myTerr(t) ? id : null; // 自分の区域（一緒に回る区域も）なら「回る表示」にする
-  const sel = $('#terrJump');
-  sel.value = [...sel.options].some(x => x.value === (curTerr || '')) ? (curTerr || '') : '';
-  if (roundTerr && o.fit) barMini = true; // 区域全体が見えるように、案内は小さくしておく
+  roundTerr = !focusCard && myTerr(t) ? id : null; // 自分の区域（一緒に回る区域も）なら「回る表示」にする
+  syncTerrJump();
   renderTerrs(); renderHouses();
   if (t && o.fit) setTimeout(() => fitTerr(id), 80);
   if (t && o.toast && beginner()) toast(`区域${t.no}をえらびました`);
@@ -2719,12 +2850,26 @@ function renderHouses() {
   }
 }
 function fillTerrJump() {
-  const sel = $('#terrJump'), cur = sel.value;
+  const sel = $('#terrJump');
   const all = D().territories.slice().sort(byNo);
   const ts = isAdmin() ? all : all.filter(myTerr); // 伝道者は自分の区域カード（一緒に回る区域も）だけ
   const head = ts.length ? '区域をえらぶ' : '受け取っている区域はありません';
   sel.innerHTML = `<option value="">${head}</option>` + ts.map(t => `<option value="${t.id}">区域 ${esc(t.no)}</option>`).join('');
-  sel.value = ts.some(t => t.id === curTerr) ? curTerr : '';
+  syncTerrJump();
+}
+/* 左上のえらび欄：留守宅カードを見ているときは、そのことが分かるようにする */
+function syncTerrJump() {
+  const sel = $('#terrJump'); if (!sel) return;
+  const card = focusCard ? activeCards().find(x => x.id === focusCard) : null;
+  const old = sel.querySelector('option[value="__card"]');
+  if (old) old.remove();
+  if (card) {
+    const t = terrById(card.terrId);
+    sel.insertAdjacentHTML('afterbegin', `<option value="__card">留守宅カード　区域 ${esc(t ? t.no : '-')}</option>`);
+    sel.value = '__card';
+    return;
+  }
+  sel.value = [...sel.options].some(x => x.value === (curTerr || '')) ? (curTerr || '') : '';
 }
 /* 自分の区域・自分の受け持ち・自分の留守宅カードの家か */
 function myPlaces() {
@@ -2767,11 +2912,11 @@ function guardTerr(tid, keys, proceed) {
   setSheet(headHtml(t, 'あなたの区域カードではありません', esc(t.name)) + `
     <div class="notice warn"><b>区域${esc(t.no)}は、あなたが受け取っている区域カードではありません。</b><br>
       ${t.holder ? 'ほかの人が担当しています。' : '今は担当者がいません。'}</div>
-    <p class="q">再訪問などで訪問しましたか？</p>
-    <button class="btn primary block" id="gOk">はい。再訪問などで訪問しました</button>
+    <p class="q">この家を訪問しましたか？</p>
+    <button class="btn primary block" id="gOk">はい。訪問しました</button>
     <button class="btn block" data-close>いいえ（やめる）</button>
     <p class="hint">区域カードを回るときは、受け取っている区域だけを訪問してください。<br>
-      この区域では、画面を開き直すまで、この確認は出ません。自分が受け持っている再訪問と、自分の留守宅カードの家では出ません。</p>`);
+      この区域では、画面を開き直すまで、この確認は出ません。自分の留守宅カードの家では出ません。</p>`);
   $('#gOk').onclick = () => { terrAck.add(tid); closeSheet(); proceed(); };
 }
 function onHouseTap(id) {
@@ -2847,27 +2992,6 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (fromBuilding) b += `<button class="btn small" id="backBld">← 部屋の一覧にもどる</button>`;
     if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
 
-    // 再訪問の受け持ちの表示（伝道者には「だれが」は見せない）
-    if (f && isAdmin()) {
-      b += `<div class="notice info"><b>再訪問の受け持ち：${esc(uname(f.by))}さん</b>（最後の記録から${followIdle(f)}日）
-        <span class="actions"><label>変更 <select id="shAssign">${userOptions(f.by)}</select></label>
-        <button class="btn small" id="shRelease">解除する</button></span></div>`;
-    } else if (mine) {
-      const memo = memoOf(k);
-      b += `<div class="notice info"><b>あなたが再訪問を受け持っています。</b>記録を付けると、期限が自動で延びます。
-        ${memo ? `<p class="memoline">${esc(memo.text)}</p><p class="muted">メモの更新：${fmtDate(memo.at)}</p>` : (st.step === 'review' ? '<p class="muted">メモはまだありません。</p>' : '')}
-        <span class="actions"><button class="btn small" id="shMemo">${memo ? 'メモを直す' : 'メモを書く'}（このスマホだけ）</button><button class="btn small" id="shStop">受け持ちをやめる</button></span>
-        ${memo && st.step === 'review' ? shareButtonsHtml() : ''}</div>`;
-    } else if (other) {
-      b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。
-        ${st.override ? '' : '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>'}</div>`;
-    } else if (featFollow() && rel && !dnc) {
-      b += `<div class="notice warn"><b>引き継ぎを待っている家です。</b>再訪問を受け持てる方はお願いします。
-        <span class="actions"><button class="btn small primary" id="shTake">私が受け持つ</button></span></div>`;
-    } else if (featFollow() && lastInterest(k) && !dnc) {
-      b += `<div class="notice info">以前、また訪ねたい方（★）に会えています。
-        <span class="actions"><button class="btn small" id="shTake">私が再訪問を受け持つ</button></span></div>`;
-    }
 
     if (!blocked) {
       if (st.step === 'result') {
@@ -2890,7 +3014,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     }
 
     if (recentMet(k)) b += `<div class="notice info"><b>最近（${daysSince(sum(k).met.at)}日前）会えた家です。</b>区域を回るときは、とばしてかまいません。</div>`;
-    if (isUnmet(k)) b += `<div class="notice info">これまで留守だった時間帯：${slotList(triedSlots(k)).map(slotShort).join('、')}<br>ほかの時間帯に訪ねてみてください。</div>`;
+    if (isUnmet(k) && UI.cSlot !== 'off') b += `<div class="notice info">これまで留守だった時間帯：${slotList(triedSlots(k)).map(slotShort).join('、')}<br>ほかの時間帯に訪ねてみてください。</div>`;
     const hasDetail = featFollow() && vs.some(v => seeV(v, k) && (v.age || v.interest));
     b += `<h3 class="sub">これまでの記録${hasDetail ? ` <button class="btn small" id="shDetail">${st.detail ? 'くわしい表示を閉じる' : 'くわしく表示'}</button>` : ''}</h3>`;
     b += vs.length
@@ -2906,10 +3030,13 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (st.step === 'review' && !blocked) b += `<button class="btn primary block review-rec" id="shRecord">訪問の結果を記録する</button>`;
 
     b += navLink(h);
+    if (unit) {
+      b += `<details class="more adv"><summary>この部屋の編集</summary>
+        <p class="q">種別</p>${kindChips(unitKind(h, unit))}</details>`;
+    }
     if (!unit) {
       b += `<details class="more adv"><summary>この家の編集</summary>
-        <label class="field"><span>目印を変える</span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="${esc(h.label)}"><button class="btn small" id="fLabelSave">保存</button></span>
-        <small class="hint">住んでいる人の名前は書かないでください。</small></label>
+        <p class="q">種別</p>${kindChips(kindOf(h))}
         ${delReqOf(h.id) ? '<p class="tag-warn">この家は削除を申請中です（区域係の確認待ち）</p>'
           : `<button class="btn small danger" id="fDel">${isAdmin() ? 'この家を削除する' : 'この家の削除を申請する'}</button>`}</details>`;
     }
@@ -2954,10 +3081,9 @@ function openTarget(hid, unit, fromBuilding, review) {
       commit(`受け持ちを${uname(v)}さんに変えました`, () => startFollow(k, v));
       paint();
     };
-    on('fLabelSave', () => {
-      const v = $('#fLabel').value.trim();
-      commit('目印を変えました', () => { h.label = v; });
-      closeSheet();
+    $$('[data-kind]', S).forEach(x => x.onclick = () => {
+      if (unit) setUnitKind(hid, unit, x.dataset.kind, paint);
+      else setHouseKind(hid, x.dataset.kind, paint);
     });
     on('fDel', () => {
       if (!isAdmin()) { closeSheet(); openDelRequest(h); return; }
@@ -3318,11 +3444,16 @@ function openBuilding(hid) {
       <label class="field"><span>部屋を追加</span><span class="inline"><input type="text" id="fUnit" placeholder="例：305　（空白で区切ると複数）"><button class="btn small" id="fUnitAdd">追加</button></span></label>
       ${isAdmin() ? `<label class="field"><span>部屋を削除</span><span class="inline"><input type="text" id="fUnitDel" placeholder="例：104"><button class="btn small danger" id="fUnitDelBtn">削除</button></span>
         <small class="hint">部屋番号がまちがっていたときに使います。</small></label>` : ''}
-      <label class="field"><span>建物名・目印を変える</span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="${esc(h.label)}"><button class="btn small" id="fLabelSave">保存</button></span></label>
+      <label class="field"><span>建物名を変える</span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="${esc(h.label)}"><button class="btn small" id="fLabelSave">保存</button></span></label>
+      <label class="check locrow"><input type="checkbox" id="fLock"${h.lock ? ' checked' : ''}>オートロックの建物</label>
+      <p class="q">建物ぜんたいの種別</p>${kindChips(kindOf(h))}
+      <p class="hint">部屋ごとの種別は、部屋をタップして「この部屋の編集」で変えられます。地図では、住居の部屋が1つでもあれば、ふつうの集合住宅として出ます。</p>
       ${delReqOf(h.id) ? '<p class="tag-warn">この建物は削除を申請中です（区域係の確認待ち）</p>'
         : `<button class="btn small danger" id="fDel">${isAdmin() ? 'この建物を削除する' : 'この建物の削除を申請する'}</button>`}
     </details>`);
   $$('[data-unit]', $('#sheet')).forEach(x => x.onclick = () => openTarget(hid, x.dataset.unit, true));
+  $$('[data-kind]', $('#sheet')).forEach(x => x.onclick = () => setHouseKind(hid, x.dataset.kind, () => openBuilding(hid)));
+  if ($('#fLock')) $('#fLock').onchange = e => setHouseLock(hid, e.target.checked);
   if ($('#seqStart')) $('#seqStart').onclick = () => openAptSeq(hid);
   $('#fUnitAdd').onclick = () => {
     if (simpleBlock('部屋を追加')) return;
@@ -3495,11 +3626,12 @@ function floorUnits(rooms) {
 }
 function openAddForm(ll, tid) {
   const t = tid ? terrById(tid) : null;
-  const f = { type: 'apt', label: '', rooms: [2, 4], manual: '' };
+  const f = { type: 'apt', label: '', rooms: [2, 4], manual: '', kind: 'home', lock: false };
   if (mode === 'draw' && drawTap === 'house') f.type = 'house';
   const keep = () => {
     const l = $('#fLabel'); if (l) f.label = l.value;
     const m = $('#fManual'); if (m) f.manual = m.value;
+    const lk2 = $('#fLock'); if (lk2) f.lock = lk2.checked;
   };
   const paint = () => {
     const apt = f.type === 'apt';
@@ -3514,9 +3646,13 @@ function openAddForm(ll, tid) {
         <button class="choice${!apt ? ' on' : ''}" data-type="house" aria-pressed="${!apt}"><i class="pin st-new">家</i>一戸建て</button>
         <button class="choice${apt ? ' on' : ''}" data-type="apt" aria-pressed="${apt}"><i class="pin apt">集</i>アパート・マンション</button>
       </div>
+      ${apt ? `<label class="check locrow"><input type="checkbox" id="fLock"${f.lock ? ' checked' : ''}>オートロックの建物</label>
+      <p class="hint">あとからでも、建物の編集で変えられます。</p>` : ''}
       <label class="field"><span>${apt ? '建物名' : '目印（見た目など）'}</span>
         <input type="text" id="fLabel" maxlength="30" value="${esc(f.label)}" placeholder="${apt ? '例：〇〇ハイツ' : '例：青い門・2階建て'}">
         <small class="hint">住んでいる人の名前は書かないでください。</small></label>
+      <p class="q">${apt ? '建物ぜんたいの種別' : '種別'}</p>${kindChips(f.kind)}
+      ${apt ? '<p class="hint">部屋ごとの種別は、あとから部屋の画面で変えられます。</p>' : ''}
       ${apt ? `
       <div class="field"><span>階の数</span><div class="stepper">
         <button type="button" data-floors="-1" aria-label="階を減らす">−</button><output>${f.rooms.length}</output>
@@ -3537,6 +3673,8 @@ function openAddForm(ll, tid) {
       <button class="btn block" data-close>やめる</button>`);
     const S = $('#sheet');
     $$('[data-type]', S).forEach(x => x.onclick = () => { keep(); f.type = x.dataset.type; paint(); });
+    $$('[data-kind]', S).forEach(x => x.onclick = () => { keep(); f.kind = x.dataset.kind; paint(); });
+    if ($('#fLock')) $('#fLock').onchange = e => { f.lock = e.target.checked; };
     $$('[data-floors]', S).forEach(x => x.onclick = () => {
       keep();
       if (Number(x.dataset.floors) > 0) { if (f.rooms.length < 30) f.rooms.push(f.rooms[f.rooms.length - 1] || 1); }
@@ -3557,7 +3695,10 @@ function openAddForm(ll, tid) {
       closeSheet();
       addCount++; updateAddBar();
       commit(f.type === 'apt' ? `集合住宅を追加しました（${us.length}部屋）` : '一戸建てを追加しました', () => {
-        D().houses.push({ id: 'h' + uid(), terrId: tid, type: f.type, lat: ll.lat, lng: ll.lng, label, units: us, createdAt: new Date().toISOString(), createdBy: me().id });
+        const nh = { id: 'h' + uid(), terrId: tid, type: f.type, lat: ll.lat, lng: ll.lng, label, units: us, createdAt: new Date().toISOString(), createdBy: me().id };
+        if (f.kind !== 'home') nh.kind = f.kind;
+        if (f.type === 'apt' && f.lock) nh.lock = true;
+        D().houses.push(nh);
       });
     };
   };
@@ -4344,17 +4485,7 @@ function renderCards() {
   renderMyAwayCards();
   $('#allCards').innerHTML = $('#allDetails').open ? ts.filter(t => !myTerr(t)).map(t => cardHtml(t, false)).join('') : '';
 
-  const myF = Object.entries(D().follows)
-    .filter(([k, f]) => f.by === me().id && houseById(parseKey(k)[0]))
-    .sort((a, b) => followIdle(b[1]) - followIdle(a[1]));
-  const need = myF.filter(([, f]) => followStage(f) > 0).length;
-  $('#followAlert').innerHTML = need
-    ? `<div class="notice warn">しばらく訪問していない再訪問が <b>${need}件</b> あります。</div>` : '';
-  $('#ctabCnt').textContent = need;
-  $('#ctabCnt').hidden = !need;
-  $$('#cardTabs [data-ctab]')[1].innerHTML = `再訪問${myF.length ? ` ${myF.length}件` : ''}<b class="cnt" id="ctabCnt"${need ? '' : ' hidden'}>${need}</b>`;
-  setCardTab(cardTab);
-  renderFollowList();
+  setCardTab('mine');
 }
 /* 再訪問のピン留め（このスマホ・本人だけ） */
 const pinKey = () => 'kuiki_pins_' + me().id;
@@ -4679,7 +4810,7 @@ function renderInbox() {
         <output class="wide">${st.groupMax}人まで</output>
         <button type="button" data-kset="groupMax" data-d="1" aria-label="人数を増やす">＋</button></div></div>` : ''}
     <div class="setrow">
-      <span>地図で、自分の区域以外を選べないようにする<br><small class="hint">オンにすると、伝道者の地図では、受け取っている区域・自分の再訪問・自分の留守宅カードの家だけを選べます。ほかの区域は灰色になります（係は、いつもすべて選べます）</small></span>
+      <span>地図で、自分の区域以外を選べないようにする<br><small class="hint">オンにすると、伝道者の地図では、受け取っている区域・自分の留守宅カードの家だけを選べます。ほかの区域は灰色になります（係は、いつもすべて選べます）</small></span>
       <div class="seg" role="group" aria-label="自分の区域以外を選べないようにする">
         <button type="button" data-sset="lockOthers" data-v="1" aria-pressed="${st.lockOthers !== 0}">オン</button>
         <button type="button" data-sset="lockOthers" data-v="0" aria-pressed="${st.lockOthers === 0}">オフ</button></div></div>
@@ -4824,7 +4955,7 @@ function openAwayCard(id) {
   const c = D().awayCards.find(x => x.id === id); if (!c) return;
   focusCard = id; roundTerr = null; firstMapShow = false;
   curTerr = c.terrId;
-  $('#terrJump').value = [...$('#terrJump').options].some(o => o.value === c.terrId) ? c.terrId : '';
+  syncTerrJump();
   showView('map'); renderTerrs();
   const pts = c.keys.map(k => houseById(parseKey(k)[0])).filter(Boolean).map(h => [h.lat, h.lng]);
   setTimeout(() => {
@@ -4857,10 +4988,8 @@ function scoreTarget(k, cur) {
   let sc = 10;
   const metS = st.metSlots, awayS = st.awaySlots, m = st.met;
   if (!st.n) { sc += 15; reasons.push('はじめて訪ねる家'); }
-  const see = m && seeV(m, k);
-  if (see && INTERESTED.has(m.interest)) { sc += m.interest === '少しあり' ? 25 : 40; reasons.push('★ また訪ねたい'); }
-  else if (see && D().settings.recInterest === 0) { sc += 15; reasons.push('以前会えた家'); }
-  if (see && YOUNG.has(m.age)) { sc += 10; reasons.push('若い世代'); }
+  // 会えたことのある家は、もう一度訪ねる価値があるので少し先に（★や年代は使わなくなりました）
+  if (m && seeV(m, k)) { sc += 15; reasons.push('以前会えた家'); }
   if (hasSlot(metS, cur)) { sc += 15; reasons.push('この時間に会えたことがある'); }
   else if (hasSlot(awayS, cur)) { sc -= 30; reasons.push('この時間は留守だった'); }
   else if (st.n && !m) {
@@ -4955,7 +5084,7 @@ function openPlanSheet() {
   const r = roundTerr ? roundInfo(roundTerr) : null; if (!r) return;
   const plan = roundPlan(r);
   setSheet(headHtml(r.t, 'おすすめの回り方', `今は${slotShort(r.cur)}　まだ訪ねていない家 ${r.c.todo}`) + `
-    <p class="hint">今の時間帯・また訪ねたいか・これまでの記録から${PLAN_SIZE}か所まで選び、近い順につないでいます。訪ねると一覧から外れ、次の家が加わります。</p>
+    <p class="hint">今の時間帯とこれまでの記録から${PLAN_SIZE}か所まで選び、近い順につないでいます。訪ねると一覧から外れ、次の家が加わります。</p>
     <div class="row"><button class="btn small" id="planNear">${myPos ? '現在地を更新して並べ直す' : '現在地から並べ直す'}</button></div>
     ${plan.length ? `<ol class="plan">${plan.map((s, i) => `<li>
         <span class="numbadge">${i + 1}</span>
@@ -4972,77 +5101,24 @@ function openPlanSheet() {
     setTimeout(() => (h.type === 'apt' ? openAptSeq(h.id) : openTarget(h.id, '', false)), 250);
   });
 }
+/* 下の案内は「留守宅カード」のときだけ。区域を回るときのようすは「?」の中に入れました */
 function renderCardBar() {
   const bar = $('#cardBar');
-  const hasBar = followMap || !!focusCard || !!roundTerr;
-  $('#legendBtn').classList.toggle('hasbar', barHidden && hasBar);
-  if (barHidden && hasBar) { bar.hidden = true; return; }
-  if (followMap) {
-    const n = myFollowKeys().length;
-    $('#legendBtn').hidden = false;
-    bar.hidden = false; bar.classList.remove('mini');
-    bar.innerHTML = `<p><b>あなたの再訪問（${n}件）</b>　印を押すと、メモ・記録（会えた・留守）と道順が開きます</p>
-      <div class="row"><button class="btn small" id="fmLocate">現在地を中心に</button><button class="btn small" id="fmList">リストにもどる</button></div>`;
-    $('#fmLocate').onclick = () => locate(() => { map.setView(myPos, Math.max(map.getZoom(), 17)); });
-    $('#fmList').onclick = () => { followMap = false; setCardTab('follow'); showView('cards'); };
-    return;
-  }
   const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
-  const r = !c && roundTerr ? roundInfo(roundTerr) : null;
-  if (!c && !r) { bar.hidden = true; return; }
-  bar.hidden = false;
-  const key = (cls, mark, label) => `<span><i class="pin mini st-plain${cls}">${mark}</i>${label}</span>`;
-  const closeBtn = `<button class="btn small" id="cardBarClose">表示を戻す</button>`;
-  if (c) {
+  if (focusCard && !c) focusCard = null;
+  $('#legendBtn').classList.toggle('hasbar', !!(c && barHidden));
+  if (!c || barHidden) { bar.hidden = true; }
+  else {
     const t = terrById(c.terrId), p = cardProgress(c);
-    bar.classList.remove('mini');
-    bar.innerHTML = `<p><b>留守宅カード　区域${t ? t.no : '-'}</b>　${slotText(c.slot)}に訪ねてください</p>
+    const key = (cls, mark, label) => `<span><i class="pin mini st-plain${cls}">${mark}</i>${label}</span>`;
+    bar.hidden = false; bar.classList.remove('mini');
+    bar.innerHTML = `<p><b>留守宅カード　区域${t ? esc(t.no) : '-'}</b>　${slotText(c.slot)}に訪ねてください</p>
       <p class="keys">${key(' hl', '', `まだ訪ねていない家 ${p.total - p.done}`)}${key(' done', '<u>✓</u>', `訪ねた家 ${p.done}`)}</p>
       ${p.total && p.done === p.total ? '<p class="okmsg"><b>すべて訪ねました。</b>「区域カード」画面で「終える」を押してください。</p>' : ''}
-      <div class="row">${closeBtn}</div>`;
-  } else {
-    const n = r.c, total = n.todo + n.done + n.recent, pct = r.pct, mode = roundMode();
-    const own = r.t.holder === me().id;
-    const retBtn = own ? `<button class="btn small primary" id="barReturn">返却する</button>` : '';
-    let body = '', extra = '';
-    if (!n.todo) {
-      body = `<p class="okmsg"><b>すべての家に緑のチェックがつきました。</b>区域を回り終えました。</p>`;
-      extra = retBtn;
-    } else if (mode === 'progress') {
-      body = `<p class="keys">${key('', '', `まだ ${n.todo}`)}${key(' done', '<u>✓</u>', `済み ${n.done}`)}${n.recent ? key(' prev', '<u class="b">✓</u>', `最近会えた ${n.recent}`) : ''}</p>
-        <p class="muted">緑のチェックが全部の家につくと完了です。</p>`;
-    } else {
-      const plan = roundPlan(r), first = plan[0];
-      const planUnits = plan.reduce((a, s) => a + s.units.length, 0);
-      body = (first
-          ? `<p class="next"><span class="numbadge">1</span> 次は <b>${stopLabel(first)}</b><br><span class="muted">${first.reasons.slice(0, 2).join('・')}</span></p>`
-          : '<p class="muted">今の時間帯のおすすめはありません。「進み具合」で残りの家を確認してください。</p>') +
-        `<p class="keys"><span><span class="numbadge sm">1</span>おすすめ ${plan.length}か所</span>${key(' later', '', `ほかの家 ${n.todo - planUnits}`)}${key(' done', '<u>✓</u>', `済み ${n.done}`)}${n.recent ? key(' prev', '<u class="b">✓</u>', `最近会えた ${n.recent}`) : ''}</p>`;
-      if (first) extra = `<button class="btn small primary" id="barList">一覧を見る</button>`;
-    }
-    if (n.todo && r.pct >= D().settings.donePct && own) {
-      body = `<p class="okmsg"><b>ほぼ回り終えました（${pct}%）。</b>返却して完了にできます。残りの家は、次に回る人のおすすめに出ます。</p>` + body;
-      extra = retBtn + extra.replace(' primary', '');
-    }
-    bar.classList.toggle('mini', barMini);
-    bar.innerHTML = `<div class="barhead"><p><b>区域${esc(r.t.no)}</b>${own ? '' : '（一緒に回る）'}${own && helpersOf(r.t).length ? `（${helpersOf(r.t).length + 1}人で回る）` : ''}　今は${slotShort(r.cur)}<br>訪ねた家 <b>${n.done} / ${total}</b>（${pct}%）</p>
-        <button class="foldbtn" id="barFold" aria-expanded="${!barMini}">${barMini ? 'ひらく' : 'たたむ'}</button></div>
-      <div class="progress big" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${pct}%"></i></div>
-      <div class="fold">
-        <div class="seg" role="group" aria-label="表示の切りかえ">
-          <button data-rmode="reco" aria-pressed="${mode === 'reco'}">おすすめ順</button>
-          <button data-rmode="progress" aria-pressed="${mode === 'progress'}">進み具合</button>
-        </div>
-        ${body}
-        <div class="row">${extra}${closeBtn}${LIVE && (helpersOf(r.t).length || isHelper(r.t)) ? `<button class="btn small" id="barSync">最新にする</button><span class="muted" id="barAge"></span>` : ''}</div>
-      </div>`;
-    $('#barFold').onclick = () => { barMini = !barMini; renderCardBar(); };
-    $$('[data-rmode]', bar).forEach(x => x.onclick = () => { me().roundMode = x.dataset.rmode; Store.save(); renderHouses(); });
-    if ($('#barList')) $('#barList').onclick = openPlanSheet;
-    if ($('#barReturn')) $('#barReturn').onclick = () => openReturnSheet(r.t.id);
-    if ($('#barSync')) { updateSyncAge(); $('#barSync').onclick = () => { $('#barAge').textContent = '更新しています…'; (Store.queue.length ? flush() : refresh(true)).catch(() => {}).then(updateSyncAge); }; }
+      <div class="row"><button class="btn small" id="cardBarClose">表示を戻す</button></div>`;
+    $('#cardBarClose').onclick = () => { focusCard = null; roundTerr = null; renderTerrs(); renderHouses(); };
   }
-  $('#cardBarClose').onclick = () => { focusCard = null; roundTerr = null; followMap = false; renderHouses(); };
+  if (!$('#legend').hidden) renderLegend();
 }
 function awayCardHtml(c) {
   const t = terrById(c.terrId), p = cardProgress(c);
@@ -5315,7 +5391,7 @@ function locate(after) {
 /* ---------- 表示の設定（このスマホ・この人だけ。サーバーには送らない） ----------
    かんたん：文字の大きさだけ　くわしく：色・文字の種類・こさ・間隔・説明文・最初の画面・地図 */
 const ICONS = ['区', '家', '図', '心', '🏠', '🗺️', '📖', '🚪', '✅', '⭐', '🚶', '☀️'];
-const UI_DEFAULT = { fTime: 'off', fFollow: 'off', cProg: 'off', cReco: 'off', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
+const UI_DEFAULT = { fTime: 'off', fFollow: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', terrColor: 'theme', terrWidth: 'normal', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
 /* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
   standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
@@ -5408,6 +5484,10 @@ function uiEff() {
   return Object.assign({}, UI_DEFAULT, { size: UI.size === 'small' ? 'normal' : UI.size });
 }
 const accentColor = () => themeOf(uiEff())[1];
+/* 区域の線の色（各自の設定） */
+const TERR_COLORS = { theme: ['', 'テーマの色'], red: ['#D32F2F', '赤'], orange: ['#E65100', 'だいだい'], blue: ['#1565C0', '青'], purple: ['#6A1B9A', 'むらさき'], black: ['#263238', '黒'] };
+const terrLineColor = () => { const v = TERR_COLORS[UI.terrColor || 'theme']; return v && v[0] ? v[0] : accentColor(); };
+const terrLineWidth = on => { const w = UI.terrWidth === 'thin' ? 2 : UI.terrWidth === 'thick' ? 7 : 3; return on ? w + 2 : w; };
 /* くわしくモードでは、スライダーで決めた％（80〜160）を使う */
 const zoomOf = e => (UI.mode === 'detail' && e.pct ? e.pct / 100 : (SIZES[e.size] || SIZES.normal)[0]);
 /* ホーム画面のアイコンを、その場で作る（テーマの色＋えらんだ絵） */
@@ -5539,24 +5619,28 @@ function openUiSheet() {
     const S_FEAT = `<h3 class="sub feathead">使う機能</h3>
       <p class="hint">はじめは、区域を回って「会えた・留守」を記録するだけの、かんたんな形です。必要な機能だけ「使う」にしてください。</p>
       <div class="featrow"><p><b>奉仕時間</b><small>時間をはかる・今月の目標・カレンダーに時間を残す</small></p>${seg('fTime', [['off', '使わない'], ['on', '使う']])}</div>
-      <div class="featrow"><p><b>再訪問</b><small>会えた方の年代と「また訪ねたいか」を記録し、自分の再訪問のリストを持つ</small></p>${seg('fFollow', [['off', '使わない'], ['on', '使う']])}</div>
       <h3 class="sub">区域カードに出すもの</h3>
       <div class="featrow"><p><b>進み具合</b><small>受け取ってから訪ねた家・部屋の数と、横のバー</small></p>${seg('cProg', [['off', '出さない'], ['on', '出す']])}</div>
       <div class="featrow"><p><b>今のおすすめ</b><small>今の時間帯に訪ねるとよい家の数</small></p>${seg('cReco', [['off', '出さない'], ['on', '出す']])}</div>
-      <h3 class="sub">画面の見え方</h3>`;
+      <h3 class="sub">家の画面に出すもの</h3>
+      <div class="featrow"><p><b>これまで留守だった時間帯</b><small>「平日の朝・土日の昼に留守でした。ほかの時間帯に訪ねてみてください」の案内</small></p>${seg('cSlot', [['off', '出さない'], ['on', '出す']])}</div>`;
     // 地図の画面から開いたときは、地図の見た目（ふつうの地図／写真）をいちばん上に出す
     const S_BASE = tab === 'map' ? `<h3 class="sub feathead">地図の見た目</h3>
       <div class="choices two basepick">
         <button class="choice${baseName === 'pale' ? ' on' : ''}" data-ui="base" data-v="pale" aria-pressed="${baseName === 'pale'}"><i class="bprev pale"></i>地図</button>
         <button class="choice${baseName === 'photo' ? ' on' : ''}" data-ui="base" data-v="photo" aria-pressed="${baseName === 'photo'}"><i class="bprev photo"></i>写真<small>空から見た写真</small></button>
-      </div>` : '';
-    let b = headHtml(null, '設定', 'このスマホで、あなたにだけ使われる設定です') + S_BASE + S_FEAT + `
+      </div>
+      <p class="q">区域の線の色</p>
+      <div class="linecolors">${Object.entries(TERR_COLORS).map(([k, v]) =>
+        `<button type="button" class="lcbtn" data-ui="terrColor" data-v="${k}" aria-pressed="${(UI.terrColor || 'theme') === k}"><i style="background:${k === 'theme' ? accentColor() : v[0]}"></i>${v[1]}</button>`).join('')}</div>
+      <p class="q">区域の線の太さ</p>${seg('terrWidth', [['thin', '細い'], ['normal', 'ふつう'], ['thick', '太い']], UI.terrWidth || 'normal')}` : '';
+    let S_VIEW = `<h3 class="sub feathead">画面の見え方</h3>
       <div class="choices two">
         <button class="choice${det ? '' : ' on'}" data-ui="mode" data-v="simple" aria-pressed="${!det}">かんたん<small>文字の大きさだけ</small></button>
         <button class="choice${det ? ' on' : ''}" data-ui="mode" data-v="detail" aria-pressed="${det}">くわしく<small>色・文字・地図など</small></button>
       </div>`;
     if (!det) {
-      b += S_TEXT + `<p class="hint">「くわしく」にすると、テーマの色・文字の種類・地図の印の大きさなども、自分の好みに変えられます。</p>`;
+      S_VIEW += S_TEXT + `<p class="hint">「くわしく」にすると、テーマの色・文字の種類・地図の印の大きさなども、自分の好みに変えられます。</p>`;
     } else {
       const cm = String(UI.custom || '').match(/^(\d+),(\d+)$/), ch = cm ? +cm[1] : 200, cs = cm ? +cm[2] : 70;
       const S_COLOR = `<h3 class="sub">テーマの色</h3>
@@ -5587,9 +5671,12 @@ function openUiSheet() {
         <p class="q">開いたときの画面</p>${seg('start', [['home', 'ホーム'], ['cards', '区域カード'], ['map', '地図']])}`;
       const S_MAP = `<h3 class="sub">地図</h3>
         <p class="q">家の印の大きさ</p>${seg('pin', Object.entries(PINS).map(([k, v]) => [k, v[1]]))}
+        <p class="q">集合住宅の名前を地図に出す</p>${seg('aptName', [['off', '出さない'], ['on', '出す']])}
         <p class="q">自分の区域を回るときの表示</p>${seg('round', [['reco', 'おすすめ順'], ['progress', '進み具合']], me().roundMode || 'reco')}`;
-      b += (tab === 'map' ? [S_MAP, S_TEXT, S_COLOR, S_SCREEN, S_ICON] : tab === 'reco' || tab === 'cards' ? [S_TEXT, S_COLOR, S_SCREEN, S_ICON, S_MAP] : [S_TEXT, S_SCREEN, S_COLOR, S_ICON, S_MAP]).join('');
+      S_VIEW += (tab === 'map' ? [S_MAP, S_TEXT, S_COLOR, S_SCREEN, S_ICON] : tab === 'reco' || tab === 'cards' ? [S_TEXT, S_COLOR, S_SCREEN, S_ICON, S_MAP] : [S_TEXT, S_SCREEN, S_COLOR, S_ICON, S_MAP]).join('');
     }
+    // 「画面の見え方」をいちばん上に（地図の画面では、地図の見た目のすぐ下）
+    let b = headHtml(null, '設定', 'このスマホで、あなたにだけ使われる設定です') + S_BASE + S_VIEW + S_FEAT;
     b += `<button class="btn block" id="uiReset">見え方を最初にもどす</button><button class="btn primary block" data-close>閉じる</button>`;
     b = `<span class="grab" aria-hidden="true"></span><p class="grabhint">下にスワイプすると、設定を残して閉じます</p>` + b;
     setSheet(b);
@@ -5638,6 +5725,8 @@ function openUiSheet() {
       uiSave(); applyUi();
       if (k === 'base') setBase(v);
       if (k === 'cProg' || k === 'cReco') renderAll();
+      if (k === 'terrColor' || k === 'terrWidth') renderTerrs();
+      if (k === 'aptName' || k === 'pin') renderHouses();
       paint(k !== 'mode');
     });
     $('#uiReset').onclick = () => {
@@ -5933,14 +6022,6 @@ function renderDataSet() {
     <div class="seg" role="group" aria-label="${label}">
       <button type="button" data-sset="${key}" data-v="1" aria-pressed="${st[key] !== 0}">記録する</button>
       <button type="button" data-sset="${key}" data-v="0" aria-pressed="${st[key] === 0}">記録しない</button></div></div>`;
-  $('#adRecSet').innerHTML =
-    `<p class="hint">年代と「また訪ねたいか」は、歯車の設定で「再訪問」を使うにした人だけに聞きます。使わない人の記録は「会えた・留守・拒否」だけです。</p>` +
-    sw('recAge', '年代（若い世代／それ以外）', '「若い世代の方に会えた家」のおすすめに使います') +
-    sw('recInterest', '「また訪ねたいか（★）」', '記録しない設定にすると、会えたあとすぐに「私が再訪問します／今回は記録だけ」を聞きます。拒否は結果の画面に表示します') +
-    `<div class="setrow"><span>再訪問のメモを、Googleマップ・LINE・メモ帳などに残す機能<br><small class="hint">「使えない」にすると、メモは本人のスマホのこのアプリの中だけになります</small></span>
-      <div class="seg" role="group" aria-label="メモを外に残す機能">
-        <button type="button" data-sset="memoShare" data-v="1" aria-pressed="${st.memoShare !== 0}">使える</button>
-        <button type="button" data-sset="memoShare" data-v="0" aria-pressed="${st.memoShare === 0}">使えない</button></div></div>`;
   $('#adDataSet').innerHTML =
     row('keepMonths', '訪問記録を残す期間', 'か月', 6, 'これより古い記録は、家ごとの最後の1件を残して、毎月整理します（自動整理を設定したとき）') +
     row('cacheDays', '通信がない端末にデータを残す期間', '日', 5, 'この日数のあいだ通信できなかった端末は、保存した区域の情報を自動で消します') +
@@ -5954,7 +6035,6 @@ function renderAdmin() {
   renderInbox();
   renderDataSet();
   renderAwayAdmin();
-  renderFollowAdmin();
   const now = Date.now();
   const ts = D().territories.slice().sort(byNo);
   let targetsN = 0, met90 = 0;
@@ -6695,6 +6775,7 @@ function openTerr(id) {
   zoomHintShown = false; // 区域カードから入ったときは、案内をもう一度出す
   showView('map');
   selectTerr(id, { fit: true });
+  if (beginner()) setTimeout(() => toast('右下の「?」を押すと、この区域の進み具合やおすすめ順が見られます'), 2500);
 }
 
 /* ---------- ボタンの動き ---------- */
@@ -6751,7 +6832,10 @@ function bindStatic() {
   });
 
   // 地図
-  $('#terrJump').onchange = e => selectTerr(e.target.value || null, { fit: true });
+  $('#terrJump').onchange = e => {
+    if (e.target.value === '__card') { const c = activeCards().find(x => x.id === focusCard); if (c) openAwayCard(c.id); return; }
+    selectTerr(e.target.value || null, { fit: true });
+  };
   $('#btnAdd').onclick = () => {
     if (simpleBlock('家を追加')) return;
     addCount = 0; delCount = 0; addMode = 'quick'; setMode('add'); updateAddBar();
