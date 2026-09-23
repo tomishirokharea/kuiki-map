@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.08"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.09"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -522,12 +522,13 @@ body.strong .pin.st-plain{border-width:4px}
 .timer .muted{color:#ffffffd0;margin:10px 0 0}
 .calhead{display:flex;align-items:center;justify-content:space-between;margin:6px 0}
 .calhead b{font-size:20px}
-.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .cw{text-align:center;font-size:14px;font-weight:700;color:var(--ink2)}
 .cw.sun,.cd.sun .dn{color:#C62828}.cw.sat,.cd.sat .dn{color:#1565C0}
 .cd{min-height:58px;border-radius:10px;border:2px solid var(--line);background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:4px 0;gap:2px;font-weight:700}
 .cd.empty{border:0;background:transparent}
 .cd.today{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand)}
+
 .cd .dots{display:flex;gap:3px;min-height:9px}
 .cd small,.calkeys small{font-size:11px;color:var(--terr);font-weight:700}
 .dg,.dp{display:inline-block;width:9px;height:9px;border-radius:50%}
@@ -601,9 +602,25 @@ body.strong .pin.st-plain{border-width:4px}
 .part-label span{display:inline-block;transform:translate(-50%,-50%);background:#ffffffe6;border:2px solid var(--draw);color:var(--draw);font-weight:700;font-size:14px;border-radius:8px;padding:1px 8px;white-space:nowrap}
 .check.dimmed{opacity:.7}
 #partBar .row{gap:8px}
-.cd.hassc{border-color:var(--terr)}
-.cdsc{display:block;font-size:11px;line-height:1.25;font-weight:700;color:var(--terr);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px}
+/* カレンダー：マスの大きさをそろえる */
+.calgrid{gap:5px;grid-template-columns:repeat(7,minmax(0,1fr))}
+.cd{aspect-ratio:1/1;min-height:0;padding:3px 2px;display:grid;grid-template-rows:auto 1fr auto;align-items:center;justify-items:center;gap:0}
+.cd .dn{font-size:16px;line-height:1.1}
+.cdmid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:0}
+.cd.hassc{border-color:var(--terr);background:var(--terr-soft)}
+.cd .cdsc,.calkeys .cdsc{font-size:clamp(9px,2.6vw,11px);line-height:1.1;font-weight:700;color:var(--terr);white-space:nowrap;letter-spacing:-.2px;max-width:100%;overflow:hidden}
+.cd,.cw{min-width:0}
+.calsched li>span{min-width:0;overflow-wrap:anywhere}
+.cdsc i{font-style:normal;font-size:10px}
 .calkeys .cdsc{display:inline-block;margin-right:4px}
+.cd small{font-size:10px;line-height:1.1}
+.calsched{list-style:none;padding:0;margin:10px 0 0;border-top:2px solid var(--line)}
+.calsched li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;padding:8px 2px;border-bottom:1px solid var(--line);font-size:15px}
+.calsched b{color:var(--terr);white-space:nowrap}
+.calsched small{color:var(--ink2);font-size:13px;white-space:nowrap}
+.calnone{margin-top:10px}
+/* 取り込んだ「仮の家」 */
+.pin.prov{border-style:dashed;opacity:.9}
 .barmini{min-height:52px;border-radius:12px;border:2px solid var(--ink);background:#fff;color:var(--ink);font-weight:700;font-size:17px;padding:0 16px;display:flex;align-items:center;gap:10px}
 .modebar.folded{padding:6px;background:transparent;border:0;box-shadow:none;width:auto;left:10px;right:auto}
 .vrow{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
@@ -1463,6 +1480,15 @@ const Store = {
     checkPermGain();
     flush();
   },
+  /* 家1件だけを、すぐ送信待ちに入れる */
+  pushHouse(h, del) {
+    if (!LIVE) { this.save(); return; }
+    if (del) this.fp.houses.delete(h.id); else this.fp.houses.set(h.id, JSON.stringify(h));
+    this.queue.push({ houses: { up: del ? [] : [clone(h)], del: del ? [h.id] : [] } });
+    this.persistQueue();
+    this.saveCacheSoon();
+    flush();
+  },
   /* 記録1件だけを、すぐ送信待ちに入れる（家3万件を調べ直さないので速い） */
   pushVisit(v, del) {
     if (!LIVE) { this.save(); return; }
@@ -1821,7 +1847,7 @@ function expandHouse(a) {
     lat: a[3], lng: a[4], label: a[5] || '',
     units: a[6] ? String(a[6]).split('|') : [],
     createdAt: new Date((a[8] || 0) * 1000).toISOString(), createdBy: a[7] || '',
-    kind: a[9] || undefined, lock: a[10] ? true : undefined,
+    kind: a[9] || undefined, lock: a[10] ? true : undefined, prov: a[12] ? true : undefined,
     uk: a[11] ? (() => { try { return JSON.parse(a[11]); } catch (e) { return undefined; } })() : undefined
   };
 }
@@ -1875,8 +1901,9 @@ let flushing = false, lastRefresh = 0;
 let nextPollAt = 0, pollFail = 0;
 function pollGap() {
   const st = D().settings;
-  const base = groupActive() ? (st.syncGroupSec || 7) * 1000
-    : (currentView === 'cards' || currentView === 'map') ? (st.syncNormalSec || 20) * 1000 : 45000;
+  // 集まりの前後は、範囲の割りふりがすぐ届くように、短い間隔で取りに行く
+  const base = (groupActive() || meetingNow()) ? (st.syncGroupSec || 7) * 1000
+    : (currentView === 'cards' || currentView === 'map') ? (st.syncNormalSec || 20) * 1000 : 25000;
   return Math.min(60000, base * Math.pow(2, pollFail));
 }
 function schedulePoll() { nextPollAt = Date.now() + pollGap() * (0.85 + Math.random() * 0.3); }
@@ -1909,6 +1936,22 @@ function applyInbox() {
   updateTabs();
   renderAll();
   checkPermGain();
+  notifyNewPart();
+}
+/* 自分に範囲がわたされたら、その場で知らせる */
+let seenParts = null;
+function notifyNewPart() {
+  const now = new Set();
+  D().territories.forEach(t => { const p = myPart(t); if (p) now.add(p.id); });
+  if (seenParts === null) { seenParts = now; return; }
+  const fresh = [...now].find(id => !seenParts.has(id));
+  seenParts = now;
+  if (!fresh) return;
+  const t = D().territories.find(x => (myPart(x) || {}).id === fresh);
+  if (!t) return;
+  const p = myPart(t);
+  toast(`区域${t.no}の回る範囲がとどきました（${partMates(p).map(u => uname(u) + 'さん').join('・') || 'ひとり'}と）`);
+  if (currentView === 'cards') renderCards();
 }
 /* 送信待ちをまとめて送る（家を続けて190件追加しても、1件ずつ190回ではなく数回で送り終える）。
    あとの変更が前の変更を上書きする順番は、そのまま守る */
@@ -2187,7 +2230,8 @@ function aptLeft(h) { return h.units.filter(u => { const s = statusOf(K(h.id, u)
    ・その日の終わりまで有効。わたした人は helpers にも入るので、その区域の記録ができる
    【GAS側で必要な確認】parts を書きかえてよいのは、その区域の担当者と区域係だけ */
 const partsOf = t => ((t && Array.isArray(t.parts) ? t.parts : []).filter(p => p && Date.parse(p.until) > Date.now()));
-const myPart = t => partsOf(t).find(p => (p.uids || []).includes(me().id)) || null;
+// 同じ人が複数の範囲に入っていたときは、いちばん新しい範囲を見る
+const myPart = t => partsOf(t).filter(p => (p.uids || []).includes(me().id)).sort((a, b) => (a.at < b.at ? 1 : -1))[0] || null;
 const partMates = p => (p.uids || []).filter(u => u !== me().id);
 const partName = p => (p.uids || []).map(u => uname(u) + 'さん').join('・');
 function partHouseCount(t, p) {
@@ -2256,6 +2300,12 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.09', items: [
+    ['仮', '地図のデータから自動で入れた「仮の家」は、点線の印で出ます。記録をつけるとふつうの家になり、家がなければその場で消せます'],
+    ['範', '回る範囲がとどいたら、その場でお知らせが出るようにしました。集まりの前後は、早く届くようにしています'],
+    ['直', '同じ区域で同じ人に2回めの範囲をわたすと、前の範囲が残って反映されなかったのを直しました'],
+    ['暦', 'カレンダーのマスの大きさをそろえ、下にその月の集まりを時間と場所つきでならべました']
+  ] },
   { v: '2026.10.08', items: [
     ['早', '記録した結果が、すぐ地図の印に出るようにしました（送信はうしろで行います）'],
     ['消', '家の「これまでの記録」を左にスワイプすると、自分の記録を取り消せます'],
@@ -2635,13 +2685,13 @@ function houseIcon(h, ff, locked) {
     const rj = targets(h).some(u => D().dnc[K(h.id, u)]) ? '<b class="rj">拒</b>' : '';
     const ak = aptKind(h);
     const nameTag = UI.aptName === 'on' && h.label ? `<b class="aptname">${esc(h.label)}</b>` : '';
-    return L.divIcon({ className: '', html: `<div class="pin apt${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${locked ? '' : kindBadge(ak) + lockBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
+    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${locked ? '' : kindBadge(ak) + lockBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
   }
   const k = K(h.id, ''), s = pinState(k, since), fo = '';
   // 選んでいないときも、今回訪ねた家（会えた・留守）は薄く＋緑のチェックにする
   const st = locked ? null : ff ? ff(k) : (s === 'met' || s === 'away') ? 'done' : (s === 'plain' && recentMet(k) ? 'prev' : null);
   const hk = kindOf(h);
-  return L.divIcon({ className: '', html: `<div class="pin st-${s}${hk !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">${PIN_CHAR[s]}${fo}${doneMark(st)}${nb}${locked ? '' : kindBadge(hk)}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
+  return L.divIcon({ className: '', html: `<div class="pin st-${s}${h.prov ? ' prov' : ''}${hk !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">${PIN_CHAR[s]}${fo}${doneMark(st)}${nb}${locked ? '' : kindBadge(hk)}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
 }
 /* ---------- 一緒に回る人（グループ） ----------
    区域の担当者が、今日の終わりまで仲間を加える。データは区域の helpers に入れる：
@@ -2658,6 +2708,14 @@ function helpersOf(t) {
 }
 const isHelper = (t, uid) => helpersOf(t).some(h => h.uid === (uid || me().id));
 const myTerr = t => !!t && (t.holder === me().id || isHelper(t)); // 自分が回ってよい区域
+/* 今日の奉仕の集まりの時間が近い（30分前〜3時間後）か */
+function meetingNow() {
+  const today = ymd(new Date()), now = Date.now();
+  return schedsOn(today).some(s => {
+    const t = Date.parse(`${s.date}T${(s.time || '09:00')}:00`);
+    return isFinite(t) && now >= t - 30 * 60000 && now <= t + 3 * 3600000;
+  });
+}
 function groupActive() {
   return D().territories.some(t => (t.holder === me().id && helpersOf(t).length) || isHelper(t));
 }
@@ -3154,7 +3212,11 @@ function openPartAssign() {
     closeSheet();
     commit(`${uids.map(u => uname(u)).join('・')}さんに範囲をわたしました（今日まで）`, () => {
       const t2 = terrById(partDraw.tid);
-      t2.parts = partsOf(t2).concat([{ id: 'p' + uid(), poly, uids, by: me().id, at: now, until }]);
+      // 同じ人が前の範囲にも入っていたら、そちらからは外す（人がいなくなった範囲は消す）
+      const rest = partsOf(t2)
+        .map(x => Object.assign({}, x, { uids: (x.uids || []).filter(u => !uids.includes(u)) }))
+        .filter(x => x.uids.length);
+      t2.parts = rest.concat([{ id: 'p' + uid(), poly, uids, by: me().id, at: now, until }]);
       // 記録できるように「今日回る人」にも入れる
       const cur = helpersOf(t2), have = new Set(cur.map(h => h.uid));
       t2.helpers = cur.concat(uids.filter(u => !have.has(u)).map(u => ({ uid: u, until, by: me().id, at: now })));
@@ -3220,6 +3282,8 @@ function openTarget(hid, unit, fromBuilding, review) {
       }
     }
 
+    if (h.prov) b += `<div class="notice warn"><b>この家は、地図のデータから自動で入れた「仮の家」です。</b>ほんとうに家があるか確かめてください。記録をつけると、ふつうの家になります。
+      <span class="actions"><button class="btn small danger" id="provDrop">ここは家ではない（消す）</button></span></div>`;
     if (recentMet(k)) b += `<div class="notice info"><b>最近（${daysSince(sum(k).met.at)}日前）会えた家です。</b>区域を回るときは、とばしてかまいません。</div>`;
     if (isUnmet(k) && UI.cSlot !== 'off') b += `<div class="notice info">これまで留守だった時間帯：${slotList(triedSlots(k)).map(slotShort).join('、')}<br>ほかの時間帯に訪ねてみてください。</div>`;
     const hasDetail = featFollow() && vs.some(v => seeV(v, k) && (v.age || v.interest));
@@ -3294,6 +3358,7 @@ function openTarget(hid, unit, fromBuilding, review) {
       commit(`受け持ちを${uname(v)}さんに変えました`, () => startFollow(k, v));
       paint();
     };
+    on('provDrop', () => { if (confirm('この場所には家がない（車庫・物置・空き地など）として消します。よろしいですか？')) dropProvHouse(hid); });
     $$('[data-vdel]', S).forEach(x => x.onclick = () => {
       const v = D().visits.find(y => y.id === x.dataset.vdel);
       if (!v) return;
@@ -3321,6 +3386,7 @@ function quickVisit(hid, unit, result, extra, msg, onUndo) {
   D().visits.push(v);
   idxAddVisit(v);
   Store.pushVisit(v, false);
+  confirmProv(hid); // 仮の家は、記録がついた時点で「ある家」になる
   if (map && currentView === 'map') renderHouses();
   if (currentView === 'cards') renderCards();
   toast(msg, () => {
@@ -3331,6 +3397,30 @@ function quickVisit(hid, unit, result, extra, msg, onUndo) {
     Store.pushVisit(v, true);
     renderAll();
     toast('取り消しました');
+  });
+}
+/* 取り込んだ「仮の家」：記録をつけたら、ふつうの家にする */
+function confirmProv(hid) {
+  const h = houseById(hid);
+  if (!h || !h.prov) return;
+  delete h.prov;
+  Store.pushHouse(h, false);
+}
+/* 仮の家を、その場で消す（地図に出ているだけで、実際には家がないとき） */
+function dropProvHouse(hid) {
+  const h = houseById(hid);
+  if (!h || !h.prov) return;
+  const copy = clone(h);
+  deleteHouseData(hid);
+  Store.pushHouse(copy, true);
+  closeSheet();
+  buildIndex();
+  renderHouses();
+  toast('この家を消しました', () => {
+    D().houses.push(copy);
+    Store.pushHouse(copy, false);
+    buildIndex(); renderHouses();
+    toast('もどしました');
   });
 }
 /* 記録を消す（自分の記録だけ） */
@@ -6591,7 +6681,8 @@ function renderAdmin() {
     <div class="tile${over ? ' alert' : ''}"><b>${over}</b>4か月をこえた貸出</div>
     <div class="tile"><b>${targetsN}</b>家・部屋${outside ? `（区域外 ${outside}）` : ''}</div>
     <div class="tile"><b>${targetsN ? Math.round(met90 / targetsN * 100) : 0}%</b>この90日で会えた家・部屋</div>
-    <div class="tile"><b>${dncN}</b>拒否の家・部屋</div>`;
+    <div class="tile"><b>${dncN}</b>拒否の家・部屋</div>
+    ${D().houses.some(h => h.prov) ? `<div class="tile alert"><b>${D().houses.filter(h => h.prov).length}</b>まだ確かめていない仮の家</div>` : ''}`;
 
   // 時間帯ごとの会えた割合
   const cell = {};
@@ -7000,15 +7091,29 @@ function calHtml(o) {
     const key = ymd(new Date(y, m, d)), sc = schedsOn(key).length, ev = o.events.filter(e => e.date === key).length, mn = featTime() ? (o.log[key] || 0) : 0;
     const wd = new Date(y, m, d).getDay();
     const list = schedsOn(key);
-    const tag = list.length ? `<b class="cdsc">${esc((list[0].time || '').slice(0, 5))}${list[0].place ? ' ' + esc(list[0].place) : ''}${list.length > 1 ? ` ほか${list.length - 1}` : ''}</b>` : '';
+    const tag = list.length
+      ? `<b class="cdsc">${esc((list[0].time || '').slice(0, 5) || '集まり')}${list.length > 1 ? `<i>+${list.length - 1}</i>` : ''}</b>` : '';
     cells += `<button type="button" class="cd${key === today ? ' today' : ''}${wd === 0 ? ' sun' : wd === 6 ? ' sat' : ''}${sc ? ' hassc' : ''}" data-day="${key}" aria-label="${m + 1}月${d}日${sc ? `　集まり ${list.map(x => (x.time || '') + (x.place ? ' ' + x.place : '')).join('、')}` : ''}">
-      <span class="dn">${d}</span>${tag}<span class="dots">${ev ? '<i class="dp"></i>' : ''}</span>${mn ? `<small>${(mn / 60).toFixed(mn % 60 ? 1 : 0)}h</small>` : ''}</button>`;
+      <span class="dn">${d}</span><span class="cdmid">${tag}${ev ? '<i class="dp"></i>' : ''}</span>${mn ? `<small>${(mn / 60).toFixed(mn % 60 ? 1 : 0)}h</small>` : ''}</button>`;
   }
   return `<div class="calhead"><button type="button" class="btn small" data-cm="-1" aria-label="前の月">‹</button><b>${y}年${m + 1}月</b>
       <button type="button" class="btn small" data-cm="1" aria-label="次の月">›</button></div>
     <div class="calgrid">${WD.map((w, i) => `<span class="cw${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</span>`).join('')}${cells}</div>
-    <p class="calkeys"><span><b class="cdsc">9:30 会館</b>奉仕の集まり</span><span><i class="dp"></i>自分の予定</span>${featTime() ? '<span><small>1.5h</small> 奉仕した時間</span>' : ''}</p>`;
+    <p class="calkeys"><span><b class="cdsc">9:30</b>奉仕の集まり</span><span><i class="dp"></i>自分の予定</span>${featTime() ? '<span><small>1.5h</small> 奉仕した時間</span>' : ''}</p>
+    ${monthSchedHtml(y, m)}`;
 }
+/* その月の集まりを、時間と場所つきで下にならべる（タップしなくても分かるように） */
+function monthSchedHtml(y, m) {
+  const pre = `${y}-${pad2(m + 1)}`;
+  const list = D().schedules.filter(s => String(s.date).startsWith(pre) && (!s.group || s.group === myGroup() || isAdmin()))
+    .sort((a, b) => (a.date + (a.time || '')) < (b.date + (b.time || '')) ? -1 : 1);
+  if (!list.length) return '<p class="muted calnone">この月の奉仕の集まりは、まだ入っていません。</p>';
+  return `<ul class="calsched">${list.map(s => {
+    const d = new Date(s.date + 'T00:00:00');
+    return `<li><b>${d.getDate()}日（${WD[d.getDay()]}）</b><span>${esc(schedLine(s))}</span><small>${esc(schedGroupName(s.group))}</small></li>`;
+  }).join('')}</ul>`;
+}
+const pad2 = n => String(n).padStart(2, '0');
 function schedListHtml() {
   const today = ymd(new Date()), until = new Date(); until.setDate(until.getDate() + 60);
   const list = D().schedules.filter(s => s.date >= today && s.date <= ymd(until) && (!s.group || s.group === myGroup() || isAdmin()))
@@ -7732,7 +7837,7 @@ async function init() {
         refresh(true).then(() => { pollFail = 0; }).catch(() => { pollFail = Math.min(3, pollFail + 1); }).then(schedulePoll);
       }
     };
-    setInterval(again, 3000);
+    setInterval(again, 1500);
     window.addEventListener('online', flush);
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) { if (Store.queue.length && !flushing) flush(); return; }
