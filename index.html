@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.06"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.08"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -547,8 +547,10 @@ body.strong .pin.st-plain{border-width:4px}
 
 /* ===== 左にスワイプして編集・削除 ===== */
 .swipe{position:relative;overflow:hidden;border-radius:12px;margin-bottom:10px}
-.swipe>.ritem{margin-bottom:0;position:relative;z-index:1;transition:transform .2s ease;touch-action:pan-y}
-.swipe.open>.ritem{transform:translateX(-176px)}
+.swipe>.ritem,.swipe>.vrow{margin-bottom:0;position:relative;z-index:1;transition:transform .2s ease;touch-action:pan-y;background:#fff}
+.swipe.open>.ritem,.swipe.open>.vrow{transform:translateX(-176px)}
+.history .swipe{margin-bottom:6px}
+.history .vrow{padding:8px 10px;border-bottom:1px solid var(--line);font-size:16px;display:flex;gap:10px;align-items:center}
 .swipe-acts{position:absolute;top:0;right:0;bottom:0;display:flex;z-index:0}
 .swipe-acts button{width:88px;border:0;font-weight:700;font-size:17px;color:#fff;background:var(--brand)}
 .swipe-acts .del{background:var(--danger)}
@@ -596,6 +598,15 @@ body.strong .pin.st-plain{border-width:4px}
 .taphint{margin:0 0 8px}
 @media (max-width:374px){.tgo{width:56px}.topen{gap:8px}.topen .tname b{font-size:19px}}
 @media (hover:hover) and (pointer:fine){.topen:hover{background:var(--terr-soft)}}
+.part-label span{display:inline-block;transform:translate(-50%,-50%);background:#ffffffe6;border:2px solid var(--draw);color:var(--draw);font-weight:700;font-size:14px;border-radius:8px;padding:1px 8px;white-space:nowrap}
+.check.dimmed{opacity:.7}
+#partBar .row{gap:8px}
+.cd.hassc{border-color:var(--terr)}
+.cdsc{display:block;font-size:11px;line-height:1.25;font-weight:700;color:var(--terr);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px}
+.calkeys .cdsc{display:inline-block;margin-right:4px}
+.barmini{min-height:52px;border-radius:12px;border:2px solid var(--ink);background:#fff;color:var(--ink);font-weight:700;font-size:17px;padding:0 16px;display:flex;align-items:center;gap:10px}
+.modebar.folded{padding:6px;background:transparent;border:0;box-shadow:none;width:auto;left:10px;right:auto}
+.vrow{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
 .qrbox{display:flex;justify-content:center;padding:12px;background:#fff;border:2px solid var(--line);border-radius:12px}
 .qrbox canvas{width:100%;max-width:340px;height:auto;image-rendering:pixelated}
 .qrnote{margin-top:10px}
@@ -874,13 +885,28 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
         </details>
       </div>
       <div class="modebar" id="addBar" hidden>
-        <p><b>家を追加：</b><span id="addMsg"></span></p>
-        <div class="seg" role="group" aria-label="追加のしかた">
-          <button data-addmode="quick">一戸建てをすぐ追加</button>
-          <button data-addmode="form">入力して追加（アパートなど）</button>
-          <button data-addmode="del" class="adv danger">家を消す</button>
+        <button type="button" class="barmini" id="addMini" hidden aria-label="家を追加のメニューを出す">家を追加 ▾<span class="muted" id="addMiniCount"></span></button>
+        <div id="addFull">
+          <p><b>家を追加：</b><span id="addMsg"></span></p>
+          <div class="seg" role="group" aria-label="追加のしかた">
+            <button data-addmode="quick">一戸建てをすぐ追加</button>
+            <button data-addmode="form">入力して追加（アパートなど）</button>
+            <button data-addmode="del" class="adv danger">家を消す</button>
+          </div>
+          <div class="row"><button class="btn primary" id="addCancel">追加を終わる</button>
+            <button class="btn" id="addBase">写真にする</button>
+            <button class="btn" id="addFold">小さくする</button>
+            <span class="muted" id="addCount"></span></div>
         </div>
-        <div class="row"><button class="btn primary" id="addCancel">追加を終わる</button><span class="muted" id="addCount"></span></div>
+      </div>
+      <div class="modebar" id="partBar" hidden>
+        <p><b>回る範囲を分ける：</b><span id="partMsg">地図をタップして、範囲を囲みます</span></p>
+        <div class="row">
+          <button class="btn small" id="partUndo">1つ戻す</button>
+          <button class="btn small primary" id="partDone">この範囲をわたす</button>
+          <button class="btn small" id="partCancel">終わる</button>
+        </div>
+        <p class="muted" id="partList"></p>
       </div>
       <div class="modebar" id="drawBar" hidden>
         <div class="barhead"><p><b id="drawTitle">区域の線を引く</b>　角 <span id="drawCount">0</span>か所<span id="drawAddCount"></span></p>
@@ -1384,7 +1410,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1 }, d.settings || {});
   },
   /* 控えを作り直す（訪問記録は件数が多いので、idだけ覚える） */
   buildFp() {
@@ -1435,6 +1461,15 @@ const Store = {
     this.persistQueue();
     this.saveCacheSoon();
     checkPermGain();
+    flush();
+  },
+  /* 記録1件だけを、すぐ送信待ちに入れる（家3万件を調べ直さないので速い） */
+  pushVisit(v, del) {
+    if (!LIVE) { this.save(); return; }
+    if (del) this.fp.visits.delete(v.id); else this.fp.visits.set(v.id, 1);
+    this.queue.push({ visits: { up: del ? [] : [clone(v)], del: del ? [v.id] : [] } });
+    this.persistQueue();
+    this.saveCacheSoon();
     flush();
   },
   persistQueue() {
@@ -2076,24 +2111,42 @@ function buildIndex() {
     if (!IDX.has(k)) IDX.set(k, []);
     IDX.get(k).push(v);
   }
-  for (const [k, a] of IDX) {
-    a.sort((x, y) => (x.at < y.at ? 1 : -1)); // 新しい順
-    const s = { n: a.length, last: a[0], met: null, awayN: 0, slots: 0, metSlots: 0, awaySlots: 0, unmet: true, bestSlot: null };
-    let cnt = null;
-    for (let i = 0; i < a.length; i++) {
-      const v = a[i], sl = slotOfVisit(v), bit = SLOT_BIT[sl]; // 時間帯は記録ごとに1回だけ計算して覚えておく
-      s.slots |= bit;
-      if (v.result === 'met') {
-        if (!s.met) s.met = v;
-        s.unmet = false; s.metSlots |= bit;
-        cnt = cnt || {};
-        cnt[sl] = (cnt[sl] || 0) + 1;
-        if (!s.bestSlot || cnt[sl] > cnt[s.bestSlot]) s.bestSlot = sl;
-      } else if (v.result === 'away') { s.awayN++; s.awaySlots |= bit; }
-      else s.unmet = false;
-    }
-    SUM.set(k, s);
+  for (const k of IDX.keys()) sumKey(k);
+}
+/* その家（部屋）だけ、まとめを作り直す */
+function sumKey(k) {
+  const a = IDX.get(k);
+  if (!a || !a.length) { SUM.delete(k); IDX.delete(k); return; }
+  a.sort((x, y) => (x.at < y.at ? 1 : -1)); // 新しい順
+  const s = { n: a.length, last: a[0], met: null, awayN: 0, slots: 0, metSlots: 0, awaySlots: 0, unmet: true, bestSlot: null };
+  let cnt = null;
+  for (let i = 0; i < a.length; i++) {
+    const v = a[i], sl = slotOfVisit(v), bit = SLOT_BIT[sl]; // 時間帯は記録ごとに1回だけ計算して覚えておく
+    s.slots |= bit;
+    if (v.result === 'met') {
+      if (!s.met) s.met = v;
+      s.unmet = false; s.metSlots |= bit;
+      cnt = cnt || {};
+      cnt[sl] = (cnt[sl] || 0) + 1;
+      if (!s.bestSlot || cnt[sl] > cnt[s.bestSlot]) s.bestSlot = sl;
+    } else if (v.result === 'away') { s.awayN++; s.awaySlots |= bit; }
+    else s.unmet = false;
   }
+  SUM.set(k, s);
+}
+/* 1件の記録だけを足す・消す（全部を数え直さないので、続けて記録しても待たされない） */
+function idxAddVisit(v) {
+  const k = K(v.houseId, v.unit);
+  if (!IDX.has(k)) IDX.set(k, []);
+  IDX.get(k).push(v);
+  sumKey(k);
+}
+function idxDelVisit(v) {
+  const k = K(v.houseId, v.unit), a = IDX.get(k);
+  if (!a) return;
+  const i = a.findIndex(x => x.id === v.id);
+  if (i >= 0) a.splice(i, 1);
+  sumKey(k);
 }
 const visitsOf = k => IDX.get(k) || [];
 const housesOf = tid => HBT.get(tid) || [];
@@ -2129,6 +2182,19 @@ const bestSlot = k => sum(k).bestSlot;
 const hasFollowIn = h => targets(h).some(u => fol(K(h.id, u)));
 function aptLeft(h) { return h.units.filter(u => { const s = statusOf(K(h.id, u)); return s === 'new' || s === 'away'; }).length; }
 
+/* ---------- 集まりの分担（グループ奉仕で、区域の一部を2人1組にわたす） ----------
+   データは区域の parts に入れる：parts: [{ id, poly:[[lat,lng]...], uids:[...], by, at, until }]
+   ・その日の終わりまで有効。わたした人は helpers にも入るので、その区域の記録ができる
+   【GAS側で必要な確認】parts を書きかえてよいのは、その区域の担当者と区域係だけ */
+const partsOf = t => ((t && Array.isArray(t.parts) ? t.parts : []).filter(p => p && Date.parse(p.until) > Date.now()));
+const myPart = t => partsOf(t).find(p => (p.uids || []).includes(me().id)) || null;
+const partMates = p => (p.uids || []).filter(u => u !== me().id);
+const partName = p => (p.uids || []).map(u => uname(u) + 'さん').join('・');
+function partHouseCount(t, p) {
+  let n = 0;
+  housesOf(t.id).forEach(h => { if (inPoly(h.lat, h.lng, p.poly)) n += targets(h).length; });
+  return n;
+}
 /* ---------- 区域の判定 ---------- */
 function inPoly(lat, lng, poly) {
   let c = false;
@@ -2190,6 +2256,17 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.08', items: [
+    ['早', '記録した結果が、すぐ地図の印に出るようにしました（送信はうしろで行います）'],
+    ['消', '家の「これまでの記録」を左にスワイプすると、自分の記録を取り消せます'],
+    ['暦', 'カレンダーに、集まりの時間と場所が出るようになりました。係の予定もカレンダーで見られます'],
+    ['追', '家を追加するときのメニューは、数秒で小さくなります。写真への切りかえもメニューに入れました'],
+    ['自', '返却から決めた日数がたつと、自動で「自由に受け取ってよい」区域になります（日数は係が設定）']
+  ] },
+  { v: '2026.10.07', items: [
+    ['分', 'グループ奉仕の区域を、地図で囲んで2人1組にわたせるようになりました（「回る範囲を分ける」）'],
+    ['範', 'わたされた人の地図には、その範囲が緑の線で出て、範囲の中の家だけが目立ちます（今日の終わりまで）']
+  ] },
   { v: '2026.10.06', items: [
     ['人', '係の画面「人・グループ」から、人の追加・役割の変更・使うのをやめる、ができるようになりました'],
     ['QR', '共通リンクと、一人ひとりの招待リンクを、QRコードで見せられるようにしました（集まりでその場で登録できます）']
@@ -2439,6 +2516,7 @@ function initMap() {
   map.on('click', e => {
     if (mode === 'draw') { if (drawTap === 'line') drawClick(e.latlng); else addAt(e.latlng, true); }
     else if (mode === 'add') addAt(e.latlng, false);
+    else if (mode === 'part') partTap(e.latlng);
   });
   map.on('moveend', renderHouses);
   // 長押し（パソコンは右クリック）した場所への道順を、Googleマップで開けるようにする
@@ -2739,6 +2817,7 @@ function renderLegend() {
     body = `<p class="okmsg"><b>ほぼ回り終えました（${pct}%）。</b>返却して完了にできます。残りの家は、次に回る人のおすすめに出ます。</p>` + body;
   }
   const helpers = helpersOf(r.t).length;
+  const mp2 = myPart(r.t), ps2 = partsOf(r.t);
   box.innerHTML = `<p class="lgtitle"><b>区域${esc(r.t.no)} ${esc(r.t.name)}</b>${own ? '' : '（一緒に回る）'}${own && helpers ? `（${helpers + 1}人で回る）` : ''}<br>
       <span class="muted">今は${slotShort(r.cur)}　訪ねた家 <b>${n.done} / ${total}</b>（${pct}%）</span></p>
     <div class="progress big" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${pct}%"></i></div>
@@ -2746,9 +2825,13 @@ function renderLegend() {
       <button data-rmode="reco" aria-pressed="${m === 'reco'}">おすすめ順</button>
       <button data-rmode="progress" aria-pressed="${m === 'progress'}">進み具合</button>
     </div>
+    ${mp2 ? `<p class="okmsg"><b>今日のあなたの範囲</b>　${esc(partMates(mp2).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と回ります（緑の線の中）</p>
+      <div class="row"><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=${center(mp2.poly)[0].toFixed(6)},${center(mp2.poly)[1].toFixed(6)}" target="_blank" rel="noopener">Googleマップでこの範囲へ</a></div>` : ''}
+    ${own && ps2.length ? `<p class="muted">今日わたした範囲：${ps2.map(p => esc(partName(p))).join(' ／ ')}</p>` : ''}
     ${body}
-    <div class="row">${first ? '<button class="btn small primary" id="lgList">おすすめの一覧</button>' : ''}${own ? '<button class="btn small" id="lgReturn">返却する</button>' : ''}${LIVE && (helpers || isHelper(r.t)) ? `<button class="btn small" id="barSync">最新にする</button><span class="muted" id="barAge"></span>` : ''}</div>`;
+    <div class="row">${own && r.t.group ? '<button class="btn small" id="lgParts">回る範囲を分ける</button>' : ''}${first ? '<button class="btn small primary" id="lgList">おすすめの一覧</button>' : ''}${own ? '<button class="btn small" id="lgReturn">返却する</button>' : ''}${LIVE && (helpers || isHelper(r.t)) ? `<button class="btn small" id="barSync">最新にする</button><span class="muted" id="barAge"></span>` : ''}</div>`;
   $$('[data-rmode]', box).forEach(x => x.onclick = () => { me().roundMode = x.dataset.rmode; Store.save(); renderHouses(); renderLegend(); });
+  if ($('#lgParts')) $('#lgParts').onclick = () => { toggleLegend(false); openPartList(r.t.id); };
   if ($('#lgList')) $('#lgList').onclick = () => { toggleLegend(false); openPlanSheet(); };
   if ($('#lgReturn')) $('#lgReturn').onclick = () => { toggleLegend(false); openReturnSheet(r.t.id); };
   if ($('#barSync')) { updateSyncAge(); $('#barSync').onclick = () => { $('#barAge').textContent = '更新しています…'; (Store.queue.length ? flush() : refresh(true)).catch(() => {}).then(updateSyncAge); }; }
@@ -2772,6 +2855,16 @@ function renderTerrs() {
       icon: L.divIcon({ className: `terr-label${dim ? ' faint' : ''}${gray ? ' gray' : ''}${t.group && !gray ? ' grp' : ''}`, html: `<span>${t.group ? 'G ' : ''}${esc(t.no)}</span>`, iconSize: [0, 0] }),
       interactive: false, keyboard: false
     }).addTo(terrLayer);
+    // 今日わたした範囲（担当者には全部、わたされた人には自分の範囲だけ）
+    const mp = myPart(t), hold = t.holder === me().id;
+    partsOf(t).forEach(p => {
+      if (!hold && (!mp || p.id !== mp.id)) return;
+      if (!okPoly(p.poly)) return;
+      const own = mp && p.id === mp.id;
+      L.polygon(p.poly, { color: own ? '#00796B' : '#C2410C', weight: 4, dashArray: own ? null : '8 6',
+        fillColor: own ? '#00796B' : '#C2410C', fillOpacity: own ? 0.08 : 0.05, interactive: false }).addTo(terrLayer);
+      L.marker(center(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false }).addTo(terrLayer);
+    });
   }
 }
 /* 区域をえらぶ（地図のタップ・プルダウン・区域カードから共通で使う） */
@@ -2964,6 +3057,8 @@ function setMode(m) {
   mode = m;
   if (m !== 'normal') clearTarget();
   $('#addBar').hidden = m !== 'add';
+  if (m === 'add') setAddFold(false); else clearTimeout(addFoldTimer);
+  $('#partBar').hidden = m !== 'part';
   $('#drawBar').hidden = m !== 'draw';
   $('#mapTools').hidden = m !== 'normal';
   $('#map').classList.toggle('crosshair', m !== 'normal');
@@ -2983,6 +3078,110 @@ function setMode(m) {
   }
 }
 
+/* ---------- 回る範囲を分ける（司会者・監督＝その区域の担当者） ---------- */
+let partDraw = null, partLayer = null;
+function startPartSplit(tid) {
+  const t = terrById(tid);
+  if (!t || t.holder !== me().id) { toast('この区域の担当者だけが分けられます'); return; }
+  showView('map');
+  selectTerr(tid, { fit: true });
+  partDraw = { tid, pts: [] };
+  setMode('part');
+  renderPartDraw();
+  toast('地図をタップして、わたす範囲を囲んでください');
+}
+function endPartSplit() {
+  partDraw = null;
+  setMode('normal');
+  renderPartDraw();
+}
+function partTap(ll) {
+  if (!partDraw) return;
+  partDraw.pts.push([ll.lat, ll.lng]);
+  renderPartDraw();
+}
+function renderPartDraw() {
+  if (!map) return;
+  if (!partLayer) partLayer = L.layerGroup().addTo(map);
+  partLayer.clearLayers();
+  if (!partDraw) { updatePartBar(); return; }
+  const pts = partDraw.pts;
+  if (pts.length >= 2) {
+    L.polygon(pts, { color: '#C2410C', weight: 4, dashArray: '8 6', fillColor: '#C2410C', fillOpacity: 0.12, interactive: false }).addTo(partLayer);
+  }
+  pts.forEach(pt => L.circleMarker(pt, { radius: 6, color: '#C2410C', weight: 3, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(partLayer));
+  updatePartBar();
+}
+function updatePartBar() {
+  const el = $('#partMsg'); if (!el) return;
+  const n = partDraw ? partDraw.pts.length : 0;
+  el.textContent = n === 0 ? '地図をタップして、範囲を囲みます'
+    : n < 3 ? `あと${3 - n}か所タップすると、範囲になります（今 ${n}か所）`
+      : `${n}か所で囲んでいます。「この範囲をわたす」を押してください`;
+  const t = partDraw ? terrById(partDraw.tid) : null;
+  const ps = t ? partsOf(t) : [];
+  $('#partList').textContent = ps.length ? `今日わたした範囲：${ps.map(p => partName(p)).join(' ／ ')}` : '';
+}
+/* だれにわたすかをえらぶ */
+function openPartAssign() {
+  if (!partDraw || partDraw.pts.length < 3) { toast('地図を3か所以上タップして、範囲を囲んでください'); return; }
+  const t = terrById(partDraw.tid); if (!t) return;
+  const poly = partDraw.pts.slice();
+  const taken = new Set();
+  partsOf(t).forEach(p => (p.uids || []).forEach(u => taken.add(u)));
+  const gm = t.group ? groupMembers(t.group).filter(u => u.id !== me().id) : [];
+  const others = D().users.filter(u => !u.inactive && u.id !== me().id && !gm.some(g => g.id === u.id));
+  const row = u => `<label class="check${taken.has(u.id) ? ' dimmed' : ''}" data-name="${esc(u.name)}"><input type="checkbox" data-pu="${u.id}">${esc(u.name)}${taken.has(u.id) ? '<span class="muted">（ほかの範囲に入っています）</span>' : ''}</label>`;
+  const n = housesOf(t.id).reduce((a, h) => a + (inPoly(h.lat, h.lng, poly) ? targets(h).length : 0), 0);
+  setSheet(headHtml(t, 'この範囲をわたす人', `家・部屋 ${n}か所　今日の終わりまで`) + `
+    <p class="hint">ふつうは2人1組です。えらんだ人の画面に、この範囲が今日だけ出ます。</p>
+    <label class="field"><span>名前でさがす</span><input type="text" id="puQ" placeholder="名前の一部を入れる" autocomplete="off"></label>
+    <div id="puList">
+      ${gm.length ? `<div class="hgrp"><b>${esc(t.group)}グループ</b></div>${gm.map(row).join('')}` : ''}
+      ${others.length ? `<div class="hgrp"><b>ほかの人</b></div>${others.map(row).join('')}` : ''}
+    </div>
+    <button class="btn primary block" id="puSave">この範囲をわたす</button>
+    <button class="btn block" data-close>もどる</button>`);
+  $('#puQ').oninput = e => {
+    const q = e.target.value.trim();
+    $$('#puList [data-name]').forEach(l => { l.hidden = !!q && !l.dataset.name.includes(q); });
+  };
+  $('#puSave').onclick = () => {
+    const uids = $$('#puList input:checked').map(x => x.dataset.pu);
+    if (!uids.length) { toast('わたす人をえらんでください'); return; }
+    if (uids.length > 6) { toast('1つの範囲は6人までです'); return; }
+    const now = new Date().toISOString(), until = endOfToday();
+    closeSheet();
+    commit(`${uids.map(u => uname(u)).join('・')}さんに範囲をわたしました（今日まで）`, () => {
+      const t2 = terrById(partDraw.tid);
+      t2.parts = partsOf(t2).concat([{ id: 'p' + uid(), poly, uids, by: me().id, at: now, until }]);
+      // 記録できるように「今日回る人」にも入れる
+      const cur = helpersOf(t2), have = new Set(cur.map(h => h.uid));
+      t2.helpers = cur.concat(uids.filter(u => !have.has(u)).map(u => ({ uid: u, until, by: me().id, at: now })));
+    });
+    partDraw.pts = [];
+    renderPartDraw();
+    renderHouses();
+  };
+}
+/* わたした範囲をやめる */
+function openPartList(tid) {
+  const t = terrById(tid); if (!t) return;
+  const ps = partsOf(t);
+  setSheet(headHtml(t, '今日わたした範囲', `${ps.length}件　今日の終わりまで`) + `
+    ${ps.length ? ps.map(p => `<div class="setrow"><b>${esc(partName(p))}</b>
+      <button class="btn small danger" data-pdel="${p.id}">取り消す</button></div>`).join('')
+      : '<div class="empty">まだありません。</div>'}
+    <button class="btn primary block" id="plAdd">＋ 範囲を分ける</button>
+    <button class="btn block" data-close>閉じる</button>`);
+  $$('[data-pdel]', $('#sheet')).forEach(b => b.onclick = () => {
+    const id = b.dataset.pdel, p = partsOf(t).find(x => x.id === id);
+    if (!p || !confirm(`${partName(p)}の範囲を取り消します。よろしいですか？`)) return;
+    commit('範囲を取り消しました', () => { t.parts = partsOf(t).filter(x => x.id !== id); });
+    openPartList(tid);
+  });
+  $('#plAdd').onclick = () => { closeSheet(); startPartSplit(tid); };
+}
 /* ---------- 家・部屋の記録 ---------- */
 function openTarget(hid, unit, fromBuilding, review) {
   const h = houseById(hid); if (!h) return;
@@ -3032,9 +3231,15 @@ function openTarget(hid, unit, fromBuilding, review) {
           const extra = !sv ? '' : st.detail
             ? (v.result === 'met' ? `（${esc(ageName(v.age))}・${esc(intName(v.interest))}）` : (v.result === 'refused' && v.age ? `（${esc(ageName(v.age))}）` : ''))
             : (featFollow() && v.result === 'met' && INTERESTED.has(v.interest) ? ' ★' : '');
-          return `<li><i class="pin st-${v.result}">${ST_CHAR[v.result]}</i><span>${fmtDate(v.at)}　${slotOf(d)}<br>${RESULT_LABEL[v.result]}${extra}</span></li>`;
+          const mine2 = v.by === me().id || isAdmin();
+          const row = `<li class="vrow${mine2 ? ' swipe-body' : ''}"><i class="pin st-${v.result}">${ST_CHAR[v.result]}</i><span>${fmtDate(v.at)}　${slotOf(d)}<br>${RESULT_LABEL[v.result]}${extra}</span></li>`;
+          // 自分でつけた記録は、左にスワイプすると取り消せる
+          return mine2
+            ? `<div class="swipe"><div class="swipe-acts"><button class="del" data-vdel="${v.id}">取り消し</button></div>${row}</div>`
+            : row;
         }).join('')}</ul>${vs.length > (st.step === 'review' ? 10 : 5) ? `<p class="muted">ほか ${vs.length - (st.step === 'review' ? 10 : 5)}件</p>` : ''}`
       : '<p class="muted">まだ記録はありません。</p>';
+    if (vs.some(v => v.by === me().id || isAdmin())) b += '<p class="hint">記録を<b>左にスワイプ</b>すると、取り消せます。</p>';
     if (st.step === 'review' && !blocked) b += `<button class="btn primary block review-rec" id="shRecord">訪問の結果を記録する</button>`;
 
     b += navLink(h);
@@ -3089,6 +3294,12 @@ function openTarget(hid, unit, fromBuilding, review) {
       commit(`受け持ちを${uname(v)}さんに変えました`, () => startFollow(k, v));
       paint();
     };
+    $$('[data-vdel]', S).forEach(x => x.onclick = () => {
+      const v = D().visits.find(y => y.id === x.dataset.vdel);
+      if (!v) return;
+      if (!confirm(`${fmtDate(v.at)}の「${RESULT_LABEL[v.result]}」の記録を取り消します。よろしいですか？`)) return;
+      deleteVisit(v, paint);
+    });
     $$('[data-kind]', S).forEach(x => x.onclick = () => {
       if (unit) setUnitKind(hid, unit, x.dataset.kind, paint);
       else setHouseKind(hid, x.dataset.kind, paint);
@@ -3101,6 +3312,44 @@ function openTarget(hid, unit, fromBuilding, review) {
   };
   paint();
 }
+/* 記録をすぐ画面に出して、送信はうしろで行う（続けて記録しても、印がすぐ変わる） */
+function quickVisit(hid, unit, result, extra, msg, onUndo) {
+  const now = new Date().toISOString();
+  const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id };
+  if (result === 'met' || result === 'refused') { if (extra.age) v.age = extra.age; }
+  if (result === 'met' && extra.interest) v.interest = extra.interest;
+  D().visits.push(v);
+  idxAddVisit(v);
+  Store.pushVisit(v, false);
+  if (map && currentView === 'map') renderHouses();
+  if (currentView === 'cards') renderCards();
+  toast(msg, () => {
+    closeSheet();
+    if (onUndo) onUndo();
+    D().visits = D().visits.filter(x => x.id !== v.id);
+    idxDelVisit(v);
+    Store.pushVisit(v, true);
+    renderAll();
+    toast('取り消しました');
+  });
+}
+/* 記録を消す（自分の記録だけ） */
+function deleteVisit(v, after) {
+  if (v.by !== me().id && !isAdmin()) { toast('自分でつけた記録だけ取り消せます'); return; }
+  D().visits = D().visits.filter(x => x.id !== v.id);
+  idxDelVisit(v);
+  Store.pushVisit(v, true);
+  renderAll();
+  toast('記録を取り消しました', () => {
+    D().visits.push(v);
+    idxAddVisit(v);
+    Store.pushVisit(v, false);
+    renderAll();
+    toast('もどしました');
+    if (after) after();
+  });
+  if (after) after();
+}
 function saveVisit(hid, unit, result, extra, keepOpen, onUndo) {
   if (!keepOpen) closeSheet();
   const k = K(hid, unit), cur = fol(k);
@@ -3109,6 +3358,8 @@ function saveVisit(hid, unit, result, extra, keepOpen, onUndo) {
   if (follow && cur) { follow = false; if (cur.by !== me().id) msg += '（再訪問はすでに受け持ちがあります）'; }
   else if (follow) msg += '。再訪問を受け持ちます';
   if (extra.dnc && cur) msg += '。受け持ちも解除しました';
+  // ふつうの記録（会えた・留守）は、すぐ画面に出して、うしろで送る
+  if (!follow && !extra.dnc && !(cur && cur.by === me().id)) { quickVisit(hid, unit, result, extra, msg, onUndo); return; }
   commit(msg, () => {
     const now = new Date().toISOString();
     const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id };
@@ -3593,7 +3844,20 @@ const ADD_MSG = {
   del: '消したい家の印をタップします。まちがえて作った家を消すときに使います。記録のある家は、記録も一緒に消えます。',
   delReq: '消したい家の印をタップすると、区域係に削除を申請します。係が確認してから消えます。'
 };
+/* 家を追加するメニューは、少し待つと自動で小さくなる（地図が見やすいように） */
+let addFoldTimer = null;
+function setAddFold(on) {
+  clearTimeout(addFoldTimer);
+  $('#addMini').hidden = !on;
+  $('#addFull').hidden = on;
+  $('#addBar').classList.toggle('folded', on);
+  if (!on) addFoldTimer = setTimeout(() => { if (mode === 'add') setAddFold(true); }, 5000);
+  updateAddBar();
+}
 function updateAddBar() {
+  const mini = $('#addMiniCount');
+  if (mini) mini.textContent = [addCount ? `追加 ${addCount}` : '', delCount ? `削除 ${delCount}` : ''].filter(Boolean).join('　');
+  if ($('#addBase')) $('#addBase').textContent = baseName === 'pale' ? '写真にする' : '地図にする';
   $('#drawAddCount').textContent = addCount ? `　家 ${addCount}件追加` : '';
   $('#addMsg').textContent = addMode === 'del' && !isAdmin() ? ADD_MSG.delReq : ADD_MSG[addMode];
   $$('#addBar [data-addmode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.addmode === addMode)));
@@ -4447,6 +4711,9 @@ function cardHtml(t, own, helper) {
   const extra = (UI.cProg === 'on'
       ? `<div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪問の進み具合"><i style="width:${pct}%"></i></div>
       <p class="muted">${t.lentAt ? '受け取ってから' : 'この90日で'}訪問した家・部屋 ${s.visited} / ${s.n}</p>` : '') +
+    (own && partsOf(t).length ? `<p class="muted"><b>今日わたした範囲：</b>${partsOf(t).map(p => esc(partName(p))).join(' ／ ')}</p>` : '') +
+    (!own && myPart(t) ? `<p class="hint-strong">今日のあなたの範囲があります（${esc(partMates(myPart(t)).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）。地図をひらくと、その範囲だけが目立ちます。</p>
+      <p class="muted"><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=${center(myPart(t).poly)[0].toFixed(6)},${center(myPart(t).poly)[1].toFixed(6)}" target="_blank" rel="noopener">Googleマップでこの範囲へ</a></p>` : '') +
     (own && hs.length ? `<p class="muted"><b>${t.group ? '今日回る人' : '今日一緒に回る人'}（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : '') +
     ((own || helper) && UI.cReco === 'on' ? roundHint(t) : '');
   return `<article class="tcard tc2${t.group ? ' grp' : ''}">
@@ -4454,7 +4721,7 @@ function cardHtml(t, own, helper) {
       `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${t.group ? 'グループ' : '区域'}</small>${esc(t.no)}</span>`,
       esc(t.name), (t.group ? `<span class="gbadge">${esc(t.group)}グループの区域</span> ` : '') + who)}
     ${extra ? `<div class="tbody">${extra}</div>` : ''}
-    <div class="actions">${own && groupOk ? `<button class="btn${t.group ? ' primary' : ''}" data-helpers="${t.id}">${t.group ? '今日回る人をえらぶ' : '一緒に回る人'}</button>` : ''}${own ? `<button class="btn" data-return="${t.id}">返却する</button>` : ''}</div>
+    <div class="actions">${own && groupOk ? `<button class="btn" data-helpers="${t.id}">${t.group ? '今日回る人をえらぶ' : '一緒に回る人'}</button>${t.group ? `<button class="btn primary" data-parts="${t.id}">回る範囲を分ける</button>` : ''}` : ''}${own ? `<button class="btn" data-return="${t.id}">返却する</button>` : ''}</div>
   </article>`;
 }
 let cardTab = 'mine';
@@ -4589,6 +4856,15 @@ const myPendings = () => D().requests.filter(r => !r.type && r.by === me().id &&
 const reqLimit = forGroup => Number(forGroup ? D().settings.reqMaxGroup : D().settings.reqMaxPersonal) || 1;
 const pendingOf = forGroup => myPendings().filter(r => !!r.forGroup === !!forGroup);
 const canAsk = forGroup => pendingOf(forGroup).length < reqLimit(forGroup);
+/* 自由に受け取ってよい区域：係のチェック、または「返却から○日たった区域」（日数は係が決める） */
+function isFree(t) {
+  if (!t || t.holder) return !!(t && t.free);
+  if (t.free) return true;
+  const d = Number(D().settings.freeAfterDays) || 0;
+  if (!d) return false;
+  const at = t.returnedAt || t.completedAt || t.lentAt;
+  return !!at && daysSince(at) >= d;
+}
 /* 1人が持てる区域カードの枚数（区域係が決める）。グループ奉仕の区域と個人の区域を、別々に数える。申し込み中もふくむ */
 const holdMax = g => Number(g ? D().settings.holdMaxGroup : D().settings.holdMaxPersonal) || 2;
 const heldOf = g => D().territories.filter(t => t.holder === me().id && !!t.group === !!g).length;
@@ -4663,7 +4939,7 @@ function openRequestSheet(g) {
       <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
       <div><b>${esc(t.name)}</b>
         <p class="muted">${n}軒・部屋　${last ? `前回回り終えた日 ${fmtDay(last)}` : '回り終えた記録なし'}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p></div>
-      ${t.free && canTake
+      ${isFree(t) && canTake
         ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
         : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
     </article>`).join('');
@@ -4671,7 +4947,7 @@ function openRequestSheet(g) {
       `持てるのは${holdMax(G)}枚まで（今 ${heldOf(G)}枚・申し込み中 ${pendingOf(G).length}件）`) + `
     ${G ? '<p class="hint">グループの区域は、奉仕の集まりで使います。受け取ったら「今日回る人をえらぶ」で、回る人を決められます。</p>' : ''}
     <p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。</p>
-    ${!canTake && list.some(x => x.t.free) ? `<div class="notice warn">この区域は自分では受け取れません（${G ? '' : `自分で受け取れるのは${D().settings.selfTakeMax}枚まで・`}上限に届いています）。係に頼むことはできます。</div>` : ''}
+    ${!canTake && list.some(x => isFree(x.t)) ? `<div class="notice warn">この区域は自分では受け取れません（${G ? '' : `自分で受け取れるのは${D().settings.selfTakeMax}枚まで・`}上限に届いています）。係に頼むことはできます。</div>` : ''}
     <div class="row"><button class="btn small" id="reqNear">${myPos ? '現在地を更新する' : '現在地から近い順にする'}</button>
       <span class="muted">${myPos ? '近い順' : '長く回っていない順'}に並んでいます</span></div>
     ${rows || '<div class="empty">今、空いている区域はありません。</div>'}
@@ -4685,7 +4961,7 @@ function openRequestSheet(g) {
 function takeTerr(id) {
   const t = terrById(id);
   if (!t || t.holder) { toast('この区域はすでに貸し出されています'); return; }
-  if (!t.free || !canTakeFree(reqForGroup && canGroupTerr())) { toast('この区域は係に頼んでください'); return; }
+  if (!isFree(t) || !canTakeFree(reqForGroup && canGroupTerr())) { toast('この区域は係に頼んでください'); return; }
   if (!confirm(`区域${t.no}を受け取ります。よろしいですか？`)) return;
   closeSheet();
   commit(`区域${t.no}を受け取りました`, () => {
@@ -4783,6 +5059,11 @@ function renderInbox() {
     <span>「自由に受け取ってよい」区域を、1人が自分で受け取れる枚数<br><small class="hint">すでに持っているカードも数えます</small></span>
     <div class="stepper"><button type="button" data-takemax="-1" aria-label="枚数を減らす">−</button><output class="wide">${st.selfTakeMax}枚まで</output>
     <button type="button" data-takemax="1" aria-label="枚数を増やす">＋</button></div></div>
+    <div class="setrow">
+      <span>返却から何日で「自由に受け取ってよい」になるか<br><small class="hint">0日にすると、係のチェックだけになります</small></span>
+      <div class="stepper"><button type="button" data-kset="freeAfterDays" data-d="-5" aria-label="日数を減らす">−</button>
+        <output class="wide">${Number(D().settings.freeAfterDays) || 0}日</output>
+        <button type="button" data-kset="freeAfterDays" data-d="5" aria-label="日数を増やす">＋</button></div></div>
     <div class="setrow">
       <span>1人が持てる区域カード（個人の区域）<br><small class="hint">持っているカードと、申し込み中をあわせた数です</small></span>
       <div class="stepper"><button type="button" data-kset="holdMaxPersonal" data-d="-1" aria-label="枚数を減らす">−</button>
@@ -5079,6 +5360,16 @@ function focusFn() {
   const r = roundTerr ? roundInfo(roundTerr) : null;
   if (roundTerr && !r) roundTerr = null;
   if (!r) return null;
+  const mp = myPart(r.t); // 今日の分担がある人は、その範囲の家だけを目立たせる
+  if (mp && okPoly(mp.poly)) {
+    const inPart = new Set();
+    housesOf(r.t.id).forEach(h => { if (inPoly(h.lat, h.lng, mp.poly)) targets(h).forEach(u => inPart.add(K(h.id, u))); });
+    return k => {
+      const st = r.map.get(k);
+      if (!inPart.has(k)) return 'dim';
+      return st === 'done' ? 'done' : st === 'todo' ? 'hl' : st === 'refuse' ? 'refuse' : st === 'recent' ? 'prev' : 'dim';
+    };
+  }
   if (roundMode() === 'progress') {
     return k => { const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? '' : s === 'refuse' ? 'refuse' : s === 'recent' ? 'prev' : 'dim'; };
   }
@@ -6339,7 +6630,7 @@ function renderAdmin() {
         <button class="btn small" data-redraw="${t.id}">線を直す</button>
         <button class="btn small" data-rename="${t.id}">番号・名前</button>
         <button class="btn small danger" data-delterr="${t.id}">削除</button>
-        <label class="check"><input type="checkbox" data-free="${t.id}"${t.free ? ' checked' : ''}>自由に受け取ってよい</label>
+        <label class="check"><input type="checkbox" data-free="${t.id}"${t.free ? ' checked' : ''}>自由に受け取ってよい</label>${!t.free && isFree(t) ? '<span class="muted">（返却から日がたったので、自由に受け取れます）</span>' : ''}
         ${t.holder && (userById(t.holder) || {}).group ? `<label class="check"><input type="checkbox" data-grp="${t.id}"${t.group ? ' checked' : ''}>${esc(userById(t.holder).group)}グループの区域にする</label>` : ''}
       </div></article>`;
   }).join('');
@@ -6708,13 +6999,15 @@ function calHtml(o) {
   for (let d = 1; d <= last; d++) {
     const key = ymd(new Date(y, m, d)), sc = schedsOn(key).length, ev = o.events.filter(e => e.date === key).length, mn = featTime() ? (o.log[key] || 0) : 0;
     const wd = new Date(y, m, d).getDay();
-    cells += `<button type="button" class="cd${key === today ? ' today' : ''}${wd === 0 ? ' sun' : wd === 6 ? ' sat' : ''}" data-day="${key}" aria-label="${m + 1}月${d}日">
-      <span class="dn">${d}</span><span class="dots">${sc ? '<i class="dg"></i>' : ''}${ev ? '<i class="dp"></i>' : ''}</span>${mn ? `<small>${(mn / 60).toFixed(mn % 60 ? 1 : 0)}h</small>` : ''}</button>`;
+    const list = schedsOn(key);
+    const tag = list.length ? `<b class="cdsc">${esc((list[0].time || '').slice(0, 5))}${list[0].place ? ' ' + esc(list[0].place) : ''}${list.length > 1 ? ` ほか${list.length - 1}` : ''}</b>` : '';
+    cells += `<button type="button" class="cd${key === today ? ' today' : ''}${wd === 0 ? ' sun' : wd === 6 ? ' sat' : ''}${sc ? ' hassc' : ''}" data-day="${key}" aria-label="${m + 1}月${d}日${sc ? `　集まり ${list.map(x => (x.time || '') + (x.place ? ' ' + x.place : '')).join('、')}` : ''}">
+      <span class="dn">${d}</span>${tag}<span class="dots">${ev ? '<i class="dp"></i>' : ''}</span>${mn ? `<small>${(mn / 60).toFixed(mn % 60 ? 1 : 0)}h</small>` : ''}</button>`;
   }
   return `<div class="calhead"><button type="button" class="btn small" data-cm="-1" aria-label="前の月">‹</button><b>${y}年${m + 1}月</b>
       <button type="button" class="btn small" data-cm="1" aria-label="次の月">›</button></div>
     <div class="calgrid">${WD.map((w, i) => `<span class="cw${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</span>`).join('')}${cells}</div>
-    <p class="calkeys"><span><i class="dg"></i>奉仕の集まり</span><span><i class="dp"></i>自分の予定</span>${featTime() ? '<span><small>1.5h</small> 奉仕した時間</span>' : ''}</p>`;
+    <p class="calkeys"><span><b class="cdsc">9:30 会館</b>奉仕の集まり</span><span><i class="dp"></i>自分の予定</span>${featTime() ? '<span><small>1.5h</small> 奉仕した時間</span>' : ''}</p>`;
 }
 function schedListHtml() {
   const today = ymd(new Date()), until = new Date(); until.setDate(until.getDate() + 60);
@@ -6895,6 +7188,7 @@ function openSchedForm(s, date, back) {
     done();
   };
 }
+let adSchedMode = 'cal'; // 係の予定：カレンダーか一覧か
 function renderSchedAdmin() {
   const box = $('#adSched'); if (!box) return;
   const admin = isAdmin(), today = ymd(new Date());
@@ -6903,8 +7197,29 @@ function renderSchedAdmin() {
   box.innerHTML = `<h2 class="sec">奉仕の集まりの予定</h2>
     <p class="hint">${admin ? 'どのグループの予定も入れられます。「全体」は会衆の全員に表示されます。' : `${esc(myGroup())}グループの予定を入れられます。グループの人のホーム画面に表示されます。`}</p>
     <button class="btn primary block" id="scNew">＋ 集まりの予定を入れる</button>
-    ${list.length ? swipeHint(list) + list.map(s => schedRow(s, true)).join('') : '<div class="empty">これからの予定はありません。</div>'}`;
+    <div class="seg" role="group" aria-label="表示の切りかえ">
+      <button type="button" data-asm="cal" aria-pressed="${adSchedMode === 'cal'}">カレンダー</button>
+      <button type="button" data-asm="list" aria-pressed="${adSchedMode === 'list'}">一覧</button></div>
+    ${adSchedMode === 'cal'
+      ? calHtml({ events: [], log: {} }) + '<p class="hint">日付を押すと、その日の予定を見たり、すぐ入れたりできます。</p>'
+      : (list.length ? swipeHint(list) + list.map(s => schedRow(s, true)).join('') : '<div class="empty">これからの予定はありません。</div>')}`;
   $('#scNew').onclick = () => openSchedForm(null, null, null);
+  $$('[data-asm]', box).forEach(b => b.onclick = () => { adSchedMode = b.dataset.asm; renderSchedAdmin(); });
+  $$('[data-cm]', box).forEach(b => b.onclick = () => {
+    const base = calMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    calMonth = new Date(base.getFullYear(), base.getMonth() + Number(b.dataset.cm), 1);
+    renderSchedAdmin();
+  });
+  $$('[data-day]', box).forEach(b => b.onclick = () => openSchedDay(b.dataset.day));
+}
+/* 係・監督：その日の集まりを見る／すぐ入れる */
+function openSchedDay(date) {
+  const sc = schedsOn(date);
+  setSheet(headHtml(null, fmtYmd(date), '奉仕の集まり') + `
+    ${sc.length ? sc.map(s => schedRow(s, false)).join('') : '<p class="muted">この日の集まりはありません。</p>'}
+    <button class="btn primary block" id="sdAdd">＋ この日に集まりを入れる</button>
+    <button class="btn block" data-close>閉じる</button>`);
+  $('#sdAdd').onclick = () => openSchedForm(null, date, () => openSchedDay(date));
 }
 
 /* ---- 人とグループ（区域係は変更できる。監督は自分のグループの人を見るだけ） ---- */
@@ -7181,6 +7496,7 @@ function bindStatic() {
     }
     else if ((x = q('[data-return]'))) openReturnSheet(x.dataset.return);
     else if ((x = q('[data-helpers]'))) openHelpers(x.dataset.helpers);
+    else if ((x = q('[data-parts]'))) openPartList(x.dataset.parts);
     else if (q('[data-awaypick]')) openAwayPick();
     else if ((x = q('[data-dguide]'))) openDummyGuide(x.dataset.dguide);
     else if ((x = q('[data-awayopen]'))) openAwayCard(x.dataset.awayopen);
@@ -7197,10 +7513,16 @@ function bindStatic() {
     addCount = 0; delCount = 0; addMode = 'quick'; setMode('add'); updateAddBar();
     if (map.getZoom() < 17) toast('場所がわかるまで地図を拡大してから、タップしてください');
   };
+  $('#partUndo').onclick = () => { if (partDraw && partDraw.pts.length) { partDraw.pts.pop(); renderPartDraw(); } };
+  $('#partDone').onclick = openPartAssign;
+  $('#partCancel').onclick = endPartSplit;
   $$('#addBar [data-addmode]').forEach(b => b.onclick = () => {
     if (b.dataset.addmode === 'del' && simpleBlock('家を消すことは')) return;
     addMode = b.dataset.addmode; closeSheet(); updateAddBar();
   });
+  $('#addMini').onclick = () => setAddFold(false);
+  $('#addFold').onclick = () => setAddFold(true);
+  $('#addBase').onclick = () => { setBase(baseName === 'pale' ? 'photo' : 'pale'); updateAddBar(); };
   $('#addCancel').onclick = () => {
     closeSheet(); setMode('normal');
     if (LIVE && Store.queue.length) {
@@ -7291,7 +7613,8 @@ function bindStatic() {
       const lim = key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 180] : key === 'groupMax' ? [1, 10]
         : key === 'syncGroupSec' ? [5, 30] : key === 'syncNormalSec' ? [10, 120]
         : key === 'reqMaxPersonal' || key === 'reqMaxGroup' ? [1, 5]
-        : key === 'holdMaxPersonal' || key === 'holdMaxGroup' ? [1, 10] : [5, 60];
+        : key === 'holdMaxPersonal' || key === 'holdMaxGroup' ? [1, 10]
+        : key === 'freeAfterDays' ? [0, 365] : [5, 60];
       st[key] = Math.min(lim[1], Math.max(lim[0], (Number(st[key]) || 2) + Number(x.dataset.d)));
       Store.save(); renderAll(); toast('設定を変えました');
     }
