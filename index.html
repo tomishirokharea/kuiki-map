@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.05"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.06"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -596,6 +596,10 @@ body.strong .pin.st-plain{border-width:4px}
 .taphint{margin:0 0 8px}
 @media (max-width:374px){.tgo{width:56px}.topen{gap:8px}.topen .tname b{font-size:19px}}
 @media (hover:hover) and (pointer:fine){.topen:hover{background:var(--terr-soft)}}
+.qrbox{display:flex;justify-content:center;padding:12px;background:#fff;border:2px solid var(--line);border-radius:12px}
+.qrbox canvas{width:100%;max-width:340px;height:auto;image-rendering:pixelated}
+.qrnote{margin-top:10px}
+.seg.small button{min-height:42px;font-size:15px;padding:0 12px}
 .pin.biz{border-radius:9px}
 .pin .kb,.pin .lk{position:absolute;left:-11px;bottom:-10px;width:23px;height:23px;border-radius:7px;display:grid;place-items:center;border:2px solid #fff;color:#fff;font-style:normal;box-shadow:0 1px 3px #0006}
 .pin .kb.k-office{background:#1565C0}
@@ -2186,6 +2190,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.06', items: [
+    ['人', '係の画面「人・グループ」から、人の追加・役割の変更・使うのをやめる、ができるようになりました'],
+    ['QR', '共通リンクと、一人ひとりの招待リンクを、QRコードで見せられるようにしました（集まりでその場で登録できます）']
+  ] },
   { v: '2026.10.05', items: [
     ['種', '家・部屋・建物に「住居・会社・店舗・事務所・工場」の種別を付けられるようにしました（はじめは住居）'],
     ['鍵', 'アパート・マンションに「オートロック」のチェックを付けられるようにしました'],
@@ -5930,6 +5938,247 @@ function renderDummy() {
       : '<button type="button" class="btn small primary" data-dummy="add">ダミーを入れる</button>'}</div></div>`;
 }
 
+/* ---------- QRコードを自分で作る（バイトモード・誤り訂正M／長いときはL、バージョン1〜10） ----------
+   外部の部品を使わずに作れるように、必要な分だけを実装しています。 */
+const QR = (() => {
+  const EXP = new Array(512), LOG = new Array(256);
+  for (let i = 0, x = 1; i < 255; i++) { EXP[i] = x; LOG[x] = i; x <<= 1; if (x & 0x100) x ^= 0x11D; }
+  for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255];
+  const mul = (a, b) => (a === 0 || b === 0 ? 0 : EXP[LOG[a] + LOG[b]]);
+  function genPoly(n) {
+    let p = [1];
+    for (let i = 0; i < n; i++) {
+      const r = new Array(p.length + 1).fill(0);
+      for (let j = 0; j < p.length; j++) { r[j] ^= mul(p[j], 1); r[j + 1] ^= mul(p[j], EXP[i]); }
+      p = r;
+    }
+    return p;
+  }
+  function ecBytes(data, n) {
+    const gen = genPoly(n), res = data.concat(new Array(n).fill(0));
+    for (let i = 0; i < data.length; i++) {
+      const f = res[i];
+      if (!f) continue;
+      for (let j = 0; j < gen.length; j++) res[i + j] ^= mul(gen[j], f);
+    }
+    return res.slice(data.length);
+  }
+  // [誤り訂正の数, [[ブロック数, 1ブロックのデータ数], ...]]
+  const RS = {
+    L: [null, [7, [[1, 19]]], [10, [[1, 34]]], [15, [[1, 55]]], [20, [[1, 80]]], [26, [[1, 108]]],
+      [18, [[2, 68]]], [20, [[2, 78]]], [24, [[2, 97]]], [30, [[2, 116]]], [18, [[2, 68], [2, 69]]]],
+    M: [null, [10, [[1, 16]]], [16, [[1, 28]]], [26, [[1, 44]]], [18, [[2, 32]]], [24, [[2, 43]]],
+      [16, [[4, 27]]], [18, [[4, 31]]], [22, [[2, 38], [2, 39]]], [22, [[3, 36], [2, 37]]], [26, [[4, 43], [1, 44]]]]
+  };
+  const ALIGN = [null, [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50]];
+  const EC_BITS = { L: 1, M: 0 };
+  const dataCount = (v, lv) => RS[lv][v][1].reduce((a, g) => a + g[0] * g[1], 0);
+  const capacity = (v, lv) => dataCount(v, lv) - (v >= 10 ? 3 : 2);
+
+  function utf8(str) {
+    const out = [];
+    for (const ch of unescape(encodeURIComponent(str))) out.push(ch.charCodeAt(0));
+    return out;
+  }
+  function bitsOf(bytes, v, lv) {
+    const total = dataCount(v, lv) * 8;
+    const bits = [];
+    const push = (val, n) => { for (let i = n - 1; i >= 0; i--) bits.push((val >> i) & 1); };
+    push(4, 4);                       // バイトモード
+    push(bytes.length, v >= 10 ? 16 : 8);
+    bytes.forEach(b => push(b, 8));
+    for (let i = 0; i < 4 && bits.length < total; i++) bits.push(0); // 終端
+    while (bits.length % 8) bits.push(0);
+    const pads = [0xEC, 0x11];
+    for (let i = 0; bits.length < total; i++) push(pads[i % 2], 8);
+    const codes = [];
+    for (let i = 0; i < bits.length; i += 8) {
+      let b = 0;
+      for (let j = 0; j < 8; j++) b = (b << 1) | bits[i + j];
+      codes.push(b);
+    }
+    return codes;
+  }
+  function interleave(codes, v, lv) {
+    const [ecn, groups] = RS[lv][v];
+    const blocks = [];
+    let at = 0;
+    groups.forEach(([n, len]) => {
+      for (let i = 0; i < n; i++) { const d = codes.slice(at, at + len); at += len; blocks.push({ d, e: ecBytes(d, ecn) }); }
+    });
+    const out = [];
+    const maxD = Math.max(...blocks.map(b => b.d.length));
+    for (let i = 0; i < maxD; i++) blocks.forEach(b => { if (i < b.d.length) out.push(b.d[i]); });
+    for (let i = 0; i < ecn; i++) blocks.forEach(b => out.push(b.e[i]));
+    return out;
+  }
+  function build(v, codes) {
+    const size = v * 4 + 17;
+    const m = Array.from({ length: size }, () => new Array(size).fill(null)); // null＝まだ
+    const put = (r, c, val) => { if (r >= 0 && c >= 0 && r < size && c < size) m[r][c] = val; };
+    const finder = (r, c) => {
+      for (let i = -1; i <= 7; i++) for (let j = -1; j <= 7; j++) {
+        const on = i >= 0 && i <= 6 && j >= 0 && j <= 6 &&
+          (i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4));
+        put(r + i, c + j, on ? 1 : 0);
+      }
+    };
+    finder(0, 0); finder(0, size - 7); finder(size - 7, 0);
+    for (let i = 8; i < size - 8; i++) { m[6][i] = i % 2 === 0 ? 1 : 0; m[i][6] = i % 2 === 0 ? 1 : 0; }
+    const cs = ALIGN[v];
+    cs.forEach(r => cs.forEach(c => {
+      if ((r <= 8 && c <= 8) || (r <= 8 && c >= size - 9) || (r >= size - 9 && c <= 8)) return;
+      for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
+        put(r + i, c + j, Math.max(Math.abs(i), Math.abs(j)) !== 1 ? 1 : 0);
+      }
+    }));
+    m[size - 8][8] = 1; // かならず黒にする点
+    // 形式・バージョンの場所を空けておく
+    for (let i = 0; i <= 8; i++) { if (m[8][i] === null) m[8][i] = 0.5; if (m[i][8] === null) m[i][8] = 0.5; }
+    for (let i = 0; i < 8; i++) { if (m[8][size - 1 - i] === null) m[8][size - 1 - i] = 0.5; if (m[size - 1 - i][8] === null) m[size - 1 - i][8] = 0.5; }
+    if (v >= 7) {
+      for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) { m[size - 11 + j][i] = 0.5; m[i][size - 11 + j] = 0.5; }
+    }
+    // データを右下からジグザグに置く
+    let bi = 0;
+    const bit = () => {
+      const b = bi < codes.length * 8 ? (codes[bi >> 3] >> (7 - (bi & 7))) & 1 : 0;
+      bi++; return b;
+    };
+    let up = true;
+    for (let c = size - 1; c > 0; c -= 2) {
+      if (c === 6) c--;
+      for (let n = 0; n < size; n++) {
+        const r = up ? size - 1 - n : n;
+        for (const cc of [c, c - 1]) {
+          if (m[r][cc] === null) m[r][cc] = { d: bit(), r, c: cc };
+        }
+      }
+      up = !up;
+    }
+    return { m, size };
+  }
+  const MASKS = [
+    (r, c) => (r + c) % 2 === 0,
+    r => r % 2 === 0,
+    (r, c) => c % 3 === 0,
+    (r, c) => (r + c) % 3 === 0,
+    (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
+    (r, c) => ((r * c) % 2) + ((r * c) % 3) === 0,
+    (r, c) => (((r * c) % 2) + ((r * c) % 3)) % 2 === 0,
+    (r, c) => (((r + c) % 2) + ((r * c) % 3)) % 2 === 0
+  ];
+  function formatBits(lv, mask) {
+    let v = (EC_BITS[lv] << 3) | mask;
+    let d = v << 10;
+    for (let i = 14; i >= 10; i--) if ((d >> i) & 1) d ^= 0x537 << (i - 10);
+    return ((v << 10) | d) ^ 0x5412;
+  }
+  function versionBits(v) {
+    let d = v << 12;
+    for (let i = 17; i >= 12; i--) if ((d >> i) & 1) d ^= 0x1F25 << (i - 12);
+    return (v << 12) | d;
+  }
+  function penalty(g, size) {
+    let p = 0;
+    const run = line => {
+      let n = 1;
+      for (let i = 1; i < size; i++) {
+        if (line[i] === line[i - 1]) n++;
+        else { if (n >= 5) p += n - 2; n = 1; }
+      }
+      if (n >= 5) p += n - 2;
+    };
+    for (let r = 0; r < size; r++) run(g[r]);
+    for (let c = 0; c < size; c++) run(g.map(row => row[c]));
+    for (let r = 0; r < size - 1; r++) for (let c = 0; c < size - 1; c++) {
+      const a = g[r][c];
+      if (a === g[r][c + 1] && a === g[r + 1][c] && a === g[r + 1][c + 1]) p += 3;
+    }
+    const pat = [1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0];
+    const has = (arr, i) => pat.every((v, j) => arr[i + j] === v);
+    const rev = pat.slice().reverse();
+    const has2 = (arr, i) => rev.every((v, j) => arr[i + j] === v);
+    for (let r = 0; r < size; r++) for (let c = 0; c + 11 <= size; c++) { if (has(g[r], c) || has2(g[r], c)) p += 40; }
+    for (let c = 0; c < size; c++) {
+      const col = g.map(row => row[c]);
+      for (let r = 0; r + 11 <= size; r++) { if (has(col, r) || has2(col, r)) p += 40; }
+    }
+    let dark = 0;
+    g.forEach(row => row.forEach(v => { if (v) dark++; }));
+    p += Math.floor(Math.abs(dark * 100 / (size * size) - 50) / 5) * 10;
+    return p;
+  }
+  /* テキストからQRの白黒の表（true＝黒）を作る */
+  function matrix(text) {
+    const bytes = utf8(text);
+    let lv = 'M', v = 0;
+    for (let i = 1; i <= 10; i++) if (bytes.length <= capacity(i, 'M')) { v = i; break; }
+    if (!v) { lv = 'L'; for (let i = 1; i <= 10; i++) if (bytes.length <= capacity(i, 'L')) { v = i; break; } }
+    if (!v) throw new Error('long');
+    const codes = interleave(bitsOf(bytes, v, lv), v, lv);
+    const { m, size } = build(v, codes);
+    let best = null;
+    for (let mk = 0; mk < 8; mk++) {
+      const g = m.map(row => row.map(cell => {
+        if (cell === null) return 0;
+        if (typeof cell === 'object') return MASKS[mk](cell.r, cell.c) ? cell.d ^ 1 : cell.d;
+        return cell === 0.5 ? 0 : cell;
+      }));
+      const f = formatBits(lv, mk);
+      const fb = [];
+      for (let i = 14; i >= 0; i--) fb.push((f >> i) & 1); // 上の位から
+      const posA = [[8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 7], [8, 8], [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8]];
+      const posB = [[size - 1, 8], [size - 2, 8], [size - 3, 8], [size - 4, 8], [size - 5, 8], [size - 6, 8], [size - 7, 8],
+        [8, size - 8], [8, size - 7], [8, size - 6], [8, size - 5], [8, size - 4], [8, size - 3], [8, size - 2], [8, size - 1]];
+      fb.forEach((b2, i) => { g[posA[i][0]][posA[i][1]] = b2; g[posB[i][0]][posB[i][1]] = b2; });
+      g[size - 8][8] = 1;
+      if (v >= 7) {
+        const vb = versionBits(v);
+        for (let i = 0; i < 18; i++) {
+          const b = (vb >> i) & 1, r = Math.floor(i / 3), c = i % 3;
+          g[size - 11 + c][r] = b; g[r][size - 11 + c] = b;
+        }
+      }
+      const p = penalty(g, size);
+      if (!best || p < best.p) best = { p, g };
+    }
+    return best.g.map(row => row.map(v2 => !!v2));
+  }
+  /* canvas に描く（まわりの白い余白もつける） */
+  function draw(canvas, text, px) {
+    const g = matrix(text), n = g.length, q = 4, size = (n + q * 2) * (px || 6);
+    const s = (px || 6);
+    canvas.width = size; canvas.height = size;
+    const x = canvas.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, size, size);
+    x.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (g[r][c]) x.fillRect((c + q) * s, (r + q) * s, s, s);
+    return size;
+  }
+  return { matrix, draw };
+})();
+
+/* QRを大きく見せる画面（集会などで、その場で読み取ってもらう） */
+function openQrSheet(title, sub, url, opts) {
+  const o = opts || {};
+  setSheet(headHtml(null, title, sub) + `
+    <div class="qrbox"><canvas id="qrCv" aria-label="QRコード"></canvas></div>
+    <p class="hint qrnote">${o.note || 'スマホのカメラでこのQRを読み取ると、この画面がひらきます。'}</p>
+    <div class="linkbox"><input type="text" id="qrUrl" readonly value="${esc(url)}" aria-label="リンク"><button class="btn small" id="qrCopy">コピー</button></div>
+    ${o.extra || ''}
+    <button class="btn block" data-close>閉じる</button>`);
+  try {
+    QR.draw($('#qrCv'), url, 8);
+  } catch (e) {
+    $('#qrCv').parentNode.innerHTML = '<p class="muted">QRを作れませんでした。下のリンクをコピーして渡してください。</p>';
+  }
+  $('#qrCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText(url); toast('リンクをコピーしました'); }
+    catch (e) { $('#qrUrl').select(); toast('リンクを選びました。長押しでコピーしてください'); }
+  };
+}
+
 /* ---------- 係の画面：スマホの承認と共通リンク（本番のときだけ） ---------- */
 const devState = { list: null, joinUrl: '', at: 0, busy: false };
 const devPending = () => (devState.list || []).filter(d => d.status === 'pending');
@@ -5978,7 +6227,8 @@ function renderDevices() {
     <h3 class="sub">共通リンク</h3>
     ${devState.joinUrl ? `<div class="linkbox"><input type="text" id="joinUrl" readonly value="${esc(devState.joinUrl)}" aria-label="共通リンク"><button class="btn small" id="joinCopy">コピー</button></div>
       <p class="hint">会衆の全員に同じリンクを配れます。名前をえらんだあと、ここで承認したスマホだけが使えます。リンクが外に広まったときは「作り直す」を押してください（登録済みのスマホは、そのまま使えます）。</p>
-      <button class="btn small danger" id="joinReset">共通リンクを作り直す</button>`
+      <div class="row"><button class="btn small primary" id="joinQr">QRで見せる</button>
+        <button class="btn small danger" id="joinReset">共通リンクを作り直す</button></div>`
       : '<p class="muted">共通リンクがまだありません。スプレッドシートのメニュー「区域マップ」→「共通リンクを表示」で作れます。</p>'}
     <h3 class="sub">登録済みのスマホ</h3>
     <p class="hint">スマホをなくした・替えた・使わなくなった人は「使えなくする」を押してください。そのスマホの区域の情報は、次に開いたときに消えます。</p>
@@ -6005,6 +6255,7 @@ function renderDevices() {
     try { await navigator.clipboard.writeText(v); toast('共通リンクをコピーしました'); }
     catch (e) { $('#joinUrl').select(); toast('リンクを選びました。長押しでコピーしてください'); }
   };
+  if ($('#joinQr')) $('#joinQr').onclick = openJoinQr;
   if ($('#joinReset')) $('#joinReset').onclick = () => {
     if (!confirm('今の共通リンクでは、新しい申し込みができなくなります。登録済みのスマホは、そのまま使えます。作り直しますか？')) return;
     deviceAction('join_reset', {}, '共通リンクを作り直しました。新しいリンクを配ってください');
@@ -6657,16 +6908,96 @@ function renderSchedAdmin() {
 }
 
 /* ---- 人とグループ（区域係は変更できる。監督は自分のグループの人を見るだけ） ---- */
-async function setUserGroup(u, group, overseer, leader) {
+async function setUserGroup(u, group, overseer, leader, role, active) {
   if (LIVE) {
-    try { await api('user_set', { id: u.id, group, overseer, leader }); } catch (e) { toast('保存できませんでした。通信を確認してください'); return; }
+    const body = { id: u.id, group, overseer, leader };
+    if (role) body.role = role;
+    if (active === false) body.active = false;
+    try { await api('user_set', body); } catch (e) { toast('保存できませんでした。通信を確認してください'); return; }
     u.group = group || undefined; u.overseer = !!overseer || undefined; u.leader = !!leader || undefined;
+    if (role) u.role = role;
+    if (active === false) u.inactive = true;
     toast(`${u.name}さんのグループを保存しました`);
     refresh(true).catch(() => {});
   } else {
-    u.group = group || undefined; u.overseer = !!overseer || undefined; u.leader = !!leader || undefined; Store.save(); toast(`${u.name}さんのグループを保存しました`);
+    u.group = group || undefined; u.overseer = !!overseer || undefined; u.leader = !!leader || undefined;
+    if (role) u.role = role;
+    if (active === false) u.inactive = true;
+    Store.save(); toast(`${u.name}さんの設定を保存しました`);
   }
   renderAll();
+}
+/* 人を追加する（区域係だけ） */
+function openAddUser() {
+  const groups = groupsAll();
+  const f = { name: '', role: 'pub', group: '', overseer: false, leader: false };
+  const paint = () => {
+    setSheet(headHtml(null, '人を追加する', '会衆で区域マップを使う人を登録します') + `
+      <label class="field"><span>名前</span><input type="text" id="auName" maxlength="30" value="${esc(f.name)}" placeholder="例：山田 花子"></label>
+      <p class="q">役割</p>
+      <div class="seg uiseg" role="group" aria-label="役割">
+        <button type="button" data-aurole="pub" aria-pressed="${f.role === 'pub'}">伝道者</button>
+        <button type="button" data-aurole="admin" aria-pressed="${f.role === 'admin'}">区域係</button></div>
+      <label class="field"><span>グループ（あとからでも変えられます）</span>
+        <input type="text" id="auGroup" list="groupList" maxlength="30" value="${esc(f.group)}" placeholder="例：北"></label>
+      <datalist id="groupList">${groups.map(g => `<option value="${esc(g)}">`).join('')}</datalist>
+      <label class="check"><input type="checkbox" id="auOver"${f.overseer ? ' checked' : ''}>グループ監督</label>
+      <label class="check"><input type="checkbox" id="auLead"${f.leader ? ' checked' : ''}>司会者</label>
+      <p class="hint">監督と司会者は、グループ奉仕の区域を受け取れます。</p>
+      <button class="btn primary block" id="auSave">追加する</button>
+      <button class="btn block" data-close>やめる</button>`);
+    const keep = () => {
+      f.name = $('#auName').value; f.group = $('#auGroup').value;
+      f.overseer = $('#auOver').checked; f.leader = $('#auLead').checked;
+    };
+    $$('[data-aurole]', $('#sheet')).forEach(x => x.onclick = () => { keep(); f.role = x.dataset.aurole; paint(); });
+    $('#auSave').onclick = async () => {
+      keep();
+      const name = f.name.trim();
+      if (!name) { toast('名前を入れてください'); return; }
+      const body = { name, role: f.role, group: normGroup(f.group), overseer: f.overseer, leader: f.leader };
+      if (!LIVE) { // 試作版：この端末の中だけに追加
+        const u = Object.assign({ id: 'u' + uid(), name, role: f.role }, body.group ? { group: body.group } : {},
+          f.overseer ? { overseer: true } : {}, f.leader ? { leader: true } : {});
+        delete u.role2;
+        commit(`${name}さんを追加しました`, () => { D().users.push(u); });
+        closeSheet(); return;
+      }
+      $('#auSave').disabled = true;
+      let j;
+      try { j = await api('user_add', body); } catch (e) { $('#auSave').disabled = false; toast('追加できませんでした。通信を確認してください'); return; }
+      toast(`${name}さんを追加しました`);
+      await refresh(true).catch(() => {});
+      renderAll();
+      if (!j.url) { closeSheet(); toast('追加しました。招待リンクを出すには、スプレッドシートの「② 公開ページのURLを設定」が必要です'); return; }
+      openQrSheet(`${name}さんの招待リンク`, 'このQRを本人のスマホで読み取ってもらいます', j.url, {
+        note: '本人のスマホのカメラでQRを読み取ると、その場で使えるようになります。ほかの人には渡さないでください。'
+      });
+    };
+  };
+  paint();
+}
+/* その人の招待リンクとQRを見せる */
+async function openUserLink(u, reissue) {
+  if (!LIVE) { toast('招待リンクは、本番のときだけ作れます'); return; }
+  if (reissue && !confirm(`${u.name}さんの今の招待リンクは使えなくなります。よろしいですか？`)) return;
+  toast('リンクを用意しています…');
+  let j;
+  try { j = await api('user_link', { id: u.id, reissue: !!reissue }); } catch (e) { toast('リンクを作れませんでした。通信を確認してください'); return; }
+  if (!j.url) { toast('先に、スプレッドシートの「② 公開ページのURLを設定」を行ってください'); return; }
+  openQrSheet(`${u.name}さんの招待リンク`, 'このQRを本人のスマホで読み取ってもらいます', j.url, {
+    note: '本人のスマホのカメラでQRを読み取ると、その場で使えるようになります。ほかの人には渡さないでください。',
+    extra: `<button class="btn small danger block" id="qrReissue">リンクを作り直す（今のリンクは使えなくなります）</button>`
+  });
+  if ($('#qrReissue')) $('#qrReissue').onclick = () => openUserLink(u, true);
+}
+/* 共通リンクのQR（集会などで、みんなに読み取ってもらう） */
+function openJoinQr() {
+  if (!LIVE) { toast('共通リンクは、本番のときだけ使えます'); return; }
+  if (!devState.joinUrl) { toast('共通リンクがありません。スプレッドシートのメニューから作ってください'); return; }
+  openQrSheet('共通リンクのQR', 'みんなに読み取ってもらいます', devState.joinUrl, {
+    note: 'このQRを読み取った人は、名前をえらんで申し込みます。そのあと、係が「申請・承認」で承認すると使えるようになります。'
+  });
 }
 function renderPeople() {
   const box = $('#adPeople'); if (!box) return;
@@ -6675,6 +7006,9 @@ function renderPeople() {
     .sort((a, b) => (a.group || '～').localeCompare(b.group || '～', 'ja') || a.name.localeCompare(b.name, 'ja'));
   const noGroup = admin ? D().users.filter(u => !u.inactive && !u.group).length : 0;
   box.innerHTML = `<h2 class="sec">${admin ? '人とグループ' : `${esc(myGroup())}グループの人`}</h2>
+    ${admin ? `<div class="row"><button class="btn primary" id="adUserAdd">＋ 人を追加</button>
+      <button class="btn" id="adJoinQr">共通リンクのQRを見せる</button></div>
+      <p class="hint">集まりのときは「共通リンクのQR」を見せると、みんながその場で申し込めます。申し込みは「申請・承認」で承認します。</p>` : ''}
     ${noGroup ? `<div class="notice warn"><b>グループが決まっていない人が ${noGroup}人 います。</b>この人たちには、グループの集まりの予定は届きません（「全体」の予定だけが届きます）。</div>` : ''}
     ${admin ? `<p class="hint">グループの名前（例：A、北）と、グループ監督・司会者かどうかを決めます。<br>監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>
       <datalist id="groupList">${groups.map(g => `<option value="${esc(g)}">`).join('')}</datalist>` : ''}
@@ -6683,7 +7017,29 @@ function renderPeople() {
       ${admin ? `<div class="actions"><label>グループ <input type="text" list="groupList" maxlength="30" data-ugroup="${u.id}" value="${esc(u.group || '')}" style="min-height:46px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;width:120px"></label>
         <label class="check"><input type="checkbox" data-uover="${u.id}"${u.overseer ? ' checked' : ''}>監督</label>
         <label class="check"><input type="checkbox" data-ulead="${u.id}"${u.leader ? ' checked' : ''}>司会者</label>
-        <button class="btn small" data-usave="${u.id}">保存</button></div>` : ''}</article>`).join('')}`;
+        <div class="seg small" role="group" aria-label="役割">
+          <button type="button" data-urole="pub" data-id="${u.id}" aria-pressed="${u.role !== 'admin'}">伝道者</button>
+          <button type="button" data-urole="admin" data-id="${u.id}" aria-pressed="${u.role === 'admin'}">区域係</button></div>
+        <button class="btn small" data-usave="${u.id}">保存</button>
+        <button class="btn small" data-ulink="${u.id}">リンク・QR</button>
+        ${u.id === me().id ? '' : `<button class="btn small danger" data-uoff="${u.id}">使うのをやめる</button>`}</div>` : ''}</article>`).join('')}`;
+  if (admin) {
+    $('#adUserAdd').onclick = openAddUser;
+    $('#adJoinQr').onclick = openJoinQr;
+    $$('[data-ulink]', box).forEach(b => b.onclick = () => { const u = userById(b.dataset.ulink); if (u) openUserLink(u, false); });
+    $$('[data-urole]', box).forEach(b => b.onclick = () => {
+      const u = userById(b.dataset.id); if (!u) return;
+      const role = b.dataset.urole;
+      if (u.role === role) return;
+      if (!confirm(`${u.name}さんを「${role === 'admin' ? '区域係' : '伝道者'}」にします。よろしいですか？`)) return;
+      setUserGroup(u, normGroup($(`[data-ugroup="${u.id}"]`).value), $(`[data-uover="${u.id}"]`).checked, $(`[data-ulead="${u.id}"]`).checked, role);
+    });
+    $$('[data-uoff]', box).forEach(b => b.onclick = () => {
+      const u = userById(b.dataset.uoff); if (!u) return;
+      if (!confirm(`${u.name}さんが区域マップを使うのをやめます。\nこの人のスマホでは、次に開いたときに区域の情報が消えます。よろしいですか？`)) return;
+      setUserGroup(u, u.group || '', !!u.overseer, !!u.leader, u.role, false);
+    });
+  }
   if (admin) $$('[data-usave]', box).forEach(b => b.onclick = () => {
     const u = userById(b.dataset.usave); if (!u) return;
     setUserGroup(u, normGroup($(`[data-ugroup="${u.id}"]`).value), $(`[data-uover="${u.id}"]`).checked, $(`[data-ulead="${u.id}"]`).checked);
