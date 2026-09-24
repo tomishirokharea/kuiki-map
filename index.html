@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.14"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.15"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -759,6 +759,11 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .mcal .pe small{display:block;font-size:7.8pt;color:#333}
 .mfoot{font-size:8.5pt;margin:2mm 0 0;color:#333;display:flex;justify-content:space-between}
 
+/* ===== 名前を出す大きさ ===== */
+.nzbox{margin-top:8px;background:#F6F8F7;border-radius:10px;padding:6px 10px}
+.nzlabel{font-size:15px;margin:0}
+.nzrange{width:100%;height:40px}
+.nzends{display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin:0}
 /* ===== 部屋の名前 ===== */
 .nmpick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .nmpick .choice{min-height:66px;font-size:17px}
@@ -2756,6 +2761,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.15', items: [
+    ['倍', 'マンションの名前・学校などの名前を地図に出す大きさを、設定のスライダーで調整できるようにしました'],
+    ['受', '「自由に受け取ってよい」区域は、地図でえらべるようになりました。えらぶと、その場で受け取れます']
+  ] },
   { v: '2026.10.14', items: [
     ['公', '家の種別に「学校・役所・警察・消防」を足しました。種別をえらぶと、名前（〇〇小学校など）も入れられます'],
     ['名', '設定で、学校・お店などの名前と、マンションの名前を地図に出せます。区域カードから地図を開いたときの大きさ（それより拡大したとき）に出ます']
@@ -3325,6 +3334,7 @@ function openHelpers(tid) {
 const lockOn = () => !isAdmin() && D().settings.lockOthers !== 0;
 function openTerrIds() {
   const s = new Set(D().territories.filter(myTerr).map(t => t.id));
+  D().territories.forEach(t => { if (!t.holder && isFree(t)) s.add(t.id); }); // 「自由に受け取ってよい」区域も、地図でえらべる
   const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
   if (c) s.add(c.terrId);
   return s;
@@ -3471,7 +3481,10 @@ function selectTerr(id, opts) {
   syncTerrJump();
   renderTerrs(); renderHouses();
   if (t && o.fit) setTimeout(() => fitTerr(id), 80);
-  if (t && o.toast && beginner()) toast(`区域${t.no}をえらびました`);
+  if (t && !isAdmin() && !myTerr(t) && !t.holder && isFree(t)) {
+    // 自由に受け取ってよい区域：その場で受け取れるようにする
+    toast(`区域${t.no}は、自由に受け取ってよい区域です`, null, { label: '受け取る', fn: () => { reqForGroup = false; takeTerr(t.id); } });
+  } else if (t && o.toast && beginner()) toast(`区域${t.no}をえらびました`);
 }
 /* 今えらんでいる区域（選んでいないときは null） */
 function selTerrId() {
@@ -3576,9 +3589,18 @@ function nameZoomNow() {
   const v = Number(lsGet(NAMEZ_KEY));
   return v > 0 ? v : 17;
 }
+/* 名前を出す大きさの調整（設定のスライダー）：0＝区域カードの大きさ、＋1＝そこから1段拡大したとき（2倍）、−1＝1段縮めても（半分） */
+const nameZoomOff = k => { const v = Number(UI[k]); return isFinite(v) ? Math.max(-3, Math.min(3, v)) : 0; };
+function nameZoomText(v) {
+  if (!v) return '区域カードの大きさから';
+  const n = Math.abs(v), times = Math.round(Math.pow(2, n) * 10) / 10;
+  return v > 0 ? `${n}段 拡大したときから（${times}倍）` : `${n}段 縮めても（${times}分の1）`;
+}
 function houseNameLabels(list, dense) {
-  const apt = UI.aptName === 'on', fc = UI.fcName === 'on';
-  if ((!apt && !fc) || mode !== 'normal' || map.getZoom() < nameZoomNow() - 0.05) return;
+  const z = map.getZoom(), base = nameZoomNow();
+  const apt = UI.aptName === 'on' && z >= base + nameZoomOff('aptZoom') - 0.05;
+  const fc = UI.fcName === 'on' && z >= base + nameZoomOff('fcZoom') - 0.05;
+  if ((!apt && !fc) || mode !== 'normal') return;
   let n = 0;
   for (const h of list) {
     if (!h.label || n > 300) continue;
@@ -3625,9 +3647,11 @@ function dotStyle(h, ff, locked) {
 function fillTerrJump() {
   const sel = $('#terrJump');
   const all = D().territories.slice().sort(byNo);
-  const ts = isAdmin() ? all : all.filter(myTerr); // 伝道者は自分の区域カード（一緒に回る区域も）だけ
+  // 区域係はすべて。伝道者は自分の区域カード（一緒に回る区域も）と、自由に受け取ってよい区域
+  const freeT = t => !t.holder && isFree(t);
+  const ts = isAdmin() ? all : all.filter(t => myTerr(t) || freeT(t));
   const head = ts.length ? '区域をえらぶ' : '受け取っている区域はありません';
-  sel.innerHTML = `<option value="">${head}</option>` + ts.map(t => `<option value="${t.id}">区域 ${esc(t.no)}</option>`).join('');
+  sel.innerHTML = `<option value="">${head}</option>` + ts.map(t => `<option value="${t.id}">区域 ${esc(t.no)}${!isAdmin() && !myTerr(t) && freeT(t) ? '（自由に受け取れる）' : ''}</option>`).join('');
   syncTerrJump();
 }
 /* 左上のえらび欄：留守宅カードを見ているときは、そのことが分かるようにする */
@@ -6019,7 +6043,7 @@ function renderInbox() {
         <output class="wide">${st.groupMax}人まで</output>
         <button type="button" data-kset="groupMax" data-d="1" aria-label="人数を増やす">＋</button></div></div>` : ''}
     <div class="setrow">
-      <span>地図で、自分の区域以外を選べないようにする<br><small class="hint">オンにすると、伝道者の地図では、受け取っている区域・自分の留守宅カードの家だけを選べます。ほかの区域は灰色になります（係は、いつもすべて選べます）</small></span>
+      <span>地図で、自分の区域以外を選べないようにする<br><small class="hint">「自由に受け取ってよい」区域は、オンでもえらべます（その場で受け取れます）。区域係は、この設定にかかわらず、すべての区域をえらべます</small><br><small class="hint">オンにすると、伝道者の地図では、受け取っている区域・自分の留守宅カードの家だけを選べます。ほかの区域は灰色になります（係は、いつもすべて選べます）</small></span>
       <div class="seg" role="group" aria-label="自分の区域以外を選べないようにする">
         <button type="button" data-sset="lockOthers" data-v="1" aria-pressed="${st.lockOthers !== 0}">オン</button>
         <button type="button" data-sset="lockOthers" data-v="0" aria-pressed="${st.lockOthers === 0}">オフ</button></div></div>
@@ -6613,8 +6637,15 @@ function locate(after) {
 
 /* ---------- 表示の設定（このスマホ・この人だけ。サーバーには送らない） ----------
    かんたん：文字の大きさだけ　くわしく：色・文字の種類・こさ・間隔・説明文・最初の画面・地図 */
+/* 名前を出す大きさのスライダー（設定の画面） */
+function nameZoomSlider(key) {
+  const v = nameZoomOff(key);
+  return `<div class="nzbox"><p class="nzlabel">出す大きさ：<b id="nzOut_${key}">${nameZoomText(v)}</b></p>
+    <input type="range" class="nzrange" data-nz="${key}" min="-2" max="3" step="0.5" value="${v}" aria-label="名前を出す大きさ">
+    <p class="nzends"><span>← 縮めても出す</span><span>拡大したときだけ →</span></p></div>`;
+}
 const ICONS = ['区', '家', '図', '心', '🏠', '🗺️', '📖', '🚪', '✅', '⭐', '🚶', '☀️'];
-const UI_DEFAULT = { fTime: 'off', fFollow: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
+const UI_DEFAULT = { fTime: 'off', fFollow: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
 /* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
   standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
@@ -6847,8 +6878,10 @@ function openUiSheet() {
       <div class="featrow"><p><b>進み具合</b><small>受け取ってから訪ねた家・部屋の数と、横のバー</small></p>${seg('cProg', [['off', '出さない'], ['on', '出す']])}</div>
       <div class="featrow"><p><b>今のおすすめ</b><small>今の時間帯に訪ねるとよい家の数</small></p>${seg('cReco', [['off', '出さない'], ['on', '出す']])}</div>
       <h3 class="sub">地図に出す名前</h3>
-      <div class="featrow"><p><b>マンション・アパートの名前</b><small>区域カードから地図を開いたときの大きさ（それより拡大したとき）に出ます</small></p>${seg('aptName', [['off', '出さない'], ['on', '出す']])}</div>
-      <div class="featrow"><p><b>学校・役所・お店などの名前</b><small>家の種別をえらんで、名前を入れた建物です。出る大きさは上と同じです</small></p>${seg('fcName', [['off', '出さない'], ['on', '出す']])}</div>
+      <div class="featrow"><p><b>マンション・アパートの名前</b><small>はじめは、区域カードから地図を開いたときの大きさから出ます</small></p>${seg('aptName', [['off', '出さない'], ['on', '出す']])}
+        ${UI.aptName === 'on' ? nameZoomSlider('aptZoom') : ''}</div>
+      <div class="featrow"><p><b>学校・役所・お店などの名前</b><small>家の種別をえらんで、名前を入れた建物です</small></p>${seg('fcName', [['off', '出さない'], ['on', '出す']])}
+        ${UI.fcName === 'on' ? nameZoomSlider('fcZoom') : ''}</div>
       <h3 class="sub">奉仕の予定</h3>
       <div class="featrow"><p><b>予定の一覧</b><small>ホームの「奉仕の予定」で、カレンダーの下の一覧に出す予定</small></p>${seg('calList', [['upcoming', '今日から'], ['all', 'その月すべて']], UI.calList || 'upcoming')}</div>
       <h3 class="sub">家の画面に出すもの</h3>
@@ -6929,6 +6962,11 @@ function openUiSheet() {
         uiSave(); applyUi(); toast('アイコンの名前を変えました');
       };
     }
+    $$('[data-nz]', $('#sheet')).forEach(r => {
+      const k = r.dataset.nz;
+      r.oninput = () => { $('#nzOut_' + k).textContent = nameZoomText(Number(r.value)); };
+      r.onchange = () => { UI[k] = Number(r.value); uiSave(); renderHouses(); };
+    });
     if ($('#uiPct')) {
       const rg = $('#uiPct');
       // 動かしている間は見本だけを変え、指をはなしたら画面全体に反映する（操作中に画面が動かないように）
