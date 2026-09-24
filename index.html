@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.11"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.12"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -770,6 +770,7 @@ header.top h1{white-space:nowrap}
 .who{min-width:0}
 .who select{min-width:0;text-overflow:ellipsis}
 img,canvas,video{max-width:100%}
+.leaflet-container canvas{max-width:none!important;max-height:none!important} /* 地図の点を描く部品は、画面の大きさで縮めない */
 @media (hover:hover) and (pointer:fine){
   .btn:hover,.chip:hover,.choice:hover,.seg button:hover,.namebtn:hover{filter:brightness(.96)}
   nav.tabs button:hover{background:var(--terr-soft)}
@@ -980,6 +981,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
           <span><i class="pin st-plain biz">${kindBadge('office')}</i>住居でない建物（会社・店舗・事務所・工場）</span>
           <span><i class="pin apt">集${LOCK_SVG ? '<b class="lk">' + LOCK_SVG + '</b>' : ''}</i>オートロックの集合住宅</span>
         </div>
+        <p class="hint">地図を縮めているときは、家は<b>小さな点</b>で出ます（白＝まだ、緑＝今回訪ねた、青＝最近会えた、赤＝拒否、点線＝仮の家）。拡大すると、くわしい印になります。</p>
         <p class="hint">色と文字は、この区域を受け取ってからの結果です。それより前の記録は、家をタップすると見られます。</p>
         <p class="hint">行きたい場所を<b>長押し</b>すると、そこまでの道順をGoogleマップで見られます。</p>
         </details>
@@ -2718,6 +2720,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.12', items: [
+    ['点', '地図を縮めているときは、家を小さな点で出すようにしました。拡大すると、くわしい印になります'],
+    ['番', '区域の番号が、家の印にかくれないようにしました']
+  ] },
   { v: '2026.10.11', items: [
     ['再', '設定の「使う機能」で「再訪問」を使うにすると、会えたあとに「再訪問する」をえらび、メモを残せます。下に「再訪問」のタブが出ます'],
     ['消', '「家を消す」で仮の家を押すと、確認なしですぐ消えます。まちがえたときは、下の「取り消す」でもどせます'],
@@ -2982,6 +2988,7 @@ const headHtml = (t, title, sub) => `<div class="sheet-head">${t ? `<span class=
 const navLink = h => `<a class="btn block" href="https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}" target="_blank" rel="noopener">Googleマップで道順を見る</a>`;
 
 /* ---------- 地図 ---------- */
+let dotRenderer = null;
 let map, terrLayer, houseLayer, baseLayers, baseName = 'pale', mode = 'normal';
 let tmpMarker = null, draw = null, myPos = null, posMarker = null, firstMapShow = true, zoomCtl = null;
 
@@ -2998,6 +3005,12 @@ function initMap() {
   baseLayers.pale.addTo(map);
   terrLayer = L.layerGroup().addTo(map);
   houseLayer = L.layerGroup().addTo(map);
+  map.createPane('labelPane'); // 区域の番号は、家の印より上に出す（押しても下の家に届く）
+  map.getPane('labelPane').style.zIndex = 650;
+  map.getPane('labelPane').style.pointerEvents = 'none';
+  map.createPane('dotPane'); // 家の小さな点：区域の線より上（押したとき、区域ではなく家がえらばれるように）
+  map.getPane('dotPane').style.zIndex = 450;
+  dotRenderer = L.canvas({ pane: 'dotPane', padding: 0.3, tolerance: 12 }); // 小さな点は、見た目より広い範囲で押せる
   map.on('click', e => {
     if (mode === 'draw') { if (drawTap === 'line') drawClick(e.latlng); else addAt(e.latlng, true); }
     else if (mode === 'add') addAt(e.latlng, false);
@@ -3381,7 +3394,7 @@ function renderTerrs() {
     if (tapOk && !gray) poly.on('click', () => selectTerr(t.id === cur ? null : t.id, { toast: t.id !== cur }));
     L.marker(center(t.polygon), {
       icon: L.divIcon({ className: `terr-label${dim ? ' faint' : ''}${gray ? ' gray' : ''}${t.group && !gray ? ' grp' : ''}`, html: `<span>${t.group ? 'G ' : ''}${esc(t.no)}</span>`, iconSize: [0, 0] }),
-      interactive: false, keyboard: false
+      interactive: false, keyboard: false, pane: 'labelPane'
     }).addTo(terrLayer);
     // 今日わたした範囲（担当者には全部、わたされた人には自分の範囲だけ）
     const mp = myPart(t), hold = t.holder === me().id;
@@ -3391,7 +3404,7 @@ function renderTerrs() {
       const own = mp && p.id === mp.id;
       L.polygon(p.poly, { color: own ? '#00796B' : '#C2410C', weight: 4, dashArray: own ? null : '8 6',
         fillColor: own ? '#00796B' : '#C2410C', fillOpacity: own ? 0.08 : 0.05, interactive: false }).addTo(terrLayer);
-      L.marker(center(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false }).addTo(terrLayer);
+      L.marker(center(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
     });
   }
 }
@@ -3461,22 +3474,70 @@ function renderHouses() {
     : fade > 0.05
       ? D().houses.filter(h => (!sel || h.terrId === sel) && b.contains([h.lat, h.lng]))
       : null;
-  const show = !!list && list.length <= 800; // 印が多すぎると動きが重くなるので、拡大してから出す
+  const show = !!list && list.length <= 4000; // 小さな点なら多くても軽い。それ以上は拡大してから出す
   setZoomHint(!show);
   if (!show) return;
   const mine = myPlaces(), dimOthers = !sel && !isAdmin(); // 何も選んでいないときは、自分の区域以外を薄く
   const okT = lockOn() && mode === 'normal' ? openTerrIds() : null;
+  // 家が混んでいるとき（印を並べると画面の半分近くをおおうとき）は、小さな点で出す
+  const sz = map.getSize(), pinPx = 36 * (PINS[uiEff().pin] || PINS.normal)[0];
+  // （いちばん近くまで拡大したとき・19以上は、いつもくわしい印）
+  const dense = !fkeys && map.getZoom() < 19 && (list.length > 800 || list.length * pinPx * pinPx > sz.x * sz.y * 0.45);
   for (const h of list) {
     const allowed = !okT || canTapHouse(h, okT, mine);
+    const op = fade * (allowed && dimOthers && !isMyHouse(h, mine) ? 0.4 : 1);
+    // 混んでいても大きく出す家：おすすめの番号・「地図で見る」でえらんだ家・留守宅カードの家
+    const big = !dense || (roundNums && roundNums.has(h.id)) || (target && target.hid === h.id) ||
+      (!!ff && allowed && targets(h).some(u => ff(K(h.id, u)) === 'hl'));
+    if (!big) {
+      const st = dotStyle(h, ff, !allowed);
+      const d = L.circleMarker([h.lat, h.lng], Object.assign({
+        renderer: dotRenderer, interactive: allowed, bubblingMouseEvents: false,
+        opacity: op * st.o, fillOpacity: op * st.o, dashArray: h.prov ? '3 3' : null
+      }, st.s));
+      if (allowed) d.on('click', () => onHouseTap(h.id));
+      d.addTo(houseLayer);
+      continue;
+    }
     const m = L.marker([h.lat, h.lng], {
       icon: houseIcon(h, ff, !allowed), title: h.label || '',
-      opacity: fade * (allowed && dimOthers && !isMyHouse(h, mine) ? 0.4 : 1),
+      opacity: op,
       interactive: allowed, keyboard: allowed,
       zIndexOffset: roundNums && roundNums.has(h.id) ? 1000 : 0
     });
     if (allowed) m.on('click', () => onHouseTap(h.id));
     m.addTo(houseLayer);
   }
+}
+/* 小さな点の色：白＝まだ、緑＝今回訪ねた、青＝最近会えた、赤＝拒否、灰＝選べない家 */
+const DOT = {
+  plain: { fillColor: '#fff', color: '#17324D', weight: 2 },
+  done: { fillColor: '#2E9E7E', color: '#fff', weight: 1.5 },
+  prev: { fillColor: '#1565C0', color: '#fff', weight: 1.5 },
+  dnc: { fillColor: '#C62828', color: '#fff', weight: 1.5 },
+  lock: { fillColor: '#C9CFCC', color: '#9AA5A0', weight: 1.5 }
+};
+function dotStyle(h, ff, locked) {
+  const r = (h.type === 'apt' ? 8 : 6) * (PINS[uiEff().pin] || PINS.normal)[0];
+  if (locked) return { s: Object.assign({ radius: r }, DOT.lock), o: 0.6 };
+  const since = periodStart(h), ks = targets(h).map(u => K(h.id, u));
+  if (!ks.length) return { s: Object.assign({ radius: r }, DOT.plain), o: 1 };
+  const one = k => {
+    if (D().dnc[k]) return 'dnc';
+    const f = ff ? ff(k) : null;
+    if (f === 'dim') return 'dim';
+    if (f === 'done') return 'done';
+    if (f === 'prev') return 'prev';
+    if (f) return 'plain';
+    const p = pinState(k, since);
+    return (p === 'met' || p === 'away') ? 'done' : (p === 'plain' && recentMet(k) ? 'prev' : 'plain');
+  };
+  const sts = ks.map(one);
+  // 集合住宅：まだの部屋が1つでもあれば「まだ」、全部すんでいれば「すんだ」
+  const st = sts.includes('plain') ? 'plain' : sts.every(x => x === 'dnc') ? 'dnc'
+    : sts.every(x => x === 'dim') ? 'dim' : sts.includes('done') ? 'done' : sts.includes('prev') ? 'prev' : 'plain';
+  if (st === 'dim') return { s: Object.assign({ radius: r }, DOT.plain), o: 0.3 };
+  return { s: Object.assign({ radius: r }, DOT[st]), o: 1 };
 }
 function fillTerrJump() {
   const sel = $('#terrJump');
