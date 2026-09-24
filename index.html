@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.13"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.14"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -635,11 +635,21 @@ body.strong .pin.st-plain{border-width:4px}
 .pin .kb.k-shop{background:#E65100}
 .pin .kb.k-biz{background:#00695C}
 .pin .kb.k-factory{background:#5D4037}
+.pin .kb.k-school{background:#6A1B9A}
+.pin .kb.k-gov{background:#37474F}
+.pin .kb.k-police{background:#1A237E}
+.pin .kb.k-fire{background:#B71C1C}
+/* 地図に出す名前（マンション・学校など） */
+.hname{position:relative;width:0;height:0}
+.hname span{position:absolute;left:0;top:20px;transform:translateX(-50%);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:#ffffffeb;border:1.5px solid var(--ink2);border-radius:7px;padding:0 6px;font-size:12px;font-weight:700;color:var(--ink);box-shadow:0 1px 2px #0003;font-family:"BIZ UDPGothic",sans-serif;line-height:1.5}
+.hname.dot span{top:9px}
+.hname span.fc{border-color:#6A1B9A;color:#4A148C}
 .pin .lk{background:#5B2E8C}
 .pin .kb ~ .lk{bottom:14px}
 .pin .kb svg,.pin .lk svg{width:15px;height:15px;stroke-width:2.4}
 .pin .aptname{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:4px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#ffffffe6;border:1px solid var(--ink2);border-radius:6px;padding:0 4px;font-size:12px;font-weight:700;color:var(--ink);font-style:normal}
-.kindpick{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.kindpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:6px}
 .kchip{min-height:72px;border-radius:12px;border:2px solid var(--line);background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;font-weight:700;color:var(--ink);padding:4px 2px}
 .kchip svg{width:24px;height:24px}
 .kchip[aria-pressed="true"]{border-color:var(--ink);background:var(--terr-soft)}
@@ -998,7 +1008,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
           <span><i class="pin apt">集<i>3</i></i>集合住宅（数字はまだの部屋）</span>
             <span><i class="pin st-plain"><s>1</s></i>おすすめの順番</span>
           <span><i class="pin st-plain locked"></i>自分の区域以外（選べません）</span>
-          <span><i class="pin st-plain biz">${kindBadge('office')}</i>住居でない建物（会社・店舗・事務所・工場）</span>
+          <span><i class="pin st-plain biz">${kindBadge('office')}</i>住居でない建物（会社・店舗・事務所・工場・学校・役所・警察・消防）</span>
           <span><i class="pin apt">集${LOCK_SVG ? '<b class="lk">' + LOCK_SVG + '</b>' : ''}</i>オートロックの集合住宅</span>
         </div>
         <p class="hint">地図を縮めているときは、家は<b>小さな点</b>で出ます（白＝まだ、緑＝今回訪ねた、青＝最近会えた、赤＝拒否、点線＝仮の家）。拡大すると、くわしい印になります。</p>
@@ -2746,6 +2756,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.14', items: [
+    ['公', '家の種別に「学校・役所・警察・消防」を足しました。種別をえらぶと、名前（〇〇小学校など）も入れられます'],
+    ['名', '設定で、学校・お店などの名前と、マンションの名前を地図に出せます。区域カードから地図を開いたときの大きさ（それより拡大したとき）に出ます']
+  ] },
   { v: '2026.10.13', items: [
     ['名', 'アパートの部屋の名前を直せるようになりました（101→A-1 など）。名前を直しても、これまでの記録はそのまま残ります'],
     ['型', 'アパートを追加するとき、部屋の名前の付け方（階＋番号・棟＋番号・通し番号・自由に入力）をえらべます。「4と9を使わない」もえらべます'],
@@ -3104,11 +3118,17 @@ const KINDS = {
   shop: ['店舗', SVG('<path d="M5 10h14v10H5z"/><path d="M3.5 10 5 5h14l1.5 5"/><path d="M10 20v-5h4v5"/>')],
   biz: ['事務所', SVG('<path d="M13 3H7v18h11V8z"/><path d="M13 3v5h5"/><path d="M10 13h5M10 17h5"/>')],
   factory: ['工場', SVG('<path d="M3 21V11l5 3.5V11l5 3.5V7.5l8 5V21z"/><path d="M7 17h1M12 17h1M17 17h1"/>')],
+  school: ['学校', SVG('<path d="M2 9.5 12 4l10 5.5L12 15z"/><path d="M6.5 12v4.2c0 1.5 2.5 2.8 5.5 2.8s5.5-1.3 5.5-2.8V12"/><path d="M21 10v5"/>')],
+  gov: ['役所', SVG('<path d="M3 21h18"/><path d="M4 9.5h16L12 4z"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8"/>')],
+  police: ['警察', SVG('<path d="M12 3l7 3v5c0 4.6-3 8-7 10-4-2-7-5.4-7-10V6z"/><path d="M9 12l2.2 2.2L15.5 10"/>')],
+  fire: ['消防', SVG('<path d="M12 3c.6 3.2 5.5 5.2 5.5 10.2a5.5 5.5 0 0 1-11 0c0-2.8 1.8-4 2.2-6 1.4 1 2.1 2.2 2.3 3.6C11.6 8.4 11.4 5.8 12 3z"/>')],
 };
 const LOCK_SVG = SVG('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/>');
 const kindOf = h => (h && KINDS[h.kind] ? h.kind : 'home');
 const unitKind = (h, u) => { const m = h && h.uk; const v = m && m[u]; return KINDS[v] ? v : 'home'; };
 const kindName = k => (KINDS[k] ? KINDS[k][0] : '住居');
+const KIND_PH = { office: '例：〇〇株式会社', shop: '例：〇〇スーパー', biz: '例：〇〇事務所', factory: '例：〇〇工場',
+  school: '例：〇〇小学校', gov: '例：〇〇市役所', police: '例：〇〇警察署', fire: '例：〇〇消防署' };
 /* 集合住宅の印：居住の部屋が1つでもあれば住居あつかい。全部お店・会社などのときだけ、そのアイコンを出す */
 function aptKind(h) {
   if (!h.units.length) return kindOf(h);
@@ -3198,7 +3218,7 @@ function houseIcon(h, ff, locked) {
     const left = aptTodo(h, since);
     const rj = targets(h).some(u => D().dnc[K(h.id, u)]) ? '<b class="rj">拒</b>' : '';
     const ak = aptKind(h);
-    const nameTag = UI.aptName === 'on' && h.label ? `<b class="aptname">${esc(h.label)}</b>` : '';
+    const nameTag = ''; // 名前は、renderHouses で別の札として出す（小さな点のときも出せるように）
     return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${locked ? '' : kindBadge(ak) + lockBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
   }
   const k = K(h.id, ''), s = pinState(k, since), fo = '';
@@ -3539,6 +3559,38 @@ function renderHouses() {
     if (allowed) m.on('click', () => onHouseTap(h.id));
     m.addTo(houseLayer);
   }
+  houseNameLabels(list, dense);
+}
+/* 名前を出す大きさ：区域カードから地図を開いたときの大きさ（区域が画面にちょうど入る大きさ）から。
+   区域をえらんでいるときはその区域の大きさ、えらんでいないときは最後に開いた区域の大きさ */
+const NAMEZ_KEY = 'kuiki_name_zoom';
+function terrFitZoom(t) {
+  const bar = $('#cardBar'), tools = $('#mapTools');
+  const top = tools && !tools.hidden ? tools.offsetHeight + 12 : 16;
+  const bottom = bar && !bar.hidden ? bar.offsetHeight + 16 : 16;
+  return map.getBoundsZoom(L.latLngBounds(t.polygon), false, L.point(24, top + bottom));
+}
+function nameZoomNow() {
+  const id = selTerrId(), t = id && terrById(id);
+  if (t && okPoly(t.polygon)) return terrFitZoom(t);
+  const v = Number(lsGet(NAMEZ_KEY));
+  return v > 0 ? v : 17;
+}
+function houseNameLabels(list, dense) {
+  const apt = UI.aptName === 'on', fc = UI.fcName === 'on';
+  if ((!apt && !fc) || mode !== 'normal' || map.getZoom() < nameZoomNow() - 0.05) return;
+  let n = 0;
+  for (const h of list) {
+    if (!h.label || n > 300) continue;
+    const k = h.type === 'apt' ? aptKind(h) : kindOf(h);
+    const isFc = k !== 'home';
+    if (h.type === 'apt' ? !(apt || (fc && isFc)) : !(fc && isFc)) continue; // 一戸建ての「目印」は出さない
+    n++;
+    L.marker([h.lat, h.lng], {
+      icon: L.divIcon({ className: 'hname' + (dense && !(roundNums && roundNums.has(h.id)) ? ' dot' : ''), html: `<span class="${isFc ? 'fc' : ''}">${esc(h.label)}</span>`, iconSize: [0, 0] }),
+      pane: 'labelPane', interactive: false, keyboard: false
+    }).addTo(houseLayer);
+  }
 }
 /* 小さな点の色：白＝まだ、緑＝今回訪ねた、青＝最近会えた、赤＝拒否、灰＝選べない家 */
 const DOT = {
@@ -3608,6 +3660,7 @@ function fitTerr(id) {
   const top = tools && !tools.hidden ? tools.offsetHeight + 12 : 16;
   const bottom = bar && !bar.hidden ? bar.offsetHeight + 16 : 16;
   map.fitBounds(L.latLngBounds(t.polygon), { paddingTopLeft: [12, top], paddingBottomRight: [12, bottom] });
+  lsSet(NAMEZ_KEY, String(terrFitZoom(t))); // この大きさから、マンション・学校などの名前を出す
 }
 function fitAll() {
   const pts = polyTerrs().flatMap(t => t.polygon);
@@ -3871,13 +3924,17 @@ function openTarget(hid, unit, fromBuilding, review) {
 
     b += navLink(h);
     if (unit) {
-      b += `<details class="more"><summary>この部屋の編集</summary>
+      b += `<details class="more"${st.editOpen ? ' open' : ''}><summary>この部屋の編集</summary>
         <p class="q">種別</p>${kindChips(unitKind(h, unit))}
         <p class="q">部屋の名前</p><button class="btn block" id="fRename">部屋の名前を直す（101→A-1 など）</button></details>`;
     }
     if (!unit) {
-      b += `<details class="more"><summary>この家の編集</summary>
-        <p class="q">種別</p>${kindChips(kindOf(h))}
+      const hk = kindOf(h);
+      b += `<details class="more"${st.editOpen ? ' open' : ''}><summary>この家の編集</summary>
+        <p class="q">種別</p>${kindChips(hk)}
+        ${hk !== 'home' ? `<label class="field"><span>${esc(kindName(hk))}の名前（なくてもよい）</span><span class="inline">
+          <input type="text" id="fHName" maxlength="30" value="${esc(h.label || '')}" placeholder="${esc(KIND_PH[hk] || '例：〇〇')}"><button class="btn small" id="fHNameSave">保存</button></span>
+          <small class="hint">設定で「学校・役所・お店などの名前」を出すにすると、地図に出ます。</small></label>` : ''}
         ${h.type === 'house' ? '<p class="q">建物</p><button class="btn block" id="fToApt">アパート・マンションに変える</button>' : ''}
         ${delReqOf(h.id) ? '<p class="tag-warn">この家は削除を申請中です（区域係の確認待ち）</p>'
           : `<button class="btn small danger" id="fDel">${isAdmin() ? 'この家を削除する' : 'この家の削除を申請する'}</button>`}</details>`;
@@ -3927,6 +3984,11 @@ function openTarget(hid, unit, fromBuilding, review) {
     };
     on('provDrop', () => dropProvHouse(hid));
     on('fToApt', () => openConvertApt(hid));
+    on('fHNameSave', () => {
+      const v = $('#fHName').value.trim();
+      commit(v ? `名前を「${v}」にしました` : '名前を消しました', () => { h.label = v; });
+      st.editOpen = true; paint();
+    });
     on('fRename', () => openUnitNames(hid, () => openTarget(hid, unit, fromBuilding))); // まちがえたら、下の「取り消す」でもどせる
     $$('[data-vdel]', S).forEach(x => x.onclick = () => {
       const v = D().visits.find(y => y.id === x.dataset.vdel);
@@ -3935,6 +3997,7 @@ function openTarget(hid, unit, fromBuilding, review) {
       deleteVisit(v, paint);
     });
     $$('[data-kind]', S).forEach(x => x.onclick = () => {
+      st.editOpen = true; // 種別をえらんだあとも、名前を入れられるように開いたままにする
       if (unit) setUnitKind(hid, unit, x.dataset.kind, paint);
       else setHouseKind(hid, x.dataset.kind, paint);
     });
@@ -4804,8 +4867,8 @@ function openAddForm(ll, tid) {
       </div>
       ${apt ? `<label class="check locrow"><input type="checkbox" id="fLock"${f.lock ? ' checked' : ''}>オートロックの建物</label>
       <p class="hint">あとからでも、建物の編集で変えられます。</p>` : ''}
-      <label class="field"><span>${apt ? '建物名' : '目印（見た目など）'}</span>
-        <input type="text" id="fLabel" maxlength="30" value="${esc(f.label)}" placeholder="${apt ? '例：〇〇ハイツ' : '例：青い門・2階建て'}">
+      <label class="field"><span>${apt ? '建物名' : f.kind !== 'home' ? `${esc(kindName(f.kind))}の名前（なくてもよい）` : '目印（見た目など）'}</span>
+        <input type="text" id="fLabel" maxlength="30" value="${esc(f.label)}" placeholder="${apt ? '例：〇〇ハイツ' : f.kind !== 'home' ? esc(KIND_PH[f.kind] || '例：〇〇') : '例：青い門・2階建て'}">
         <small class="hint">住んでいる人の名前は書かないでください。</small></label>
       <p class="q">${apt ? '建物ぜんたいの種別' : '種別'}</p>${kindChips(f.kind)}
       ${apt ? '<p class="hint">部屋ごとの種別は、あとから部屋の画面で変えられます。</p>' : ''}
@@ -6551,7 +6614,7 @@ function locate(after) {
 /* ---------- 表示の設定（このスマホ・この人だけ。サーバーには送らない） ----------
    かんたん：文字の大きさだけ　くわしく：色・文字の種類・こさ・間隔・説明文・最初の画面・地図 */
 const ICONS = ['区', '家', '図', '心', '🏠', '🗺️', '📖', '🚪', '✅', '⭐', '🚶', '☀️'];
-const UI_DEFAULT = { fTime: 'off', fFollow: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', terrColor: 'theme', terrWidth: 'normal', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
+const UI_DEFAULT = { fTime: 'off', fFollow: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
 /* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
   standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
@@ -6783,6 +6846,9 @@ function openUiSheet() {
       <h3 class="sub">区域カードに出すもの</h3>
       <div class="featrow"><p><b>進み具合</b><small>受け取ってから訪ねた家・部屋の数と、横のバー</small></p>${seg('cProg', [['off', '出さない'], ['on', '出す']])}</div>
       <div class="featrow"><p><b>今のおすすめ</b><small>今の時間帯に訪ねるとよい家の数</small></p>${seg('cReco', [['off', '出さない'], ['on', '出す']])}</div>
+      <h3 class="sub">地図に出す名前</h3>
+      <div class="featrow"><p><b>マンション・アパートの名前</b><small>区域カードから地図を開いたときの大きさ（それより拡大したとき）に出ます</small></p>${seg('aptName', [['off', '出さない'], ['on', '出す']])}</div>
+      <div class="featrow"><p><b>学校・役所・お店などの名前</b><small>家の種別をえらんで、名前を入れた建物です。出る大きさは上と同じです</small></p>${seg('fcName', [['off', '出さない'], ['on', '出す']])}</div>
       <h3 class="sub">奉仕の予定</h3>
       <div class="featrow"><p><b>予定の一覧</b><small>ホームの「奉仕の予定」で、カレンダーの下の一覧に出す予定</small></p>${seg('calList', [['upcoming', '今日から'], ['all', 'その月すべて']], UI.calList || 'upcoming')}</div>
       <h3 class="sub">家の画面に出すもの</h3>
@@ -6834,7 +6900,6 @@ function openUiSheet() {
         <p class="q">開いたときの画面</p>${seg('start', [['home', 'ホーム'], ['cards', '区域カード'], ['map', '地図']])}`;
       const S_MAP = `<h3 class="sub">地図</h3>
         <p class="q">家の印の大きさ</p>${seg('pin', Object.entries(PINS).map(([k, v]) => [k, v[1]]))}
-        <p class="q">集合住宅の名前を地図に出す</p>${seg('aptName', [['off', '出さない'], ['on', '出す']])}
         <p class="q">自分の区域を回るときの表示</p>${seg('round', [['reco', 'おすすめ順'], ['progress', '進み具合']], me().roundMode || 'reco')}`;
       S_VIEW += (tab === 'map' ? [S_MAP, S_TEXT, S_COLOR, S_SCREEN, S_ICON] : tab === 'reco' || tab === 'cards' ? [S_TEXT, S_COLOR, S_SCREEN, S_ICON, S_MAP] : [S_TEXT, S_SCREEN, S_COLOR, S_ICON, S_MAP]).join('');
     }
@@ -6889,7 +6954,7 @@ function openUiSheet() {
       if (k === 'base') setBase(v);
       if (k === 'cProg' || k === 'cReco') renderAll();
       if (k === 'terrColor' || k === 'terrWidth') renderTerrs();
-      if (k === 'aptName' || k === 'pin') renderHouses();
+      if (k === 'aptName' || k === 'fcName' || k === 'pin') renderHouses();
       if (k === 'calList') renderHome();
       paint(k !== 'mode');
     });
