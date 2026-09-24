@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.12"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.13"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -748,6 +748,26 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .mcal .pe b{font-size:9.4pt}
 .mcal .pe small{display:block;font-size:7.8pt;color:#333}
 .mfoot{font-size:8.5pt;margin:2mm 0 0;color:#333;display:flex;justify-content:space-between}
+
+/* ===== 部屋の名前 ===== */
+.nmpick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.nmpick .choice{min-height:66px;font-size:17px}
+.unitprev{background:#F6F8F7;border-radius:12px;padding:8px 10px;margin:10px 0}
+.unitprev div{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.unitprev span{background:#fff;border:1.5px solid var(--line);border-radius:7px;padding:1px 7px;font-weight:700;font-size:15px}
+.field .floorrow .bname,.floorrow .bname{width:64px!important;min-width:0;min-height:44px;border-radius:10px;border:2px solid var(--ink2);text-align:center;font-size:18px;font-weight:700;flex:none}
+.nmrules{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.nmrules button{min-height:62px;border-radius:12px;border:2px solid var(--line);background:#fff;font-weight:700;font-size:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.3;padding:4px}
+.nmrules button small{font-weight:400;font-size:12px;color:var(--ink2)}
+.nmrules button[aria-pressed="true"]{border-color:var(--brand);background:var(--terr-soft)}
+.rulebox{background:#F6F8F7;border-radius:12px;padding:10px 12px;margin:10px 0}
+.renlist{display:grid;gap:6px}
+.renrow{display:grid;grid-template-columns:minmax(64px,auto) auto 1fr;gap:8px;align-items:center}
+.renrow .old{font-weight:700;color:var(--ink2);text-align:right}
+.renrow input{min-height:48px;border-radius:10px;border:2px solid var(--ink2);padding:0 10px;font-size:18px;font-weight:700;width:100%}
+.renrow.chg input{border-color:var(--terr);background:var(--terr-soft)}
+.renrow.dup input{border-color:var(--danger);background:var(--ref-bg)}
+.ugrp{font-weight:700;margin:12px 0 6px;padding:2px 10px;border-left:5px solid var(--terr);background:var(--terr-soft);border-radius:0 8px 8px 0}
 
 /* ===== お知らせ ===== */
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--brand);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
@@ -2162,7 +2182,8 @@ function expandHouse(a) {
     units: a[6] ? String(a[6]).split('|') : [],
     createdAt: new Date((a[8] || 0) * 1000).toISOString(), createdBy: a[7] || '',
     kind: a[9] || undefined, lock: a[10] ? true : undefined, prov: a[12] ? true : undefined,
-    uk: a[11] ? (() => { try { return JSON.parse(a[11]); } catch (e) { return undefined; } })() : undefined
+    uk: a[11] ? (() => { try { return JSON.parse(a[11]); } catch (e) { return undefined; } })() : undefined,
+    ul: a[13] ? (() => { try { return JSON.parse(a[13]); } catch (e) { return undefined; } })() : undefined
   };
 }
 async function apiRetry(action, extra, onRetry) {
@@ -2623,7 +2644,12 @@ const fol = k => D().follows[k] || null;
 const followIdle = f => daysSince(f.touchedAt);
 function followStage(f) { const d = followIdle(f), s = D().settings; return d >= s.escalateDays ? 2 : d >= s.remindDays ? 1 : 0; }
 function parseKey(k) { const i = k.indexOf('|'); return [k.slice(0, i), k.slice(i + 1)]; }
-function targetName(h, unit) { return h.type === 'apt' ? `${esc(h.label || '集合住宅')} ${esc(unit)}号室` : esc(h.label || '家'); }
+/* 部屋の「表示名」：部屋には変わらない中の番号（units）があり、名前だけを ul で変えられる。
+   記録は中の番号に結びついているので、名前を何度直しても記録はそのまま */
+const uName = (h, u) => (h && h.ul && h.ul[u]) || u;
+const unitTitle = (h, u) => { const n = uName(h, u); return /\d$/.test(n) ? n + '号室' : n; };
+const cleanUnit = v => String(v || '').replace(/[|]/g, '').replace(/[\s　]+/g, '').slice(0, 12);
+function targetName(h, unit) { return h.type === 'apt' ? `${esc(h.label || '集合住宅')} ${esc(unitTitle(h, unit))}` : esc(h.label || '家'); }
 /* 年代・また訪ねたいかを見られるのは、区域係・その区域の担当者・再訪問を受け持っている本人・記録した本人だけ */
 function canSeeDetail(k, house) {
   if (isAdmin()) return true;
@@ -2720,6 +2746,11 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.13', items: [
+    ['名', 'アパートの部屋の名前を直せるようになりました（101→A-1 など）。名前を直しても、これまでの記録はそのまま残ります'],
+    ['型', 'アパートを追加するとき、部屋の名前の付け方（階＋番号・棟＋番号・通し番号・自由に入力）をえらべます。「4と9を使わない」もえらべます'],
+    ['階', '部屋の一覧を、階ごと・棟ごとに分けて出すようにしました']
+  ] },
   { v: '2026.10.12', items: [
     ['点', '地図を縮めているときは、家を小さな点で出すようにしました。拡大すると、くわしい印になります'],
     ['番', '区域の番号が、家の印にかくれないようにしました']
@@ -2945,7 +2976,7 @@ function toast(msg, undoFn, action) {
 /* ＋−や選択ボタンで同じ画面を描き直すときは、見ていた位置と押したボタンをそのままにする */
 let sheetKeep = false;
 document.addEventListener('click', e => {
-  const t = e.target.closest && e.target.closest('#sheet .stepper button, #sheet .chips button, #sheet [data-type], #sheet [data-wd], #sheet #evAdd, #sheet #dMinSave, #sheet #fPreview, #sheet #pgGo');
+  const t = e.target.closest && e.target.closest('#sheet .stepper button, #sheet .chips button, #sheet [data-type], #sheet [data-wd], #sheet #evAdd, #sheet #dMinSave, #sheet #fPreview, #sheet [data-nm], #sheet [data-rule], #sheet #nmSkip, #sheet #pgGo');
   if (t) { sheetKeep = true; setTimeout(() => { sheetKeep = false; }, 0); }
 }, true);
 function setSheet(html) {
@@ -3136,7 +3167,7 @@ function setHouseKind(hid, kind, after) {
 /* 部屋ごとの種別を保存する */
 function setUnitKind(hid, unit, kind, after) {
   const h = houseById(hid); if (!h) return;
-  commit(`${unit}号室を「${kindName(kind)}」にしました`, () => {
+  commit(`${unitTitle(h, unit)}を「${kindName(kind)}」にしました`, () => {
     const m = Object.assign({}, h.uk || {});
     if (kind === 'home') delete m[unit]; else m[unit] = kind;
     if (Object.keys(m).length) h.uk = m; else delete h.uk;
@@ -3630,7 +3661,7 @@ function onHouseTap(id) {
     if (!ks.length) return;
     if (ks.length === 1) { openMemo(ks[0]); return; }
     setSheet(headHtml(terrById(h.terrId), esc(h.label || '集合住宅'), '部屋をえらんでください') +
-      ks.map(k => `<button class="btn block" data-fk="${esc(k)}">${esc(parseKey(k)[1])}号室</button>`).join('') + '<button class="btn block" data-close>もどる</button>');
+      ks.map(k => `<button class="btn block" data-fk="${esc(k)}">${esc(unitTitle(h, parseKey(k)[1]))}</button>`).join('') + '<button class="btn block" data-close>もどる</button>');
     $$('[data-fk]', $('#sheet')).forEach(b => b.onclick = () => openMemo(b.dataset.fk));
     return;
   }
@@ -3840,8 +3871,9 @@ function openTarget(hid, unit, fromBuilding, review) {
 
     b += navLink(h);
     if (unit) {
-      b += `<details class="more adv"><summary>この部屋の編集</summary>
-        <p class="q">種別</p>${kindChips(unitKind(h, unit))}</details>`;
+      b += `<details class="more"><summary>この部屋の編集</summary>
+        <p class="q">種別</p>${kindChips(unitKind(h, unit))}
+        <p class="q">部屋の名前</p><button class="btn block" id="fRename">部屋の名前を直す（101→A-1 など）</button></details>`;
     }
     if (!unit) {
       b += `<details class="more"><summary>この家の編集</summary>
@@ -3894,7 +3926,8 @@ function openTarget(hid, unit, fromBuilding, review) {
       paint();
     };
     on('provDrop', () => dropProvHouse(hid));
-    on('fToApt', () => openConvertApt(hid)); // まちがえたら、下の「取り消す」でもどせる
+    on('fToApt', () => openConvertApt(hid));
+    on('fRename', () => openUnitNames(hid, () => openTarget(hid, unit, fromBuilding))); // まちがえたら、下の「取り消す」でもどせる
     $$('[data-vdel]', S).forEach(x => x.onclick = () => {
       const v = D().visits.find(y => y.id === x.dataset.vdel);
       if (!v) return;
@@ -3980,7 +4013,7 @@ function deleteVisit(v, after) {
 function saveVisit(hid, unit, result, extra, keepOpen, onUndo) {
   if (!keepOpen) closeSheet();
   const k = K(hid, unit), cur = fol(k);
-  let msg = `${unit ? `${unit}号室を` : ''}「${RESULT_LABEL[result]}」で記録しました`;
+  let msg = `${unit ? `${unitTitle(houseById(hid), unit)}を` : ''}「${RESULT_LABEL[result]}」で記録しました`;
   let follow = !!extra.follow;
   if (follow && cur) { follow = false; if (cur.by !== me().id) msg += '（再訪問はすでに受け持ちがあります）'; }
   else if (follow) msg += '。再訪問のタブに入れました';
@@ -4156,7 +4189,7 @@ function shareButtonsHtml(withHead) {
 const gmapUrl = h => `https://www.google.com/maps/search/?api=1&query=${h.lat.toFixed(6)},${h.lng.toFixed(6)}`;
 function memoText(k) {
   const [hid, unit] = parseKey(k), h = houseById(hid), t = h && terrById(h.terrId), m = memoOf(k);
-  const name = h.type === 'apt' ? `${h.label || '集合住宅'} ${unit}号室` : (h.label || '家');
+  const name = h.type === 'apt' ? `${h.label || '集合住宅'} ${unitTitle(h, unit)}` : (h.label || '家');
   return `【再訪問メモ】${t ? `区域${t.no} ` : ''}${name}\n${m ? m.text : ''}\n（${fmtDay(m ? m.at : new Date().toISOString())}のメモ）\n場所：${gmapUrl(h)}`;
 }
 async function copyText(text) {
@@ -4313,21 +4346,26 @@ function followItem(k, f, mode) {
 function openBuilding(hid) {
   const h = houseById(hid); if (!h) return;
   const t = terrById(h.terrId), ff = focusFn(), since = unitDoneSince(h);
-  const cells = h.units.map(u => {
+  const cell = u => {
     const s = statusOf(K(h.id, u));
     const fo = fol(K(h.id, u)) ? '<em>再</em>' : '';
     const k2 = K(h.id, u);
     const fs = ff ? ff(k2) : (!D().dnc[k2] && visitedSince(k2, since) ? 'done' : null), hl = focusCls(fs);
-    return `<button class="unit st-${s}${hl}" data-unit="${esc(u)}">${fo}${doneMark(fs)}<b>${esc(u)}</b><small>${ST_LABEL[s]}</small></button>`;
-  }).join('');
+    return `<button class="unit st-${s}${hl}" data-unit="${esc(u)}">${fo}${doneMark(fs)}<b>${esc(uName(h, u))}</b><small>${ST_LABEL[s]}</small></button>`;
+  };
+  const groups = unitGroups(h);
+  const cells = groups.length > 1
+    ? groups.map(([g, us]) => `<p class="ugrp">${esc(g || 'そのほか')}</p><div class="units">${us.map(cell).join('')}</div>`).join('')
+    : (h.units.length ? `<div class="units">${h.units.map(cell).join('')}</div>` : '');
   setSheet(headHtml(t, esc(h.label || '集合住宅'), `区域${t ? t.no : '-'}　${h.units.length}部屋　まだ会えていない部屋 ${aptLeft(h)}`) + `
     ${h.units.length ? `<button class="btn primary block" id="seqStart">続けて入力にもどる</button>` : ''}
     <p class="q">部屋の一覧</p>
     <p class="hint">部屋をタップすると、その部屋の記録をくわしく見られます。</p>
-    <div class="units">${cells || '<p class="muted">部屋がありません。下の「建物の編集」から追加してください。</p>'}</div>
+    ${cells || '<p class="muted">部屋がありません。下の「建物の編集」から追加してください。</p>'}
     ${navLink(h)}
-    <details class="more adv"><summary>建物の編集</summary>
-      <label class="field"><span>部屋を追加</span><span class="inline"><input type="text" id="fUnit" placeholder="例：305　（空白で区切ると複数）"><button class="btn small" id="fUnitAdd">追加</button></span></label>
+    <details class="more"><summary>建物の編集</summary>
+      ${h.units.length ? '<button class="btn block" id="fRename">部屋の名前を直す（101→A-1 など）</button><p class="hint">名前を直しても、これまでの記録はそのまま残ります。</p>' : ''}
+      <label class="field"><span>部屋を追加</span><span class="inline"><input type="text" id="fUnit" placeholder="例：305　A-5（空白で区切ると複数）"><button class="btn small" id="fUnitAdd">追加</button></span></label>
       ${isAdmin() ? `<label class="field"><span>部屋を削除</span><span class="inline"><input type="text" id="fUnitDel" placeholder="例：104"><button class="btn small danger" id="fUnitDelBtn">削除</button></span>
         <small class="hint">部屋番号がまちがっていたときに使います。</small></label>` : ''}
       <label class="field"><span>建物名を変える</span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="${esc(h.label)}"><button class="btn small" id="fLabelSave">保存</button></span></label>
@@ -4341,21 +4379,25 @@ function openBuilding(hid) {
   $$('[data-kind]', $('#sheet')).forEach(x => x.onclick = () => setHouseKind(hid, x.dataset.kind, () => openBuilding(hid)));
   if ($('#fLock')) $('#fLock').onchange = e => setHouseLock(hid, e.target.checked);
   if ($('#seqStart')) $('#seqStart').onclick = () => openAptSeq(hid);
+  if ($('#fRename')) $('#fRename').onclick = () => openUnitNames(hid, () => openBuilding(hid));
   $('#fUnitAdd').onclick = () => {
     if (simpleBlock('部屋を追加')) return;
-    const us = parseUnits($('#fUnit').value).filter(u => !h.units.includes(u));
-    if (!us.length) { toast('新しい部屋番号を入力してください'); return; }
-    commit(`${us.join('・')}号室を追加しました`, () => { h.units.push(...us); h.units.sort((a, b) => cmpNo(a, b)); });
+    const used = new Set(h.units.concat(h.units.map(u => uName(h, u))));
+    const us = parseUnits($('#fUnit').value).map(cleanUnit).filter(u => u && !used.has(u));
+    if (!us.length) { toast('新しい部屋の名前を入力してください（同じ名前の部屋は追加できません）'); return; }
+    commit(`${us.join('・')}を追加しました`, () => { h.units.push(...us); h.units.sort((a, b) => cmpNo(uName(h, a), uName(h, b))); });
     openBuilding(hid);
   };
   if ($('#fUnitDelBtn')) $('#fUnitDelBtn').onclick = () => {
     if (simpleBlock('部屋を削除')) return;
-    const u = parseUnits($('#fUnitDel').value)[0];
-    if (!u || !h.units.includes(u)) { toast('その部屋番号はありません'); return; }
+    const want = parseUnits($('#fUnitDel').value)[0];
+    const u = want && (h.units.find(x => uName(h, x) === want) || h.units.find(x => x === want)); // 表示名でも中の番号でもさがす
+    if (!u) { toast('その部屋はありません'); return; }
     const n = visitsOf(K(hid, u)).length;
-    if (!confirm(`${u}号室を削除します。${n ? `この部屋の記録${n}件も見えなくなります。` : ''}よろしいですか？`)) return;
-    commit(`${u}号室を削除しました`, () => {
+    if (!confirm(`${unitTitle(h, u)}を削除します。${n ? `この部屋の記録${n}件も見えなくなります。` : ''}よろしいですか？`)) return;
+    commit(`${unitTitle(h, u)}を削除しました`, () => {
       h.units = h.units.filter(x => x !== u);
+      if (h.ul) { delete h.ul[u]; if (!Object.keys(h.ul).length) delete h.ul; }
       const k = K(hid, u); delete D().dnc[k]; delete D().follows[k]; delete D().released[k];
     });
     openBuilding(hid);
@@ -4407,7 +4449,7 @@ function openAptSeq(hid, startUnit) {
     let b = headHtml(t, `${esc(h.label || '集合住宅')}　続けて入力`, `${inRound ? '受け取ってから訪ねた部屋' : '今日入力した部屋'} ${cnt} / ${need}`);
     b += `<div class="unitstrip">${h.units.map((u, i) => {
       const s = statusOf(K(hid, u));
-      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(u)}号室へ">${esc(u)}</button>`;
+      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}へ">${esc(uName(h, u))}</button>`;
     }).join('')}</div>`;
     if (st.finished) {
       b += `<div class="okmsg"><b>${cnt === need ? 'すべての部屋に緑のチェックがつきました。' : '最後の部屋まで進みました。'}</b>部屋番号をタップすると、その部屋を入力できます。</div>
@@ -4416,7 +4458,7 @@ function openAptSeq(hid, startUnit) {
     } else {
       const u = h.units[idx], k = K(hid, u), f = fol(k), last = visitsOf(k)[0];
       const other = !!f && f.by !== me().id;
-      b += `<p class="seqroom"><b>${esc(u)}</b>号室 <span class="muted">（${idx + 1} / ${n}）</span></p>`;
+      b += `<p class="seqroom"><b>${esc(uName(h, u))}</b>${/\d$/.test(uName(h, u)) ? '号室' : ''} <span class="muted">（${idx + 1} / ${n}）</span></p>`;
       b += `<p class="muted">${last ? `前回：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}` : 'はじめて訪ねる部屋'}</p>`;
       b += recentOtherHtml(k);
       if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の部屋です。</b>訪問しないで、次の部屋へ進んでください。</div>`;
@@ -4466,63 +4508,215 @@ function openAptSeq(hid, startUnit) {
 function openConvertApt(hid) {
   const h = houseById(hid); if (!h || h.type !== 'house') return;
   const t = terrById(h.terrId), n = visitsOf(K(hid, '')).length;
-  const f = { label: h.label || '', rooms: [2, 2], manual: '', lock: false };
+  const f = { label: h.label || '', n: newNaming(), lock: false };
   const keep = () => {
     const l = $('#cvLabel'); if (l) f.label = l.value;
-    const m = $('#cvManual'); if (m) f.manual = m.value;
     const k = $('#cvLock'); if (k) f.lock = k.checked;
+    namingKeep(f.n);
   };
   const paint = () => {
-    const manual = parseUnits(f.manual), units = manual.length ? manual : floorUnits(f.rooms);
-    const preview = manual.length ? `自分で入力した ${manual.length}部屋`
-      : f.rooms.map((c, i) => (c === 1 ? `${i + 1}01` : `${i + 1}01〜${i + 1}${pad(c)}`)).join(' ／ ');
     setSheet(headHtml(t, 'アパート・マンションに変える', esc(h.label || '一戸建て')) + `
       <label class="field"><span>建物名</span><input type="text" id="cvLabel" maxlength="30" value="${esc(f.label)}" placeholder="例：〇〇ハイツ">
         <small class="hint">住んでいる人の名前は書かないでください。</small></label>
       <label class="check locrow"><input type="checkbox" id="cvLock"${f.lock ? ' checked' : ''}>オートロックの建物</label>
-      <div class="field"><span>階の数</span><div class="stepper">
-        <button type="button" data-floors="-1" aria-label="階を減らす">−</button><output>${f.rooms.length}</output>
-        <button type="button" data-floors="1" aria-label="階を増やす">＋</button></div></div>
-      <div class="field"><span>階ごとの部屋の数</span>
-        <div class="floorlist">${f.rooms.map((c, i) => `<div class="floorrow"><b>${i + 1}階</b><div class="stepper">
-          <button type="button" data-room="${i}" data-d="-1" aria-label="${i + 1}階の部屋を減らす">−</button><output>${c}</output>
-          <button type="button" data-room="${i}" data-d="1" aria-label="${i + 1}階の部屋を増やす">＋</button></div><span class="muted">部屋</span></div>`).join('')}
-        </div></div>
-      <p class="hint">部屋番号：${esc(preview)}（全部で ${units.length}部屋）</p>
-      <details class="more"${f.manual ? ' open' : ''}><summary>部屋番号を自分で入力する</summary>
-        <label class="field"><span>部屋番号（空白か「、」で区切る）</span>
-          <input type="text" id="cvManual" value="${esc(f.manual)}" placeholder="例：101 102 201 202"></label>
-        <button type="button" class="btn small" id="cvPreview">部屋の数を確認する</button></details>
+      ${namingHtml(f.n)}
       ${n ? `<div class="notice warn">この家の記録 ${n}件は、建物ぜんたいの記録として残り、部屋ごとの記録には入りません。</div>` : ''}
       <button class="btn primary block" id="cvSave">アパート・マンションにする</button>
       <button class="btn block" id="cvBack">もどる</button>`);
-    const S = $('#sheet');
-    $$('[data-floors]', S).forEach(x => x.onclick = () => {
-      keep();
-      if (Number(x.dataset.floors) > 0) { if (f.rooms.length < 30) f.rooms.push(f.rooms[f.rooms.length - 1] || 1); }
-      else if (f.rooms.length > 1) f.rooms.pop();
-      paint();
-    });
-    $$('[data-room]', S).forEach(x => x.onclick = () => {
-      keep();
-      const i = Number(x.dataset.room);
-      f.rooms[i] = Math.min(30, Math.max(1, f.rooms[i] + Number(x.dataset.d)));
-      paint();
-    });
-    $('#cvPreview').onclick = () => { keep(); paint(); };
+    bindNaming(f.n, () => { keep(); paint(); });
     $('#cvBack').onclick = () => openTarget(hid, '', false);
     $('#cvSave').onclick = () => {
       keep();
-      const us = parseUnits(f.manual).length ? parseUnits(f.manual) : floorUnits(f.rooms);
-      if (!us.length) { toast('部屋の数を入れてください'); return; }
+      const us = genUnits(f.n);
+      if (!us.length) { toast('部屋の名前を入れてください'); return; }
       const label = f.label.trim();
       closeSheet();
       commit(`${label || '建物'}をアパート・マンションにしました（${us.length}部屋）`, () => {
         h.type = 'apt'; h.units = us; h.label = label;
         if (f.lock) h.lock = true; else delete h.lock;
-        delete h.prov; delete h.uk; // 確かめた建物なので「仮の家」ではなくなる
+        delete h.prov; delete h.uk; delete h.ul; // 確かめた建物なので「仮の家」ではなくなる
       });
       setTimeout(() => openAptSeq(hid), 300);
+    };
+  };
+  paint();
+}
+
+/* ---------- 部屋の名前の付け方（アパートを新しく作るとき・一戸建てから変えるとき） ----------
+   floor：階＋番号（101, 102, 201…）　bldg：棟＋番号（A-1, A-2, B-1…）
+   seq：通し番号（1, 2, 3…）　free：自由に入力（管理人室 など）
+   skip49：4と9で終わる番号を使わない　pre / suf：前・後ろに付ける文字 */
+const NAMING = [['floor', '階＋番号', '101, 102, 201…'], ['bldg', '棟＋番号', 'A-1, A-2, B-1…'], ['seq', '通し番号', '1, 2, 3…'], ['free', '自由に入力', '管理人室 など']];
+const newNaming = () => ({ nm: 'floor', rooms: [2, 2], bldgs: [{ name: 'A', n: 4 }, { name: 'B', n: 4 }], seqN: 6, skip49: false, pre: '', suf: '', manual: '' });
+function roomNums(n, skip49) {
+  const out = [];
+  for (let r = 1; out.length < n && r < 300; r++) { if (skip49 && (r % 10 === 4 || r % 10 === 9)) continue; out.push(r); }
+  return out;
+}
+function genUnits(f) {
+  let us = [];
+  if (f.nm === 'free') us = parseUnits(f.manual);
+  else if (f.nm === 'floor') f.rooms.forEach((n, i) => roomNums(n, f.skip49).forEach(r => us.push(`${i + 1}${pad(r)}`)));
+  else if (f.nm === 'bldg') f.bldgs.forEach(b => roomNums(b.n, f.skip49).forEach(r => us.push(`${b.name || '?'}-${r}`)));
+  else roomNums(f.seqN, f.skip49).forEach(r => us.push(String(r)));
+  if (f.nm !== 'free') us = us.map(u => `${f.pre}${u}${f.suf}`);
+  return [...new Set(us.map(cleanUnit).filter(Boolean))];
+}
+const nextBldgName = f => { const ab = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'; const used = new Set(f.bldgs.map(b => b.name)); return [...ab].find(c => !used.has(c)) || String(f.bldgs.length + 1); };
+function namingHtml(f) {
+  const us = genUnits(f);
+  const step = (attr, v, lbl) => `<div class="stepper"><button type="button" ${attr} data-d="-1" aria-label="${lbl}を減らす">−</button><output>${v}</output><button type="button" ${attr} data-d="1" aria-label="${lbl}を増やす">＋</button></div>`;
+  let body = '';
+  if (f.nm === 'floor') {
+    body = `<div class="field"><span>階の数</span><div class="stepper">
+        <button type="button" data-floors="-1" aria-label="階を減らす">−</button><output>${f.rooms.length}</output>
+        <button type="button" data-floors="1" aria-label="階を増やす">＋</button></div></div>
+      <div class="field"><span>階ごとの部屋の数</span><div class="floorlist">${f.rooms.map((n, i) =>
+        `<div class="floorrow"><b>${i + 1}階</b>${step(`data-room="${i}"`, n, `${i + 1}階の部屋`)}<span class="muted">部屋</span></div>`).join('')}</div></div>`;
+  } else if (f.nm === 'bldg') {
+    body = `<div class="field"><span>棟の数</span>${step('data-nb="1"', f.bldgs.length, '棟')}</div>
+      <div class="field"><span>棟の名前と、部屋の数</span><div class="floorlist">${f.bldgs.map((b, i) =>
+        `<div class="floorrow"><input type="text" class="bname" data-bname="${i}" maxlength="4" value="${esc(b.name)}" aria-label="${i + 1}つめの棟の名前">${step(`data-broom="${i}"`, b.n, `${esc(b.name)}棟の部屋`)}<span class="muted">部屋</span></div>`).join('')}</div>
+      <p class="hint">棟の名前は「A」「東」などに変えられます。</p></div>`;
+  } else if (f.nm === 'seq') {
+    body = `<div class="field"><span>部屋の数</span>${step('data-seq="1"', f.seqN, '部屋')}</div>`;
+  } else {
+    body = `<label class="field"><span>部屋の名前（空白か「、」で区切る）</span>
+        <input type="text" id="nmManual" value="${esc(f.manual)}" placeholder="例：101 102 管理人室 1F店舗"></label>
+      <button type="button" class="btn small" id="nmPreview">できる部屋を確認する</button>`;
+  }
+  const opts = f.nm === 'free' ? '' : `<label class="check"><input type="checkbox" id="nmSkip"${f.skip49 ? ' checked' : ''}>4と9で終わる番号を使わない（104・109 など）</label>
+    <div class="inline"><label class="field" style="flex:1;margin:6px 0"><span>前に付ける文字</span><input type="text" id="nmPre" maxlength="6" value="${esc(f.pre)}" placeholder="例：東-"></label>
+      <label class="field" style="flex:1;margin:6px 0"><span>後ろに付ける文字</span><input type="text" id="nmSuf" maxlength="6" value="${esc(f.suf)}" placeholder="例：号"></label></div>`;
+  return `<p class="q">部屋の名前の付け方</p>
+    <div class="nmpick">${NAMING.map(([k, l, e]) => `<button type="button" class="choice${f.nm === k ? ' on' : ''}" data-nm="${k}" aria-pressed="${f.nm === k}">${l}<small>${e}</small></button>`).join('')}</div>
+    ${body}${opts}
+    <div class="unitprev"><b>できる部屋：${us.length}部屋</b><div>${us.slice(0, 80).map(u => `<span>${esc(u)}</span>`).join('')}${us.length > 80 ? '<span>…</span>' : ''}</div></div>
+    <p class="hint">あとからでも、部屋の名前は「部屋の名前を直す」で変えられます。</p>`;
+}
+function namingKeep(f) {
+  $$('#sheet [data-bname]').forEach(x => { const b = f.bldgs[Number(x.dataset.bname)]; if (b) b.name = cleanUnit(x.value).slice(0, 4); });
+  const g = id => $('#' + id);
+  if (g('nmManual')) f.manual = g('nmManual').value;
+  if (g('nmPre')) f.pre = cleanUnit(g('nmPre').value).slice(0, 6);
+  if (g('nmSuf')) f.suf = cleanUnit(g('nmSuf').value).slice(0, 6);
+  if (g('nmSkip')) f.skip49 = g('nmSkip').checked;
+}
+/* repaint：画面全体を描き直す関数（呼ぶ前に、ほかの入力欄も読んでおくこと） */
+function bindNaming(f, repaint) {
+  const S = $('#sheet');
+  const again = () => { sheetKeep = true; repaint(); }; // 見ていた位置はそのまま
+  $$('[data-nm]', S).forEach(x => x.onclick = () => { f.nm = x.dataset.nm; again(); });
+  $$('[data-floors]', S).forEach(x => x.onclick = () => {
+    if (Number(x.dataset.floors) > 0) { if (f.rooms.length < 40) f.rooms.push(f.rooms[f.rooms.length - 1] || 1); }
+    else if (f.rooms.length > 1) f.rooms.pop();
+    again();
+  });
+  $$('[data-room]', S).forEach(x => x.onclick = () => { const i = Number(x.dataset.room); f.rooms[i] = Math.min(40, Math.max(1, f.rooms[i] + Number(x.dataset.d))); again(); });
+  $$('[data-nb]', S).forEach(x => x.onclick = () => {
+    if (Number(x.dataset.d) > 0) { if (f.bldgs.length < 12) f.bldgs.push({ name: nextBldgName(f), n: (f.bldgs[f.bldgs.length - 1] || { n: 4 }).n }); }
+    else if (f.bldgs.length > 1) f.bldgs.pop();
+    again();
+  });
+  $$('[data-broom]', S).forEach(x => x.onclick = () => { const b = f.bldgs[Number(x.dataset.broom)]; b.n = Math.min(80, Math.max(1, b.n + Number(x.dataset.d))); again(); });
+  $$('[data-seq]', S).forEach(x => x.onclick = () => { f.seqN = Math.min(300, Math.max(1, f.seqN + Number(x.dataset.d))); again(); });
+  ['nmSkip'].forEach(id => { const el = $('#' + id); if (el) el.onchange = again; });
+  ['nmPre', 'nmSuf', 'nmManual'].forEach(id => { const el = $('#' + id); if (el) el.onchange = again; });
+  $$('[data-bname]', S).forEach(x => { x.onchange = again; });
+  if ($('#nmPreview')) $('#nmPreview').onclick = again;
+}
+
+/* ---------- 部屋の名前を直す（記録はそのまま） ---------- */
+function unitGroups(h) {
+  const g = new Map();
+  h.units.forEach(u => {
+    const n = uName(h, u);
+    let m, key = '';
+    if ((m = n.match(/^(.+?)[-－ー]/))) key = /[棟館号]$/.test(m[1]) ? m[1] : m[1] + '棟';
+    else if ((m = n.match(/^(\d{1,2})\d{2}$/))) key = `${Number(m[1])}階`;
+    if (!g.has(key)) g.set(key, []);
+    g.get(key).push(u);
+  });
+  const list = [...g.entries()];
+  if (list.length > 1 && list.every(([k]) => /^\d+階$/.test(k))) list.reverse(); // 階は、上の階から（建物の形に近く）
+  return list;
+}
+function openUnitNames(hid, back) {
+  const h = houseById(hid); if (!h || h.type !== 'apt' || !h.units.length) return;
+  const cur = h.units.map(u => uName(h, u));
+  const st = { names: cur.slice(), rule: '', letters: 'A B C D E F G H', sep: '-', pre: '', suf: '', find: '', repl: '' };
+  const keep = () => {
+    $$('#sheet [data-ren]').forEach(x => { st.names[Number(x.dataset.ren)] = x.value; });
+    ['letters', 'sep', 'pre', 'suf', 'find', 'repl'].forEach(k => { const el = $('#rl_' + k); if (el) st[k] = el.value; });
+  };
+  const apply = () => {
+    const L = st.letters.split(/[\s,、，]+/).filter(Boolean);
+    st.names = cur.map((n, i) => {
+      if (st.rule === 'floor') {
+        const m = n.match(/^(\D*)(\d{1,2})(\d{2})(\D*)$/);
+        if (!m) return n;
+        const fl = Number(m[2]), rm = Number(m[3]);
+        return `${L[fl - 1] || fl}${st.sep}${rm}`;
+      }
+      if (st.rule === 'seq') return String(i + 1);
+      if (st.rule === 'pre') return `${st.pre}${n}${st.suf}`;
+      if (st.rule === 'repl') return st.find ? n.split(st.find).join(st.repl) : n;
+      if (st.rule === 'reset') return h.units[i];
+      return n;
+    });
+  };
+  const paint = () => {
+    const clean = st.names.map(cleanUnit);
+    const cnt = {}; clean.forEach(n => { cnt[n] = (cnt[n] || 0) + 1; });
+    const dups = clean.filter(n => !n || cnt[n] > 1).length;
+    const changed = clean.filter((n, i) => n !== cur[i]).length;
+    const ruleBox = {
+      floor: `<label class="field"><span>1階・2階・3階…に使う文字（空白で区切る）</span><input type="text" id="rl_letters" value="${esc(st.letters)}"></label>
+        <label class="field"><span>間に入れる文字</span><input type="text" id="rl_sep" maxlength="2" value="${esc(st.sep)}"></label>
+        <p class="hint">例：「A B C」「-」なら、101→A-1、203→B-3 になります。</p>`,
+      seq: '<p class="hint">今の並び順で、1, 2, 3…にします。</p>',
+      pre: `<div class="inline"><label class="field" style="flex:1"><span>前に付ける</span><input type="text" id="rl_pre" maxlength="6" value="${esc(st.pre)}" placeholder="例：東-"></label>
+        <label class="field" style="flex:1"><span>後ろに付ける</span><input type="text" id="rl_suf" maxlength="6" value="${esc(st.suf)}" placeholder="例：号"></label></div>`,
+      repl: `<div class="inline"><label class="field" style="flex:1"><span>この文字を</span><input type="text" id="rl_find" maxlength="8" value="${esc(st.find)}" placeholder="例：10"></label>
+        <label class="field" style="flex:1"><span>これにする</span><input type="text" id="rl_repl" maxlength="8" value="${esc(st.repl)}" placeholder="例：A-"></label></div>`,
+      reset: '<p class="hint">はじめに作ったときの名前にもどします。</p>'
+    }[st.rule] || '';
+    setSheet(headHtml(terrById(h.terrId), '部屋の名前を直す', esc(h.label || '集合住宅') + `　${h.units.length}部屋`) + `
+      <div class="notice info">名前を直しても、<b>これまでの記録はそのまま残ります</b>。</div>
+      <p class="q">まとめて変える</p>
+      <div class="nmrules">
+        <button type="button" data-rule="floor" aria-pressed="${st.rule === 'floor'}">階を文字にする<small>101→A-1、201→B-1</small></button>
+        <button type="button" data-rule="seq" aria-pressed="${st.rule === 'seq'}">通し番号にする<small>1, 2, 3…</small></button>
+        <button type="button" data-rule="pre" aria-pressed="${st.rule === 'pre'}">前・後ろに文字を足す<small>101→東-101</small></button>
+        <button type="button" data-rule="repl" aria-pressed="${st.rule === 'repl'}">文字を置きかえる<small>10→A-（101→A-1）</small></button>
+        <button type="button" data-rule="reset" aria-pressed="${st.rule === 'reset'}">はじめの名前にもどす<small>作ったときの名前</small></button>
+      </div>
+      ${st.rule ? `<div class="rulebox">${ruleBox}<button type="button" class="btn small primary" id="rlApply">この変え方で、下に入れる</button></div>` : ''}
+      <p class="q">変える前 → 変えた後 <span class="muted" style="font-size:14px">（1つずつ直せます）</span></p>
+      <div class="renlist">${h.units.map((u, i) => {
+        const n = clean[i], bad = !n || cnt[n] > 1;
+        return `<div class="renrow${bad ? ' dup' : n !== cur[i] ? ' chg' : ''}"><span class="old">${esc(cur[i])}</span><span aria-hidden="true">→</span>
+          <input type="text" data-ren="${i}" maxlength="12" value="${esc(st.names[i])}" aria-label="${esc(cur[i])}の新しい名前"></div>`;
+      }).join('')}</div>
+      ${dups ? `<div class="notice warn">同じ名前か、空の名前が ${dups}か所あります。赤い欄を直してください。</div>` : ''}
+      <button class="btn primary block" id="renSave"${dups || !changed ? ' disabled' : ''}>${changed ? `${changed}部屋の名前を直す` : '変わったところはありません'}</button>
+      <button class="btn block" id="renBack">もどる</button>`);
+    const S = $('#sheet');
+    $$('[data-rule]', S).forEach(x => x.onclick = () => { keep(); st.rule = st.rule === x.dataset.rule ? '' : x.dataset.rule; sheetKeep = true; paint(); });
+    if ($('#rlApply')) $('#rlApply').onclick = () => { keep(); apply(); sheetKeep = true; paint(); };
+    $$('[data-ren]', S).forEach(x => { x.onchange = () => { keep(); sheetKeep = true; paint(); }; });
+    $('#renBack').onclick = () => (back ? back() : closeSheet());
+    $('#renSave').onclick = () => {
+      keep();
+      const fin = st.names.map(cleanUnit);
+      const c2 = {}; fin.forEach(n => { c2[n] = (c2[n] || 0) + 1; });
+      if (fin.some(n => !n || c2[n] > 1)) { sheetKeep = true; paint(); return; }
+      commit(`部屋の名前を直しました（${fin.filter((n, i) => n !== cur[i]).length}部屋）`, () => {
+        const ul = {};
+        h.units.forEach((u, i) => { if (fin[i] !== u) ul[u] = fin[i]; });
+        if (Object.keys(ul).length) h.ul = ul; else delete h.ul;
+      });
+      if (back) back(); else closeSheet();
     };
   };
   paint();
@@ -4593,20 +4787,15 @@ function floorUnits(rooms) {
 }
 function openAddForm(ll, tid) {
   const t = tid ? terrById(tid) : null;
-  const f = { type: 'apt', label: '', rooms: [2, 4], manual: '', kind: 'home', lock: false };
+  const f = { type: 'apt', label: '', n: Object.assign(newNaming(), { rooms: [2, 4] }), kind: 'home', lock: false };
   if (mode === 'draw' && drawTap === 'house') f.type = 'house';
   const keep = () => {
     const l = $('#fLabel'); if (l) f.label = l.value;
-    const m = $('#fManual'); if (m) f.manual = m.value;
     const lk2 = $('#fLock'); if (lk2) f.lock = lk2.checked;
+    namingKeep(f.n);
   };
   const paint = () => {
     const apt = f.type === 'apt';
-    const manual = parseUnits(f.manual);
-    const units = manual.length ? manual : floorUnits(f.rooms);
-    const preview = manual.length
-      ? `自分で入力した ${manual.length}部屋`
-      : f.rooms.map((n, i) => (n === 1 ? `${i + 1}01` : `${i + 1}01〜${i + 1}${pad(n)}`)).join(' ／ ');
     setSheet(headHtml(t, 'ここに追加します', t ? `区域${esc(t.no)}　${esc(t.name)}` : '区域は、線を完成したときに決まります') + `
       <p class="q">建物の種類</p>
       <div class="choices two">
@@ -4620,45 +4809,19 @@ function openAddForm(ll, tid) {
         <small class="hint">住んでいる人の名前は書かないでください。</small></label>
       <p class="q">${apt ? '建物ぜんたいの種別' : '種別'}</p>${kindChips(f.kind)}
       ${apt ? '<p class="hint">部屋ごとの種別は、あとから部屋の画面で変えられます。</p>' : ''}
-      ${apt ? `
-      <div class="field"><span>階の数</span><div class="stepper">
-        <button type="button" data-floors="-1" aria-label="階を減らす">−</button><output>${f.rooms.length}</output>
-        <button type="button" data-floors="1" aria-label="階を増やす">＋</button></div></div>
-      <div class="field"><span>階ごとの部屋の数</span>
-        <div class="floorlist">${f.rooms.map((n, i) => `<div class="floorrow"><b>${i + 1}階</b><div class="stepper">
-          <button type="button" data-room="${i}" data-d="-1" aria-label="${i + 1}階の部屋を減らす">−</button><output>${n}</output>
-          <button type="button" data-room="${i}" data-d="1" aria-label="${i + 1}階の部屋を増やす">＋</button></div><span class="muted">部屋</span></div>`).join('')}
-        </div></div>
-      <p class="hint">部屋番号：${esc(preview)}（全部で ${units.length}部屋）</p>
-      <details class="more"${f.manual ? ' open' : ''}><summary>部屋番号を自分で入力する</summary>
-        <label class="field"><span>部屋番号（空白か「、」で区切る）</span>
-          <input type="text" id="fManual" value="${esc(f.manual)}" placeholder="例：101 102 201 202 203 205"></label>
-        <p class="hint">入力すると、上の階ごとの数より優先されます。</p>
-        <button type="button" class="btn small" id="fPreview">部屋の数を確認する</button>
-      </details>` : ''}
+      ${apt ? namingHtml(f.n) : ''}
       <button class="btn primary block" id="fSave">この場所に追加する</button>
       <button class="btn block" data-close>やめる</button>`);
     const S = $('#sheet');
     $$('[data-type]', S).forEach(x => x.onclick = () => { keep(); f.type = x.dataset.type; paint(); });
     $$('[data-kind]', S).forEach(x => x.onclick = () => { keep(); f.kind = x.dataset.kind; paint(); });
     if ($('#fLock')) $('#fLock').onchange = e => { f.lock = e.target.checked; };
-    $$('[data-floors]', S).forEach(x => x.onclick = () => {
-      keep();
-      if (Number(x.dataset.floors) > 0) { if (f.rooms.length < 30) f.rooms.push(f.rooms[f.rooms.length - 1] || 1); }
-      else if (f.rooms.length > 1) f.rooms.pop();
-      paint();
-    });
-    $$('[data-room]', S).forEach(x => x.onclick = () => {
-      keep();
-      const i = Number(x.dataset.room);
-      f.rooms[i] = Math.min(30, Math.max(1, f.rooms[i] + Number(x.dataset.d)));
-      paint();
-    });
-    if ($('#fPreview')) $('#fPreview').onclick = () => { keep(); paint(); };
+    if (f.type === 'apt') { const l = $('#fLabel'), lk = $('#fLock'); bindNaming(f.n, () => { if (l) f.label = l.value; if (lk) f.lock = lk.checked; namingKeep(f.n); paint(); }); }
     $('#fSave').onclick = () => {
       keep();
       const label = f.label.trim();
-      const us = f.type === 'apt' ? (parseUnits(f.manual).length ? parseUnits(f.manual) : floorUnits(f.rooms)) : [];
+      const us = f.type === 'apt' ? genUnits(f.n) : [];
+      if (f.type === 'apt' && !us.length) { toast('部屋の名前を入れてください'); return; }
       closeSheet();
       addCount++; updateAddBar();
       commit(f.type === 'apt' ? `集合住宅を追加しました（${us.length}部屋）` : '一戸建てを追加しました', () => {
@@ -5487,7 +5650,7 @@ function renderFollowList() {
     const q = followQ.toLowerCase();
     list = list.filter(([k]) => {
       const [hid, unit] = parseKey(k), h = houseById(hid), t = terrById(h.terrId), m = memoOf(k);
-      return [h.label, unit, t && t.no, t && t.name, m && m.text].some(v => v && String(v).toLowerCase().includes(q));
+      return [h.label, unit, uName(h, unit), t && t.no, t && t.name, m && m.text].some(v => v && String(v).toLowerCase().includes(q));
     });
   }
   const pos = k => { const h = houseById(parseKey(k)[0]); return [h.lat, h.lng]; };
@@ -6318,7 +6481,7 @@ function renderReco() {
   const MAX = 40, more = list.length - MAX;
   list = list.slice(0, MAX);
   $('#recoList').innerHTML = list.length ? list.map(i => {
-    const name = i.h.type === 'apt' ? `${esc(i.h.label || '集合住宅')} ${esc(i.unit)}号室` : esc(i.h.label || '家');
+    const name = i.h.type === 'apt' ? `${esc(i.h.label || '集合住宅')} ${esc(unitTitle(i.h, i.unit))}` : esc(i.h.label || '家');
     return `<article class="ritem k-${i.kind}"><div>
         <p class="rt"><span class="stamp xs${noCls(i.t.no)}">${esc(i.t.no)}</span> ${name}</p>
         <p class="muted">${esc(i.reason)}</p>
@@ -7489,7 +7652,7 @@ function exportCsv() {
   const rows = [['区域番号', '家ID', '種類', '部屋', '結果', '年代', '再訪問', '日時', '曜日区分', '時間帯']];
   for (const v of D().visits) {
     const h = houseById(v.houseId), t = h && terrById(h.terrId), d = new Date(v.at);
-    rows.push([t ? t.no : '', v.houseId, h ? (h.type === 'apt' ? '集合住宅' : '一戸建て') : '', v.unit || '',
+    rows.push([t ? t.no : '', v.houseId, h ? (h.type === 'apt' ? '集合住宅' : '一戸建て') : '', v.unit ? uName(h, v.unit) : '',
       RESULT_LABEL[v.result], ageName(v.age), intName(v.interest),
       `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
       dayTypeOf(d), bandOf(d)]);
