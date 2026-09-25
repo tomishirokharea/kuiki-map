@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.20"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.21"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -876,6 +876,17 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .todo.hot .btn{background:var(--terr);border-color:var(--terr);color:#fff}
 .todonone{margin:6px 0 10px}
 
+/* ===== ホーム：おすすめ・再訪問の約束 ===== */
+.homereco{margin-top:6px}
+.ritem.rk-near{border-left-color:var(--terr)} .ritem.rk-slot{border-left-color:var(--met)} .ritem.rk-try{border-left-color:var(--away)}
+.ritem.rk-long{border-left-color:var(--follow)} .ritem.rk-biz{border-left-color:#E65100} .ritem.rk-fresh{border-left-color:var(--ink)}
+.recowhy{margin:2px 0 0;font-size:16px}
+.recotag{display:inline-block;background:var(--terr-soft);color:var(--terr);border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;margin-top:4px}
+.todo.appt .tico{background:#FBE9F0;color:var(--follow)}
+.todo .tbtns2{display:flex;flex-direction:column;gap:6px;flex:none}
+.nextline{font-weight:700;color:var(--follow);margin:6px 0 0}
+.field input[type=time]{width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:18px;background:#fff}
+
 /* ===== お知らせ ===== */
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--brand);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
 #toast button{min-height:46px;border-radius:10px;border:2px solid #fff;background:transparent;color:#fff;font-weight:700;padding:0 14px;flex:none}
@@ -1047,6 +1058,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
         <div id="homeCal"></div>
         <p class="hint">自分で入れた予定や時間は、このスマホの中だけに保存されます。係やほかの人には送られません。</p>
         </div></div>
+        <div id="homeReco" class="homereco"></div>
       </div>
     </section>
 
@@ -1243,6 +1255,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
         <div id="adHard"></div>
         </div>
         <div class="apane" data-apane="set" hidden>
+        <div id="adReco"></div>
         <div id="adAge"></div>
         <h2 class="sec">データ</h2>
         <div id="adDataSet"></div>
@@ -1334,17 +1347,19 @@ function memoStepHtml(k) {
   const m = memoOf(k);
   return `<p class="q">メモ <span class="muted" style="font-size:15px">（このスマホの中だけに残ります）</span></p>
     <label class="field"><textarea id="stepMemo" rows="5" maxlength="1000" placeholder="例：次は土曜の午前に。前回の話の続きから">${esc(m ? m.text : '')}</textarea></label>
+    ${nextInputsHtml('stepNext', m && m.next)}
     <p class="hint">住んでいる人の名前・電話番号は書かないでください。メモは係やほかの人には送られません。</p>
     <button class="btn primary block" data-memosave>記録する</button>
     <button class="btn block" data-back="result">← 結果の選択にもどる</button>`;
 }
 /* 会えた（再訪問する）を記録し、メモの先頭に日時を入れて、このスマホに残す */
-function saveFollowVisit(hid, unit, text, keepOpen) {
+function saveFollowVisit(hid, unit, text, keepOpen, next) {
   const k = K(hid, unit);
   saveVisit(hid, unit, 'met', { interest: '再訪問したい', follow: true }, keepOpen);
   const now = new Date(), t = String(text || '').trim(), o = memoAll();
   const line = `${now.getMonth() + 1}月${now.getDate()}日 ${fmtTime(now)}　会えた`;
   o[k] = { text: (line + (t ? '\n' + t : '')).slice(0, 1000), at: now.toISOString() };
+  if (next) o[k].next = next;
   memoSaveAll(o);
   if (currentView === 'follow') renderFollowList();
 }
@@ -1630,6 +1645,7 @@ function mergeVisitRows(rows) {
     const v = { id: a[0], houseId: a[1], unit: a[2], result: RES_NAME[a[3]] || 'away', at: new Date(a[4] * 1000).toISOString(), by: a[5] };
     if (a[6]) v.age = a[6];
     if (a[7]) v.interest = a[7];
+    if (a[8]) v.src = a[8];
     const cur = byId.get(v.id);
     if (cur) { delete cur.age; delete cur.interest; if (v.age) cur.age = v.age; if (v.interest) cur.interest = v.interest; return; }
     d.visits.push(v); byId.set(v.id, v);
@@ -1758,7 +1774,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, ageShow: 10, ageShowMode: 0 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1 }, d.settings || {});
     d.s13 = d.s13 || [];
     d.agedata = d.agedata || [];
   },
@@ -1852,6 +1868,7 @@ const Store = {
         const v = { id: a[0], houseId: a[1], unit: a[2], result: RES_NAME[a[3]] || 'away', at: new Date(a[4] * 1000).toISOString(), by: a[5] };
         if (a[6]) v.age = a[6];
         if (a[7]) v.interest = a[7];
+        if (a[8]) v.src = a[8];
         return v;
       });
       delete st.visitsC;
@@ -2755,7 +2772,7 @@ function slotOfVisit(v) {
   return s;
 }
 function buildIndex() {
-  AGE_CACHE = null; RATE_CACHE = null; SHARE_CACHE = null; CHANCE_CACHE = null;
+  AGE_CACHE = null; RATE_CACHE = null; SHARE_CACHE = null; CHANCE_CACHE = null; RECO_CACHE = null;
   IDX = new Map(); HBT = new Map(); SUM = new Map(); HID = new Map(); TID = new Map();
   for (const t of D().territories) TID.set(t.id, t);
   for (const h of D().houses) {
@@ -2920,6 +2937,11 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.21', items: [
+    ['今', '設定の「使う機能」で、ホームの「今日やること」を出す・出さないをえらべるようにしました（はじめは出しません）。出すと、自分の予定と再訪問の約束も出ます'],
+    ['約', '再訪問のメモに「次の約束」の日と時刻を入れられるようになりました。カレンダーと「今日やること」に出ます'],
+    ['推', 'ホームの下に「おすすめ」がもどりました。空いた時間に、近くの家や長く会えていない家を2〜3件回れます（出すかどうか・種類は区域係が決めます）']
+  ] },
   { v: '2026.10.20', items: [
     ['今', 'ホームのいちばん上に「今日やること」（集まり・たのまれた区域・区域カード・今がチャンスの留守宅カード）をまとめました'],
     ['次', '地図で記録したあと、下に「取り消す」と「次のおすすめの家」が出るようになりました'],
@@ -3979,6 +4001,7 @@ async function onHouseTap(id) {
   if (!canTapHouse(h)) { toast('自分の区域以外の家は選べません'); return; }
   const tg = target && target.hid === id ? target : null;
   if (tg) clearTarget();
+  if (tg && tg.reco && h.terrId) terrAck.add(h.terrId); // おすすめから開いた家は、区域の確認を出さない
   guardTerr(h.terrId, tg && tg.unit ? [K(h.id, tg.unit)] : targets(h).map(u => K(h.id, u)), () => {
     if (tg && tg.route) { openMemo(K(id, tg.unit)); return; }                 // 再訪問から：メモ・記録の画面
     if (tg && (h.type !== 'apt' || tg.unit)) { openTarget(id, tg.unit, false, true); return; } // まず記録とメモを見る
@@ -4293,7 +4316,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     $$('[data-fol]', S).forEach(x => x.onclick = () => {
       if (x.dataset.fol === '1') { st.step = 'memo'; paint(); } else saveVisit(hid, unit, 'met', {});
     });
-    $$('[data-memosave]', S).forEach(x => x.onclick = () => saveFollowVisit(hid, unit, $('#stepMemo').value, false));
+    $$('[data-memosave]', S).forEach(x => x.onclick = () => saveFollowVisit(hid, unit, $('#stepMemo').value, false, readNext('stepNext')));
     $$('[data-refok]', S).forEach(x => x.onclick = () => saveVisit(hid, unit, 'refused', { age: st.age, dnc: true }));
     $$('[data-back]', S).forEach(x => x.onclick = () => { st.step = x.dataset.back; paint(); });
     const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
@@ -4343,7 +4366,7 @@ function openTarget(hid, unit, fromBuilding, review) {
 /* 記録をすぐ画面に出して、送信はうしろで行う（続けて記録しても、印がすぐ変わる） */
 function quickVisit(hid, unit, result, extra, msg, onUndo, keepOpen) {
   const now = new Date().toISOString();
-  const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id };
+  const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id }; { const rs = recoSrc(hid, unit); if (rs) v.src = rs; }
   if (result === 'met' || result === 'refused') { if (extra.age) v.age = extra.age; }
   if (result === 'met' && extra.interest) v.interest = extra.interest;
   D().visits.push(v);
@@ -4502,7 +4525,7 @@ function saveVisit(hid, unit, result, extra, keepOpen, onUndo) {
   if (!follow && !extra.dnc && !(cur && cur.by === me().id)) { quickVisit(hid, unit, result, extra, msg, onUndo, keepOpen); return; }
   commit(msg, () => {
     const now = new Date().toISOString();
-    const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id };
+    const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id }; { const rs = recoSrc(hid, unit); if (rs) v.src = rs; }
     if (result === 'met') { // 記録しない設定の項目は、そもそも持たせない
       if (extra.age) v.age = extra.age;
       if (extra.interest) v.interest = extra.interest;
@@ -4611,12 +4634,13 @@ function openMemo(k, back) {
   if (!f || f.by !== me().id) { toast('メモは、自分が受け持っている再訪問にだけ書けます'); return; }
   const m = memoOf(k), met = sum(k).met, last = sum(k).last;
   const done = () => { if (back) back(); else { closeSheet(); renderAll(); } };
-  const keepMemo = () => { // 書きかけのメモを保存してから次へ進む
+  /* 書きかけのメモと「次の約束」を保存する */
+  const keepMemo = () => {
     const el = $('#memoText');
-    if (!el) return;
-    const text = el.value.trim(), o = memoAll();
-    if (text) o[k] = { text, at: new Date().toISOString() }; else delete o[k];
-    memoSaveAll(o);
+    if (!el) return true;
+    const text = el.value.trim(), nx = readNext('memoNext'), o = memoAll();
+    if (text || nx) o[k] = Object.assign({ text, at: new Date().toISOString() }, nx ? { next: nx } : {}); else delete o[k];
+    return memoSaveAll(o);
   };
   setSheet(headHtml(terrById(h.terrId), 'メモ・記録', targetName(h, unit)) + `
     <div class="stamps"><button type="button" class="choice c-met" data-stamp="met"><i class="pin st-met">会</i>会えた</button>
@@ -4625,6 +4649,9 @@ function openMemo(k, back) {
     ${met ? `<p class="metline">前回 会えた日：${fmtDate(met.at)}（${slotShort(slotOf(new Date(met.at)))}）</p>` : '<p class="muted">まだ会えた記録はありません。</p>'}
     ${last ? `<p class="muted">前回の記録：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}</p>` : ''}
     <label class="field"><span>メモ（このスマホだけ）</span><textarea id="memoText" rows="8" maxlength="1000" placeholder="例：次は土曜の午前に。前回の話の続きから">${esc(m ? m.text : '')}</textarea></label>
+    ${nextInputsHtml('memoNext', m && m.next)}
+    <p class="hint">約束の日は、ホームのカレンダーと「今日やること」に出ます（このスマホの中だけ）。</p>
+    ${m && m.next ? `<a class="btn small" href="${gcalUrl('再訪問の約束', m.next.date, m.next.time, '', '', '')}" target="_blank" rel="noopener">約束をGoogleカレンダーに入れる</a>` : ''}
     ${m ? `<p class="muted">最後に保存：${fmtDate(m.at)}</p>` : ''}
     <button class="btn primary block" id="memoSave">メモを保存する</button>
     <a class="btn block" href="https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}&travelmode=walking" target="_blank" rel="noopener">Googleマップで道順を見る</a>
@@ -4635,15 +4662,19 @@ function openMemo(k, back) {
     </details>
     <p class="hint">メモはこのスマホの中だけに保存され、係やほかの人には送られません。住んでいる人の名前・電話番号は書かないでください。受け持ちが終わると、メモも自動で消えます。</p>
     <button class="btn block" id="memoBack">もどる</button>`);
-  $$('[data-stamp]', $('#sheet')).forEach(b => b.onclick = () =>
-    stampFollow(k, b.dataset.stamp, $('#memoText').value, () => openMemo(k, back)));
+  $$('[data-stamp]', $('#sheet')).forEach(b => b.onclick = () => {
+    const nx = readNext('memoNext'), o = memoAll();
+    if (nx) { o[k] = Object.assign({ text: '', at: new Date().toISOString() }, o[k] || {}, { next: nx }); memoSaveAll(o); }
+    else if (o[k] && o[k].next) { delete o[k].next; memoSaveAll(o); }
+    stampFollow(k, b.dataset.stamp, $('#memoText').value, () => openMemo(k, back));
+  });
   $$('[data-share]', $('#sheet')).forEach(x => x.onclick = () => { keepMemo(); shareMemo(k, x.dataset.share, () => openMemo(k, back)); });
   $('#memoRec').onclick = () => { keepMemo(); openTarget(hid, unit, false); };
   $('#memoSave').onclick = () => {
-    const text = $('#memoText').value.trim(), o = memoAll();
-    if (text) o[k] = { text, at: new Date().toISOString() }; else delete o[k];
-    if (!memoSaveAll(o)) { toast('このスマホに保存できませんでした'); return; }
-    toast(text ? 'メモを保存しました（このスマホだけ）' : 'メモを消しました');
+    const text = $('#memoText').value.trim(), nx = readNext('memoNext');
+    if (keepMemo() === false) { toast('このスマホに保存できませんでした'); return; }
+    toast(text || nx ? 'メモを保存しました（このスマホだけ）' : 'メモを消しました');
+    if (currentView === 'home') renderHome();
     done();
   };
   if ($('#memoDel')) $('#memoDel').onclick = async () => {
@@ -4670,7 +4701,7 @@ const gmapUrl = h => `https://www.google.com/maps/search/?api=1&query=${h.lat.to
 function memoText(k) {
   const [hid, unit] = parseKey(k), h = houseById(hid), t = h && terrById(h.terrId), m = memoOf(k);
   const name = h.type === 'apt' ? `${h.label || '集合住宅'} ${unitTitle(h, unit)}` : (h.label || '家');
-  return `【再訪問メモ】${t ? `区域${t.no} ` : ''}${name}\n${m ? m.text : ''}\n（${fmtDay(m ? m.at : new Date().toISOString())}のメモ）\n場所：${gmapUrl(h)}`;
+  return `【再訪問メモ】${t ? `区域${t.no} ` : ''}${name}\n${m ? m.text : ''}\n（${fmtDay(m ? m.at : new Date().toISOString())}のメモ）${m && m.next ? '\n次の約束：' + fmtNext(m.next) : ''}\n場所：${gmapUrl(h)}`;
 }
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* 古い方法でためす */ }
@@ -5029,7 +5060,7 @@ function openAptSeq(hid, startUnit) {
     $$('[data-fol]', S).forEach(x => x.onclick = () => { if (x.dataset.fol === '1') { st.step = 'memo'; paint(); } else save('met', {}); });
     $$('[data-memosave]', S).forEach(x => x.onclick = () => {
       const u2 = houseById(hid).units[idx];
-      saveFollowVisit(hid, u2, $('#stepMemo').value, true);
+      saveFollowVisit(hid, u2, $('#stepMemo').value, true, readNext('stepNext'));
       go(nextIdx(idx + 1));
     });
     $$('[data-refok]', S).forEach(x => x.onclick = () => save('refused', { age: st.age, dnc: true }));
@@ -6225,6 +6256,7 @@ function followCard(k, f, pinned) {
     <p class="muted">最後の記録から ${d}日${state}${myPos ? `　ここから約${fmtDist(distM(myPos, [h.lat, h.lng]))}` : ''}</p>
     <div class="stamps"><button type="button" class="choice c-met" data-fstamp="met" data-key="${esc(k)}"><i class="pin mini st-met">会</i>会えた</button>
       <button type="button" class="choice c-away" data-fstamp="away" data-key="${esc(k)}"><i class="pin mini st-away">留</i>留守</button></div>
+    ${memo && memo.next ? `<p class="nextline">次の約束：${esc(fmtNext(memo.next))}</p>` : ''}
     <div class="fmemo${memo ? '' : ' none'}">${memo ? esc(memoLines) : 'メモはまだありません'}</div>
     <div class="actions">${acts}</div></article>`;
 }
@@ -6238,7 +6270,7 @@ async function stampFollow(k, res, curText, after) {
   const line = `${now.getMonth() + 1}月${now.getDate()}日 ${fmtTime(now)}　${RESULT_LABEL[res]}`;
   const before = memoOf(k), base = (curText == null ? (before ? before.text : '') : curText).trim();
   const o = memoAll();
-  o[k] = { text: (line + (base ? '\n' + base : '')).slice(0, 1000), at: now.toISOString() };
+  o[k] = Object.assign({}, before || {}, { text: (line + (base ? '\n' + base : '')).slice(0, 1000), at: now.toISOString() });
   memoSaveAll(o);
   const m = sum(k).met;
   const extra = res === 'met' ? { age: m && seeV(m, k) ? m.age : undefined, interest: '再訪問したい' } : {};
@@ -7054,11 +7086,11 @@ function openFollowMap() {
 }
 /* 「地図で見る」：その家まで地図が飛んでいき、四すみの枠で家をしぼりこんで見せる。
    家をタップすると、まずこれまでの記録とメモ → 「訪問の結果を記録する」で結果を残す */
-function goTo(hid, unit, route) {
+function goTo(hid, unit, route, rk) {
   const h = houseById(hid); if (!h) return;
   clearTarget(); followMap = false;
   focusCard = null; roundTerr = null; curTerr = null; firstMapShow = false;
-  target = { hid, unit: unit || '', route: !!route };
+  target = { hid, unit: unit || '', route: !!route, reco: rk || '' };
   showView('map');
   $('#terrJump').value = '';
   setTimeout(() => {
@@ -7102,7 +7134,7 @@ function nameZoomSlider(key) {
     <p class="nzends"><span>← 縮めても出す</span><span>拡大したときだけ →</span></p></div>`;
 }
 const ICONS = ['区', '家', '図', '心', '🏠', '🗺️', '📖', '🚪', '✅', '⭐', '🚶', '☀️'];
-const UI_DEFAULT = { fTime: 'off', fFollow: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
+const UI_DEFAULT = { fTime: 'off', fFollow: 'off', todayOn: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
 /* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
   standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
@@ -7331,6 +7363,8 @@ function openUiSheet() {
       <p class="hint">はじめは、区域を回って「会えた・留守」を記録するだけの、かんたんな形です。必要な機能だけ「使う」にしてください。</p>
       <div class="featrow"><p><b>奉仕時間</b><small>時間をはかる・今月の目標・カレンダーに時間を残す</small></p>${seg('fTime', [['off', '使わない'], ['on', '使う']])}</div>
       <div class="featrow"><p><b>再訪問</b><small>会えたあとに「再訪問する」をえらぶと、メモを残して、下の「再訪問」タブで管理できます（メモはこのスマホの中だけ）</small></p>${seg('fFollow', [['off', '使わない'], ['on', '使う']])}</div>
+      <h3 class="sub">ホームに出すもの</h3>
+      <div class="featrow"><p><b>今日やること</b><small>今日の集まり・自分の予定・再訪問の約束・区域カード・今がチャンスの留守宅カードを、ホームのいちばん上にまとめます</small></p>${seg('todayOn', [['off', '出さない'], ['on', '出す']])}</div>
       <h3 class="sub">区域カードに出すもの</h3>
       <div class="featrow"><p><b>進み具合</b><small>受け取ってから訪ねた家・部屋の数と、横のバー</small></p>${seg('cProg', [['off', '出さない'], ['on', '出す']])}</div>
       <div class="featrow"><p><b>今のおすすめ</b><small>今の時間帯に訪ねるとよい家の数</small></p>${seg('cReco', [['off', '出さない'], ['on', '出す']])}</div>
@@ -7451,12 +7485,12 @@ function openUiSheet() {
       if (k === 'cProg' || k === 'cReco') renderAll();
       if (k === 'terrColor' || k === 'terrWidth') renderTerrs();
       if (k === 'aptName' || k === 'fcName' || k === 'pin' || k === 'nameScope') renderHouses();
-      if (k === 'calList') renderHome();
+      if (k === 'calList' || k === 'todayOn') renderHome();
       paint(k !== 'mode');
     });
     $('#uiReset').onclick = async () => {
       if (!await ask('画面の見え方を、最初の状態にもどします（「使う機能」はそのままです）。よろしいですか？')) return;
-      UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fFollow: UI.fFollow, cProg: UI.cProg, cReco: UI.cReco }); uiSave(); applyUi(); setBase('pale'); // 使う機能・区域カードに出すものはそのまま
+      UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fFollow: UI.fFollow, cProg: UI.cProg, cReco: UI.cReco, todayOn: UI.todayOn }); uiSave(); applyUi(); setBase('pale'); // 使う機能・区域カードに出すものはそのまま
       toast('表示の設定を最初にもどしました');
       paint(false);
     };
@@ -8361,6 +8395,7 @@ function bindAgeAdmin() {
 
 function renderDataSet() {
   renderDummy();
+  renderRecoAdmin();
   renderAgeAdmin();
   const st = D().settings;
   const row = (key, label, unit, d, hint) => `<div class="setrow"><span>${label}<br><small class="hint">${hint}</small></span><div class="stepper">
@@ -8581,13 +8616,13 @@ async function bulkMove() {
   });
 }
 function exportCsv() {
-  const rows = [['区域番号', '家ID', '種類', '部屋', '結果', '年代', '再訪問', '日時', '曜日区分', '時間帯']];
+  const rows = [['区域番号', '家ID', '種類', '部屋', '結果', '年代', '再訪問', '日時', '曜日区分', '時間帯', 'おすすめ経由']];
   for (const v of D().visits) {
     const h = houseById(v.houseId), t = h && terrById(h.terrId), d = new Date(v.at);
     rows.push([t ? t.no : '', v.houseId, h ? (h.type === 'apt' ? '集合住宅' : '一戸建て') : '', v.unit ? uName(h, v.unit) : '',
       RESULT_LABEL[v.result], ageName(v.age), intName(v.interest),
       `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
-      dayTypeOf(d), bandOf(d)]);
+      dayTypeOf(d), bandOf(d), recoLabel(v.src)]);
   }
   const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const a = document.createElement('a');
@@ -8808,7 +8843,7 @@ function calHtml(o) {
   let cells = '';
   for (let i = 0; i < first; i++) cells += '<span class="cd empty"></span>';
   for (let d = 1; d <= last; d++) {
-    const key = ymd(new Date(y, m, d)), sc = schedsOn(key).length, ev = o.events.filter(e => e.date === key).length, mn = featTime() ? (o.log[key] || 0) : 0;
+    const key = ymd(new Date(y, m, d)), sc = schedsOn(key).length, ev = o.events.filter(e => e.date === key).length + (o.admin ? 0 : apptsOn(key).length), mn = featTime() ? (o.log[key] || 0) : 0;
     const wd = new Date(y, m, d).getDay();
     const list = schedsOn(key);
     const tag = list.length
@@ -8831,6 +8866,15 @@ function monthListHtml(y, m, o) {
     .forEach(s => items.push({ date: s.date, time: s.time || '', text: schedLine(s), tag: schedGroupName(s.group), mine: false }));
   ((o && o.events) || []).filter(e => String(e.date).startsWith(pre))
     .forEach(e => items.push({ date: e.date, time: e.time || '', text: `${e.time ? esc(e.time) + '　' : ''}${esc(e.title)}`, tag: '自分の予定', mine: true }));
+  if (o && !o.admin && featFollow()) { // 再訪問の約束（このスマホの中だけ）
+    const mo = memoAll();
+    Object.keys(mo).forEach(k => {
+      const mm = mo[k], f = fol(k);
+      if (!mm || !mm.next || !String(mm.next.date).startsWith(pre) || !f || f.by !== me().id) return;
+      const [hid, unit] = parseKey(k), h = houseById(hid); if (!h) return;
+      items.push({ date: mm.next.date, time: mm.next.time || '', text: `${mm.next.time ? esc(mm.next.time) + '　' : ''}${targetName(h, unit)}`, tag: '再訪問の約束', mine: true });
+    });
+  }
   let list = items.sort((a, b) => ((a.date + a.time) < (b.date + b.time) ? -1 : 1));
   const hid = upcoming ? list.filter(x => x.date < today).length : 0;
   if (upcoming) list = list.filter(x => x.date >= today);
@@ -8861,6 +8905,7 @@ function openDay(date) {
       ${ev.length ? ev.map(e => `<article class="ritem k-young"><div><p class="rt">${e.time ? esc(e.time) + '　' : ''}${esc(e.title)}</p></div>
         <span class="actions" style="margin:0"><a class="btn small" href="${gcalUrl(e.title, e.date, e.time, '', '', '')}" target="_blank" rel="noopener">Googleカレンダーへ</a>
         <button class="btn small danger" data-evdel="${e.id}">消す</button></span></article>`).join('') : '<p class="muted">予定はありません。</p>'}
+      ${apptDayHtml(date)}
       <div class="inline" style="margin-top:8px"><input type="time" id="evTime" aria-label="時刻" style="min-height:52px;border-radius:12px;border:2px solid var(--ink2);padding:0 8px;max-width:130px">
         <input type="text" id="evTitle" maxlength="40" placeholder="例：〇〇さんと奉仕" style="min-height:52px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:18px"></div>
       <button class="btn block" id="evAdd">予定を入れる</button>
@@ -8879,10 +8924,219 @@ function openDay(date) {
     };
     $$('[data-evdel]', S).forEach(b => b.onclick = () => { const x = myData(); x.events = x.events.filter(e => e.id !== b.dataset.evdel); mySave(x); renderHome(); paint(); });
     if ($('#dAddSched')) $('#dAddSched').onclick = () => openSchedForm(null, date, () => openDay(date));
+    $$('[data-apmemo2]', S).forEach(b => b.onclick = () => openMemo(b.dataset.apmemo2, () => openDay(date)));
   };
   paint();
 }
 
+
+/* ---------- 再訪問の約束（メモの next に入れる。このスマホの中だけ） ---------- */
+function nextInputsHtml(p, n) {
+  return `<div class="inline"><label class="field" style="flex:1.4;margin:6px 0"><span>次の約束の日（なくてもよい）</span><input type="date" id="${p}D" value="${esc(n ? n.date : '')}"></label>
+    <label class="field" style="flex:1;margin:6px 0"><span>時刻</span><input type="time" id="${p}T" value="${esc(n ? n.time : '')}"></label></div>`;
+}
+function readNext(p) {
+  const d = $('#' + p + 'D'), t = $('#' + p + 'T');
+  const v = d && /^\d{4}-\d{2}-\d{2}$/.test(d.value) ? d.value : '';
+  return v ? { date: v, time: t && /^\d{1,2}:\d{2}$/.test(t.value) ? t.value : '' } : null;
+}
+function fmtNext(n) { return `${fmtYmd(n.date)}${n.time ? ' ' + n.time : ''}`; }
+/* その日の、自分の再訪問の約束 */
+function apptsOn(date) {
+  if (!Store.data || !featFollow()) return [];
+  const o = memoAll(), out = [];
+  Object.keys(o).forEach(k => {
+    const m = o[k], f = fol(k);
+    if (!m || !m.next || m.next.date !== date || !f || f.by !== me().id) return;
+    const [hid, unit] = parseKey(k), h = houseById(hid);
+    if (h) out.push({ k, h, unit, next: m.next });
+  });
+  return out.sort((a, b) => ((a.next.time || '99') < (b.next.time || '99') ? -1 : 1));
+}
+function clearAppt(k) {
+  const o = memoAll();
+  if (!o[k]) return;
+  delete o[k].next;
+  if (!o[k].text) delete o[k];
+  memoSaveAll(o);
+}
+function apptDayHtml(date) {
+  const list = apptsOn(date);
+  if (!list.length) return '';
+  return `<p class="q" style="font-size:17px">再訪問の約束</p>` + list.map(a => `<article class="ritem k-handoff"><div>
+      <p class="rt">${a.next.time ? esc(a.next.time) + '　' : ''}${targetName(a.h, a.unit)}</p></div>
+      <button type="button" class="btn small" data-apmemo2="${esc(a.k)}">メモ・記録</button></article>`).join('');
+}
+const ICO_RE = SVG('<path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7"/><path d="M20 4v4.7h-4.7"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.3"/><path d="M4 20v-4.7h4.7"/>');
+
+/* ---------- ホームの「おすすめ」 ----------
+   カードを受け取らなくても、空いた時間に2〜3件回れる「会えていない家」を出す。
+   ・出すかどうか・種類・件数などは区域係が決める（settings.reco…）
+   ・種類ごとに順番に1件ずつえらぶので、「近く」と「長く会えていない」などが混ざって出る
+   ・自分の留守宅カード・区域カードの家を先に出す。ほかの人の留守宅カードの家は、係の設定で外す
+   ・おすすめから開いて記録すると、記録に src: 'reco:種類' が付く（係の画面で、種類ごとの会えた割合を見る） */
+const RECO_KINDS2 = [
+  ['near', 1, '近くの留守宅', '現在地から近くて、最近会えていない家'],
+  ['slot', 2, '今の時間帯がねらい目', '今の曜日・時間帯に会えたことがある家'],
+  ['try', 4, '時間帯を変えてみる', '留守が続いていて、今の時間帯はまだ訪ねていない家'],
+  ['long', 8, '長く会えていない家', '遠くても出します'],
+  ['biz', 16, '会社・店舗（営業時間中）', '平日の昼間に、会社・店舗・事務所など'],
+  ['fresh', 32, 'まだ一度も訪ねていない家', '仮の家の確認にもなります']
+];
+const RECO_LIM = { recoCount: [1, 5], recoDist: [100, 3000], recoLongDays: [30, 730], recoSkipDays: [0, 60] };
+const recoOn = () => !!Store.data && Number(D().settings.recoOn) !== 0;
+function recoLabel(src) {
+  if (!src || String(src).indexOf('reco') !== 0) return '';
+  const r = RECO_KINDS2.find(x => 'reco:' + x[0] === src);
+  return r ? r[2] : 'おすすめ';
+}
+let RECO_CACHE = null, lastReco = [], recoLocTried = false;
+const recoSkip = new Set(), recoTags = new Map();
+function recoMark(hid, unit, rk) { recoTags.set(K(hid, unit || ''), rk || ''); }
+/* 記録のときに、おすすめから開いた家なら種類を返す（1回かぎり） */
+function recoSrc(hid, unit) {
+  const k = K(hid, unit || '');
+  if (!recoTags.has(k)) return '';
+  const rk = recoTags.get(k); recoTags.delete(k);
+  return rk ? 'reco:' + rk : 'reco';
+}
+function computeHomeReco() {
+  const st = D().settings, bits = Number(st.recoKinds) || 0, on = b => !!(bits & b);
+  if (!recoOn() || !bits) return { list: [], needPos: false };
+  const nowD = new Date(), now = nowD.getTime(), cur = slotOf(nowD), band = bandOf(nowD);
+  const key = [me().id, cur, myPos ? myPos[0].toFixed(4) + ',' + myPos[1].toFixed(4) : '', [...recoSkip].join(',')].join('|');
+  if (RECO_CACHE && RECO_CACHE.key === key && now - RECO_CACHE.at < 60000) return RECO_CACHE.v;
+  const skipMs = (Number(st.recoSkipDays) || 0) * DAY, longMs = (Number(st.recoLongDays) || 180) * DAY;
+  const near = Number(st.recoDist) || 500, others = Number(st.recoOthers) !== 0, cardOut = Number(st.recoCardOut) !== 0;
+  const bizTime = dayTypeOf(nowD) === '平日' && (band === '朝' || band === '昼' || band === '午後');
+  const mineKeys = new Set(), othersCard = new Set();
+  activeCards().forEach(c => c.keys.forEach(k => (c.by === me().id ? mineKeys : othersCard).add(k)));
+  const buckets = {};
+  RECO_KINDS2.forEach(r => { buckets[r[0]] = new Map(); });
+  for (const h of D().houses) {
+    if (!h.terrId || recoSkip.has(h.id)) continue;
+    const t = terrById(h.terrId);
+    if (!t || (!others && t.holder && !myTerr(t))) continue;
+    const d = myPos ? distM(myPos, [h.lat, h.lng]) : null;
+    for (const u of targets(h)) {
+      const k = K(h.id, u);
+      if (D().dnc[k] || D().follows[k] || relOf(k) || recentMet(k)) continue;
+      if (cardOut && othersCard.has(k)) continue;
+      const s = sum(k);
+      if (s.last && skipMs && now - Date.parse(s.last.at) < skipMs) continue;
+      const metAgo = s.met ? now - Date.parse(s.met.at) : Infinity;
+      const unmet = isUnmet(k), longOk = !s.met || metAgo > longMs;
+      const kind = h.type === 'apt' ? unitKind(h, u) : kindOf(h);
+      const c = [];
+      if (on(1) && d != null && d <= near && s.n && longOk) c.push(['near', 70 - d / 20, `近く（約${fmtDist(d)}）${s.awayN ? `・留守${s.awayN}回` : ''}`]);
+      if (on(2) && hasSlot(s.metSlots, cur) && metAgo > 30 * DAY) c.push(['slot', 60, `${slotShort(cur)}に会えたことがある`]);
+      if (on(4) && unmet && slotCount(s.slots) < SLOTS.length && !hasSlot(s.slots, cur)) c.push(['try', 50 + Math.min(s.awayN, 5) * 3, `留守${s.awayN}回・${slotShort(cur)}はまだ訪ねていない`]);
+      if (on(8) && s.n && longOk) {
+        const a = visitsOf(k), days = daysSince(s.met ? s.met.at : a[a.length - 1].at);
+        if (days * DAY >= longMs) c.push(['long', 40 + Math.min(days, 730) / 15, s.met ? `最後に会えてから${days}日` : `${days}日前から会えていない`]);
+      }
+      if (on(16) && bizTime && kind !== 'home' && longOk) c.push(['biz', 45, `${kindName(kind)}・営業時間中`]);
+      if (on(32) && !s.n) c.push(['fresh', 35, h.prov ? 'まだ訪ねていない（仮の家の確認にも）' : 'まだ一度も訪ねていない家']);
+      if (!c.length) continue;
+      const mine = mineKeys.has(k), own = myTerr(t);
+      const bonus = mine ? 30 : own ? 15 : 0;
+      const tag = mine ? 'あなたの留守宅カードの家' : own ? 'あなたの区域カードの家' : '';
+      c.forEach(([rk, base, why]) => {
+        const sc = base + bonus - (d != null && rk !== 'near' ? Math.min(30, d / 200) : 0);
+        const b = buckets[rk], prev = b.get(h.id);
+        if (!prev || prev.sc < sc) b.set(h.id, { k, h, u, t, rk, sc, why, tag, d, mine });
+      });
+    }
+  }
+  const N = Math.min(5, Math.max(1, Number(st.recoCount) || 3));
+  const lists = Object.keys(buckets).map(rk => [...buckets[rk].values()].sort((a, b) => b.sc - a.sc)).filter(l => l.length);
+  lists.sort((a, b) => b[0].sc - a[0].sc);
+  const out = [], used = new Set();
+  while (out.length < N && lists.some(l => l.length)) {
+    for (const l of lists) {
+      while (l.length && used.has(l[0].h.id)) l.shift();
+      if (l.length && out.length < N) { const x = l.shift(); used.add(x.h.id); out.push(x); }
+    }
+  }
+  const v = { list: out, needPos: on(1) && !myPos };
+  RECO_CACHE = { key, at: now, v };
+  return v;
+}
+function homeRecoHtml() {
+  lastReco = [];
+  if (!recoOn() || !(Number(D().settings.recoKinds) || 0)) return '';
+  const st = D().settings, r = computeHomeReco(), cur = slotOf(new Date());
+  lastReco = r.list.map(x => x.h.id);
+  // おすすめの家の区域に、今の時間帯の留守宅カードがあれば、受け取るボタンを出す
+  let sugg = null;
+  if (Number(st.recoCardBtn) !== 0 && r.list.length && activeCards().filter(c => c.by === me().id).length < st.awayMax) {
+    sugg = new Map();
+    awaySuggestions(me().id, [cur]).forEach(x => { if (!sugg.has(x.t.id)) sugg.set(x.t.id, x); });
+  }
+  const items = r.list.map(x => {
+    const cs = sugg && !x.mine ? sugg.get(x.t.id) : null;
+    return `<article class="ritem rk-${x.rk}"><div>
+      <p class="rt"><span class="stamp xs${noCls(x.t.no)}">${esc(x.t.no)}</span> ${targetName(x.h, x.u)}</p>
+      <p class="recowhy"><b>${esc(recoLabel('reco:' + x.rk))}</b>　${esc(x.why)}</p>
+      ${x.d != null && x.rk !== 'near' ? `<p class="muted">ここから約${fmtDist(x.d)}</p>` : ''}
+      ${x.tag ? `<span class="recotag">${esc(x.tag)}</span>` : ''}
+    </div><button type="button" class="btn small primary" data-rgo="${x.h.id}" data-unit="${esc(x.u)}" data-rk="${x.rk}">地図で見る</button>
+    ${cs ? `<div class="actions span"><button type="button" class="btn small" data-rcard="${x.t.id}" data-slot="${esc(cur)}">この区域の留守宅カードを受け取る（${cs.keys.length}軒）</button></div>` : ''}</article>`;
+  }).join('');
+  return `<h2 class="sec">空いた時間に、おすすめ</h2>
+    <p class="hint">カードを受け取らなくても回れる、会えていない家です（今は${slotShort(cur)}）。記録すると、その区域の地図にも反映されます。</p>
+    ${r.needPos ? '<div class="row"><button type="button" class="btn small" data-rpos>現在地から近い家も出す</button></div>' : ''}
+    ${items || '<div class="empty">今出せるおすすめはありません。</div>'}
+    <div class="row">${r.list.length ? '<button type="button" class="btn small" data-rmore>ほかのおすすめ</button>' : ''}${recoSkip.size ? '<button type="button" class="btn small" data-rreset>はじめのおすすめにもどす</button>' : ''}${myPos ? '<button type="button" class="btn small" data-rpos>現在地を更新</button>' : ''}</div>`;
+}
+/* 位置情報をすでに許可しているスマホでは、だまって現在地を取って「近くの留守宅」を出す */
+function maybeAutoLocate() {
+  if (recoLocTried || myPos || !recoOn() || !((Number(D().settings.recoKinds) || 0) & 1)) return;
+  recoLocTried = true;
+  try {
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then(p => {
+        if (p.state === 'granted') locate(() => { RECO_CACHE = null; renderHome(); });
+      }).catch(() => {});
+    }
+  } catch (e) { /* 何もしない */ }
+}
+/* 係の画面：おすすめの設定と、種類ごとの会えた割合 */
+function renderRecoAdmin() {
+  const box = $('#adReco'); if (!box) return;
+  const st = D().settings, bits = Number(st.recoKinds) || 0, on = Number(st.recoOn) !== 0;
+  const step = (key, label, val, d, hint) => `<div class="setrow"><span>${label}${hint ? `<br><small class="hint">${hint}</small>` : ''}</span><div class="stepper">
+    <button type="button" data-kset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${val}</output>
+    <button type="button" data-kset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div></div>`;
+  const flag = (key, label, hint, a, b) => `<div class="setrow"><span>${label}<br><small class="hint">${hint}</small></span>
+    <div class="seg" role="group" aria-label="${label}"><button type="button" data-sset="${key}" data-v="1" aria-pressed="${Number(st[key]) !== 0}">${a}</button><button type="button" data-sset="${key}" data-v="0" aria-pressed="${Number(st[key]) === 0}">${b}</button></div></div>`;
+  const since = Date.now() - 90 * DAY, stat = {};
+  D().visits.forEach(v => {
+    if (!v.src || String(v.src).indexOf('reco') !== 0 || Date.parse(v.at) < since) return;
+    const rk = String(v.src).split(':')[1] || '?', s = stat[rk] || (stat[rk] = { n: 0, m: 0 });
+    s.n++; if (v.result === 'met') s.m++;
+  });
+  const rows = RECO_KINDS2.filter(r => stat[r[0]]).map(r => {
+    const s = stat[r[0]];
+    return `<tr><th>${r[2]}</th><td>${s.n}件</td><td>${s.m}件</td><td><b>${Math.round(s.m / s.n * 100)}%</b></td></tr>`;
+  }).join('');
+  box.innerHTML = `<h2 class="sec">ホームの「おすすめ」</h2>
+    <p class="hint">カードを受け取らなくても、空いた時間に2〜3件回れる家を、全員のホームの下に出します。</p>
+    ${flag('recoOn', 'おすすめを出す', '出さないにすると、全員のホームから消えます', '出す', '出さない')}
+    ${on ? `<p class="q">出すおすすめの種類</p>
+    <div class="chips">${RECO_KINDS2.map(r => `<button type="button" class="chip" data-recok="${r[1]}" aria-pressed="${!!(bits & r[1])}">${r[2]}</button>`).join('')}</div>
+    <p class="hint">${RECO_KINDS2.map(r => `<b>${r[2]}</b>：${r[3]}`).join('<br>')}<br>えらんだ種類から、順番に1件ずつ出します。</p>
+    ${step('recoCount', '一度に出す件数', st.recoCount + '件', 1)}
+    ${step('recoDist', '「近く」とする距離', st.recoDist + 'm以内', 100)}
+    ${step('recoLongDays', '「長く会えていない」とする日数', st.recoLongDays + '日', 30)}
+    ${step('recoSkipDays', 'だれかが訪ねてから、おすすめに出さない日数', st.recoSkipDays ? st.recoSkipDays + '日' : '0日', 1, '同じ家に、続けて何人も行かないように')}
+    ${flag('recoOthers', 'ほかの人が担当している区域の家も出す', '出すと、担当者の地図にも緑のチェックが付きます（だれが行ったかは見せません）', '出す', '出さない')}
+    ${flag('recoCardOut', 'ほかの人の留守宅カードに入っている家', 'カードを持っている人の予定を崩さないように', '出さない', '出す')}
+    ${flag('recoCardBtn', '「この区域の留守宅カードを受け取る」ボタン', 'おすすめの家の区域に、今の時間帯の留守宅カードがあるときに出します', '出す', '出さない')}` : ''}
+    <h3 class="sub">おすすめから訪ねた記録（直近90日）</h3>
+    ${rows ? `<div class="scroll"><table class="slots narrow"><tr><th>種類</th><th>訪ねた</th><th>会えた</th><th>会えた割合</th></tr>${rows}</table></div>
+      <p class="hint">会えた割合が高い種類を残すと、会えない人に会いやすくなります。</p>` : '<p class="muted">まだ記録はありません。</p>'}`;
+}
 
 /* ---------- ホーム：今日やること ----------
    開いたときに、今日必要なことだけを上から順に出す：
@@ -8916,6 +9170,18 @@ function todayTodoHtml(todays) {
     h += `<div class="todo"><span class="tico">${ICO_CAL}</span>
       <div class="tbody2"><small>今日の集まり（${esc(schedGroupName(sc.group))}）</small><b>${esc(sc.time || '時間未定')}${sc.end ? '〜' + esc(sc.end) : ''}</b><span>${esc(sc.place || '場所未定')}</span></div>
       ${sc.place ? `<a class="btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sc.place)}" target="_blank" rel="noopener">道順</a>` : ''}</div>`;
+  });
+  const today = ymd(new Date()), od = myData();
+  od.events.filter(e => e.date === today).sort((a, b) => ((a.time || '') < (b.time || '') ? -1 : 1)).forEach(e => {
+    h += `<div class="todo"><span class="tico">${ICO_CAL}</span>
+      <div class="tbody2"><small>自分の予定</small><b>${e.time ? esc(e.time) + '　' : ''}${esc(e.title)}</b></div>
+      <button type="button" class="btn" data-day="${today}">見る</button></div>`;
+  });
+  apptsOn(today).forEach(a => {
+    h += `<div class="todo appt"><span class="tico">${ICO_RE}</span>
+      <div class="tbody2"><small>再訪問の約束</small><b>${a.next.time ? esc(a.next.time) + '　' : ''}${targetName(a.h, a.unit)}</b></div>
+      <div class="tbtns2"><button type="button" class="btn" data-apmemo="${esc(a.k)}">メモ・記録</button>
+        <button type="button" class="btn" data-apdone="${esc(a.k)}">済み</button></div></div>`;
   });
   const seen = asgSeen();
   todayAsgs().filter(a => a.keys.some(k => !seen.has(k))).forEach(a => {
@@ -8953,7 +9219,7 @@ function renderHome() {
   const todays = schedsOn(ymd(new Date()));
   $('#homeHello').innerHTML = `<div class="homehello"><p>${esc(me().name)}さん、${hi}</p><b>${fmtYmd(ymd(new Date()))}</b>
     ${me().group ? `<span class="gbadge">${esc(me().group)}グループ${isOverseer() ? '・監督' : me().leader ? '・司会者' : ''}</span>` : ''}</div>
-    ${todayTodoHtml(todays)}`;
+    ${UI.todayOn === 'on' ? todayTodoHtml(todays) : asgNoticeHtml()}`;
   clearInterval(timerTick);
   if (!featTime()) { // 奉仕時間を使わない人には、タイマー・目標・まとめを出さない
     $('#homeTimer').innerHTML = ''; $('#homeGoal').innerHTML = ''; $('#homeMonthEnd').innerHTML = '';
@@ -8972,6 +9238,8 @@ function renderHome() {
   $('#homeMonthEnd').innerHTML = monthEndHtml(o);
   }
   $('#homeCal').innerHTML = calHtml(o);
+  const hr = $('#homeReco'); if (hr) hr.innerHTML = homeRecoHtml();
+  maybeAutoLocate();
 }
 /* スワイプの動き（指でもマウスでも）：左に半分以上ずらすと開き、ほかをさわると閉じる */
 const SWIPE_W = 176;
@@ -9034,7 +9302,14 @@ function bindHome() {
   $('#view-home').addEventListener('click', e => {
     const q = sel => e.target.closest(sel);
     let x;
-    if ((x = q('[data-openterr]'))) openTerr(x.dataset.openterr);
+    if ((x = q('[data-rgo]'))) { recoMark(x.dataset.rgo, x.dataset.unit, x.dataset.rk); goTo(x.dataset.rgo, x.dataset.unit, false, x.dataset.rk); }
+    else if ((x = q('[data-rcard]'))) { CHANCE_CACHE = null; RECO_CACHE = null; takeAwayCard(x.dataset.rcard, x.dataset.slot); }
+    else if (q('[data-rmore]')) { lastReco.forEach(id => recoSkip.add(id)); RECO_CACHE = null; renderHome(); }
+    else if (q('[data-rreset]')) { recoSkip.clear(); RECO_CACHE = null; renderHome(); }
+    else if (q('[data-rpos]')) locate(() => { RECO_CACHE = null; renderHome(); });
+    else if ((x = q('[data-apmemo]'))) openMemo(x.dataset.apmemo);
+    else if ((x = q('[data-apdone]'))) { clearAppt(x.dataset.apdone); renderHome(); toast('約束を「済み」にしました'); }
+    else if ((x = q('[data-openterr]'))) openTerr(x.dataset.openterr);
     else if ((x = q('[data-chance]'))) { CHANCE_CACHE = null; takeAwayCard(x.dataset.chance, x.dataset.slot); }
     else if ((x = q('[data-timer]'))) timerAction(x.dataset.timer);
     else if (q('#goalEdit')) openGoalSheet();
@@ -9098,7 +9373,7 @@ function renderSchedAdmin() {
       <button type="button" data-asm="cal" aria-pressed="${adSchedMode === 'cal'}">カレンダー</button>
       <button type="button" data-asm="list" aria-pressed="${adSchedMode === 'list'}">一覧</button></div>
     ${adSchedMode === 'cal'
-      ? calHtml({ events: [], log: {} }) + '<p class="hint">日付を押すと、その日の予定を見たり、すぐ入れたりできます。</p>'
+      ? calHtml({ events: [], log: {}, admin: true }) + '<p class="hint">日付を押すと、その日の予定を見たり、すぐ入れたりできます。</p>'
       : (list.length ? swipeHint(list) + list.map(s => schedRow(s, true)).join('') : '<div class="empty">これからの予定はありません。</div>')}`;
   $('#scNew').onclick = () => openSchedForm(null, null, null);
   $('#scPrint').onclick = () => { const n = new Date(); const d = new Date(n.getFullYear(), n.getMonth() + 1, 1); printMonthSchedule(d.getFullYear(), d.getMonth()); };
@@ -9807,7 +10082,8 @@ function bindStatic() {
   $('#view-admin').addEventListener('click', e => {
     const q = sel => e.target.closest(sel);
     let x;
-    if ((x = q('[data-open]'))) openTerr(x.dataset.open);
+    if ((x = q('[data-recok]'))) { const st = D().settings; st.recoKinds = (Number(st.recoKinds) || 0) ^ Number(x.dataset.recok); Store.save(); renderAll(); }
+    else if ((x = q('[data-open]'))) openTerr(x.dataset.open);
     else if ((x = q('[data-redraw]'))) startDraw(x.dataset.redraw);
     else if ((x = q('[data-rename]'))) { const t = terrById(x.dataset.rename); if (t) openTerrForm({ terr: t }); else toast('この区域は、もうありません'); }
     else if ((x = q('[data-delterr]'))) openDeleteTerr(x.dataset.delterr);
@@ -9822,12 +10098,13 @@ function bindStatic() {
     }
     else if ((x = q('[data-kset]'))) {
       const st = D().settings, key = x.dataset.kset;
-      const lim = key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 180] : key === 'followSkipDays' ? [0, 365] : key === 'groupMax' ? [1, 10]
+      const lim = RECO_LIM[key] || (key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 180] : key === 'followSkipDays' ? [0, 365] : key === 'groupMax' ? [1, 10]
         : key === 'syncGroupSec' ? [5, 30] : key === 'syncNormalSec' ? [10, 120]
         : key === 'reqMaxPersonal' || key === 'reqMaxGroup' ? [1, 5]
         : key === 'holdMaxPersonal' || key === 'holdMaxGroup' ? [1, 10]
-        : key === 'freeAfterDays' ? [0, 365] : [5, 60];
-      st[key] = Math.min(lim[1], Math.max(lim[0], (Number(st[key]) || 2) + Number(x.dataset.d)));
+        : key === 'freeAfterDays' ? [0, 365] : [5, 60]);
+      const cv = st[key] == null || st[key] === '' ? NaN : Number(st[key]);
+      st[key] = Math.min(lim[1], Math.max(lim[0], (isFinite(cv) ? cv : 2) + Number(x.dataset.d)));
       Store.save(); renderAll(); toast('設定を変えました');
     }
     else if ((x = q('[data-donepct]'))) {
