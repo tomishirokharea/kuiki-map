@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.18"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.20"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -808,6 +808,74 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 
 .agelines{margin:2px 0 0;font-size:15px;color:#4A2C7A;font-weight:700}
 
+.asgnote{border-width:3px}
+.asgnote b{font-size:18px}
+
+/* ===== 確認の画面 ===== */
+#askBox{position:fixed;inset:0;z-index:3500}
+#askBox .askback{position:absolute;inset:0;background:#00000066}
+#askBox .asksheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-radius:20px 20px 0 0;padding:14px 18px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;box-shadow:0 -6px 20px #0003;zoom:var(--z,1);max-height:90vh;overflow:auto}
+@media (min-width:760px){#askBox .asksheet{left:calc(50% - 280px);right:auto;width:560px;bottom:24px;border-radius:20px}}
+#askBox .grab{margin:0 auto}
+.askhead{display:flex;align-items:center;gap:12px}
+.askhead h2{font-size:24px;line-height:1.4;margin:0;outline:none}
+.askicon{flex:none;width:56px;height:56px;border-radius:99px;background:var(--ref-bg);color:var(--danger);display:grid;place-items:center}
+.askicon svg{width:30px;height:30px}
+.askbody{background:var(--warn-bg);border:2px solid var(--away);border-radius:12px;padding:12px 14px;font-size:17px;line-height:1.6;white-space:pre-line}
+.askbtn{min-height:64px;border-radius:14px;border:3px solid var(--ink);background:#fff;color:var(--ink);font-weight:700;font-size:20px}
+.askbtn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.askbtn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+
+/* ===== 記録のあと：次の家 ===== */
+.nextpanel{position:absolute;left:0;right:0;bottom:0;z-index:760;background:var(--paper);border-radius:20px 20px 0 0;box-shadow:0 -6px 20px #0003;padding:10px 16px calc(14px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;zoom:var(--z,1);max-height:70%;overflow:auto}
+@media (min-width:768px){.nextpanel{right:auto;left:10px;bottom:10px;width:min(560px,calc(100% - 84px));border-radius:20px}}
+.nextpanel .grab{margin:0 auto}
+.nprow{display:flex;align-items:center;gap:10px}
+.npok{flex:none;width:40px;height:40px;border-radius:99px;background:var(--met);color:#fff;display:grid;place-items:center}
+.npok.st-away{background:var(--away);color:#1F1A00}
+.npok svg{width:22px;height:22px;stroke-width:3}
+.npmsg{flex:1;min-width:0;display:flex;flex-direction:column}
+.npmsg b{font-size:19px}
+.npmsg small{font-size:14px;color:var(--ink2)}
+.npbarrow{display:flex;align-items:center;gap:8px}
+.npbar{flex:1;height:6px;border-radius:99px;background:#E0E6E3;overflow:hidden}
+.npbar i{display:block;height:100%;background:var(--ink2);transition:width 1s linear}
+.npbarrow small{font-size:13px;color:var(--ink2);white-space:nowrap}
+.npline{height:2px;background:#E0E6E3}
+.nplab{margin:0;font-size:15px;font-weight:700;color:var(--ink2)}
+.npnext{display:flex;align-items:center;gap:12px;background:#FFF1E8;border:2px solid var(--draw);border-radius:14px;padding:12px}
+.npnext .numbadge{min-width:40px;height:40px;font-size:20px}
+.npnext b{display:block;font-size:19px}
+.npnext small{font-size:14px;color:#6B2A08}
+.npbtns{display:flex;gap:8px}
+.npbtns .btn{min-height:56px;font-size:17px}
+.npbtns .btn.primary{flex:1;background:var(--draw);border-color:var(--draw)}
+.npbtns .npclose{border-color:var(--line);color:var(--ink2)}
+
+/* ===== ホーム：今日やること ===== */
+.todo{background:#fff;border:2px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;gap:12px;align-items:center;margin:10px 0}
+.todo .tico{flex:none;width:48px;height:48px;border-radius:12px;background:var(--terr-soft);color:var(--terr);display:grid;place-items:center}
+.todo .tico svg{width:26px;height:26px}
+.todo .tbody2{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.todo .tbody2 small{font-size:14px;color:var(--ink2)}
+.todo .tbody2 b{font-size:19px;line-height:1.35}
+.todo .btn{flex:none;min-height:52px;padding:0 12px;font-size:15px}
+.todo.terr{flex-wrap:wrap}
+.todo.terr .progress{flex-basis:100%;height:12px;margin:0}
+.todo.asg{background:#FFF1E8;border:3px solid var(--draw);flex-direction:column;align-items:stretch}
+.todo.asg .asgtop{display:flex;gap:10px;align-items:flex-start}
+.todo.asg .asgdot{flex:none;width:32px;height:32px;border-radius:99px;background:var(--draw);color:#fff;display:grid;place-items:center}
+.todo.asg .asgdot svg{width:18px;height:18px;stroke-width:2.6}
+.todo.asg b{font-size:18px;line-height:1.4}
+.todo.asg small{display:block;font-size:15px;color:#6B2A08}
+.todo.asg .row{margin:0;gap:8px}
+.todo.asg .btn.primary{flex:1;background:var(--draw);border-color:var(--draw)}
+.todo.hot{background:#FFFBEA;border-color:#D9A300}
+.todo.hot .tico{border-radius:99px;background:#FFE9A8;color:#8A5A00}
+.todo.hot .hotlab{font-size:14px;font-weight:700;color:#7A4F00}
+.todo.hot .btn{background:var(--terr);border-color:var(--terr);color:#fff}
+.todonone{margin:6px 0 10px}
+
 /* ===== お知らせ ===== */
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--brand);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
 #toast button{min-height:46px;border-radius:10px;border:2px solid #fff;background:transparent;color:#fff;font-weight:700;padding:0 14px;flex:none}
@@ -986,6 +1054,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
     <section class="view" id="view-cards" hidden>
       <div class="wrap">
         <div id="todayBox"></div>
+        <div id="asgNotice"></div>
         <div id="reqNotice"></div>
         <div id="homeAdd"></div>
         <div id="paneMine">
@@ -1022,6 +1091,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
       </div>
       <button type="button" class="zoomhint" id="zoomHint" hidden>地図を拡大すると家の印が出ます<span aria-hidden="true">×</span></button>
       <div class="cardbar" id="cardBar" hidden></div>
+      <div class="nextpanel" id="nextPanel" hidden role="region" aria-label="記録のあと"></div>
       <button type="button" class="locbtn" id="btnLocate" aria-label="現在地を表示"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></button>
       <button type="button" class="helpbtn" id="legendBtn" aria-label="この区域のようすと、印の見かた" aria-expanded="false" aria-controls="legend">?</button>
       <div class="legend" id="legend" hidden role="dialog" aria-labelledby="legendTitle">
@@ -1198,6 +1268,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
 <div id="backdrop" hidden></div>
 <section id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><div id="sheetBody"></div></section>
 <div id="toast" hidden role="status" aria-live="polite"></div>
+<div id="askBox" hidden></div>
 <div id="splash"><div class="sp-inner">
   <div class="sp-pin"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.6" fill="#fff" stroke="none"/></svg></div>
   <p class="sp-hi" id="spHi">こんにちは</p>
@@ -1626,12 +1697,23 @@ const IDB = {
   clearCache() { return this.run('readwrite', st => { ['cache'].concat(CACHE_KEYS).forEach(k => st.delete(k)); }); }
 };
 
+/* 同じ物（区域・家など）は、入れかえずに中身だけを書きかえる。
+   画面を開いたときにつかんだ区域や家が、あとで届いた変更で「古い物」にならないようにするため
+   （古い物を書きかえても保存されず、「押しても変わらない」ことが起きていた） */
+function refill(cur, v) {
+  if (!cur || !v || typeof cur !== 'object' || typeof v !== 'object' || cur === v) return v;
+  Object.keys(cur).forEach(k => { if (!(k in v)) delete cur[k]; });
+  return Object.assign(cur, v);
+}
 /* まだ送っていない変更を、手元のデータに重ねる */
 function applyDiff(st, ch) {
   ARR_COLS.forEach(c => {
     if (!ch[c]) return;
     const m = new Map((st[c] || []).map(x => [x.id, x]));
-    ch[c].up.forEach(x => m.set(x.id, clone(x)));
+    ch[c].up.forEach(x => {
+      const cur = m.get(x.id);
+      if (cur && c !== 'visits') refill(cur, clone(x)); else m.set(x.id, clone(x));
+    });
     ch[c].del.forEach(id => m.delete(id));
     st[c] = [...m.values()];
   });
@@ -1813,7 +1895,8 @@ const Store = {
       }
       if (m.has(id)) {
         const old = d[c][m.get(id)];
-        d[c][m.get(id)] = v;
+        if (c === 'visits' || !old) d[c][m.get(id)] = v;
+        else refill(old, v); // 区域・家などは中身だけを書きかえる（開いている画面がつかんでいる物を古くしない）
         if (dels[c]) dels[c].delete(id);
         if (inc && c === 'visits') { if (old) idxDelVisit(old); idxAddVisit(v); }
       } else {
@@ -2164,8 +2247,8 @@ function openWaiting() {
       toast('係に名前を知らせました');
     } catch (e) { toast('送れませんでした。もう一度ためしてください'); }
   };
-  $('#wCancel').onclick = () => {
-    if (!confirm('申し込みを取り消します。よろしいですか？')) return;
+  $('#wCancel').onclick = async () => {
+    if (!await ask('申し込みを取り消します。よろしいですか？')) return;
     clearTimeout(waitTimer);
     lsDel(TOKEN_KEY); lsDel(PENDING_KEY);
     if (lsGet(JOIN_KEY)) joinError('申し込みを取り消しました', 'もう一度申し込むときは、下のボタンを押してください。', openJoin);
@@ -2287,7 +2370,11 @@ async function reloadMeta() {
   try {
     const r = await api('load', { part: 'meta' });
     const st = r.state || {}, d = D();
-    ['territories', 'requests', 'awayCards', 'returns', 'schedules', 's13', 'agedata'].forEach(c => { if (Array.isArray(st[c])) d[c] = st[c]; });
+    ['territories', 'requests', 'awayCards', 'returns', 'schedules', 's13', 'agedata'].forEach(c => {
+      if (!Array.isArray(st[c])) return;
+      const old = new Map((d[c] || []).map(x => [x.id, x]));
+      d[c] = st[c].map(x => { const cur = old.get(x.id); return cur ? refill(cur, x) : x; }); // 同じ物は中身だけ書きかえる
+    });
     MAP_COLS.forEach(c => { if (st[c] && typeof st[c] === 'object') d[c] = st[c]; });
     if (Array.isArray(st.users)) d.users = st.users;
     if (st.settings) d.settings = st.settings;
@@ -2355,19 +2442,55 @@ function applyInbox() {
   notifyNewPart();
 }
 /* 自分に範囲がわたされたら、その場で知らせる */
+/* ---------- 今日たのまれた区域（「今日回る人」「回る範囲」）のお知らせ ----------
+   ・アプリを開いていれば、とどいたときにお知らせを出す
+   ・閉じていたときも、次に開いたとき、ホームと区域カードの上に「たのまれました」を出す
+     （「わかりました」か「地図をひらく」を押すまで出る。このスマホに覚える） */
+const asgSeenKey = () => 'kuiki_asg_seen_' + me().id;
+function asgSeen() { try { return new Set(JSON.parse(lsGet(asgSeenKey()) || '[]')); } catch (e) { return new Set(); } }
+function asgMarkSeen(keys) {
+  const s = asgSeen(); keys.forEach(k => s.add(k));
+  lsSet(asgSeenKey(), JSON.stringify([...s].slice(-60)));
+}
+/* 今日、自分にたのまれている区域（担当者本人の区域はのぞく） */
+function todayAsgs() {
+  const out = [];
+  D().territories.forEach(t => {
+    if (t.holder === me().id) return;
+    const h = helpersOf(t).find(x => x.uid === me().id), p = myPart(t);
+    if (!h && !p) return;
+    const keys = [];
+    if (h) keys.push(`h:${t.id}:${h.at}`);
+    if (p) keys.push(`p:${p.id}`);
+    out.push({ t, p, by: (p && p.by) || (h && h.by) || t.holder, keys });
+  });
+  return out;
+}
+function asgNoticeHtml() {
+  const seen = asgSeen();
+  return todayAsgs().filter(a => a.keys.some(k => !seen.has(k))).map(a => `<div class="notice info asgnote">
+    <b>区域${esc(a.t.no)}を、今日いっしょに回るように、たのまれました</b><br>
+    ${esc(uname(a.by))}さんから${a.p ? `・回る範囲があります（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}
+    <span class="actions"><button class="btn small primary" data-asgopen="${a.t.id}" data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
+      <button class="btn small" data-asgok="${esc(a.keys.join(' '))}">わかりました</button></span></div>`).join('');
+}
 let seenParts = null;
 function notifyNewPart() {
-  const now = new Set();
-  D().territories.forEach(t => { const p = myPart(t); if (p) now.add(p.id); });
-  if (seenParts === null) { seenParts = now; return; }
-  const fresh = [...now].find(id => !seenParts.has(id));
+  const now = new Set(), list = todayAsgs();
+  list.forEach(a => a.keys.forEach(k => now.add(k)));
+  if (seenParts === null) { seenParts = now; if (list.length) paintAsg(); return; }
+  const fresh = list.find(a => a.keys.some(k => !seenParts.has(k)));
   seenParts = now;
   if (!fresh) return;
-  const t = D().territories.find(x => (myPart(x) || {}).id === fresh);
-  if (!t) return;
-  const p = myPart(t);
-  toast(`区域${t.no}の回る範囲がとどきました（${partMates(p).map(u => uname(u) + 'さん').join('・') || 'ひとり'}と）`);
+  toast(fresh.p
+    ? `区域${fresh.t.no}の回る範囲がとどきました（${partMates(fresh.p).map(u => uname(u) + 'さん').join('・') || 'ひとり'}と）`
+    : `${uname(fresh.by)}さんから、区域${fresh.t.no}を今日いっしょに回るように、たのまれました`,
+    null, { label: '地図をひらく', fn: () => { asgMarkSeen(fresh.keys); openTerr(fresh.t.id); } });
+  paintAsg();
+}
+function paintAsg() {
   if (currentView === 'cards') renderCards();
+  if (currentView === 'home') renderHome();
 }
 /* 送信待ちをまとめて送る（家を続けて190件追加しても、1件ずつ190回ではなく数回で送り終える）。
    あとの変更が前の変更を上書きする順番は、そのまま守る */
@@ -2502,8 +2625,8 @@ function openSyncSheet() {
     headFail = 0; flushFail = 0; Store.reapplyQueue(); renderAll();
     closeSheet(); flush(true);
   };
-  if ($('#syDrop')) $('#syDrop').onclick = () => {
-    if (!confirm('送れなかった変更を消します。サーバーの内容に合わせて、画面を読み直します。よろしいですか？')) return;
+  if ($('#syDrop')) $('#syDrop').onclick = async () => {
+    if (!await ask('送れなかった変更を消します。サーバーの内容に合わせて、画面を読み直します。よろしいですか？')) return;
     lsDel(FAILED_KEY); updateSyncBadge(); closeSheet();
     Store.needFull = true; reloadAll(false).catch(() => {});
   };
@@ -2529,12 +2652,12 @@ function showLoadError(e) {
   $('#blockRetry').hidden = false;
   $('#blockRetry').onclick = () => location.reload();
 }
-function logout() {
+async function logout() {
   const n = Store.queue.length;
   const q = n
     ? `まだ送っていない記録が${n}件あります。消すと送られません。それでもこの端末から消しますか？`
     : 'この端末から、区域マップの情報と招待リンクを消します。奉仕時間、自分の予定（このスマホだけの記録）も消えます。よろしいですか？';
-  if (!confirm(q)) return;
+  if (!await ask(q)) return;
   [TOKEN_KEY, QUEUE_KEY, OLD_CACHE_KEY, SYNC_KEY, PENDING_KEY, JOIN_KEY, FAILED_KEY].forEach(lsDel);
   clearAllMemos(true);
   clearTimeout(Store.cacheTimer);
@@ -2632,7 +2755,7 @@ function slotOfVisit(v) {
   return s;
 }
 function buildIndex() {
-  AGE_CACHE = null; RATE_CACHE = null; SHARE_CACHE = null;
+  AGE_CACHE = null; RATE_CACHE = null; SHARE_CACHE = null; CHANCE_CACHE = null;
   IDX = new Map(); HBT = new Map(); SUM = new Map(); HID = new Map(); TID = new Map();
   for (const t of D().territories) TID.set(t.id, t);
   for (const h of D().houses) {
@@ -2797,6 +2920,15 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.20', items: [
+    ['今', 'ホームのいちばん上に「今日やること」（集まり・たのまれた区域・区域カード・今がチャンスの留守宅カード）をまとめました'],
+    ['次', '地図で記録したあと、下に「取り消す」と「次のおすすめの家」が出るようになりました'],
+    ['確', '削除などの確認を、大きな文字と大きなボタンの画面にしました']
+  ] },
+  { v: '2026.10.19', items: [
+    ['届', '「今日回る人」「回る範囲」でたのまれたとき、アプリを閉じていても、次に開いたときにホームと区域カードに出るようにしました'],
+    ['直', '画面を開いたまま続けて直すと、変更が保存されないことがあったのを、ほかの画面もふくめて直しました']
+  ] },
   { v: '2026.10.18', items: [
     ['✏', '回る範囲を分けるとき、指でなぞって囲めるようになりました'],
     ['名', '設定で、マンションなどの名前を「地図に見えている全体」に出せるようになりました'],
@@ -3044,7 +3176,49 @@ function toast(msg, undoFn, action) {
   el.hidden = false;
   if (act) el.querySelector('button').onclick = () => { el.hidden = true; act.fn(); };
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, act ? 7000 : 3500);
+  toastTimer = setTimeout(() => { el.hidden = true; }, act ? 12000 : 3500);
+}
+
+
+/* ---------- 確認の画面（スマホ標準の小さな確認の代わり） ----------
+   大きな文字と大きなボタンで、押しまちがえにくくする。
+   ask('〜を削除します。よろしいですか？') → はい：true／やめる：false
+   o：{ title, body, ok, cancel, danger } で、見出し・説明・ボタンの文字を変えられる */
+function ask(msg, o) {
+  o = o || {};
+  return new Promise(resolve => {
+    const text = String(msg || '').replace(/\s*よろしいですか[？?]\s*$/, '').trim();
+    let title = o.title, body = o.body;
+    if (!title) {
+      const sents = text.match(/[^。？?\n]+[。？?]?/g) || [text];
+      const qi = sents.map(x => /[？?]$/.test(x.trim())).lastIndexOf(true); // 問いかけの文があれば、それを見出しに
+      if (qi >= 0) { title = sents[qi].trim(); body = sents.filter((x, i) => i !== qi).join('').trim(); }
+      else { title = sents[0].trim().replace(/(します|取ります|もどします)。$/, '$1か？'); body = sents.slice(1).join('').trim(); }
+    }
+    const danger = o.danger != null ? o.danger : /削除|消し|消す|消え|外し|外す|見送|取り消|使えなく|やめ|もどし|戻し|引き直|記録しません/.test(msg);
+    const OKS = [[/削除/, '削除する'], [/取り消/, '取り消す'], [/消/, '消す'], [/見送/, '見送る'], [/外/, '外す'], [/受け取/, '受け取る'],
+      [/印刷/, '印刷する'], [/引き継/, '引き継ぐ'], [/移します/, '移す'], [/登録/, '登録する'], [/作り直/, '作り直す'], [/もう一度記録/, '記録する'],
+      [/もどします|戻します/, 'もどす'], [/引き直/, '引き直す'], [/使わない/, '使わない']];
+    const hit = OKS.find(x => x[0].test(msg));
+    const ok = o.ok || (hit ? hit[1] : 'はい');
+    const box = $('#askBox');
+    box.innerHTML = `<div class="askback" data-askno></div>
+      <div class="asksheet" role="alertdialog" aria-modal="true" aria-labelledby="askTitle">
+        <span class="grab" aria-hidden="true"></span>
+        <div class="askhead">${danger ? `<span class="askicon">${SVG('<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/><path d="M10 11v6M14 11v6"/>')}</span>` : ''}
+          <h2 id="askTitle">${esc(title)}</h2></div>
+        ${body ? `<div class="askbody">${esc(body)}</div>` : ''}
+        <button type="button" class="askbtn ${danger ? 'danger' : 'primary'}" data-askyes>${esc(ok)}</button>
+        <button type="button" class="askbtn" data-askno>${esc(o.cancel || 'やめる')}</button>
+      </div>`;
+    box.hidden = false;
+    const done = v => { box.hidden = true; box.innerHTML = ''; document.removeEventListener('keydown', key, true); resolve(v); };
+    const key = e => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } };
+    document.addEventListener('keydown', key, true);
+    box.querySelector('[data-askyes]').onclick = () => done(true);
+    $$('[data-askno]', box).forEach(x => { x.onclick = () => done(false); });
+    const h = box.querySelector('#askTitle'); h.tabIndex = -1; h.focus({ preventScroll: true });
+  });
 }
 
 /* ---------- 下から出る画面 ---------- */
@@ -3777,7 +3951,7 @@ function guardTerr(tid, keys, proceed) {
       この区域では、画面を開き直すまで、この確認は出ません。自分の留守宅カードの家では出ません。</p>`);
   $('#gOk').onclick = () => { terrAck.add(tid); closeSheet(); proceed(); };
 }
-function onHouseTap(id) {
+async function onHouseTap(id) {
   const h = houseById(id); if (!h) return;
   if (mode === 'draw' && drawTap === 'line') { drawClick(L.latLng(h.lat, h.lng)); return; }
   if (mode === 'draw') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
@@ -3788,7 +3962,7 @@ function onHouseTap(id) {
     if (h.prov && !n && (isAdmin() || myTerr(terrById(h.terrId)))) { delCount++; updateAddBar(); dropProvHouse(h.id, true); return; }
     if (!isAdmin()) { openDelRequest(h); return; } // 伝道者は申請になる
     const name = h.type === 'apt' ? `${h.label || '集合住宅'}（${h.units.length}部屋）` : (h.label || 'この家');
-    if (n && !confirm(`「${name}」を消します。訪問の記録 ${n}件も一緒に消えます。よろしいですか？`)) return; // 記録のある家だけ確かめる
+    if (n && !await ask(`「${name}」を消します。訪問の記録 ${n}件も一緒に消えます。よろしいですか？`)) return; // 記録のある家だけ確かめる
     delCount++; updateAddBar();
     deleteHouse(h.id);
     return;
@@ -3813,6 +3987,7 @@ function onHouseTap(id) {
   });
 }
 function setMode(m) {
+  if (m !== 'normal' && typeof hideNextPanel === 'function') hideNextPanel();
   if (m !== 'part' && typeof penOff === 'function') penOff(); // えんぴつで囲むのをやめたら、地図をまた動かせるようにする
   mode = m;
   if (m !== 'normal') clearTarget();
@@ -4009,9 +4184,9 @@ function openPartList(tid) {
       : '<div class="empty">まだありません。</div>'}
     <button class="btn primary block" id="plAdd">＋ 範囲を分ける</button>
     <button class="btn block" data-close>閉じる</button>`);
-  $$('[data-pdel]', $('#sheet')).forEach(b => b.onclick = () => {
+  $$('[data-pdel]', $('#sheet')).forEach(b => b.onclick = async () => {
     const id = b.dataset.pdel, p = partsOf(t).find(x => x.id === id);
-    if (!p || !confirm(`${partName(p)}の範囲を取り消します。よろしいですか？`)) return;
+    if (!p || !await ask(`${partName(p)}の範囲を取り消します。よろしいですか？`)) return;
     commit('範囲を取り消しました', () => { t.parts = partsOf(t).filter(x => x.id !== id); });
     openPartList(tid);
   });
@@ -4124,7 +4299,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
     on('backBld', () => openBuilding(hid));
     on('unDnc', () => { commit('拒否マークを外しました', () => { delete D().dnc[k]; }); paint(); });
-    on('shRelease', () => { followAction('release', k); paint(); });
+    on('shRelease', async () => { await followAction('release', k); paint(); });
     on('shStop', () => openReleaseSheet(k, false));
     on('shMemo', () => openMemo(k, paint));
     on('shRecord', () => { st.step = 'result'; st.detail = false; paint(); });
@@ -4146,10 +4321,10 @@ function openTarget(hid, unit, fromBuilding, review) {
       st.editOpen = true; paint();
     });
     on('fRename', () => openUnitNames(hid, () => openTarget(hid, unit, fromBuilding))); // まちがえたら、下の「取り消す」でもどせる
-    $$('[data-vdel]', S).forEach(x => x.onclick = () => {
+    $$('[data-vdel]', S).forEach(x => x.onclick = async () => {
       const v = D().visits.find(y => y.id === x.dataset.vdel);
       if (!v) return;
-      if (!confirm(`${fmtDate(v.at)}の「${RESULT_LABEL[v.result]}」の記録を取り消します。よろしいですか？`)) return;
+      if (!await ask(`${fmtDate(v.at)}の「${RESULT_LABEL[v.result]}」の記録を取り消します。よろしいですか？`)) return;
       deleteVisit(v, paint);
     });
     $$('[data-kind]', S).forEach(x => x.onclick = () => {
@@ -4157,16 +4332,16 @@ function openTarget(hid, unit, fromBuilding, review) {
       if (unit) setUnitKind(hid, unit, x.dataset.kind, paint);
       else setHouseKind(hid, x.dataset.kind, paint);
     });
-    on('fDel', () => {
+    on('fDel', async () => {
       if (!isAdmin()) { closeSheet(); openDelRequest(h); return; }
-      if (!confirm('この家と、その記録をすべて削除します。よろしいですか？')) return;
+      if (!await ask('この家と、その記録をすべて削除します。よろしいですか？')) return;
       closeSheet(); deleteHouse(hid);
     });
   };
   paint();
 }
 /* 記録をすぐ画面に出して、送信はうしろで行う（続けて記録しても、印がすぐ変わる） */
-function quickVisit(hid, unit, result, extra, msg, onUndo) {
+function quickVisit(hid, unit, result, extra, msg, onUndo, keepOpen) {
   const now = new Date().toISOString();
   const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id };
   if (result === 'met' || result === 'refused') { if (extra.age) v.age = extra.age; }
@@ -4177,7 +4352,7 @@ function quickVisit(hid, unit, result, extra, msg, onUndo) {
   confirmProv(hid); // 仮の家は、記録がついた時点で「ある家」になる
   if (map && currentView === 'map') renderHouses();
   if (currentView === 'cards') renderCards();
-  toast(msg, () => {
+  const undo = () => {
     closeSheet();
     if (onUndo) onUndo();
     D().visits = D().visits.filter(x => x.id !== v.id);
@@ -4185,7 +4360,93 @@ function quickVisit(hid, unit, result, extra, msg, onUndo) {
     Store.pushVisit(v, true);
     renderAll();
     toast('取り消しました');
-  });
+  };
+  // 地図で記録したときは、「取り消す」と「次のおすすめの家」を下に出す（アパートを続けて入力しているときは出さない）
+  if (!keepOpen && map && currentView === 'map' && mode === 'normal' && showNextPanel(hid, unit, result, undo)) return;
+  toast(msg, undo);
+}
+
+/* ---------- 記録のあと：「取り消す」と「次のおすすめの家」 ----------
+   地図で「会えた」「留守」を押したあと、下に出す。
+   ・取り消しは15秒のあいだ押せる
+   ・次の家：留守宅カードならそのカードのまだの家、自分の区域なら「おすすめ順」の家（進み具合の表示ならまだの家）から、
+     いま記録した家にいちばん近い家をえらぶ。「とばす」で次の候補に進む */
+const NEXT_UNDO_SEC = 15;
+let nextState = null, nextTick = null;
+function nextCandidates(fromHid) {
+  const from = houseById(fromHid);
+  const skip = nextState ? nextState.skip : new Set();
+  const seen = new Set(), out = [];
+  const add = (h, why) => { if (!h || h.id === fromHid || seen.has(h.id) || skip.has(h.id)) return; seen.add(h.id); out.push({ h, why }); };
+  const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
+  if (c) c.keys.filter(k => !visitedSince(k, c.at) && !D().dnc[k]).forEach(k => add(houseById(parseKey(k)[0]), 'この留守宅カードの家'));
+  else if (roundTerr) {
+    const r = roundInfo(roundTerr);
+    if (r && roundMode() === 'reco') roundPlan(r).forEach(sp => add(sp.h, sp.reasons[0] || 'おすすめの家'));
+    else if (r) r.items.forEach(x => add(x.h, 'まだ訪ねていない家'));
+  }
+  const pos = from ? [from.lat, from.lng] : myPos;
+  if (pos) { out.forEach(x => { x.dist = distM(pos, [x.h.lat, x.h.lng]); }); out.sort((a, b) => a.dist - b.dist); }
+  return out;
+}
+function showNextPanel(hid, unit, result, undo) {
+  if (!focusCard && !roundTerr) return false; // 区域を回っていないときは、ふつうのお知らせ
+  clearInterval(nextTick);
+  const h = houseById(hid);
+  nextState = { hid, unit, result, undo, until: Date.now() + NEXT_UNDO_SEC * 1000, skip: new Set(), name: h ? targetName(h, unit) : '' };
+  $('#toast').hidden = true;
+  paintNextPanel();
+  nextTick = setInterval(() => {
+    if (!nextState || $('#nextPanel').hidden) { clearInterval(nextTick); return; }
+    const left = Math.ceil((nextState.until - Date.now()) / 1000);
+    const bar = $('#npBar'), lb = $('#npLeft');
+    if (left <= 0) { clearInterval(nextTick); paintNextPanel(); return; }
+    if (bar) bar.style.width = (left / NEXT_UNDO_SEC * 100) + '%';
+    if (lb) lb.textContent = `取り消せるのは あと${left}秒`;
+  }, 1000);
+  return true;
+}
+function hideNextPanel() {
+  clearInterval(nextTick);
+  nextState = null;
+  const p = $('#nextPanel'); if (p) { p.hidden = true; p.innerHTML = ''; }
+}
+function paintNextPanel() {
+  const st = nextState, el = $('#nextPanel');
+  if (!st || !el) return;
+  const left = Math.ceil((st.until - Date.now()) / 1000), canUndo = left > 0;
+  const nx = nextCandidates(st.hid)[0];
+  const num = nx && roundNums ? roundNums.get(nx.h.id) : null;
+  const okIcon = SVG('<path d="M4 12.5l4.5 4.5L20 6.5"/>');
+  el.innerHTML = `<span class="grab" aria-hidden="true"></span>
+    <div class="nprow"><span class="npok st-${st.result}">${okIcon}</span>
+      <div class="npmsg"><b>「${RESULT_LABEL[st.result]}」を記録しました</b><small>${st.name}</small></div>
+      ${canUndo ? '<button type="button" class="btn" id="npUndo">取り消す</button>' : ''}</div>
+    ${canUndo ? `<div class="npbarrow"><div class="npbar"><i id="npBar" style="width:${left / NEXT_UNDO_SEC * 100}%"></i></div><small id="npLeft">取り消せるのは あと${left}秒</small></div>` : ''}
+    <div class="npline"></div>
+    ${nx ? `<p class="nplab">次のおすすめ</p>
+      <div class="npnext"><span class="numbadge">${num || '→'}</span>
+        <div><b>${targetName(nx.h, '')}</b><small>${nx.dist != null ? `約${fmtDist(nx.dist)}・` : ''}${esc(nx.why)}</small></div></div>
+      <div class="npbtns"><button type="button" class="btn primary" id="npGo">${num ? `${num} へ行く` : 'そこへ行く'}</button>
+        <button type="button" class="btn" id="npSkip">とばす</button>
+        <button type="button" class="btn npclose" id="npClose">閉じる</button></div>`
+      : `<p class="okmsg"><b>このあたりのおすすめの家は、ぜんぶ回りました。</b></p>
+      <div class="npbtns"><button type="button" class="btn npclose" id="npClose">閉じる</button></div>`}`;
+  el.hidden = false;
+  if ($('#npUndo')) $('#npUndo').onclick = () => { const u = st.undo; hideNextPanel(); u(); };
+  if ($('#npClose')) $('#npClose').onclick = hideNextPanel;
+  if ($('#npSkip')) $('#npSkip').onclick = () => { st.skip.add(nx.h.id); paintNextPanel(); };
+  if ($('#npGo')) $('#npGo').onclick = () => {
+    const h = nx.h;
+    hideNextPanel();
+    clearTarget();
+    target = { hid: h.id, unit: '' };
+    let shown = false;
+    const show = () => { if (shown) return; shown = true; renderHouses(); showTargetMarker(h); };
+    map.once('moveend', show);
+    map.flyTo([h.lat, h.lng], Math.max(map.getZoom(), 18), { duration: 0.7 });
+    setTimeout(show, 1200);
+  };
 }
 /* 取り込んだ「仮の家」：記録をつけたら、ふつうの家にする */
 function confirmProv(hid) {
@@ -4238,7 +4499,7 @@ function saveVisit(hid, unit, result, extra, keepOpen, onUndo) {
   else if (follow) msg += '。再訪問のタブに入れました';
   if (extra.dnc && cur) msg += '。受け持ちも解除しました';
   // ふつうの記録（会えた・留守）は、すぐ画面に出して、うしろで送る
-  if (!follow && !extra.dnc && !(cur && cur.by === me().id)) { quickVisit(hid, unit, result, extra, msg, onUndo); return; }
+  if (!follow && !extra.dnc && !(cur && cur.by === me().id)) { quickVisit(hid, unit, result, extra, msg, onUndo, keepOpen); return; }
   commit(msg, () => {
     const now = new Date().toISOString();
     const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id };
@@ -4298,19 +4559,19 @@ function openDelRequest(h) {
     });
   });
 }
-function approveDel(id) {
+async function approveDel(id) {
   const r = D().requests.find(x => x.id === id); if (!r) return;
   const h = houseById(r.houseId);
   const name = h ? (h.type === 'apt' ? `${h.label || '集合住宅'}（${h.units.length}部屋）` : (h.label || '家')) : '';
-  if (h && !confirm(`${uname(r.by)}さんの申請で「${name}」を消します。訪問の記録も一緒に消えます。よろしいですか？`)) return;
+  if (h && !await ask(`${uname(r.by)}さんの申請で「${name}」を消します。訪問の記録も一緒に消えます。よろしいですか？`)) return;
   commit(h ? `「${name}」を削除しました` : '申請を閉じました', () => {
     if (h) deleteHouseData(h.id);
     Object.assign(r, { status: 'approved', decidedAt: new Date().toISOString(), seen: false });
   });
 }
-function declineDel(id) {
+async function declineDel(id) {
   const r = D().requests.find(x => x.id === id); if (!r) return;
-  if (!confirm(`${uname(r.by)}さんの削除の申請を見送ります。よろしいですか？`)) return;
+  if (!await ask(`${uname(r.by)}さんの削除の申請を見送ります。よろしいですか？`)) return;
   commit('削除の申請を見送りました', () => {
     Object.assign(r, { status: 'declined', decidedAt: new Date().toISOString(), seen: false });
   });
@@ -4385,8 +4646,8 @@ function openMemo(k, back) {
     toast(text ? 'メモを保存しました（このスマホだけ）' : 'メモを消しました');
     done();
   };
-  if ($('#memoDel')) $('#memoDel').onclick = () => {
-    if (!confirm('このメモを消します。よろしいですか？')) return;
+  if ($('#memoDel')) $('#memoDel').onclick = async () => {
+    if (!await ask('このメモを消します。よろしいですか？')) return;
     const o = memoAll(); delete o[k]; memoSaveAll(o);
     toast('メモを消しました');
     done();
@@ -4479,14 +4740,14 @@ function releaseFollow(k, reason) {
   else if (reason === 'lost' || reason === 'gone') D().released[k] = { at: new Date().toISOString(), reason: 'closed' };
   else delete D().released[k];
 }
-function followAction(act, k) {
+async function followAction(act, k) {
   switch (act) {
     case 'continue':
       if (!fol(k)) return;
       commit('受け持ちを続けます。期限を延ばしました', () => { D().follows[k].touchedAt = new Date().toISOString(); });
       break;
     case 'handoff':
-      if (!confirm('この再訪問をほかの人に引き継ぎます。よろしいですか？')) return;
+      if (!await ask('この再訪問をほかの人に引き継ぎます。よろしいですか？')) return;
       commit(RELEASE_MSG.handoff, () => releaseFollow(k, 'handoff'));
       break;
     case 'stop':
@@ -4496,7 +4757,7 @@ function followAction(act, k) {
       openReleaseSheet(k, false);
       break;
     case 'release':
-      if (!confirm('この受け持ちを解除します。よろしいですか？')) return;
+      if (!await ask('この受け持ちを解除します。よろしいですか？')) return;
       commit(RELEASE_MSG.admin, () => releaseFollow(k, 'admin'));
       break;
     case 'memo':
@@ -4610,14 +4871,14 @@ function openBuilding(hid) {
     commit(`${us.join('・')}を追加しました`, () => { h.units.push(...us); h.units.sort((a, b) => cmpNo(uName(h, a), uName(h, b))); });
     openBuilding(hid);
   };
-  if ($('#fUnitDelBtn')) $('#fUnitDelBtn').onclick = () => {
+  if ($('#fUnitDelBtn')) $('#fUnitDelBtn').onclick = async () => {
     if (simpleBlock('部屋を削除')) return;
     const h = houseById(hid); if (!h) return; // いつも最新の家で消す（古い家を消しても、保存されないため）
     const want = parseUnits($('#fUnitDel').value)[0];
     const u = want && (h.units.find(x => uName(h, x) === want) || h.units.find(x => x === want)); // 表示名でも中の番号でもさがす
     if (!u) { toast('その部屋はありません'); return; }
     const n = visitsOf(K(hid, u)).length;
-    if (!confirm(`${unitTitle(h, u)}を削除します。${n ? `この部屋の記録${n}件も見えなくなります。` : ''}よろしいですか？`)) return;
+    if (!await ask(`${unitTitle(h, u)}を削除します。${n ? `この部屋の記録${n}件も見えなくなります。` : ''}よろしいですか？`)) return;
     commit(`${unitTitle(h, u)}を削除しました`, () => {
       h.units = h.units.filter(x => x !== u);
       if (h.ul) { delete h.ul[u]; if (!Object.keys(h.ul).length) delete h.ul; }
@@ -4628,9 +4889,9 @@ function openBuilding(hid) {
   };
   $('#fLabelSave').onclick = () => { const v = $('#fLabel').value.trim(); commit('建物名を変えました', () => { const h2 = houseById(hid); if (h2) h2.label = v; }); openBuilding(hid); };
   if ($('#fUnitBulk')) $('#fUnitBulk').onclick = () => openUnitBulkDel(hid);
-  if ($('#fDel')) $('#fDel').onclick = () => {
+  if ($('#fDel')) $('#fDel').onclick = async () => {
     if (!isAdmin()) { closeSheet(); openDelRequest(h); return; }
-    if (!confirm(`「${h.label || '集合住宅'}」と、すべての部屋の記録を削除します。よろしいですか？`)) return;
+    if (!await ask(`「${h.label || '集合住宅'}」と、すべての部屋の記録を削除します。よろしいですか？`)) return;
     closeSheet(); deleteHouse(hid);
   };
 }
@@ -4663,11 +4924,11 @@ function openUnitBulkDel(hid) {
     $$('[data-bu]', S).forEach(b => b.onclick = () => { const u = b.dataset.bu; if (sel.has(u)) sel.delete(u); else sel.add(u); sheetKeep = true; paint(); });
     $('#buAll').onclick = () => { if (sel.size === h.units.length) sel.clear(); else h.units.forEach(u => sel.add(u)); sheetKeep = true; paint(); };
     $('#buBack').onclick = () => openBuilding(hid);
-    $('#buGo').onclick = () => {
+    $('#buGo').onclick = async () => {
       const us = [...sel].filter(u => h.units.includes(u));
       if (!us.length) return;
-      if (us.length === h.units.length && !confirm('すべての部屋を削除します。建物は残ります。よろしいですか？')) return;
-      if (us.length < h.units.length && !confirm(`${us.map(u => uName(h, u)).join('・')} の${us.length}部屋を削除します。よろしいですか？`)) return;
+      if (us.length === h.units.length && !await ask('すべての部屋を削除します。建物は残ります。よろしいですか？')) return;
+      if (us.length < h.units.length && !await ask(`${us.map(u => uName(h, u)).join('・')} の${us.length}部屋を削除します。よろしいですか？`)) return;
       commit(`${us.length}部屋を削除しました`, () => {
         const h2 = houseById(hid); if (!h2) return; // いつも最新の家で消す
         const del = new Set(us);
@@ -5313,8 +5574,8 @@ function deleteSelectedPoint() {
   redrawDraw();
   toast('点を消しました', null, { label: '戻す', fn: drawUndo });
 }
-function restartDraw() {
-  if (!confirm('今の線を消して、最初から引き直します。よろしいですか？')) return;
+async function restartDraw() {
+  if (!await ask('今の線を消して、最初から引き直します。よろしいですか？')) return;
   pushHist();
   draw.points = []; draw.snaps = []; draw.origs = []; draw.sel = -1; draw.edit = false;
   redrawDraw();
@@ -5324,7 +5585,7 @@ function endDraw() {
   if (draw) { map.removeLayer(draw.line); map.removeLayer(draw.hints); map.removeLayer(draw.handles); }
   draw = null; setMode('normal');
 }
-function finishDraw() {
+async function finishDraw() {
   if (!draw) return;
   if (draw.points.length < 3) { toast('角を3か所以上にしてください'); return; }
   const pts = draw.points.map(p => p.slice());
@@ -5347,7 +5608,7 @@ function finishDraw() {
     let alsoMove = false;
     if (affected.size) {
       const names = [...affected.keys()].map(id => `区域${terrById(id).no}`).join('・');
-      alsoMove = confirm(`隣の区域（${names}）と共有している点を動かしました。\n隣の区域の同じ点も一緒に動かしますか？\n\n「OK」…隣の区域も一緒に直す（すき間ができません）\n「キャンセル」…この区域だけを直す`);
+      alsoMove = await ask('', { title: '隣の区域の点も一緒に動かしますか？', body: `隣の区域（${names}）と共有している点を動かしました。\n一緒に動かすと、区域のあいだにすき間ができません。`, ok: '隣の区域も一緒に直す', cancel: 'この区域だけ直す', danger: false });
     }
     endDraw();
     commit(`区域${t.no}の線を直しました${alsoMove ? '（隣の区域も一緒に）' : ''}`, () => {
@@ -5867,6 +6128,7 @@ function setCardTab() {
 }
 function renderCards() {
   renderToday();
+  const an = $('#asgNotice'); if (an) an.innerHTML = asgNoticeHtml();
   const ha = $('#homeAdd');
   if (ha) ha.innerHTML = LIVE && isMobile() && !isStandalone() && !lsGet(HOME_OFF)
     ? `<div class="notice info homeadd"><p><b>ホーム画面に追加すると、</b>アプリのようにアイコンからすぐ開けます。</p>
@@ -5967,11 +6229,11 @@ function followCard(k, f, pinned) {
     <div class="actions">${acts}</div></article>`;
 }
 /* 会えた・留守のスタンプ：訪問の記録として残し（区域の地図にも反映）、メモのいちばん上に日時と結果を入れる */
-function stampFollow(k, res, curText, after) {
+async function stampFollow(k, res, curText, after) {
   const [hid, unit] = parseKey(k);
   const mine = visitsOf(k).find(v => v.by === me().id);
   if (mine && mine.result === res && Date.now() - Date.parse(mine.at) < 120000 &&
-      !confirm(`2分以内に「${RESULT_LABEL[res]}」を記録しています。もう一度記録しますか？`)) return;
+      !await ask(`2分以内に「${RESULT_LABEL[res]}」を記録しています。もう一度記録しますか？`)) return;
   const now = new Date();
   const line = `${now.getMonth() + 1}月${now.getDate()}日 ${fmtTime(now)}　${RESULT_LABEL[res]}`;
   const before = memoOf(k), base = (curText == null ? (before ? before.text : '') : curText).trim();
@@ -6094,11 +6356,11 @@ function openRequestSheet(g) {
   $$('[data-take]', S).forEach(x => x.onclick = () => takeTerr(x.dataset.take));
   $$('[data-ask]', S).forEach(x => x.onclick = () => askTerr(x.dataset.ask || null));
 }
-function takeTerr(id) {
+async function takeTerr(id) {
   const t = terrById(id);
   if (!t || t.holder) { toast('この区域はすでに貸し出されています'); return; }
   if (!isFree(t) || !canTakeFree(reqForGroup && canGroupTerr())) { toast('この区域は係に頼んでください'); return; }
-  if (!confirm(`区域${t.no}を受け取ります。よろしいですか？`)) return;
+  if (!await ask(`区域${t.no}を受け取ります。よろしいですか？`)) return;
   closeSheet();
   commit(`区域${t.no}を受け取りました`, () => {
     const now = new Date().toISOString();
@@ -6266,9 +6528,9 @@ function approveReq(id) {
     Object.assign(r, { status: 'approved', terrId: t.id, decidedAt: now, seen: false });
   });
 }
-function declineReq(id) {
+async function declineReq(id) {
   const r = D().requests.find(x => x.id === id); if (!r) return;
-  if (!confirm(`${uname(r.by)}さんの申し込みを見送ります。よろしいですか？`)) return;
+  if (!await ask(`${uname(r.by)}さんの申し込みを見送ります。よろしいですか？`)) return;
   commit('申し込みを見送りました', () => {
     Object.assign(r, { status: 'declined', decidedAt: new Date().toISOString(), seen: false });
   });
@@ -6375,9 +6637,9 @@ function takeAwayCard(tid, slot) {
   commit(`留守宅カード（区域${t.no}・${slotShort(slot)}）を受け取りました`, () => { D().awayCards.push(card); });
   openAwayCard(card.id);
 }
-function endAwayCard(id) {
+async function endAwayCard(id) {
   const c = D().awayCards.find(x => x.id === id); if (!c) return;
-  if (!confirm('この留守宅カードを終えます。訪ねていない家は、ほかの人のカードに戻ります。よろしいですか？')) return;
+  if (!await ask('この留守宅カードを終えます。訪ねていない家は、ほかの人のカードに戻ります。よろしいですか？')) return;
   if (focusCard === id) focusCard = null;
   commit('留守宅カードを終えました', () => { c.endedAt = new Date().toISOString(); });
 }
@@ -7170,12 +7432,12 @@ function openUiSheet() {
       rg.onchange = () => { UI.pct = Number(rg.value); uiSave(); applyUi(); };
       $('#uiPct100').onclick = () => { UI.pct = 100; uiSave(); applyUi(); paint(true); };
     }
-    $$('[data-ui]', $('#sheet')).forEach(x => x.onclick = () => {
+    $$('[data-ui]', $('#sheet')).forEach(x => x.onclick = async () => {
       const k = x.dataset.ui, v = x.dataset.v;
       if (k === 'round') { me().roundMode = v; Store.save(); renderHouses(); paint(true); return; }
       if (k === 'fFollow' && v === 'off' && featFollow()) {
         const n = Object.values(D().follows).filter(f => f.by === me().id).length;
-        if (n && !confirm(`受け持っている再訪問が${n}件あります。\n「使わない」にするとリストは見えなくなりますが、受け持ちは残ります（ほかの人は訪問を控えたままです）。\n受け持ちをやめる場合は、先にリストから外してください。\n「使わない」にしますか？`)) return;
+        if (n && !await ask(`受け持っている再訪問が${n}件あります。\n「使わない」にするとリストは見えなくなりますが、受け持ちは残ります（ほかの人は訪問を控えたままです）。\n受け持ちをやめる場合は、先にリストから外してください。\n「使わない」にしますか？`)) return;
       }
       if (k === 'fTime' || k === 'fFollow') {
         UI[k] = v; uiSave(); applyUi(); updateTabs(); renderAll(); paint(true);
@@ -7192,8 +7454,8 @@ function openUiSheet() {
       if (k === 'calList') renderHome();
       paint(k !== 'mode');
     });
-    $('#uiReset').onclick = () => {
-      if (!confirm('画面の見え方を、最初の状態にもどします（「使う機能」はそのままです）。よろしいですか？')) return;
+    $('#uiReset').onclick = async () => {
+      if (!await ask('画面の見え方を、最初の状態にもどします（「使う機能」はそのままです）。よろしいですか？')) return;
       UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fFollow: UI.fFollow, cProg: UI.cProg, cReco: UI.cReco }); uiSave(); applyUi(); setBase('pale'); // 使う機能・区域カードに出すものはそのまま
       toast('表示の設定を最初にもどしました');
       paint(false);
@@ -7374,10 +7636,10 @@ function openDummyGuide(tid) {
   if ($('#dgMap')) $('#dgMap').onclick = () => { closeSheet(); openTerr(mineT.id); };
   $('#dgReco').onclick = () => { closeSheet(); showView('reco'); };
 }
-function delDummy() {
+async function delDummy() {
   const ts = dummyTerrs(), cards = dummyCards();
   if (!ts.length && !cards.length) return;
-  if (!confirm(`検証用の区域 ${ts.length}つと、家・訪問記録・留守宅カードのダミーをすべて消します。よろしいですか？`)) return;
+  if (!await ask(`検証用の区域 ${ts.length}つと、家・訪問記録・留守宅カードのダミーをすべて消します。よろしいですか？`)) return;
   commit('検証用のデータを消しました', () => {
     const dv = new Set(cards.flatMap(c => c.dv || []));
     if (dv.size) D().visits = D().visits.filter(v => !dv.has(v.id));
@@ -7709,11 +7971,11 @@ function renderDevices() {
   box.innerHTML = html;
   if (open) box.querySelector('details').open = true;
   $$('[data-devreg]', box).forEach(b => b.onclick = () => openDevRegister(b.dataset.devreg, null));
-  $$('[data-dev]', box).forEach(b => b.onclick = () => {
+  $$('[data-dev]', box).forEach(b => b.onclick = async () => {
     const dec = b.dataset.dev, d = devState.list.find(x => x.id === b.dataset.id);
     if (!d) return;
-    if (dec === 'deny' && !confirm(`${d.name ? d.name + 'さんの' : 'このスマホの'}申し込みを見送ります。よろしいですか？`)) return;
-    if (dec === 'revoke' && !confirm(`${d.name}さんのスマホ（${d.label}）を使えなくします。よろしいですか？`)) return;
+    if (dec === 'deny' && !await ask(`${d.name ? d.name + 'さんの' : 'このスマホの'}申し込みを見送ります。よろしいですか？`)) return;
+    if (dec === 'revoke' && !await ask(`${d.name}さんのスマホ（${d.label}）を使えなくします。よろしいですか？`)) return;
     b.disabled = true;
     deviceAction('device_decide', { id: d.id, decision: dec },
       dec === 'approve' ? `${d.name}さんのスマホを承認しました` : dec === 'deny' ? '申し込みを見送りました' : 'スマホを使えなくしました');
@@ -7724,8 +7986,8 @@ function renderDevices() {
     catch (e) { $('#joinUrl').select(); toast('リンクを選びました。長押しでコピーしてください'); }
   };
   if ($('#joinQr')) $('#joinQr').onclick = openJoinQr;
-  if ($('#joinReset')) $('#joinReset').onclick = () => {
-    if (!confirm('今の共通リンクでは、新しい申し込みができなくなります。登録済みのスマホは、そのまま使えます。作り直しますか？')) return;
+  if ($('#joinReset')) $('#joinReset').onclick = async () => {
+    if (!await ask('今の共通リンクでは、新しい申し込みができなくなります。登録済みのスマホは、そのまま使えます。作り直しますか？')) return;
     deviceAction('join_reset', {}, '共通リンクを作り直しました。新しいリンクを配ってください');
   };
 }
@@ -8019,10 +8281,10 @@ async function onAgeFile(file) {
     });
   };
 }
-function restoreAge() {
+async function restoreAge() {
   const cur = ageDoc('current'), prev = ageDoc('prev');
   if (!prev) return;
-  if (!confirm(`前の年齢データ（${prev.asOf || '日付不明'}）にもどします。よろしいですか？`)) return;
+  if (!await ask(`前の年齢データ（${prev.asOf || '日付不明'}）にもどします。よろしいですか？`)) return;
   commit('前の年齢データにもどしました', () => {
     const rest = (D().agedata || []).filter(x => x && x.id !== 'current' && x.id !== 'prev');
     rest.push(Object.assign({}, prev, { id: 'current' }));
@@ -8200,12 +8462,12 @@ function openDeleteTerr(tid) {
       <button class="choice c-refx" data-del="all">家と記録もまとめて消す<small>元に戻せるのは、この画面のお知らせの「取り消す」だけです</small></button>
     </div>
     <button class="btn block" data-close>やめる</button>`);
-  $$('[data-del]', $('#sheet')).forEach(x => x.onclick = () => {
+  $$('[data-del]', $('#sheet')).forEach(x => x.onclick = async () => {
     const all = x.dataset.del === 'all';
     const msg = all
       ? `区域${t.no}と、家 ${hs.length}件・訪問記録 ${visits}件をすべて削除します。\n本当によろしいですか？`
       : `区域${t.no}の線を削除します。家 ${hs.length}件は「区域外の家」として残ります。\nよろしいですか？`;
-    if (!confirm(msg)) return;
+    if (!await ask(msg)) return;
     closeSheet();
     deleteTerr(tid, all);
   });
@@ -8307,13 +8569,13 @@ function changeSetting(key, d) {
   }
   Store.save(); renderAll(); toast('日数を変えました');
 }
-function bulkMove() {
+async function bulkMove() {
   const from = $('#bkFrom').value, to = $('#bkTo').value;
   if (!from) { toast('「だれから」を選んでください'); return; }
   if (from === to) { toast('同じ人は選べません'); return; }
   const keys = Object.keys(D().follows).filter(k => D().follows[k].by === from);
   const toLabel = to ? `${uname(to)}さん` : '引き継ぎ待ち';
-  if (!confirm(`${uname(from)}さんの受け持ち ${keys.length}件を「${toLabel}」に移します。よろしいですか？`)) return;
+  if (!await ask(`${uname(from)}さんの受け持ち ${keys.length}件を「${toLabel}」に移します。よろしいですか？`)) return;
   commit(`${keys.length}件を${toLabel}に移しました`, () => {
     keys.forEach(k => { if (to) startFollow(k, to); else releaseFollow(k, 'handoff'); });
   });
@@ -8397,8 +8659,8 @@ function openTimerStop() {
       x.log[t.day] = (x.log[t.day] || 0) + min; x.timer = null; mySave(x);
       closeSheet(); renderHome(); toast(`奉仕時間 ${fmtMin(min)} を記録しました。おつかれさまでした！`);
     };
-    $('#tmDiscard').onclick = () => {
-      if (!confirm('この時間は記録しません。よろしいですか？')) return;
+    $('#tmDiscard').onclick = async () => {
+      if (!await ask('この時間は記録しません。よろしいですか？')) return;
       const x = myData(); x.timer = null; mySave(x); closeSheet(); renderHome();
     };
   };
@@ -8531,8 +8793,8 @@ function openSchedActions(s, back) {
   $('#scBack').onclick = done;
   if (!can) return;
   $('#scEdit').onclick = () => openSchedForm(s, null, back);
-  $('#scDel').onclick = () => {
-    if (!confirm(`${fmtYmd(s.date)}　${s.time || ''} ${s.place || '場所未定'} の予定を消します。よろしいですか？`)) return;
+  $('#scDel').onclick = async () => {
+    if (!await ask(`${fmtYmd(s.date)}　${s.time || ''} ${s.place || '場所未定'} の予定を消します。よろしいですか？`)) return;
     commit('集まりの予定を消しました', () => { D().schedules = D().schedules.filter(x => x.id !== s.id); });
     done();
   };
@@ -8621,6 +8883,69 @@ function openDay(date) {
   paint();
 }
 
+
+/* ---------- ホーム：今日やること ----------
+   開いたときに、今日必要なことだけを上から順に出す：
+   今日の集まり → たのまれた区域 → 自分の区域カード → 今がチャンスの留守宅カード */
+const ICO_CAL = SVG('<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>');
+const ICO_SUN = SVG('<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/>');
+const ICO_OK = SVG('<path d="M4 12.5l4.5 4.5L20 6.5"/>');
+let CHANCE_CACHE = null;
+/* 今の時間帯に受け取れる留守宅カードのうち、会えそうな軒数がいちばん多いもの（1分ためておく） */
+function chanceCard() {
+  const now = Date.now();
+  if (CHANCE_CACHE && now - CHANCE_CACHE.at < 60000 && CHANCE_CACHE.uid === me().id) return CHANCE_CACHE.v;
+  let v = null;
+  if (activeCards().filter(c => c.by === me().id).length < D().settings.awayMax) {
+    const slot = slotOf(new Date());
+    const list = awaySuggestions(me().id, [slot]);
+    list.forEach(x => { x.p = meetChance(x.t, slot).p; x.exp = x.keys.length * x.p; });
+    list.sort((a, b) => b.exp - a.exp);
+    const x = list[0];
+    if (x) {
+      const top = SLOTS.map(sl => [sl, meetChance(x.t, sl).p]).sort((a, b) => b[1] - a[1]).slice(0, 3).map(y => y[0]);
+      v = Object.assign(x, { slot, hot: top.includes(slot) });
+    }
+  }
+  CHANCE_CACHE = { at: now, uid: me().id, v };
+  return v;
+}
+function todayTodoHtml(todays) {
+  let h = '';
+  todays.forEach(sc => {
+    h += `<div class="todo"><span class="tico">${ICO_CAL}</span>
+      <div class="tbody2"><small>今日の集まり（${esc(schedGroupName(sc.group))}）</small><b>${esc(sc.time || '時間未定')}${sc.end ? '〜' + esc(sc.end) : ''}</b><span>${esc(sc.place || '場所未定')}</span></div>
+      ${sc.place ? `<a class="btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sc.place)}" target="_blank" rel="noopener">道順</a>` : ''}</div>`;
+  });
+  const seen = asgSeen();
+  todayAsgs().filter(a => a.keys.some(k => !seen.has(k))).forEach(a => {
+    h += `<div class="todo asg"><div class="asgtop"><span class="asgdot">${ICO_OK}</span>
+        <div><b>区域${esc(a.t.no)}を、今日いっしょに回るように、たのまれました</b>
+        <small>${esc(uname(a.by))}さんから${a.p ? `・回る範囲あり（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}</small></div></div>
+      <div class="row"><button type="button" class="btn primary" data-asgopen="${a.t.id}" data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
+        <button type="button" class="btn" data-asgok="${esc(a.keys.join(' '))}">わかりました</button></div></div>`;
+  });
+  const mine = D().territories.filter(t => t.holder === me().id).sort(byNo);
+  mine.slice(0, 3).forEach(t => {
+    const r = roundInfo(t.id), total = r ? r.c.todo + r.c.done : 0;
+    h += `<div class="todo terr"><span class="stamp sm${noCls(t.no)}${t.group ? ' grp' : ''}">${esc(t.no)}</span>
+      <div class="tbody2"><small>${t.group ? `${esc(t.group)}グループの区域カード` : 'あなたの区域カード'}</small><b>${esc(t.name)}</b>
+        ${r ? `<small>訪ねた家 ${r.c.done} / ${total}</small>` : ''}</div>
+      <button type="button" class="btn primary" data-openterr="${t.id}">地図 ›</button>
+      ${r ? `<div class="progress" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${r.pct}%"></i></div>` : ''}</div>`;
+  });
+  if (mine.length > 3) h += `<p class="muted todonone">ほかに区域カードが${mine.length - 3}枚あります。「区域カード」の画面で見られます。</p>`;
+  const ch = chanceCard();
+  if (ch) {
+    const n = ch.keys.length, k = Math.max(1, Math.round(ch.exp));
+    h += `<div class="todo${ch.hot ? ' hot' : ''}"><span class="tico">${ch.hot ? ICO_SUN : ICO_CAL}</span>
+      <div class="tbody2"><span class="hotlab">${ch.hot ? '今がチャンス・留守宅カード' : '今の時間帯の留守宅カード'}</span>
+        <b>区域${esc(ch.t.no)}　${esc(slotShort(ch.slot))}</b><span>${n}軒のうち、約${k}軒で会えそう</span></div>
+      <button type="button" class="btn" data-chance="${ch.t.id}" data-slot="${esc(ch.slot)}">受け取る</button></div>`;
+  }
+  return `<h2 class="sec">今日やること</h2>` + (h || '<p class="muted todonone">今日の予定や、たのまれた区域はありません。</p>');
+}
+
 function renderHome() {
   const box = $('#view-home'); if (!box || box.hidden) return;
   const o = myData(), t = o.timer, h = new Date().getHours();
@@ -8628,7 +8953,7 @@ function renderHome() {
   const todays = schedsOn(ymd(new Date()));
   $('#homeHello').innerHTML = `<div class="homehello"><p>${esc(me().name)}さん、${hi}</p><b>${fmtYmd(ymd(new Date()))}</b>
     ${me().group ? `<span class="gbadge">${esc(me().group)}グループ${isOverseer() ? '・監督' : me().leader ? '・司会者' : ''}</span>` : ''}</div>
-    ${todays.length ? `<div class="notice info homecard"><b>今日の奉仕の集まり</b><br>${todays.map(s => schedLine(s) + `（${schedGroupName(s.group)}）`).join('<br>')}</div>` : ''}`;
+    ${todayTodoHtml(todays)}`;
   clearInterval(timerTick);
   if (!featTime()) { // 奉仕時間を使わない人には、タイマー・目標・まとめを出さない
     $('#homeTimer').innerHTML = ''; $('#homeGoal').innerHTML = ''; $('#homeMonthEnd').innerHTML = '';
@@ -8695,12 +9020,12 @@ function bindSwipe() {
     e.preventDefault(); openRow(r);
   });
   // 「編集」「削除」（スワイプで出るボタン）
-  document.addEventListener('click', e => {
+  document.addEventListener('click', async e => {
     const b = e.target.closest('[data-scact]'); if (!b) return;
     const s = D().schedules.find(x => x.id === b.dataset.sid); if (!s) return;
     const day = !$('#sheet').hidden ? dayCtx : null, back = day ? () => openDay(day) : null;
     if (b.dataset.scact === 'edit') { openSchedForm(s, null, back); return; }
-    if (!confirm(`${fmtYmd(s.date)}　${s.time || ''} ${s.place || '場所未定'} の予定を消します。よろしいですか？`)) return;
+    if (!await ask(`${fmtYmd(s.date)}　${s.time || ''} ${s.place || '場所未定'} の予定を消します。よろしいですか？`)) return;
     commit('集まりの予定を消しました', () => { D().schedules = D().schedules.filter(x => x.id !== s.id); });
     if (back) back();
   });
@@ -8709,7 +9034,9 @@ function bindHome() {
   $('#view-home').addEventListener('click', e => {
     const q = sel => e.target.closest(sel);
     let x;
-    if ((x = q('[data-timer]'))) timerAction(x.dataset.timer);
+    if ((x = q('[data-openterr]'))) openTerr(x.dataset.openterr);
+    else if ((x = q('[data-chance]'))) { CHANCE_CACHE = null; takeAwayCard(x.dataset.chance, x.dataset.slot); }
+    else if ((x = q('[data-timer]'))) timerAction(x.dataset.timer);
     else if (q('#goalEdit')) openGoalSheet();
     else if (q('#monthHist')) openMonthHist();
     else if ((x = q('[data-cm]'))) { const b = calMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1); calMonth = new Date(b.getFullYear(), b.getMonth() + Number(x.dataset.cm), 1); renderHome(); }
@@ -8751,8 +9078,8 @@ function openSchedForm(s, date, back) {
     });
     done();
   };
-  if ($('#scDel')) $('#scDel').onclick = () => {
-    if (!confirm('この予定を消します。よろしいですか？')) return;
+  if ($('#scDel')) $('#scDel').onclick = async () => {
+    if (!await ask('この予定を消します。よろしいですか？')) return;
     commit('集まりの予定を消しました', () => { D().schedules = D().schedules.filter(x => x.id !== s.id); });
     done();
   };
@@ -8866,7 +9193,7 @@ function openAddUser() {
 /* その人の招待リンクとQRを見せる */
 async function openUserLink(u, reissue) {
   if (!LIVE) { toast('招待リンクは、本番のときだけ作れます'); return; }
-  if (reissue && !confirm(`${u.name}さんの今の招待リンクは使えなくなります。よろしいですか？`)) return;
+  if (reissue && !await ask(`${u.name}さんの今の招待リンクは使えなくなります。よろしいですか？`)) return;
   toast('リンクを用意しています…');
   let j;
   try { j = await api('user_link', { id: u.id, reissue: !!reissue }); } catch (e) { toast('リンクを作れませんでした。通信を確認してください'); return; }
@@ -8919,8 +9246,8 @@ function openDevRegister(id, back) {
     <button class="btn block" id="drNew">新しい人として登録する</button>
     <button class="btn block" id="drBack">もどる</button>`);
   $('#drQ').oninput = e => { const q = norm(e.target.value); $$('#drList [data-name]').forEach(b => { b.hidden = !!q && !norm(b.dataset.name).includes(q); }); };
-  $$('[data-druid]', $('#sheet')).forEach(b => b.onclick = () => {
-    if (!confirm(`${b.dataset.name}さんのスマホとして登録します。よろしいですか？`)) return;
+  $$('[data-druid]', $('#sheet')).forEach(b => b.onclick = async () => {
+    if (!await ask(`${b.dataset.name}さんのスマホとして登録します。よろしいですか？`)) return;
     approveDevice(d, { uid: b.dataset.druid }, b.dataset.name, back);
   });
   $('#drNew').onclick = () => openDevNewUser(d, back);
@@ -8989,16 +9316,16 @@ function renderPeople() {
     $('#adUserAdd').onclick = openAddUser;
     $('#adJoinQr').onclick = openJoinQr;
     $$('[data-ulink]', box).forEach(b => b.onclick = () => { const u = userById(b.dataset.ulink); if (u) openUserLink(u, false); });
-    $$('[data-urole]', box).forEach(b => b.onclick = () => {
+    $$('[data-urole]', box).forEach(b => b.onclick = async () => {
       const u = userById(b.dataset.id); if (!u) return;
       const role = b.dataset.urole;
       if (u.role === role) return;
-      if (!confirm(`${u.name}さんを「${role === 'admin' ? '区域係' : '伝道者'}」にします。よろしいですか？`)) return;
+      if (!await ask(`${u.name}さんを「${role === 'admin' ? '区域係' : '伝道者'}」にします。よろしいですか？`)) return;
       setUserGroup(u, normGroup($(`[data-ugroup="${u.id}"]`).value), $(`[data-uover="${u.id}"]`).checked, $(`[data-ulead="${u.id}"]`).checked, role);
     });
-    $$('[data-uoff]', box).forEach(b => b.onclick = () => {
+    $$('[data-uoff]', box).forEach(b => b.onclick = async () => {
       const u = userById(b.dataset.uoff); if (!u) return;
-      if (!confirm(`${u.name}さんが区域マップを使うのをやめます。\nこの人のスマホでは、次に開いたときに区域の情報が消えます。よろしいですか？`)) return;
+      if (!await ask(`${u.name}さんが区域マップを使うのをやめます。\nこの人のスマホでは、次に開いたときに区域の情報が消えます。よろしいですか？`)) return;
       setUserGroup(u, u.group || '', !!u.overseer, !!u.leader, u.role, false);
     });
   }
@@ -9179,9 +9506,9 @@ function openS13Edit(tid, editId) {
   };
   if ($('#s13EdCancel')) $('#s13EdCancel').onclick = () => openS13Edit(tid);
   $$('[data-s13ed]', $('#sheet')).forEach(b => b.onclick = () => openS13Edit(tid, b.dataset.s13ed));
-  $$('[data-s13del]', $('#sheet')).forEach(b => b.onclick = () => {
+  $$('[data-s13del]', $('#sheet')).forEach(b => b.onclick = async () => {
     const x = D().s13.find(z => z.id === b.dataset.s13del); if (!x) return;
-    if (!confirm(`${x.name}さん（${s13Fmt(x.a)}）の記録を消します。よろしいですか？`)) return;
+    if (!await ask(`${x.name}さん（${s13Fmt(x.a)}）の記録を消します。よろしいですか？`)) return;
     commit('記録を消しました', () => { D().s13 = D().s13.filter(z => z.id !== x.id); });
     again();
   });
@@ -9206,7 +9533,7 @@ function openS13Edit(tid, editId) {
 /* =========================================================
    翌月の奉仕の予定を印刷（掲示板に張る用・A4よこ）
    ========================================================= */
-function printMonthSchedule(y, m) {
+async function printMonthSchedule(y, m) {
   const pre = `${y}-${pad2(m + 1)}`, first = new Date(y, m, 1).getDay(), last = new Date(y, m + 1, 0).getDate();
   const list = D().schedules.filter(s => String(s.date).startsWith(pre) && (isAdmin() || !s.group || s.group === myGroup()))
     .sort((a, b) => ((a.date + (a.time || '')) < (b.date + (b.time || '')) ? -1 : 1));
@@ -9226,7 +9553,7 @@ function printMonthSchedule(y, m) {
     <table class="mcal"><thead><tr>${WD.map((w, i) => `<th class="${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}">${w}</th>`).join('')}</tr></thead>
       <tbody>${weeks.join('').replace(/<td/g, `<td style="height:${h}mm"`)}</tbody></table>
     <p class="mfoot"><span>変更があるときは、区域マップのホーム画面でお知らせします。</span><span>${fmtDay(new Date().toISOString())} 作成</span></p></div>`;
-  if (!list.length && !confirm(`${m + 1}月の予定は、まだ入っていません。このまま印刷しますか？`)) return;
+  if (!list.length && !await ask(`${m + 1}月の予定は、まだ入っていません。このまま印刷しますか？`)) return;
   printDoc(html, true);
 }
 
@@ -9237,7 +9564,7 @@ function showView(name) {
   if (name === 'admin' && !isAdmin() && !isOverseer()) name = 'cards';
   if (name === 'follow' && !featFollow()) name = 'cards';
   if (currentView === 'map' && name !== 'map' && mode !== 'normal') { if (draw) endDraw(); else setMode('normal'); }
-  if (name !== 'map') { clearTarget(); followMap = false; }
+  if (name !== 'map') { clearTarget(); followMap = false; hideNextPanel(); }
   currentView = name;
   $$('.view').forEach(v => { v.hidden = v.id !== 'view-' + name; });
   $$('#tabs button').forEach(b => { if (b.dataset.view === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
@@ -9335,7 +9662,7 @@ function bindStatic() {
 
   $('#allDetails').addEventListener('toggle', () => { if ($('#allDetails').open) renderCards(); else $('#allCards').innerHTML = ''; });
   // 区域カード・自分の再訪問
-  $('#view-cards').addEventListener('click', e => {
+  $('#view-cards').addEventListener('click', async e => {
     const q = sel => e.target.closest(sel);
     let x;
     if ((x = q('[data-open]'))) openTerr(x.dataset.open);
@@ -9346,7 +9673,7 @@ function bindStatic() {
     else if ((x = q('[data-reqopen]'))) openRequestSheet(x.dataset.reqopen === 'g');
     else if ((x = q('[data-reqcancel]'))) {
       const id = x.dataset.reqcancel;
-      if (!confirm('申し込みを取り消します。よろしいですか？')) return;
+      if (!await ask('申し込みを取り消します。よろしいですか？')) return;
       commit('申し込みを取り消しました', () => { D().requests = D().requests.filter(r => r.id !== id); });
     }
     else if ((x = q('[data-reqseen]'))) {
@@ -9374,6 +9701,11 @@ function bindStatic() {
     else if ((x = q('[data-fstamp]'))) stampFollow(x.dataset.key, x.dataset.fstamp, null, renderFollowList);
   });
   $('#adS13').onclick = () => openS13();
+  document.addEventListener('click', e => {
+    const o = e.target.closest('[data-asgopen], [data-asgok]'); if (!o) return;
+    asgMarkSeen(String(o.dataset.asgkeys || o.dataset.asgok || '').split(' ').filter(Boolean));
+    if (o.dataset.asgopen) openTerr(o.dataset.asgopen); else { renderCards(); if (currentView === 'home') renderHome(); }
+  });
   bindAgeAdmin();
 
   // 地図
@@ -9466,8 +9798,8 @@ function bindStatic() {
     e.target.value = '';
   };
   $('#adCsv').onclick = exportCsv;
-  $('#adReset').onclick = () => {
-    if (!confirm('この端末の試作データを最初の状態に戻します。よろしいですか？')) return;
+  $('#adReset').onclick = async () => {
+    if (!await ask('この端末の試作データを最初の状態に戻します。よろしいですか？')) return;
     const cu = D().currentUser;
     Store.data = makeDemo(); Store.data.currentUser = cu; Store.save();
     fillWho(); updateTabs(); renderAll(); toast('試作データに戻しました');
