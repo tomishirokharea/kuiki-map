@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.16"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.17"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -783,6 +783,27 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .renrow.chg input{border-color:var(--terr);background:var(--terr-soft)}
 .renrow.dup input{border-color:var(--danger);background:var(--ref-bg)}
 .ugrp{font-weight:700;margin:12px 0 6px;padding:2px 10px;border-left:5px solid var(--terr);background:var(--terr-soft);border-radius:0 8px 8px 0}
+
+/* ===== 部屋の種別のしるし（店舗・事務所など） ===== */
+.unit .kb,.uchip .kb,.kindtag .kb,.bulkgrid .kb{position:absolute;display:grid;place-items:center;border:2px solid #fff;color:#fff;border-radius:6px;box-shadow:0 1px 3px #0005}
+.unit .kb{left:4px;bottom:4px;width:24px;height:24px}
+.unit .kb svg{width:15px;height:15px;stroke-width:2.4}
+.unit.ukind{padding-left:22px}
+.uchip .kb{left:-8px;top:-9px;width:20px;height:20px}
+.uchip .kb svg{width:13px;height:13px;stroke-width:2.4}
+.kindtag{position:relative;display:inline-flex;align-items:center;gap:4px;font-size:15px;font-weight:700;background:#F6F8F7;border:1.5px solid var(--line);border-radius:8px;padding:0 8px 0 30px;vertical-align:middle}
+.kindtag .kb{left:3px;top:50%;transform:translateY(-50%);width:22px;height:22px}
+.kindtag .kb svg{width:14px;height:14px}
+.kb.k-office{background:#1565C0}.kb.k-shop{background:#E65100}.kb.k-biz{background:#00695C}.kb.k-factory{background:#5D4037}
+.kb.k-school{background:#6A1B9A}.kb.k-gov{background:#37474F}.kb.k-police{background:#1A237E}.kb.k-fire{background:#B71C1C}
+/* 部屋をまとめて削除 */
+.bulkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
+.bulkgrid button{position:relative;min-height:60px;border-radius:12px;border:3px solid var(--line);background:#fff;font-weight:700;font-size:17px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.25}
+.bulkgrid button small{font-size:12px;font-weight:400;color:var(--ink2)}
+.bulkgrid button[aria-pressed="true"]{border-color:var(--danger);background:var(--ref-bg);color:var(--danger)}
+.bulkgrid button[aria-pressed="true"]::after{content:'✓';position:absolute;right:-7px;top:-9px;width:22px;height:22px;border-radius:99px;background:var(--danger);color:#fff;font-size:13px;display:grid;place-items:center;border:2px solid #fff}
+.bulkgrid .kb{left:4px;bottom:4px;width:20px;height:20px}
+.bulkgrid .kb svg{width:13px;height:13px}
 
 /* ===== お知らせ ===== */
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--brand);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
@@ -2769,6 +2790,11 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.17', items: [
+    ['部', 'アパートの部屋を削除しても、消えないことがあったのを直しました'],
+    ['消', '区域係：部屋をえらんで、まとめて削除できるようになりました（建物の編集）'],
+    ['店', '店舗・事務所などの部屋に、しるしと種別の名前が出るようになりました']
+  ] },
   { v: '2026.10.16', items: [
     ['会', '留守宅カードをえらぶ画面に「会いやすい順」ができ、カードごとに「会える見込み」が出るようになりました'],
     ['齢', '区域係：市の年齢データ（CSV）を「設定・データ」から読み込めます。区域の字は自動で調べます'],
@@ -4023,7 +4049,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     on('fToApt', () => openConvertApt(hid));
     on('fHNameSave', () => {
       const v = $('#fHName').value.trim();
-      commit(v ? `名前を「${v}」にしました` : '名前を消しました', () => { h.label = v; });
+      commit(v ? `名前を「${v}」にしました` : '名前を消しました', () => { const h2 = houseById(hid); if (h2) h2.label = v; });
       st.editOpen = true; paint();
     });
     on('fRename', () => openUnitNames(hid, () => openTarget(hid, unit, fromBuilding))); // まちがえたら、下の「取り消す」でもどせる
@@ -4451,7 +4477,8 @@ function openBuilding(hid) {
     const fo = fol(K(h.id, u)) ? '<em>再</em>' : '';
     const k2 = K(h.id, u);
     const fs = ff ? ff(k2) : (!D().dnc[k2] && visitedSince(k2, since) ? 'done' : null), hl = focusCls(fs);
-    return `<button class="unit st-${s}${hl}" data-unit="${esc(u)}">${fo}${doneMark(fs)}<b>${esc(uName(h, u))}</b><small>${ST_LABEL[s]}</small></button>`;
+    const uk = unitKind(h, u);
+    return `<button class="unit st-${s}${hl}${uk !== 'home' ? ' ukind' : ''}" data-unit="${esc(u)}" aria-label="${esc(unitTitle(h, u))}　${uk !== 'home' ? kindName(uk) + '　' : ''}${ST_LABEL[s]}">${fo}${doneMark(fs)}${kindBadge(uk)}<b>${esc(uName(h, u))}</b><small>${uk !== 'home' ? kindName(uk) + '・' : ''}${ST_LABEL[s]}</small></button>`;
   };
   const groups = unitGroups(h);
   const cells = groups.length > 1
@@ -4467,7 +4494,8 @@ function openBuilding(hid) {
       ${h.units.length ? '<button class="btn block" id="fRename">部屋の名前を直す（101→A-1 など）</button><p class="hint">名前を直しても、これまでの記録はそのまま残ります。</p>' : ''}
       <label class="field"><span>部屋を追加</span><span class="inline"><input type="text" id="fUnit" placeholder="例：305　A-5（空白で区切ると複数）"><button class="btn small" id="fUnitAdd">追加</button></span></label>
       ${isAdmin() ? `<label class="field"><span>部屋を削除</span><span class="inline"><input type="text" id="fUnitDel" placeholder="例：104"><button class="btn small danger" id="fUnitDelBtn">削除</button></span>
-        <small class="hint">部屋番号がまちがっていたときに使います。</small></label>` : ''}
+        <small class="hint">部屋番号がまちがっていたときに使います。</small></label>
+        ${h.units.length ? '<button class="btn block danger" id="fUnitBulk">部屋をえらんで、まとめて削除する</button>' : ''}` : ''}
       <label class="field"><span>建物名を変える</span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="${esc(h.label)}"><button class="btn small" id="fLabelSave">保存</button></span></label>
       <label class="check locrow"><input type="checkbox" id="fLock"${h.lock ? ' checked' : ''}>オートロックの建物</label>
       <p class="q">建物ぜんたいの種別</p>${kindChips(kindOf(h))}
@@ -4482,6 +4510,7 @@ function openBuilding(hid) {
   if ($('#fRename')) $('#fRename').onclick = () => openUnitNames(hid, () => openBuilding(hid));
   $('#fUnitAdd').onclick = () => {
     if (simpleBlock('部屋を追加')) return;
+    const h = houseById(hid); if (!h) return; // 開いたあとに届いた変更で、家が入れかわっていることがあるため、いつも最新を使う
     const used = new Set(h.units.concat(h.units.map(u => uName(h, u))));
     const us = parseUnits($('#fUnit').value).map(cleanUnit).filter(u => u && !used.has(u));
     if (!us.length) { toast('新しい部屋の名前を入力してください（同じ名前の部屋は追加できません）'); return; }
@@ -4490,6 +4519,7 @@ function openBuilding(hid) {
   };
   if ($('#fUnitDelBtn')) $('#fUnitDelBtn').onclick = () => {
     if (simpleBlock('部屋を削除')) return;
+    const h = houseById(hid); if (!h) return; // いつも最新の家で消す（古い家を消しても、保存されないため）
     const want = parseUnits($('#fUnitDel').value)[0];
     const u = want && (h.units.find(x => uName(h, x) === want) || h.units.find(x => x === want)); // 表示名でも中の番号でもさがす
     if (!u) { toast('その部屋はありません'); return; }
@@ -4498,16 +4528,69 @@ function openBuilding(hid) {
     commit(`${unitTitle(h, u)}を削除しました`, () => {
       h.units = h.units.filter(x => x !== u);
       if (h.ul) { delete h.ul[u]; if (!Object.keys(h.ul).length) delete h.ul; }
+      if (h.uk) { delete h.uk[u]; if (!Object.keys(h.uk).length) delete h.uk; }
       const k = K(hid, u); delete D().dnc[k]; delete D().follows[k]; delete D().released[k];
     });
     openBuilding(hid);
   };
-  $('#fLabelSave').onclick = () => { const v = $('#fLabel').value.trim(); commit('建物名を変えました', () => { h.label = v; }); openBuilding(hid); };
+  $('#fLabelSave').onclick = () => { const v = $('#fLabel').value.trim(); commit('建物名を変えました', () => { const h2 = houseById(hid); if (h2) h2.label = v; }); openBuilding(hid); };
+  if ($('#fUnitBulk')) $('#fUnitBulk').onclick = () => openUnitBulkDel(hid);
   if ($('#fDel')) $('#fDel').onclick = () => {
     if (!isAdmin()) { closeSheet(); openDelRequest(h); return; }
     if (!confirm(`「${h.label || '集合住宅'}」と、すべての部屋の記録を削除します。よろしいですか？`)) return;
     closeSheet(); deleteHouse(hid);
   };
+}
+
+/* ---------- 部屋をえらんで、まとめて削除する（区域係） ---------- */
+function openUnitBulkDel(hid) {
+  const h0 = houseById(hid); if (!h0 || !h0.units.length) return;
+  if (simpleBlock('部屋を削除')) return;
+  const sel = new Set();
+  const paint = () => {
+    const h = houseById(hid); if (!h) { closeSheet(); return; }
+    const cell = u => {
+      const n = visitsOf(K(hid, u)).length, uk = unitKind(h, u);
+      return `<button type="button" data-bu="${esc(u)}" aria-pressed="${sel.has(u)}" aria-label="${esc(unitTitle(h, u))}${sel.has(u) ? '（えらんでいます）' : ''}">${kindBadge(uk)}${esc(uName(h, u))}<small>${n ? `記録${n}件` : '記録なし'}</small></button>`;
+    };
+    const groups = unitGroups(h);
+    const cells = groups.length > 1
+      ? groups.map(([g, us]) => `<p class="ugrp">${esc(g || 'そのほか')}</p><div class="bulkgrid">${us.map(cell).join('')}</div>`).join('')
+      : `<div class="bulkgrid">${h.units.map(cell).join('')}</div>`;
+    const recs = [...sel].reduce((a, u) => a + visitsOf(K(hid, u)).length, 0);
+    setSheet(headHtml(terrById(h.terrId), '部屋をまとめて削除', `${esc(h.label || '集合住宅')}　${h.units.length}部屋`) + `
+      <p class="hint">消したい部屋を押してえらびます（もう一度押すと、えらぶのをやめます）。部屋番号がまちがっていたとき、部屋がなくなったときに使います。</p>
+      <div class="row"><button type="button" class="btn small" id="buAll">${sel.size === h.units.length ? 'えらぶのをやめる' : 'ぜんぶえらぶ'}</button>
+        <span class="muted">えらんだ部屋：<b>${sel.size}</b></span></div>
+      ${cells}
+      ${recs ? `<div class="notice warn">えらんだ部屋には、訪問の記録が${recs}件あります。削除すると見えなくなります。</div>` : ''}
+      <button class="btn danger block" id="buGo"${sel.size ? '' : ' disabled'}>${sel.size ? `えらんだ${sel.size}部屋を削除する` : '部屋をえらんでください'}</button>
+      <button class="btn block" id="buBack">もどる</button>`);
+    const S = $('#sheet');
+    $$('[data-bu]', S).forEach(b => b.onclick = () => { const u = b.dataset.bu; if (sel.has(u)) sel.delete(u); else sel.add(u); sheetKeep = true; paint(); });
+    $('#buAll').onclick = () => { if (sel.size === h.units.length) sel.clear(); else h.units.forEach(u => sel.add(u)); sheetKeep = true; paint(); };
+    $('#buBack').onclick = () => openBuilding(hid);
+    $('#buGo').onclick = () => {
+      const us = [...sel].filter(u => h.units.includes(u));
+      if (!us.length) return;
+      if (us.length === h.units.length && !confirm('すべての部屋を削除します。建物は残ります。よろしいですか？')) return;
+      if (us.length < h.units.length && !confirm(`${us.map(u => uName(h, u)).join('・')} の${us.length}部屋を削除します。よろしいですか？`)) return;
+      commit(`${us.length}部屋を削除しました`, () => {
+        const h2 = houseById(hid); if (!h2) return; // いつも最新の家で消す
+        const del = new Set(us);
+        h2.units = h2.units.filter(x => !del.has(x));
+        us.forEach(u => {
+          if (h2.ul) delete h2.ul[u];
+          if (h2.uk) delete h2.uk[u];
+          const k = K(hid, u); delete D().dnc[k]; delete D().follows[k]; delete D().released[k];
+        });
+        if (h2.ul && !Object.keys(h2.ul).length) delete h2.ul;
+        if (h2.uk && !Object.keys(h2.uk).length) delete h2.uk;
+      });
+      openBuilding(hid);
+    };
+  };
+  paint();
 }
 
 /* ---------- 集合住宅：続けて入力 ---------- */
@@ -4549,7 +4632,8 @@ function openAptSeq(hid, startUnit) {
     let b = headHtml(t, `${esc(h.label || '集合住宅')}　続けて入力`, `${inRound ? '受け取ってから訪ねた部屋' : '今日入力した部屋'} ${cnt} / ${need}`);
     b += `<div class="unitstrip">${h.units.map((u, i) => {
       const s = statusOf(K(hid, u));
-      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}へ">${esc(uName(h, u))}</button>`;
+      const uk = unitKind(h, u);
+      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}へ">${kindBadge(uk)}${esc(uName(h, u))}</button>`;
     }).join('')}</div>`;
     if (st.finished) {
       b += `<div class="okmsg"><b>${cnt === need ? 'すべての部屋に緑のチェックがつきました。' : '最後の部屋まで進みました。'}</b>部屋番号をタップすると、その部屋を入力できます。</div>
@@ -4558,7 +4642,8 @@ function openAptSeq(hid, startUnit) {
     } else {
       const u = h.units[idx], k = K(hid, u), f = fol(k), last = visitsOf(k)[0];
       const other = !!f && f.by !== me().id;
-      b += `<p class="seqroom"><b>${esc(uName(h, u))}</b>${/\d$/.test(uName(h, u)) ? '号室' : ''} <span class="muted">（${idx + 1} / ${n}）</span></p>`;
+      const uk2 = unitKind(h, u);
+      b += `<p class="seqroom"><b>${esc(uName(h, u))}</b>${/\d$/.test(uName(h, u)) ? '号室' : ''}${uk2 !== 'home' ? ` <span class="kindtag">${kindBadge(uk2)}${kindName(uk2)}</span>` : ''} <span class="muted">（${idx + 1} / ${n}）</span></p>`;
       b += `<p class="muted">${last ? `前回：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}` : 'はじめて訪ねる部屋'}</p>`;
       b += recentOtherHtml(k);
       if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の部屋です。</b>訪問しないで、次の部屋へ進んでください。</div>`;
@@ -4811,10 +4896,11 @@ function openUnitNames(hid, back) {
       const fin = st.names.map(cleanUnit);
       const c2 = {}; fin.forEach(n => { c2[n] = (c2[n] || 0) + 1; });
       if (fin.some(n => !n || c2[n] > 1)) { sheetKeep = true; paint(); return; }
+      const orig = h.units.slice();
       commit(`部屋の名前を直しました（${fin.filter((n, i) => n !== cur[i]).length}部屋）`, () => {
-        const ul = {};
-        h.units.forEach((u, i) => { if (fin[i] !== u) ul[u] = fin[i]; });
-        if (Object.keys(ul).length) h.ul = ul; else delete h.ul;
+        const h2 = houseById(hid) || h, ul = {}; // いつも最新の家に書く
+        orig.forEach((u, i) => { if (fin[i] !== u && h2.units.includes(u)) ul[u] = fin[i]; });
+        if (Object.keys(ul).length) h2.ul = ul; else delete h2.ul;
       });
       if (back) back(); else closeSheet();
     };
