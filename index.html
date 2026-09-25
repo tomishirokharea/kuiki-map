@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.21"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.22"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -1058,7 +1058,6 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
         <div id="homeCal"></div>
         <p class="hint">自分で入れた予定や時間は、このスマホの中だけに保存されます。係やほかの人には送られません。</p>
         </div></div>
-        <div id="homeReco" class="homereco"></div>
       </div>
     </section>
 
@@ -1190,18 +1189,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
 
     <!-- おすすめ -->
     <section class="view" id="view-reco" hidden>
-      <div class="wrap">
-        <h2 class="sec">今、訪問するとよい家</h2>
-        <p class="lead" id="recoNow"></p>
-        <div class="row"><button class="btn" id="recoLocate">現在地から近い順にする</button><button class="btn" id="slotEdit">行ける時間を登録する</button></div>
-        <h3 class="sub">留守宅カード</h3>
-        <p class="hint" id="awayHint"></p>
-        <div id="awayList"></div>
-        <h3 class="sub">再訪問のおすすめ</h3>
-        <label class="check"><input type="checkbox" id="recoMine" checked>自分の区域と、担当者のいない区域だけ表示</label>
-        <div class="chips" id="recoChips"></div>
-        <div id="recoList"></div>
-      </div>
+      <div class="wrap"><div id="recoPane"></div></div>
     </section>
 
     <!-- 係の画面 -->
@@ -1273,6 +1261,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
     <button data-view="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5h4v5"/></svg>ホーム</button>
     <button data-view="cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h6M7 14h10"/></svg>区域カード</button>
     <button data-view="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>地図</button>
+    <button data-view="reco" id="tabReco" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>おすすめ</button>
     <button data-view="follow" id="tabFollow" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7"/><path d="M20 4v4.7h-4.7"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.3"/><path d="M4 20v-4.7h4.7"/></svg>再訪問</button>
     <button data-view="admin" id="tabAdmin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 20h18M6 17v-6M11 17V6M16 17v-9"/></svg><span id="tabAdminLabel">係の画面</span><b class="tabbadge" id="tabBadge" hidden>0</b></button>
   </nav>
@@ -2937,10 +2926,13 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.22', items: [
+    ['推', '「おすすめ」を、下のタブ（ホーム・区域カード・地図のならび）に移しました']
+  ] },
   { v: '2026.10.21', items: [
     ['今', '設定の「使う機能」で、ホームの「今日やること」を出す・出さないをえらべるようにしました（はじめは出しません）。出すと、自分の予定と再訪問の約束も出ます'],
     ['約', '再訪問のメモに「次の約束」の日と時刻を入れられるようになりました。カレンダーと「今日やること」に出ます'],
-    ['推', 'ホームの下に「おすすめ」がもどりました。空いた時間に、近くの家や長く会えていない家を2〜3件回れます（出すかどうか・種類は区域係が決めます）']
+    ['推', '下のタブに「おすすめ」がもどりました。空いた時間に、近くの家や長く会えていない家を2〜3件回れます（出すかどうか・種類は区域係が決めます）']
   ] },
   { v: '2026.10.20', items: [
     ['今', 'ホームのいちばん上に「今日やること」（集まり・たのまれた区域・区域カード・今がチャンスの留守宅カード）をまとめました'],
@@ -7422,7 +7414,7 @@ function openUiSheet() {
         <p class="q">はじめの案内（「拡大すると家の印が出ます」など）</p>${seg('guide', [['auto', '最初の5日だけ'], ['on', 'いつも出す'], ['off', '出さない']])}
         <p class="q">ボタンの間隔</p>${seg('density', [['normal', 'ゆったり'], ['compact', 'コンパクト']])}
         <p class="q">説明の文</p>${seg('hints', [['show', '表示する'], ['hide', 'かくす']])}
-        <p class="q">開いたときの画面</p>${seg('start', [['home', 'ホーム'], ['cards', '区域カード'], ['map', '地図']])}`;
+        <p class="q">開いたときの画面</p>${seg('start', [['home', 'ホーム'], ['cards', '区域カード'], ['map', '地図']].concat(recoOn() ? [['reco', 'おすすめ']] : []))}`;
       const S_MAP = `<h3 class="sub">地図</h3>
         <p class="q">家の印の大きさ</p>${seg('pin', Object.entries(PINS).map(([k, v]) => [k, v[1]]))}
         <p class="q">自分の区域を回るときの表示</p>${seg('round', [['reco', 'おすすめ順'], ['progress', '進み具合']], me().roundMode || 'reco')}`;
@@ -9096,7 +9088,7 @@ function maybeAutoLocate() {
   try {
     if (navigator.permissions && navigator.permissions.query) {
       navigator.permissions.query({ name: 'geolocation' }).then(p => {
-        if (p.state === 'granted') locate(() => { RECO_CACHE = null; renderHome(); });
+        if (p.state === 'granted') locate(() => { RECO_CACHE = null; renderRecoView(); });
       }).catch(() => {});
     }
   } catch (e) { /* 何もしない */ }
@@ -9121,8 +9113,8 @@ function renderRecoAdmin() {
     return `<tr><th>${r[2]}</th><td>${s.n}件</td><td>${s.m}件</td><td><b>${Math.round(s.m / s.n * 100)}%</b></td></tr>`;
   }).join('');
   box.innerHTML = `<h2 class="sec">ホームの「おすすめ」</h2>
-    <p class="hint">カードを受け取らなくても、空いた時間に2〜3件回れる家を、全員のホームの下に出します。</p>
-    ${flag('recoOn', 'おすすめを出す', '出さないにすると、全員のホームから消えます', '出す', '出さない')}
+    <p class="hint">カードを受け取らなくても、空いた時間に2〜3件回れる家を、全員の画面の下のタブ「おすすめ」に出します。</p>
+    ${flag('recoOn', 'おすすめを出す', '出さないにすると、全員の画面から「おすすめ」のタブが消えます', '出す', '出さない')}
     ${on ? `<p class="q">出すおすすめの種類</p>
     <div class="chips">${RECO_KINDS2.map(r => `<button type="button" class="chip" data-recok="${r[1]}" aria-pressed="${!!(bits & r[1])}">${r[2]}</button>`).join('')}</div>
     <p class="hint">${RECO_KINDS2.map(r => `<b>${r[2]}</b>：${r[3]}`).join('<br>')}<br>えらんだ種類から、順番に1件ずつ出します。</p>
@@ -9238,8 +9230,6 @@ function renderHome() {
   $('#homeMonthEnd').innerHTML = monthEndHtml(o);
   }
   $('#homeCal').innerHTML = calHtml(o);
-  const hr = $('#homeReco'); if (hr) hr.innerHTML = homeRecoHtml();
-  maybeAutoLocate();
 }
 /* スワイプの動き（指でもマウスでも）：左に半分以上ずらすと開き、ほかをさわると閉じる */
 const SWIPE_W = 176;
@@ -9298,16 +9288,28 @@ function bindSwipe() {
     if (back) back();
   });
 }
-function bindHome() {
-  $('#view-home').addEventListener('click', e => {
+/* おすすめのタブ */
+function renderRecoView() {
+  const box = $('#recoPane'); if (!box || $('#view-reco').hidden) return;
+  box.innerHTML = homeRecoHtml() || '<div class="empty">今は、おすすめを出さない設定です。</div>';
+  maybeAutoLocate();
+}
+function bindReco() {
+  $('#view-reco').addEventListener('click', e => {
     const q = sel => e.target.closest(sel);
     let x;
     if ((x = q('[data-rgo]'))) { recoMark(x.dataset.rgo, x.dataset.unit, x.dataset.rk); goTo(x.dataset.rgo, x.dataset.unit, false, x.dataset.rk); }
     else if ((x = q('[data-rcard]'))) { CHANCE_CACHE = null; RECO_CACHE = null; takeAwayCard(x.dataset.rcard, x.dataset.slot); }
-    else if (q('[data-rmore]')) { lastReco.forEach(id => recoSkip.add(id)); RECO_CACHE = null; renderHome(); }
-    else if (q('[data-rreset]')) { recoSkip.clear(); RECO_CACHE = null; renderHome(); }
-    else if (q('[data-rpos]')) locate(() => { RECO_CACHE = null; renderHome(); });
-    else if ((x = q('[data-apmemo]'))) openMemo(x.dataset.apmemo);
+    else if (q('[data-rmore]')) { lastReco.forEach(id => recoSkip.add(id)); RECO_CACHE = null; renderRecoView(); }
+    else if (q('[data-rreset]')) { recoSkip.clear(); RECO_CACHE = null; renderRecoView(); }
+    else if (q('[data-rpos]')) locate(() => { RECO_CACHE = null; renderRecoView(); });
+  });
+}
+function bindHome() {
+  $('#view-home').addEventListener('click', e => {
+    const q = sel => e.target.closest(sel);
+    let x;
+    if ((x = q('[data-apmemo]'))) openMemo(x.dataset.apmemo);
     else if ((x = q('[data-apdone]'))) { clearAppt(x.dataset.apdone); renderHome(); toast('約束を「済み」にしました'); }
     else if ((x = q('[data-openterr]'))) openTerr(x.dataset.openterr);
     else if ((x = q('[data-chance]'))) { CHANCE_CACHE = null; takeAwayCard(x.dataset.chance, x.dataset.slot); }
@@ -9835,7 +9837,7 @@ async function printMonthSchedule(y, m) {
 /* ---------- 画面の切りかえ ---------- */
 let currentView = 'cards';
 function showView(name) {
-  if (name === 'reco') name = 'home'; // おすすめはホームに変わりました
+  if (name === 'reco' && !recoOn()) name = 'home'; // 区域係が「おすすめを出さない」にしているとき
   if (name === 'admin' && !isAdmin() && !isOverseer()) name = 'cards';
   if (name === 'follow' && !featFollow()) name = 'cards';
   if (currentView === 'map' && name !== 'map' && mode !== 'normal') { if (draw) endDraw(); else setMode('normal'); }
@@ -9853,6 +9855,7 @@ function showView(name) {
   }
   if (name === 'cards') renderCards();
   if (name === 'home') renderHome();
+  if (name === 'reco') renderRecoView();
   if (name === 'follow') renderFollowList();
   if (LIVE && (name === 'cards' || name === 'map') && !Store.queue.length && Date.now() - lastRefresh > 5000) refresh(true).catch(() => {});
   if (name === 'admin') {
@@ -9876,6 +9879,7 @@ function updateTabs() {
   const show = isAdmin() || isOverseer();
   $('#tabAdmin').hidden = !show;
   $('#tabFollow').hidden = !featFollow();
+  $('#tabReco').hidden = !recoOn();
   $('#tabAdminLabel').textContent = isAdmin() ? '係の画面' : 'グループ';
   $('#tabs').classList.remove('three');
   $('#tabs').style.setProperty('--tabs', $$('#tabs > button').filter(b => !b.hidden).length);
@@ -9885,6 +9889,9 @@ function fillWho() {
 }
 function renderAll(skipIndex) {
   if (!skipIndex) buildIndex(); // ほかの人の記録だけが届いたときは、索引を1件ずつ直してあるので作り直さない
+  updateTabs();
+  if (currentView === 'reco' && !recoOn()) { showView('home'); return; }
+  if (currentView === 'reco') renderRecoView();
   purgeMemos();
   fillTerrJump();
   if (currentView === 'cards') renderCards();
@@ -9915,6 +9922,7 @@ function bindStatic() {
   $$('#tabs button').forEach(b => b.onclick = () => showView(b.dataset.view));
   $('#adTabs').addEventListener('click', e => { const b = e.target.closest('[data-ap]'); if (b) { setAdPane(b.dataset.ap); $('#view-admin').scrollTop = 0; } });
   bindHome();
+  bindReco();
   bindSwipe();
   $('#splash').addEventListener('click', () => hideSplash(true));
   watchResume();
@@ -10053,17 +10061,6 @@ function bindStatic() {
   $('#drawHouses').onchange = e => { drawShowHouses = e.target.checked; renderHouses(); };
   $('#drawFold').onclick = () => setDrawFold(!$('#drawBar').classList.contains('mini'));
   $$('#drawBar [data-drawtap]').forEach(b => b.onclick = () => setDrawTap(b.dataset.drawtap));
-
-  // おすすめ
-  $('#recoChips').addEventListener('click', e => { const c = e.target.closest('[data-kind]'); if (c) { recoFilter = c.dataset.kind; renderReco(); } });
-  $('#recoMine').onchange = renderReco;
-  $('#recoLocate').onclick = () => locate(renderReco);
-  $('#slotEdit').onclick = openSlotSheet;
-  $('#awayList').addEventListener('click', e => {
-    const x = e.target.closest('[data-awaytake]');
-    if (x && !x.disabled) takeAwayCard(x.dataset.awaytake, x.dataset.slot);
-  });
-  $('#recoList').addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) goTo(g.dataset.go, g.dataset.unit); });
 
   // 係の画面
   $('#adNewTerr').onclick = () => startDraw(null);
