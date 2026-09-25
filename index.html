@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.17"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.18"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -103,6 +103,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 #map{position:absolute;inset:0;z-index:1}
 #map.see-through{background:transparent!important}
 #map.crosshair{cursor:crosshair}
+#map.penmode{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ctext y='20' font-size='20'%3E%E2%9C%8F%EF%B8%8F%3C/text%3E%3C/svg%3E") 2 22,crosshair}
 .maptools{position:absolute;top:10px;left:10px;right:10px;z-index:500;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
 .maptools>*{pointer-events:auto;box-shadow:0 2px 6px #0003}
 .maptools select{min-height:52px;border-radius:12px;border:2px solid var(--ink);background:#fff;padding:0 8px;font-weight:700;max-width:44vw}
@@ -805,6 +806,8 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .bulkgrid .kb{left:4px;bottom:4px;width:20px;height:20px}
 .bulkgrid .kb svg{width:13px;height:13px}
 
+.agelines{margin:2px 0 0;font-size:15px;color:#4A2C7A;font-weight:700}
+
 /* ===== お知らせ ===== */
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:3000;background:var(--brand);color:#fff;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px #0005;width:max-content;max-width:calc(100% - 24px);font-size:17px}
 #toast button{min-height:46px;border-radius:10px;border:2px solid #fff;background:transparent;color:#fff;font-weight:700;padding:0 14px;flex:none}
@@ -1034,8 +1037,8 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
           <span><i class="pin apt">集<i>3</i></i>集合住宅（数字はまだの部屋）</span>
             <span><i class="pin st-plain"><s>1</s></i>おすすめの順番</span>
           <span><i class="pin st-plain locked"></i>自分の区域以外（選べません）</span>
-          <span><i class="pin st-plain biz">${kindBadge('office')}</i>住居でない建物（会社・店舗・事務所・工場・学校・役所・警察・消防）</span>
-          <span><i class="pin apt">集${LOCK_SVG ? '<b class="lk">' + LOCK_SVG + '</b>' : ''}</i>オートロックの集合住宅</span>
+          <span><i class="pin st-plain biz" id="lgBiz"></i>住居でない建物（会社・店舗・事務所・工場・学校・役所・警察・消防）</span>
+          <span><i class="pin apt" id="lgLock">集</i>オートロックの集合住宅</span>
         </div>
         <p class="hint">地図を縮めているときは、家は<b>小さな点</b>で出ます（白＝まだ、緑＝今回訪ねた、青＝最近会えた、赤＝拒否、点線＝仮の家）。拡大すると、くわしい印になります。</p>
         <p class="hint">色と文字は、この区域を受け取ってからの結果です。それより前の記録は、家をタップすると見られます。</p>
@@ -1059,6 +1062,10 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
       </div>
       <div class="modebar" id="partBar" hidden>
         <p><b>回る範囲を分ける：</b><span id="partMsg">地図をタップして、範囲を囲みます</span></p>
+        <div class="seg small" role="group" aria-label="囲み方">
+          <button type="button" data-parttool="tap" aria-pressed="true">タップで角を置く</button>
+          <button type="button" data-parttool="pen" aria-pressed="false">✏️ 指でなぞって囲む</button>
+        </div>
         <div class="row">
           <button class="btn small" id="partUndo">1つ戻す</button>
           <button class="btn small primary" id="partDone">この範囲をわたす</button>
@@ -1669,7 +1676,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, ageShow: 10, ageShowMode: 0 }, d.settings || {});
     d.s13 = d.s13 || [];
     d.agedata = d.agedata || [];
   },
@@ -2625,7 +2632,7 @@ function slotOfVisit(v) {
   return s;
 }
 function buildIndex() {
-  AGE_CACHE = null; RATE_CACHE = null;
+  AGE_CACHE = null; RATE_CACHE = null; SHARE_CACHE = null;
   IDX = new Map(); HBT = new Map(); SUM = new Map(); HID = new Map(); TID = new Map();
   for (const t of D().territories) TID.set(t.id, t);
   for (const h of D().houses) {
@@ -2790,6 +2797,12 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.18', items: [
+    ['✏', '回る範囲を分けるとき、指でなぞって囲めるようになりました'],
+    ['名', '設定で、マンションなどの名前を「地図に見えている全体」に出せるようになりました'],
+    ['齢', '区域をえらぶ画面に、世代の割合が出るようになりました（出す世代は区域係が決めます）'],
+    ['?', '地図の「?」の印の見かたに、文字のかたまりが出ていたのを直しました']
+  ] },
   { v: '2026.10.17', items: [
     ['部', 'アパートの部屋を削除しても、消えないことがあったのを直しました'],
     ['消', '区域係：部屋をえらんで、まとめて削除できるようになりました（建物の編集）'],
@@ -3579,7 +3592,7 @@ function renderHouses() {
       : null;
   const show = !!list && list.length <= 4000; // 小さな点なら多くても軽い。それ以上は拡大してから出す
   setZoomHint(!show);
-  if (!show) return;
+  if (!show) { houseNameLabels(null, false); return; }
   const mine = myPlaces(), dimOthers = !sel && !isAdmin(); // 何も選んでいないときは、自分の区域以外を薄く
   const okT = lockOn() && mode === 'normal' ? openTerrIds() : null;
   // 家が混んでいるとき（印を並べると画面の半分近くをおおうとき）は、小さな点で出す
@@ -3640,6 +3653,14 @@ function houseNameLabels(list, dense) {
   const apt = UI.aptName === 'on' && z >= base + nameZoomOff('aptZoom') - 0.05;
   const fc = UI.fcName === 'on' && z >= base + nameZoomOff('fcZoom') - 0.05;
   if ((!apt && !fc) || mode !== 'normal') return;
+  // 設定で「地図に見えている全体」をえらんだときは、えらんだ区域の外の建物の名前も出す
+  const all = UI.nameScope === 'all' && !followMap;
+  if (all) {
+    const b = map.getBounds().pad(0.1), onMap = new Set((list || []).map(h => h.id));
+    list = D().houses.filter(h => h.label && b.contains([h.lat, h.lng]));
+    dense = dense && list.some(h => onMap.has(h.id));
+  }
+  if (!list) return;
   let n = 0;
   for (const h of list) {
     if (!h.label || n > 300) continue;
@@ -3792,6 +3813,7 @@ function onHouseTap(id) {
   });
 }
 function setMode(m) {
+  if (m !== 'part' && typeof penOff === 'function') penOff(); // えんぴつで囲むのをやめたら、地図をまた動かせるようにする
   mode = m;
   if (m !== 'normal') clearTarget();
   $('#addBar').hidden = m !== 'add';
@@ -3823,21 +3845,89 @@ function startPartSplit(tid) {
   if (!t || t.holder !== me().id) { toast('この区域の担当者だけが分けられます'); return; }
   showView('map');
   selectTerr(tid, { fit: true });
-  partDraw = { tid, pts: [] };
+  partDraw = { tid, pts: [], tool: lsGet('kuiki_parttool') === 'pen' ? 'pen' : 'tap' };
   setMode('part');
+  setPartTool(partDraw.tool);
   renderPartDraw();
   toast('地図をタップして、わたす範囲を囲んでください');
 }
 function endPartSplit() {
+  penOff();
   partDraw = null;
   setMode('normal');
   renderPartDraw();
 }
 function partTap(ll) {
-  if (!partDraw) return;
+  if (!partDraw || partDraw.tool === 'pen') return;
   partDraw.pts.push([ll.lat, ll.lng]);
   renderPartDraw();
 }
+/* ---------- 範囲を「指でなぞって」囲む（えんぴつ） ----------
+   ・なぞっているあいだは地図が動かないようにし、2本指なら地図の拡大・移動にする
+   ・なぞった線は、形を保ったまま点を減らす（サーバーに送る点は60まで） */
+let penStroke = null, penBound = false, penLine = null;
+function setPartTool(tool) {
+  if (!partDraw) return;
+  partDraw.tool = tool === 'pen' ? 'pen' : 'tap';
+  lsSet('kuiki_parttool', partDraw.tool);
+  $$('#partBar [data-parttool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.parttool === partDraw.tool)));
+  if (partDraw.tool === 'pen') penOn(); else penOff();
+  updatePartBar();
+}
+function penOn() {
+  if (!map) return;
+  map.dragging.disable();
+  map.getContainer().style.touchAction = 'none';
+  $('#map').classList.add('penmode');
+  if (penBound) return;
+  penBound = true;
+  const el = map.getContainer();
+  let touches = 0;
+  const active = () => mode === 'part' && partDraw && partDraw.tool === 'pen';
+  el.addEventListener('pointerdown', e => {
+    touches++;
+    if (!active()) return;
+    if (touches > 1 || !e.isPrimary) { penCancel(); map.dragging.enable(); return; } // 2本指：地図を動かす
+    penStroke = [map.mouseEventToLatLng(e)];
+    penStroke.px = [[e.clientX, e.clientY]];
+    try { el.setPointerCapture(e.pointerId); } catch (x) { /* 何もしない */ }
+  });
+  el.addEventListener('pointermove', e => {
+    if (!penStroke || !active()) return;
+    const last = penStroke.px[penStroke.px.length - 1];
+    if (Math.hypot(e.clientX - last[0], e.clientY - last[1]) < 4) return;
+    penStroke.push(map.mouseEventToLatLng(e)); penStroke.px.push([e.clientX, e.clientY]);
+    if (!penLine) penLine = L.polyline([], { color: '#C2410C', weight: 4, interactive: false }).addTo(map);
+    penLine.setLatLngs(penStroke);
+  });
+  const up = () => {
+    touches = Math.max(0, touches - 1);
+    if (!active()) return;
+    if (touches === 0) map.dragging.disable();
+    if (!penStroke) return;
+    const st = penStroke; penStroke = null;
+    if (penLine) { map.removeLayer(penLine); penLine = null; }
+    if (st.length < 8) { toast('もう少し大きく、ぐるっと囲んでください'); return; }
+    partDraw.pts = simplifyRing(st.map(ll => [ll.lat, ll.lng]), 0.5);
+    let tol = 1; // 点が多いときは、形を少しずつゆるめて60点までにする
+    while (partDraw.pts.length > 60 && tol < 200) { partDraw.pts = simplifyRing(st.map(ll => [ll.lat, ll.lng]), tol); tol *= 1.6; }
+    renderPartDraw();
+  };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+}
+function penCancel() {
+  penStroke = null;
+  if (penLine && map) { map.removeLayer(penLine); penLine = null; }
+}
+function penOff() {
+  penCancel();
+  if (!map) return;
+  map.dragging.enable();
+  map.getContainer().style.touchAction = '';
+  $('#map').classList.remove('penmode');
+}
+
 function renderPartDraw() {
   if (!map) return;
   if (!partLayer) partLayer = L.layerGroup().addTo(map);
@@ -3847,13 +3937,16 @@ function renderPartDraw() {
   if (pts.length >= 2) {
     L.polygon(pts, { color: '#C2410C', weight: 4, dashArray: '8 6', fillColor: '#C2410C', fillOpacity: 0.12, interactive: false }).addTo(partLayer);
   }
-  pts.forEach(pt => L.circleMarker(pt, { radius: 6, color: '#C2410C', weight: 3, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(partLayer));
+  if (partDraw.tool !== 'pen') pts.forEach(pt => L.circleMarker(pt, { radius: 6, color: '#C2410C', weight: 3, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(partLayer));
   updatePartBar();
 }
 function updatePartBar() {
   const el = $('#partMsg'); if (!el) return;
   const n = partDraw ? partDraw.pts.length : 0;
-  el.textContent = n === 0 ? '地図をタップして、範囲を囲みます'
+  if (partDraw && partDraw.tool === 'pen') {
+    el.textContent = n >= 3 ? '囲めました。「この範囲をわたす」を押してください。なぞり直すと、囲みが入れかわります'
+      : '指で、わたす範囲をぐるっとなぞって囲みます（地図を動かすときは、2本指で）';
+  } else el.textContent = n === 0 ? '地図をタップして、範囲を囲みます'
     : n < 3 ? `あと${3 - n}か所タップすると、範囲になります（今 ${n}か所）`
       : `${n}か所で囲んでいます。「この範囲をわたす」を押してください`;
   const t = partDraw ? terrById(partDraw.tid) : null;
@@ -4629,7 +4722,7 @@ function openAptSeq(hid, startUnit) {
   const paint = () => {
     const h = houseById(hid); if (!h) { closeSheet(); return; }
     const n = h.units.length, cnt = h.units.filter(doneToday).length, need = h.units.filter(u => !isRef(u)).length;
-    let b = headHtml(t, `${esc(h.label || '集合住宅')}　続けて入力`, `${inRound ? '受け取ってから訪ねた部屋' : '今日入力した部屋'} ${cnt} / ${need}`);
+    let b = headHtml(t, esc(h.label || '集合住宅'), `${inRound ? '受け取ってから訪ねた部屋' : '今日入力した部屋'} ${cnt} / ${need}`);
     b += `<div class="unitstrip">${h.units.map((u, i) => {
       const s = statusOf(K(hid, u));
       const uk = unitKind(h, u);
@@ -5981,7 +6074,7 @@ function openRequestSheet(g) {
   const rows = list.map(({ t, last, n, dist }) => `<article class="pick">
       <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
       <div><b>${esc(t.name)}</b>
-        <p class="muted">${n}軒・部屋　${last ? `前回回り終えた日 ${fmtDay(last)}` : '回り終えた記録なし'}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p></div>
+        <p class="muted">${n}軒・部屋　${last ? `前回回り終えた日 ${fmtDay(last)}` : '回り終えた記録なし'}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${ageLine(t)}</div>
       ${isFree(t) && canTake
         ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
         : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
@@ -6518,6 +6611,7 @@ function openAwayPick() {
       ${list.length ? list.slice(0, 20).map(x => `<article class="ritem k-away"><div>
           <p class="rt"><span class="stamp xs${noCls(x.t.no)}">${esc(x.t.no)}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}</p>
           <p class="metline">会える見込み 約${pctTxt(x.chance)}<small class="muted">（目安）</small></p>
+          ${ageLine(x.t)}
           <p class="muted">まだ会えていない家 ${x.keys.length}軒${x.longDays ? `　いちばん長い家は${x.longDays}日会えていない` : ''}${x.dist != null ? `　ここから約${fmtDist(x.dist)}` : ''}${x.t.holder ? '　あなたの区域' : ''}</p>
         </div><button class="btn small primary" data-awaytake2="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`).join('')
         : `<div class="empty">今、合う留守宅カードはありません。${reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`}
@@ -6746,7 +6840,7 @@ function nameZoomSlider(key) {
     <p class="nzends"><span>← 縮めても出す</span><span>拡大したときだけ →</span></p></div>`;
 }
 const ICONS = ['区', '家', '図', '心', '🏠', '🗺️', '📖', '🚪', '✅', '⭐', '🚶', '☀️'];
-const UI_DEFAULT = { fTime: 'off', fFollow: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
+const UI_DEFAULT = { fTime: 'off', fFollow: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
 /* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
   standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
@@ -6983,6 +7077,7 @@ function openUiSheet() {
         ${UI.aptName === 'on' ? nameZoomSlider('aptZoom') : ''}</div>
       <div class="featrow"><p><b>学校・役所・お店などの名前</b><small>家の種別をえらんで、名前を入れた建物です</small></p>${seg('fcName', [['off', '出さない'], ['on', '出す']])}
         ${UI.fcName === 'on' ? nameZoomSlider('fcZoom') : ''}</div>
+      ${UI.aptName === 'on' || UI.fcName === 'on' ? `<div class="featrow"><p><b>名前を出す範囲</b><small>「全体」にすると、区域をえらんでいるときも、ほかの区域の建物の名前が出ます</small></p>${seg('nameScope', [['sel', 'えらんだ区域だけ'], ['all', '地図に見えている全体']], UI.nameScope || 'sel')}</div>` : ''}
       <h3 class="sub">奉仕の予定</h3>
       <div class="featrow"><p><b>予定の一覧</b><small>ホームの「奉仕の予定」で、カレンダーの下の一覧に出す予定</small></p>${seg('calList', [['upcoming', '今日から'], ['all', 'その月すべて']], UI.calList || 'upcoming')}</div>
       <h3 class="sub">家の画面に出すもの</h3>
@@ -7093,7 +7188,7 @@ function openUiSheet() {
       if (k === 'base') setBase(v);
       if (k === 'cProg' || k === 'cReco') renderAll();
       if (k === 'terrColor' || k === 'terrWidth') renderTerrs();
-      if (k === 'aptName' || k === 'fcName' || k === 'pin') renderHouses();
+      if (k === 'aptName' || k === 'fcName' || k === 'pin' || k === 'nameScope') renderHouses();
       if (k === 'calList') renderHome();
       paint(k !== 'mode');
     });
@@ -7810,6 +7905,60 @@ function parseAgeCsv(text, fname) {
 }
 const ageType = a => (a.o >= 27 ? '高齢型' : a.o <= 12 ? '子育て・現役型' : (a.y >= 30 && a.hi && a.hi < 0.95) ? '若い世代・少人数世帯型' : '標準型');
 
+
+/* ---------- 区域をえらぶ画面に出す「世代の割合」（出す世代と表し方は、区域係が決める） ----------
+   ageShow：出す世代（足し算：1＝0〜14歳、2＝20〜39歳、4＝40〜64歳、8＝65歳以上、16＝75歳以上）
+   ageShowMode：0＝市全体のその世代のうち、この区域にいる割合　1＝この区域の人のうち、その世代の割合
+   市全体のうちの割合は「字の人口 × 字の中の世代の割合 × 区域がその字にしめる家の割合」から出す目安 */
+const AGE_GROUPS = [[1, 'c', '0〜14歳'], [2, 'y', '若い世代（20〜39歳）'], [4, 'm', '40〜64歳'], [8, 'o', '65歳以上'], [16, 'o75', '75歳以上']];
+const AGE_SHORT = { c: '子ども', y: '若い世代', m: '40〜64歳', o: '65歳以上', o75: '75歳以上' };
+let SHARE_CACHE = null;
+function azaHouseShare() {
+  if (SHARE_CACHE) return SHARE_CACHE;
+  const tot = {}, per = new Map();
+  D().territories.forEach(t => {
+    if (t.dummy) return;
+    const n = housesOf(t.id).reduce((a, h) => a + targets(h).length, 0);
+    terrAza(t).forEach(a => { tot[a.k] = (tot[a.k] || 0) + n * a.r; });
+    per.set(t.id, n);
+  });
+  SHARE_CACHE = { tot, per };
+  return SHARE_CACHE;
+}
+function ageLine(t) {
+  const bits = Number(D().settings.ageShow) || 0, am = ageMap();
+  if (!bits || !am || !t) return '';
+  const list = terrAza(t).filter(a => am.has(a.k));
+  if (!list.length) return '';
+  const gs = AGE_GROUPS.filter(g => bits & g[0]);
+  let parts;
+  if (Number(D().settings.ageShowMode) === 1) { // この区域の人のうち
+    const w = list.reduce((s, a) => s + a.r, 0) || 1;
+    parts = gs.map(g => `${AGE_SHORT[g[1]]} ${Math.round(list.reduce((s, a) => s + am.get(a.k)[g[1]] * a.r, 0) / w)}%`);
+    return `<p class="agelines">この区域：${parts.join('・')}</p>`;
+  }
+  const sh = azaHouseShare(), n = sh.per.get(t.id) || 0;
+  if (!n) return '';
+  const areas = [...am.values()].filter(a => a.k !== '__all');
+  parts = gs.map(g => {
+    const city = areas.reduce((s, a) => s + a.pop * a[g[1]], 0);
+    const mine = list.reduce((s, a) => s + (sh.tot[a.k] ? am.get(a.k).pop * am.get(a.k)[g[1]] * (n * a.r / sh.tot[a.k]) : 0), 0);
+    const p = city ? mine / city * 100 : 0;
+    return `${AGE_SHORT[g[1]]}の${p < 1 ? p.toFixed(1) : Math.round(p * 10) / 10}%`;
+  });
+  return `<p class="agelines">市全体の${parts.join('・')}がこの区域にいます</p>`;
+}
+function ageShowSetHtml() {
+  const st = D().settings, bits = Number(st.ageShow) || 0;
+  return `<h3 class="sub">区域をえらぶ画面に出す世代</h3>
+    <p class="hint">区域カードをもらう画面・留守宅カードをえらぶ画面に出します。いくつでもえらべます（なにもえらばないと出しません）。</p>
+    <div class="chips">${AGE_GROUPS.map(g => `<button type="button" class="chip" data-agesh="${g[0]}" aria-pressed="${!!(bits & g[0])}">${g[2]}</button>`).join('')}</div>
+    <p class="q" style="font-size:17px">表し方</p>
+    <div class="seg uiseg" role="group" aria-label="表し方">
+      <button type="button" data-agemode="0" aria-pressed="${Number(st.ageShowMode) !== 1}">市全体のうち、この区域にいる割合</button>
+      <button type="button" data-agemode="1" aria-pressed="${Number(st.ageShowMode) === 1}">この区域の人のうちの割合</button></div>
+    <p class="hint">例：「市全体の若い世代の2.1%がこの区域にいます」／「この区域：若い世代 24%」。区域の家の数と字の割合から出す目安です。</p>`;
+}
 /* ---------- 区域係：年齢データの画面 ---------- */
 function ageNoticeHtml() {
   if (!isAdmin()) return '';
@@ -7839,6 +7988,7 @@ function renderAgeAdmin() {
     <div class="row"><label class="btn primary">年齢データを更新する<input type="file" id="ageFile" hidden></label>
       ${prev ? `<button type="button" class="btn" data-agerestore>前のデータ（${esc(prev.asOf || '')}）にもどす</button>` : ''}</div>
     <p class="hint">市が公開している字ごとの集計だけを使います。ファイルそのものは保存せず、計算した割合だけを残します。更新は年1回で十分です。</p>
+    ${cur ? ageShowSetHtml() : ''}
     <div class="setrow"><span>区域と字の対応：<b>${done} / ${ts.length}区域</b>で決まっています<br>
       <small class="hint">${LIVE ? '区域の線を引く・直すと、数分でサーバーが自動で調べます（国土地理院の住所検索を使います。送るのは建物の位置だけです）。' : '試作版では自動で調べられません。「区域」の一覧の「字を直す」で手で決められます。'}
       おかしいときは「区域」の一覧の「字を直す」で直せます。</small></span></div>`;
@@ -7938,8 +8088,11 @@ function bindAgeAdmin() {
     if (file) onAgeFile(file);
   });
   v.addEventListener('click', e => {
-    const x = e.target.closest('[data-azaedit], [data-agerestore]');
+    const x = e.target.closest('[data-azaedit], [data-agerestore], [data-agesh], [data-agemode]');
     if (!x) return;
+    const st = D().settings;
+    if (x.dataset.agesh) { st.ageShow = (Number(st.ageShow) || 0) ^ Number(x.dataset.agesh); Store.save(); renderAll(); return; }
+    if (x.dataset.agemode) { st.ageShowMode = Number(x.dataset.agemode); Store.save(); renderAll(); return; }
     if (x.dataset.azaedit) openAzaEdit(x.dataset.azaedit); else restoreAge();
   });
 }
@@ -9233,7 +9386,12 @@ function bindStatic() {
     addCount = 0; delCount = 0; addMode = 'quick'; setMode('add'); updateAddBar();
     if (map.getZoom() < 17) toast('場所がわかるまで地図を拡大してから、タップしてください');
   };
-  $('#partUndo').onclick = () => { if (partDraw && partDraw.pts.length) { partDraw.pts.pop(); renderPartDraw(); } };
+  $('#partUndo').onclick = () => {
+    if (!partDraw || !partDraw.pts.length) return;
+    if (partDraw.tool === 'pen') partDraw.pts = []; else partDraw.pts.pop(); // なぞった囲みは、まるごと消す
+    renderPartDraw();
+  };
+  $$('#partBar [data-parttool]').forEach(b => b.onclick = () => setPartTool(b.dataset.parttool));
   $('#partDone').onclick = openPartAssign;
   $('#partCancel').onclick = endPartSplit;
   $$('#addBar [data-addmode]').forEach(b => b.onclick = () => {
@@ -9264,6 +9422,8 @@ function bindStatic() {
     barHidden = true; renderCardBar();
     toast('右下の「?」を押すと、また表示されます');
   });
+  $('#lgBiz').innerHTML = kindBadge('office'); // 印の見かたのアイコン（HTMLの中では作れないので、ここで入れる）
+  $('#lgLock').innerHTML = '集<b class="lk">' + LOCK_SVG + '</b>';
   $('#legendClose').onclick = () => { toggleLegend(false); $('#legendBtn').focus(); };
   $('#btnUi').onclick = openUiSheet;
   bindSheetSwipe();
