@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.15"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.16"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -1119,6 +1119,9 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
         <h2 class="sec">時間帯ごとの「会えた」割合（直近180日）</h2>
         <p class="hint">枠で囲んだ欄が、いちばん会えている時間帯です（10件以上の記録がある欄のみ）。</p>
         <div class="scroll"><table class="slots" id="adSlots"></table></div>
+        <h2 class="sec">区域ごとの会いやすい時間帯</h2>
+        <p class="hint" id="adMeetHint"></p>
+        <div class="scroll" id="adMeet"></div>
         </div>
         <div class="apane" data-apane="terr" hidden>
         <h2 class="sec">区域の一覧</h2>
@@ -1142,6 +1145,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
         <div id="adHard"></div>
         </div>
         <div class="apane" data-apane="set" hidden>
+        <div id="adAge"></div>
         <h2 class="sec">データ</h2>
         <div id="adDataSet"></div>
         <div id="adDummy"></div>
@@ -1476,7 +1480,7 @@ const DATA_VER = 2; // データの種類が増えたら上げる（端末が一
 const CACHE_KEYS = ['c2_meta', 'c2_houses', 'c2_visits']; // 端末の保存：3つに分けて、変わった分だけ書く
 const FAILED_KEY = 'kuiki_failed'; // 何度送っても受け付けられなかった変更（捨てずに取っておく）
 const metaSigOf = j => JSON.stringify([j.users || null, j.settings || null, j.currentUser || null]);
-const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'schedules', 'users', 's13'];
+const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'schedules', 'users', 's13', 'agedata'];
 const MAP_COLS = ['dnc', 'follows', 'released'];
 const RES_NAME = { m: 'met', a: 'away', r: 'refused' };
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -1646,6 +1650,7 @@ const Store = {
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
     d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60 }, d.settings || {});
     d.s13 = d.s13 || [];
+    d.agedata = d.agedata || [];
   },
   /* 控えを作り直す（訪問記録は件数が多いので、idだけ覚える） */
   buildFp() {
@@ -1862,6 +1867,7 @@ const Store = {
       // 区域係：S-13（紙から転記した記録）を持っていない保存なら、区域・予定などだけを読み直す
       const cu = (cache.state.users || []).find(u => u.id === cache.state.currentUser);
       if (cu && cu.role === 'admin' && !Array.isArray(cache.state.s13)) this.needMeta = true;
+      if (!Array.isArray(cache.state.agedata)) this.needMeta = true; // 年齢データを持っていない保存（この版より前）
       this.setServer({ seq: cache.seq, state: cache.state }); // すぐ表示して、あとで差分を取りに行く
       if (legacy) { this.markAll(); this.saveCacheSoon(); } // 新しい形で保存し直す
       return 'cache';
@@ -2253,7 +2259,7 @@ async function reloadMeta() {
   try {
     const r = await api('load', { part: 'meta' });
     const st = r.state || {}, d = D();
-    ['territories', 'requests', 'awayCards', 'returns', 'schedules', 's13'].forEach(c => { if (Array.isArray(st[c])) d[c] = st[c]; });
+    ['territories', 'requests', 'awayCards', 'returns', 'schedules', 's13', 'agedata'].forEach(c => { if (Array.isArray(st[c])) d[c] = st[c]; });
     MAP_COLS.forEach(c => { if (st[c] && typeof st[c] === 'object') d[c] = st[c]; });
     if (Array.isArray(st.users)) d.users = st.users;
     if (st.settings) d.settings = st.settings;
@@ -2598,6 +2604,7 @@ function slotOfVisit(v) {
   return s;
 }
 function buildIndex() {
+  AGE_CACHE = null; RATE_CACHE = null;
   IDX = new Map(); HBT = new Map(); SUM = new Map(); HID = new Map(); TID = new Map();
   for (const t of D().territories) TID.set(t.id, t);
   for (const h of D().houses) {
@@ -2614,6 +2621,7 @@ function buildIndex() {
 }
 /* その家（部屋）だけ、まとめを作り直す */
 function sumKey(k) {
+  RATE_CACHE = null;
   const a = IDX.get(k);
   if (!a || !a.length) { SUM.delete(k); IDX.delete(k); return; }
   a.sort((x, y) => (x.at < y.at ? 1 : -1)); // 新しい順
@@ -2761,6 +2769,11 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.16', items: [
+    ['会', '留守宅カードをえらぶ画面に「会いやすい順」ができ、カードごとに「会える見込み」が出るようになりました'],
+    ['齢', '区域係：市の年齢データ（CSV）を「設定・データ」から読み込めます。区域の字は自動で調べます'],
+    ['表', '区域係：「状況」に、区域ごとの会いやすい時間帯の表ができました']
+  ] },
   { v: '2026.10.15', items: [
     ['倍', 'マンションの名前・学校などの名前を地図に出す大きさを、設定のスライダーで調整できるようにしました'],
     ['受', '「自由に受け取ってよい」区域は、地図でえらべるようになりました。えらぶと、その場で受け取れます']
@@ -6399,28 +6412,30 @@ function openAwayPick() {
     const list = awaySuggestions(u.id, slots).map(x => {
       const items = (unmetIndex().get(x.t.id) || []).filter(i => x.keys.includes(i.k));
       const oldest = items.reduce((a, i) => (!a || i.first < a ? i.first : a), '');
-      return Object.assign(x, { longDays: oldest ? daysSince(oldest) : 0 });
+      return Object.assign(x, { longDays: oldest ? daysSince(oldest) : 0, chance: meetChance(x.t, x.slot).p });
     });
     const by = {
       near: (a, b) => (a.dist == null ? 1e12 : a.dist) - (b.dist == null ? 1e12 : b.dist),
       long: (a, b) => b.longDays - a.longDays,
       many: (a, b) => b.keys.length - a.keys.length,
-      now: (a, b) => (a.slot === cur ? 0 : 1) - (b.slot === cur ? 0 : 1) || b.keys.length - a.keys.length
+      now: (a, b) => (a.slot === cur ? 0 : 1) - (b.slot === cur ? 0 : 1) || b.keys.length - a.keys.length,
+      easy: (a, b) => b.chance - a.chance || b.keys.length - a.keys.length
     };
     list.sort(by[sort] || by.long);
     const full = activeCards().filter(c => c.by === u.id).length >= D().settings.awayMax;
     setSheet(headHtml(null, '留守宅カードをえらぶ', reg ? `行ける時間：${slots.map(slotShort).join('、')}` : `今の時間帯：${slotShort(cur)}`) + `
       <div class="seg uiseg" role="group" aria-label="並び順">
-        ${[['near', '近い順'], ['long', '長く会えていない順'], ['many', '家が多い順'], ['now', '今の時間帯']].map(([v, l]) =>
+        ${[['easy', '会いやすい順'], ['near', '近い順'], ['long', '長く会えていない順'], ['many', '家が多い順'], ['now', '今の時間帯']].map(([v, l]) =>
           `<button type="button" data-asort="${v}" aria-pressed="${sort === v}">${l}</button>`).join('')}
       </div>
       <div class="row"><button class="btn small" id="apSlots">${reg ? '行ける時間を変える' : '行ける時間を登録する'}</button></div>
       ${list.length ? list.slice(0, 20).map(x => `<article class="ritem k-away"><div>
           <p class="rt"><span class="stamp xs${noCls(x.t.no)}">${esc(x.t.no)}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}</p>
+          <p class="metline">会える見込み 約${pctTxt(x.chance)}<small class="muted">（目安）</small></p>
           <p class="muted">まだ会えていない家 ${x.keys.length}軒${x.longDays ? `　いちばん長い家は${x.longDays}日会えていない` : ''}${x.dist != null ? `　ここから約${fmtDist(x.dist)}` : ''}${x.t.holder ? '　あなたの区域' : ''}</p>
         </div><button class="btn small primary" data-awaytake2="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`).join('')
         : `<div class="empty">今、合う留守宅カードはありません。${reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`}
-      <p class="hint">受け取ると${D().settings.awayDays}日間使えます。返却はいりません。</p>
+      <p class="hint">受け取ると${D().settings.awayDays}日間使えます。返却はいりません。<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>
       <button class="btn block" data-close>もどる</button>`);
     const S = $('#sheet');
     $$('[data-asort]', S).forEach(b => b.onclick = () => { lsSet(key, b.dataset.asort); paint(); });
@@ -7535,8 +7550,317 @@ function renderDevices() {
 }
 
 /* ---------- 係の画面 ---------- */
+/* =========================================================
+   年齢データ（字ごとの年齢の割合）と、区域ごとの「会いやすい時間帯」
+   ・市のオープンデータのCSVを、区域係が「年齢データを更新する」から読み込む。
+     計算はこの端末の中で行い、サーバーに保存するのは字ごとの割合（集計値）だけ
+   ・区域と字の対応は、サーバーが国土地理院の住所検索で自動で調べる（t.aza）。
+     区域係は手で直せる（t.azaManual）。「もう一度調べる」は t.azaRedo
+   ・会える見込み：年代ごとの在宅しやすさ（目安の値）× 字の年齢構成 を最初の予想にし、
+     その区域・時間帯の実際の記録（直近1年）がたまるほど、実際の割合に近づける
+   ========================================================= */
+const AGE_PAGE = 'https://www.city.tomigusuku.lg.jp/soshiki/1/1005/gyomuannai/12/3/3/771.html';
+const AGE_STALE_DAYS = 400; // これより古いデータは「更新してください」と出す
+const PRIOR_K = 3;          // 予想を「記録3件分」として混ぜる
+// 年代ごとの在宅しやすさの目安 [20〜39歳, 40〜64歳, 65歳以上]（実際の記録がたまると影響は小さくなる）
+const HOME_W = {
+  '平日・朝': [.30, .35, .80], '平日・昼': [.25, .30, .75], '平日・午後': [.30, .35, .80],
+  '平日・夕方': [.50, .55, .70], '平日・夜': [.60, .60, .50],
+  '土日・朝': [.40, .55, .75], '土日・昼': [.50, .55, .70], '土日・午後': [.55, .55, .70],
+  '土日・夕方': [.55, .60, .65], '土日・夜': [.55, .55, .45]
+};
+const DAY_SLOTS = ['平日・朝', '平日・昼', '平日・午後'];
+/* 字の名前をそろえる（「字高安」「高安」、「宜保１丁目」「宜保一丁目」を同じにする）。サーバーと同じ決まり */
+const kanjiNum = k => {
+  const d = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+  if (!k.includes('十')) return String(d[k] || k);
+  const [a, b] = k.split('十');
+  return String((a ? d[a] : 1) * 10 + (b ? d[b] : 0));
+};
+function azaKey(s) {
+  let x = String(s || '').normalize('NFKC').replace(/\s+/g, '');
+  x = x.replace(/^沖縄県/, '').replace(/^豊見城市/, '').replace(/^大字/, '').replace(/^字/, '');
+  return x.replace(/([一二三四五六七八九十]+)丁目/, (m, k) => kanjiNum(k) + '丁目');
+}
+const azaShow = n => String(n || '').replace(/^字/, '');
+const ageDoc = id => (D().agedata || []).find(x => x && x.id === id) || null;
+let AGE_CACHE = null, RATE_CACHE = null;
+function ageMap() {
+  if (AGE_CACHE) return AGE_CACHE.map;
+  const cur = ageDoc('current');
+  if (!cur || !Array.isArray(cur.areas) || !cur.areas.length) { AGE_CACHE = { map: null }; return null; }
+  const map = new Map();
+  cur.areas.forEach(a => map.set(a.k, a));
+  if (cur.all) map.set('__all', cur.all);
+  AGE_CACHE = { map };
+  return map;
+}
+const terrAza = t => ((t && Array.isArray(t.azaManual) && t.azaManual.length) ? t.azaManual : (t && Array.isArray(t.aza) ? t.aza : []));
+/* 区域の年代の割合（字の割合で混ぜる）。字がわからないときは市全体 */
+function terrMix(t) {
+  const am = ageMap(); if (!am) return null;
+  let y = 0, m = 0, o = 0, w = 0;
+  terrAza(t).forEach(a => { const x = am.get(a.k); if (!x) return; y += x.y * a.r; m += x.m * a.r; o += x.o * a.r; w += a.r; });
+  if (w) return { y: y / w, m: m / w, o: o / w };
+  const all = am.get('__all');
+  return all ? { y: all.y, m: all.m, o: all.o, city: true } : null;
+}
+const mixIdx = (mx, slot) => { const w = HOME_W[slot], s = (mx.y + mx.m + mx.o) || 1; return (mx.y * w[0] + mx.m * w[1] + mx.o * w[2]) / s; };
+/* 区域×時間帯の実際の記録（直近1年）と、全体の会えた割合 */
+function rateStats() {
+  if (RATE_CACHE) return RATE_CACHE;
+  const now = Date.now(), per = new Map();
+  let n = 0, m = 0;
+  for (const v of D().visits) {
+    if (now - Date.parse(v.at) > 365 * DAY) continue;
+    const h = HID.get(v.houseId); if (!h || !h.terrId) continue;
+    const key = h.terrId + '|' + slotOfVisit(v);
+    const c = per.get(key) || { n: 0, m: 0 };
+    c.n++; if (v.result === 'met') c.m++;
+    per.set(key, c);
+    n++; if (v.result === 'met') m++;
+  }
+  const am = ageMap(), all = am && am.get('__all');
+  const meanIdx = all ? SLOTS.reduce((a, s) => a + mixIdx(all, s), 0) / SLOTS.length : 0.5;
+  RATE_CACHE = { per, R: n >= 30 ? m / n : 0.35, meanIdx };
+  return RATE_CACHE;
+}
+/* 会える見込み（0〜1）。p：見込み、n：その区域・時間帯の記録数 */
+function meetChance(t, slot) {
+  const st = rateStats(), mx = terrMix(t);
+  const prior = mx ? Math.min(0.95, Math.max(0.02, mixIdx(mx, slot) * st.R / st.meanIdx)) : st.R;
+  const c = st.per.get(t.id + '|' + slot) || { n: 0, m: 0 };
+  return { p: (c.m + prior * PRIOR_K) / (c.n + PRIOR_K), n: c.n };
+}
+const pctTxt = p => `${Math.round(p * 100)}%`;
+function azaText(t) {
+  const list = terrAza(t);
+  if (list.length) return list.slice().sort((a, b) => b.r - a.r).map(a => `${esc(azaShow(a.n))}${list.length > 1 ? ` ${Math.round(a.r * 100)}%` : ''}`).join('・') +
+    (t.azaManual && t.azaManual.length ? '（手で設定）' : '');
+  if (t.azaErr) return '<span class="tag-warn">調べられませんでした</span>';
+  return LIVE ? '<span class="muted">調べています（数分かかります）</span>' : '<span class="muted">未設定</span>';
+}
+
+/* ---------- CSVを読む ---------- */
+function parseCsvText(text) {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+      else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ',') { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell); rows.push(row); row = []; cell = '';
+    } else cell += ch;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+async function readAgeFile(file) {
+  if (file.size > 5 * 1024 * 1024) throw new Error('ファイルが大きすぎます（5MBまで）');
+  const buf = await file.arrayBuffer();
+  let text = new TextDecoder('utf-8').decode(buf);
+  if (text.includes('\uFFFD')) { // 文字化け → Shift_JIS（Excelで保存したCSV）として読み直す
+    try { text = new TextDecoder('shift_jis').decode(buf); } catch (e) { /* そのまま */ }
+  }
+  return parseAgeCsv(text.replace(/^\uFEFF/, ''), file.name || '');
+}
+const AGE_RE = /(\d+)\s*[-‐－～〜~]\s*(\d+)\s*歳|(\d+)\s*歳以上/;
+function parseAgeCsv(text, fname) {
+  const rows = parseCsvText(text).map(r => r.map(c => String(c).normalize('NFKC').trim()));
+  const isAgeHead = c => AGE_RE.test(c) && !/再掲|人口/.test(c);
+  const hi = rows.findIndex(r => r.filter(isAgeHead).length >= 3);
+  if (hi < 0) throw new Error('年齢（「0-4歳」など）の列が見つかりません');
+  const head = rows[hi];
+  const nameCol = head.findIndex(c => /地域名|町丁|字名|地区名|町名/.test(c));
+  if (nameCol < 0) throw new Error('「地域名」（字の名前）の列が見つかりません');
+  const dateCol = head.findIndex(c => /調査年月日|基準日|年月日/.test(c));
+  const hhCol = head.findIndex(c => /^世帯数/.test(c));
+  const cols = [];
+  head.forEach((c, i) => {
+    if (!isAgeHead(c)) return;
+    const m = c.match(AGE_RE), lo = Number(m[1] != null ? m[1] : m[3]);
+    cols.push({ i, lo, sex: /男/.test(c) ? 'm' : /女/.test(c) ? 'f' : 't' });
+  });
+  const hasSex = cols.some(a => a.sex !== 't');
+  const use = cols.filter(a => (hasSex ? a.sex !== 't' : true));
+  const num = v => { const x = Number(String(v || '').replace(/[,\s]/g, '')); return isFinite(x) ? x : 0; };
+  const r1 = x => Math.round(x * 1000) / 10; // ％（小数1けた）
+  let asOf = '', all = null;
+  const areas = [], seen = new Set();
+  rows.slice(hi + 1).forEach(r => {
+    const name = String(r[nameCol] || '').trim();
+    if (!name) return;
+    let tot = 0, y = 0, mi = 0, o = 0, o75 = 0, ch = 0;
+    use.forEach(a => {
+      const v = num(r[a.i]); tot += v;
+      if (a.lo < 15) ch += v; else if (a.lo >= 20 && a.lo < 40) y += v; else if (a.lo >= 40 && a.lo < 65) mi += v; else if (a.lo >= 65) o += v;
+      if (a.lo >= 75) o75 += v;
+    });
+    if (tot <= 0) return;
+    if (!asOf && dateCol >= 0 && r[dateCol]) asOf = String(r[dateCol]).replace(/\//g, '-').slice(0, 10);
+    const rec = { k: azaKey(name), n: name, pop: Math.round(tot * 1000) / 1000, c: r1(ch / tot), y: r1(y / tot), m: r1(mi / tot), o: r1(o / tot), o75: r1(o75 / tot) };
+    if (hhCol >= 0) rec.hh = num(r[hhCol]);
+    if (/^(全体|合計|総数|計|市計|総計)$/.test(name) || /市$/.test(name)) { all = rec; return; }
+    if (seen.has(rec.k)) return;
+    seen.add(rec.k); areas.push(rec);
+  });
+  if (areas.length < 3) throw new Error('字のデータが少なすぎます（3つ以上必要です）');
+  if (!asOf) { const m = String(fname).match(/(20\d{2})[-_]?(\d{2})[-_]?(\d{2})/); if (m) asOf = `${m[1]}-${m[2]}-${m[3]}`; }
+  if (!all) { // 全体の行がないときは、字を足して作る
+    const s = { y: 0, m: 0, o: 0, c: 0, o75: 0, pop: 0 };
+    areas.forEach(a => { ['y', 'm', 'o', 'c', 'o75'].forEach(k => { s[k] += a[k] * a.pop; }); s.pop += a.pop; });
+    all = { k: '__all', n: '全体', pop: s.pop };
+    ['y', 'm', 'o', 'c', 'o75'].forEach(k => { all[k] = Math.round(s[k] / s.pop * 10) / 10; });
+  }
+  all.k = '__all'; delete all.hh;
+  // 1世帯あたりの人数（市の平均を1とした比）
+  const popAll = areas.reduce((a, x) => a + x.pop, 0), hhAll = areas.reduce((a, x) => a + (x.hh || 0), 0);
+  areas.forEach(a => { if (a.hh && hhAll) a.hi = Math.round((a.pop / popAll) / (a.hh / hhAll) * 100) / 100; delete a.hh; });
+  return { asOf, areas, all, file: String(fname).slice(0, 80) };
+}
+const ageType = a => (a.o >= 27 ? '高齢型' : a.o <= 12 ? '子育て・現役型' : (a.y >= 30 && a.hi && a.hi < 0.95) ? '若い世代・少人数世帯型' : '標準型');
+
+/* ---------- 区域係：年齢データの画面 ---------- */
+function ageNoticeHtml() {
+  if (!isAdmin()) return '';
+  const cur = ageDoc('current');
+  if (!cur) return `<div class="notice info">年齢データがまだありません。「設定・データ」の「年齢データを更新する」から入れると、区域ごとの会いやすい時間帯がわかります。</div>`;
+  const base = cur.asOf || cur.savedAt;
+  if (base && daysSince(base) > AGE_STALE_DAYS) return `<div class="notice warn"><b>年齢データが1年以上前のものです（${esc(cur.asOf || '')}）。</b>「設定・データ」の「年齢データを更新する」から新しくしてください。</div>`;
+  return '';
+}
+function renderAgeAdmin() {
+  const box = $('#adAge'); if (!box) return;
+  const cur = ageDoc('current'), prev = ageDoc('prev');
+  const ts = D().territories.filter(t => !t.dummy && okPoly(t.polygon));
+  const done = ts.filter(t => terrAza(t).length).length;
+  const old = cur && (cur.asOf || cur.savedAt) && daysSince(cur.asOf || cur.savedAt) > AGE_STALE_DAYS;
+  box.innerHTML = `<h2 class="sec">年齢データ（字ごとの年齢の割合）</h2>
+    ${cur ? `<div class="setrow"><span>今のデータ：<b>${esc(cur.asOf || '日付不明')}</b>時点・${cur.areas.length}字<br>
+        <small class="hint">${cur.savedAt ? `${fmtDay(cur.savedAt)}に${esc(uname(cur.by))}さんが保存` : ''}</small></span></div>
+      ${old ? '<div class="notice warn">1年以上前のデータです。下の手順で新しくしてください。</div>' : ''}`
+      : '<div class="notice info">まだ年齢データがありません。下の手順で入れてください。</div>'}
+    <ol class="hsteps">
+      <li><span class="hnum">1</span><div><p>市のホームページで「字別年齢（5歳階級）別人口」のCSVをダウンロードします（豊見城市オープンデータ）。</p>
+        <a class="btn small" href="${AGE_PAGE}" target="_blank" rel="noopener">市のページを開く</a></div></li>
+      <li><span class="hnum">2</span><div><p>下の「年齢データを更新する」を押して、そのファイルをえらびます。</p></div></li>
+      <li><span class="hnum">3</span><div><p>出てきた内容を確かめて「保存する」を押します。あとは自動です。</p></div></li>
+    </ol>
+    <div class="row"><label class="btn primary">年齢データを更新する<input type="file" id="ageFile" hidden></label>
+      ${prev ? `<button type="button" class="btn" data-agerestore>前のデータ（${esc(prev.asOf || '')}）にもどす</button>` : ''}</div>
+    <p class="hint">市が公開している字ごとの集計だけを使います。ファイルそのものは保存せず、計算した割合だけを残します。更新は年1回で十分です。</p>
+    <div class="setrow"><span>区域と字の対応：<b>${done} / ${ts.length}区域</b>で決まっています<br>
+      <small class="hint">${LIVE ? '区域の線を引く・直すと、数分でサーバーが自動で調べます（国土地理院の住所検索を使います。送るのは建物の位置だけです）。' : '試作版では自動で調べられません。「区域」の一覧の「字を直す」で手で決められます。'}
+      おかしいときは「区域」の一覧の「字を直す」で直せます。</small></span></div>`;
+}
+async function onAgeFile(file) {
+  let res;
+  try { res = await readAgeFile(file); }
+  catch (e) {
+    infoSheet('このファイルは読めませんでした', `${esc(e.message || '形がちがいます')}<br>市のオープンデータの「字別年齢（5歳階級）別人口」のCSVをえらんでください。今のデータはそのまま使います。`);
+    return;
+  }
+  const list = res.areas.slice().sort((a, b) => b.o - a.o);
+  setSheet(headHtml(null, 'この内容で保存しますか', `${esc(res.asOf || '日付不明')}時点・${res.areas.length}字`) + `
+    <p class="hint">ファイル：${esc(res.file)}<br>市全体の高齢化率 ${res.all.o}%。高齢化率の高い順に並べています。</p>
+    <div class="scroll"><table class="slots narrow"><tr><th>字</th><th>65歳以上</th><th>20〜39歳</th><th>0〜14歳</th><th>タイプ</th></tr>
+      ${list.map(a => `<tr><th>${esc(azaShow(a.n))}</th><td>${a.o}%</td><td>${a.y}%</td><td>${a.c}%</td><td>${ageType(a)}</td></tr>`).join('')}</table></div>
+    ${res.asOf ? '' : '<div class="notice warn">データの日付がわかりませんでした。保存はできます。</div>'}
+    <button class="btn primary block" id="ageSave">保存する</button>
+    <button class="btn block" data-close>やめる</button>`);
+  $('#ageSave').onclick = () => {
+    closeSheet();
+    commit(`年齢データ（${res.asOf || '日付不明'}）を保存しました`, () => {
+      const cur = ageDoc('current');
+      const rest = (D().agedata || []).filter(x => x && x.id !== 'current' && x.id !== 'prev');
+      if (cur) rest.push(Object.assign({}, cur, { id: 'prev' }));
+      rest.push({ id: 'current', asOf: res.asOf, areas: res.areas, all: res.all, file: res.file, savedAt: new Date().toISOString(), by: me().id });
+      D().agedata = rest;
+    });
+  };
+}
+function restoreAge() {
+  const cur = ageDoc('current'), prev = ageDoc('prev');
+  if (!prev) return;
+  if (!confirm(`前の年齢データ（${prev.asOf || '日付不明'}）にもどします。よろしいですか？`)) return;
+  commit('前の年齢データにもどしました', () => {
+    const rest = (D().agedata || []).filter(x => x && x.id !== 'current' && x.id !== 'prev');
+    rest.push(Object.assign({}, prev, { id: 'current' }));
+    if (cur) rest.push(Object.assign({}, cur, { id: 'prev' }));
+    D().agedata = rest;
+  });
+}
+/* 区域の字を手で直す */
+function openAzaEdit(tid) {
+  const t = terrById(tid); if (!t) return;
+  const am = ageMap();
+  if (!am) { infoSheet('先に年齢データを入れてください', '「設定・データ」の「年齢データを更新する」から入れると、字をえらべるようになります。'); return; }
+  const names = [...am.values()].filter(a => a.k !== '__all').sort((a, b) => a.n.localeCompare(b.n, 'ja'));
+  const cur = new Set(terrAza(t).map(a => a.k));
+  setSheet(headHtml(t, 'この区域の字', esc(t.name)) + `
+    <p>自動で調べた結果：<b>${(t.aza || []).length ? (t.aza || []).map(a => `${esc(azaShow(a.n))} ${Math.round(a.r * 100)}%`).join('・') : (t.azaErr ? '調べられませんでした' : 'まだありません')}</b></p>
+    <p class="q">区域に入っている字をえらぶ</p>
+    <div id="azaList">${names.map(a => `<label class="check"><input type="checkbox" data-az="${esc(a.k)}"${cur.has(a.k) ? ' checked' : ''}>${esc(azaShow(a.n))}</label>`).join('')}</div>
+    <p class="hint">手でえらぶと、えらんだ字を同じ割合で混ぜます。</p>
+    <button class="btn primary block" id="azaSave">この字で決める</button>
+    ${t.azaManual && t.azaManual.length ? '<button class="btn block" id="azaAuto">自動で調べた結果にもどす</button>' : ''}
+    ${LIVE ? '<button class="btn block" id="azaRedo">もう一度、自動で調べる</button>' : ''}
+    <button class="btn block" data-close>やめる</button>`);
+  $('#azaSave').onclick = () => {
+    const ks = $$('#azaList input:checked').map(x => x.dataset.az);
+    if (!ks.length) { toast('字を1つ以上えらんでください'); return; }
+    closeSheet();
+    commit(`区域${t.no}の字を決めました`, () => {
+      t.azaManual = ks.map(k => ({ k, n: am.get(k).n, r: Math.round(1000 / ks.length) / 1000 }));
+    });
+  };
+  if ($('#azaAuto')) $('#azaAuto').onclick = () => { closeSheet(); commit('自動で調べた結果にもどしました', () => { delete t.azaManual; }); };
+  if ($('#azaRedo')) $('#azaRedo').onclick = () => {
+    closeSheet();
+    commit('もう一度調べます（数分かかります）', () => { t.azaRedo = new Date().toISOString(); });
+  };
+}
+/* 区域係「状況」：区域ごとの会いやすい時間帯 */
+function renderMeetAdmin() {
+  const box = $('#adMeet'); if (!box) return;
+  const cur = ageDoc('current');
+  const ts = D().territories.filter(t => !t.dummy && okPoly(t.polygon));
+  const rows = ts.map(t => {
+    const ch = {}; let n = 0;
+    SLOTS.forEach(s => { const c = meetChance(t, s); ch[s] = c.p; n += c.n; });
+    const day = DAY_SLOTS.reduce((a, s) => a + ch[s], 0) / DAY_SLOTS.length;
+    const best = SLOTS.slice().sort((a, b) => ch[b] - ch[a]).slice(0, 2);
+    return { t, day, best, ch, n };
+  }).sort((a, b) => b.day - a.day);
+  $('#adMeetHint').innerHTML = (cur ? `年齢データ（${esc(cur.asOf || '')}）と、直近1年の記録から出した目安です。` : '年齢データがまだないので、記録だけから出しています。') +
+    '上にある区域ほど、平日の昼間にも会いやすい区域です。平日の昼間に動ける人の区域カード・留守宅カードに向いています。記録が増えるほど、実際の結果に近づきます。';
+  box.innerHTML = rows.length ? `<table class="slots narrow"><tr><th>区域</th><th>字</th><th>平日の昼間<br><small>朝〜午後</small></th><th>いちばん会いやすい</th><th>記録<br><small>1年</small></th></tr>
+    ${rows.map(r => `<tr><th>${esc(r.t.no)}</th><td style="text-align:left">${azaText(r.t)}</td>
+      <td><b>${pctTxt(r.day)}</b><div class="bar"><i style="width:${Math.round(r.day * 100)}%"></i></div></td>
+      <td>${r.best.map(s => `${slotShort(s)} ${pctTxt(r.ch[s])}`).join('<br>')}</td><td>${r.n}件</td></tr>`).join('')}</table>`
+    : '<div class="empty">区域がありません。</div>';
+}
+function bindAgeAdmin() {
+  const v = $('#view-admin');
+  v.addEventListener('change', e => {
+    if (e.target.id !== 'ageFile') return;
+    const file = e.target.files[0]; e.target.value = '';
+    if (file) onAgeFile(file);
+  });
+  v.addEventListener('click', e => {
+    const x = e.target.closest('[data-azaedit], [data-agerestore]');
+    if (!x) return;
+    if (x.dataset.azaedit) openAzaEdit(x.dataset.azaedit); else restoreAge();
+  });
+}
+
 function renderDataSet() {
   renderDummy();
+  renderAgeAdmin();
   const st = D().settings;
   const row = (key, label, unit, d, hint) => `<div class="setrow"><span>${label}<br><small class="hint">${hint}</small></span><div class="stepper">
     <button type="button" data-kset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${st[key]}${unit}</output>
@@ -7556,8 +7880,10 @@ function renderAdmin() {
   setAdPane(adPane);
   renderDevices();
   renderInbox();
+  $('#adInbox').insertAdjacentHTML('afterbegin', ageNoticeHtml());
   renderDataSet();
   renderAwayAdmin();
+  renderMeetAdmin();
   const now = Date.now();
   const ts = D().territories.slice().sort(byNo);
   let targetsN = 0, met90 = 0;
@@ -7603,6 +7929,7 @@ function renderAdmin() {
         <span>家・部屋 ${s.n}</span><span>90日以内に訪問 ${s.visited}</span>
         <span>前回回り終えた日 ${t.completedAt ? fmtDay(t.completedAt) + (t.completedPct != null && t.completedPct < 100 ? `（${t.completedPct}%）` : '') : '記録なし'}</span>
         <span>最終記録 ${s.last ? fmtDate(s.last) : 'なし'}</span>
+        <span>字：${azaText(t)}</span>
         ${t.holder ? `<span class="${d > 120 ? 'tag-warn' : ''}">貸出 ${d}日${d > 120 ? '（4か月超）' : ''}</span>` : ''}
         ${helpersOf(t).length ? `<span>今日一緒に回る人：${helpersOf(t).map(h => esc(uname(h.uid)) + 'さん').join('、')}</span>` : ''}
       </div></div>
@@ -7611,6 +7938,7 @@ function renderAdmin() {
         <button class="btn small" data-open="${t.id}">地図</button>
         <button class="btn small" data-redraw="${t.id}">線を直す</button>
         <button class="btn small" data-rename="${t.id}">番号・名前</button>
+        <button class="btn small" data-azaedit="${t.id}">字を直す</button>
         <button class="btn small danger" data-delterr="${t.id}">削除</button>
         <label class="check"><input type="checkbox" data-free="${t.id}"${t.free ? ' checked' : ''}>自由に受け取ってよい</label>${!t.free && isFree(t) ? '<span class="muted">（返却から日がたったので、自由に受け取れます）</span>' : ''}
         ${t.holder && (userById(t.holder) || {}).group ? `<label class="check"><input type="checkbox" data-grp="${t.id}"${t.group ? ' checked' : ''}>${esc(userById(t.holder).group)}グループの区域にする</label>` : ''}
@@ -8807,6 +9135,7 @@ function bindStatic() {
     else if ((x = q('[data-fstamp]'))) stampFollow(x.dataset.key, x.dataset.fstamp, null, renderFollowList);
   });
   $('#adS13').onclick = () => openS13();
+  bindAgeAdmin();
 
   // 地図
   $('#terrJump').onchange = e => {
