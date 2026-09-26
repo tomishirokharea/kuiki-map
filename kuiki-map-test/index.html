@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.25"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.26"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -450,6 +450,27 @@ body.strong .pin.st-plain{border-width:4px}
 @keyframes spUp{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
 @keyframes spBar{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
 @media (prefers-reduced-motion:reduce){.sp-pin,.sp-hi,.sp-main,.sp-sub{animation:none}.sp-pin::after,.sp-bar i{animation:none}}
+/* はじめての読み込みの進み具合 */
+#splash.loading .sp-bar{display:none}
+.ldprog{margin:24px auto 0;width:min(340px,86vw);text-align:left}
+.ldsteps{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:15px;margin:0 0 10px;opacity:.95}
+.ldsteps span{padding:2px 8px;border-radius:99px;border:1.5px solid #ffffff66;opacity:.7}
+.ldsteps span.done{opacity:1;background:#ffffff26}
+.ldsteps span.done::before{content:'✓ '}
+.ldsteps span.now{opacity:1;background:#fff;color:var(--brand);font-weight:700;border-color:#fff}
+.ldsteps i{font-style:normal;opacity:.6}
+.ldbar{height:14px;border-radius:99px;background:#ffffff40;overflow:hidden}
+.ldbar i{display:block;height:100%;background:#fff;border-radius:99px;transition:width .6s ease}
+.ldpct{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:8px 0 0;font-size:17px}
+.ldpct b{font-size:30px;font-weight:700;line-height:1}
+.ldnote{font-size:15px;line-height:1.6;margin:12px 0 0;opacity:.92}
+.ldnote.warn{background:#ffffff26;border-radius:10px;padding:6px 10px;opacity:1}
+.ldprog.light{margin:14px 0 0;width:auto}
+.ldprog.light .ldsteps span{border-color:var(--line);opacity:.8}
+.ldprog.light .ldsteps span.done{background:var(--terr-soft);color:var(--terr)}
+.ldprog.light .ldsteps span.now{background:var(--brand);color:#fff;border-color:var(--brand)}
+.ldprog.light .ldbar{background:#E0E6E3}
+.ldprog.light .ldbar i{background:var(--terr)}
 /* ===== 区域カードの中のタブ ===== */
 .subtabs{display:flex;width:100%;margin:2px 0 12px}
 .subtabs button{flex:1;min-height:56px;font-size:17px;position:relative}
@@ -1277,12 +1298,13 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
   <h1 class="sp-main">さぁ、奉仕に行こう！</h1>
   <p class="sp-sub" id="spSub"></p>
   <div class="sp-bar"><i></i></div>
+  <div class="ldprog" id="spProg" hidden></div>
 </div></div>
 <div id="news" hidden></div>
 <div id="s13View" hidden></div>
 <div id="printArea" class="pdoc"></div>
 <div id="joinScreen" hidden></div>
-<div id="blocker" hidden><div class="blockbox" role="alert"><h2 id="blockTitle"></h2><p id="blockMsg"></p><p class="muted" id="blockDetail" hidden></p><button type="button" class="btn primary block" id="blockRetry" hidden>もう一度読み込む</button></div></div>
+<div id="blocker" hidden><div class="blockbox" role="alert"><h2 id="blockTitle"></h2><p id="blockMsg"></p><div class="ldprog light" id="blockProg" hidden></div><p class="muted" id="blockDetail" hidden></p><button type="button" class="btn primary block" id="blockRetry" hidden>もう一度読み込む</button></div></div>
 
 <script>
 'use strict';
@@ -1995,10 +2017,11 @@ const Store = {
       if (legacy) { this.markAll(); this.saveCacheSoon(); } // 新しい形で保存し直す
       return 'cache';
     }
-    let pct = 0;
+    let last = { pct: 0, stage: 'meta', eta: null };
     const j = await loadAll(
-      p => { pct = p; showBlocking('読み込んでいます…', `初めて開くときは少し時間がかかります（${p}%）`, true); },
-      n => showBlocking('読み込んでいます…', `通信が混み合っています。もう一度ためしています（${n}回目・${pct}%）`, true));
+      p => { last = p; showLoadProgress(p, 0); },
+      n => showLoadProgress(last, n));
+    await new Promise(r => setTimeout(r, 60)); // 「仕上げ」の表示を先に出してから、重い処理をする
     this.setServer(j);
     this.markAll();
     this.saveCacheSoon();
@@ -2355,13 +2378,21 @@ async function apiRetry(action, extra, onRetry, valid) {
     }
   }
 }
+/* 全部を読み込む。onProgress には { pct, stage, eta（残りの秒・わからないときは null） } をわたす
+   段階：meta（区域など）→ houses（家）→ visits（訪問の記録）→ finish（仕上げ：スマホの中で整える） */
 async function loadAll(onProgress, onRetry) {
+  const prog = o => { if (onProgress) onProgress(o); };
+  prog({ pct: 1, stage: 'meta', eta: null });
   const meta = await apiRetry('load', { part: 'meta' }, onRetry, j => !!(j && j.state && Array.isArray(j.state.territories)));
   const st = meta.state;
   st.houses = [];
   const vis = [];
-  const total = Math.max(1, (meta.counts ? meta.counts.houses + meta.counts.visits : 0));
+  const cnt = meta.counts || { houses: 0, visits: 0 };
+  const total = Math.max(1, cnt.houses + cnt.visits);
+  const finishSec = 2 + total / 60000; // 仕上げ（スマホの中で整える）にかかるおおよその秒数
+  const t0 = Date.now();
   let done = 0;
+  prog({ pct: 4, stage: 'houses', eta: null });
   for (const part of ['houses', 'visits']) {
     let off = 0;
     while (off !== null) {
@@ -2370,9 +2401,14 @@ async function loadAll(onProgress, onRetry) {
       else r.rows.forEach(a => vis.push(a));
       done += r.rows.length;
       off = r.next;
-      if (onProgress) onProgress(Math.min(99, Math.round(done / total * 100)));
+      // 残りの時間：ここまでの速さから計算（はじめの1回は、まだ当てにならないので出さない）
+      const el = (Date.now() - t0) / 1000, calls = Math.ceil(done / 5000);
+      const eta = done > 0 && el > 1.5 && calls >= 2 ? Math.round((total - done) * el / done + finishSec) : null;
+      const stage = part === 'houses' && off !== null ? 'houses' : (part === 'houses' && cnt.visits ? 'visits' : part);
+      prog({ pct: Math.min(95, 4 + Math.round(done / total * 91)), stage, eta });
     }
   }
+  prog({ pct: 96, stage: 'finish', eta: Math.round(finishSec) });
   st.visitsC = vis;
   return { mode: 'full', seq: meta.seq, state: st };
 }
@@ -2383,7 +2419,7 @@ async function reloadAll(delay) {
   try {
     // 全員が同時に3万件を読み直すとサーバーが混むので、0〜15秒ずらす
     if (delay) { updateSyncBadge('最新の情報を用意しています…'); await wait(Math.random() * 15000); }
-    const j = await loadAll(p => updateSyncBadge(`読み込み中 ${p}%`));
+    const j = await loadAll(p => updateSyncBadge(`読み込み中 ${p.pct}%`));
     Store.needFull = false; Store.needMeta = false;
     Store.inbox = [j];
     applyInbox();
@@ -2658,10 +2694,38 @@ function openSyncSheet() {
     Store.needFull = true; reloadAll(false).catch(() => {});
   };
 }
+
+/* ---------- はじめての読み込みの進み具合（あいさつの画面と、読み込み中の画面に出す） ---------- */
+const LD_STAGES = [['meta', '区域'], ['houses', '家'], ['visits', '訪問の記録'], ['finish', '仕上げ']];
+function fmtEta(sec) {
+  if (sec == null) return '残りの時間を計算しています…';
+  if (sec < 10) return 'まもなく終わります';
+  if (sec < 60) return `あと約${Math.ceil(sec / 10) * 10}秒`;
+  const m = Math.floor(sec / 60), r = Math.round((sec % 60) / 10) * 10;
+  return `あと約${m}分${r ? r + '秒' : ''}`;
+}
+function showLoadProgress(p, retry) {
+  const si = Math.max(0, LD_STAGES.findIndex(x => x[0] === p.stage));
+  const html = `<div class="ldsteps" aria-hidden="true">${LD_STAGES.map((x, i) =>
+      `<span class="${i < si ? 'done' : i === si ? 'now' : ''}">${x[1]}</span>`).join('<i>›</i>')}</div>
+    <div class="ldbar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="読み込みの進み具合"><i style="width:${p.pct}%"></i></div>
+    <p class="ldpct"><b>${p.pct}%</b><span>${p.stage === 'finish' ? 'スマホの中でデータを整えています' : fmtEta(p.eta)}</span></p>
+    ${retry ? `<p class="ldnote warn">通信が混み合っています。自動でもう一度ためしています（${retry}回目）</p>` : ''}
+    <p class="ldnote">初めて開くときだけ、時間がかかります。次からはすぐに開きます。画面を閉じずに、このままお待ちください。</p>`;
+  const sp = $('#splash');
+  if (sp && !sp.hidden) {
+    sp.classList.add('loading');
+    const b = $('#spProg'); b.innerHTML = html; b.hidden = false;
+  }
+  showBlocking('読み込んでいます…', '', true);
+  const bp = $('#blockProg'); bp.innerHTML = html; bp.hidden = false;
+}
 function showBlocking(title, msg, keepSplash) {
   if (!keepSplash) hideSplash(true); // 読み込み中は、あいさつの画面をそのまま出しておく
   $('#blockTitle').textContent = title;
   $('#blockMsg').textContent = msg;
+  $('#blockMsg').hidden = !msg;
+  if (msg && $('#blockProg')) $('#blockProg').hidden = true; // ほかの知らせのときは、進み具合を消す
   $('#blocker').hidden = false;
 }
 function hideBlocking() { $('#blocker').hidden = true; }
@@ -2961,6 +3025,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.26', items: [
+    ['進', '初めて開くときの読み込みで、バーと％、残りの時間が出るようになりました']
+  ] },
   { v: '2026.10.22', items: [
     ['速', '記録が何十万件あっても、区域や家の編集がすぐ終わるようにしました']
   ] },
