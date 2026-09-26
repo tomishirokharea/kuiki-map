@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.24"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.25"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -2335,10 +2335,20 @@ function expandHouse(a) {
     ul: a[13] ? (() => { try { return JSON.parse(a[13]); } catch (e) { return undefined; } })() : undefined
   };
 }
-async function apiRetry(action, extra, onRetry) {
+/* valid：返事の形を確かめる（まちがった形の返事が来たときも、送り直す） */
+async function apiRetry(action, extra, onRetry, valid) {
   const waits = [2000, 5000, 10000];
   for (let i = 0; ; i++) {
-    try { return await api(action, extra, { timeout: 120000 }); } catch (e) {
+    try {
+      const j = await api(action, extra, { timeout: 120000 });
+      if (valid && !valid(j)) {
+        const what = action + (extra && extra.part ? `:${extra.part}${extra.offset ? '@' + extra.offset : ''}` : '');
+        const e = Object.assign(new Error('badreply'), { code: 'badreply', retry: true,
+          sample: `${what}・返事の中身：${Object.keys(j || {}).join(',')}${j && j.mode ? '・mode=' + j.mode : ''}${j && j.app ? '・GETとして届いた' : ''}` });
+        noteError(action, e); throw e;
+      }
+      return j;
+    } catch (e) {
       if (!e.retry || i >= waits.length) throw e;
       if (onRetry) onRetry(i + 1, e);
       await wait(waits[i] + Math.random() * 1500); // みんなが同時にやり直さないよう、少しずらす
@@ -2346,7 +2356,7 @@ async function apiRetry(action, extra, onRetry) {
   }
 }
 async function loadAll(onProgress, onRetry) {
-  const meta = await apiRetry('load', { part: 'meta' }, onRetry);
+  const meta = await apiRetry('load', { part: 'meta' }, onRetry, j => !!(j && j.state && Array.isArray(j.state.territories)));
   const st = meta.state;
   st.houses = [];
   const vis = [];
@@ -2355,7 +2365,7 @@ async function loadAll(onProgress, onRetry) {
   for (const part of ['houses', 'visits']) {
     let off = 0;
     while (off !== null) {
-      const r = await apiRetry('load', { part, offset: off }, onRetry);
+      const r = await apiRetry('load', { part, offset: off }, onRetry, j => !!(j && Array.isArray(j.rows)));
       if (part === 'houses') r.rows.forEach(a => st.houses.push(expandHouse(a)));
       else r.rows.forEach(a => vis.push(a));
       done += r.rows.length;
@@ -2659,7 +2669,8 @@ const ERR_TEXT = {
   timeout: 'サーバーの返事が遅く、時間切れになりました。',
   network: 'サーバーにつながりませんでした。',
   nonjson: 'サーバーが混み合っていて、正しい返事が来ませんでした。',
-  server: 'サーバーの中でエラーが起きました。'
+  server: 'サーバーの中でエラーが起きました。',
+  badreply: 'サーバーから、思っていたのとちがう形の返事が来ました。'
 };
 function showLoadError(e) {
   showBlocking('読み込めませんでした', (ERR_TEXT[e && e.code] || '通信がうまくいきませんでした。') + '少し時間をおいて「もう一度読み込む」を押してください。');
