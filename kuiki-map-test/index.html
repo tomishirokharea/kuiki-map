@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.22"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.24"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -1585,9 +1585,18 @@ const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'r
 const MAP_COLS = ['dnc', 'follows', 'released'];
 const RES_NAME = { m: 'met', a: 'away', r: 'refused' };
 const clone = o => JSON.parse(JSON.stringify(o));
-const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
-const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
-const lsDel = k => { try { localStorage.removeItem(k); } catch (e) { /* 何もしない */ } };
+/* 保存場所の名札：テスト用のページ（config.js に ns: 'test' があるか、URLに「test」が入っている）は、
+   本番とは別の場所に保存する。同じ github.io の中では、本番とテストの保存場所がまざってしまうため
+   （まざると、本番の登録や、まだ送っていない記録が、テスト用のサーバーに送られてしまう） */
+const NS = (function () {
+  const c = window.KUIKI_CONFIG && window.KUIKI_CONFIG.ns;
+  if (typeof c === 'string' && c.trim()) return c.replace(/[^\w-]/g, '').slice(0, 20);
+  return /test/i.test(location.pathname) ? 'test' : '';
+})();
+const nsKey = k => (NS ? NS + '::' + k : k);
+const lsGet = k => { try { return localStorage.getItem(nsKey(k)); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(nsKey(k), v); return true; } catch (e) { return false; } };
+const lsDel = k => { try { localStorage.removeItem(nsKey(k)); } catch (e) { /* 何もしない */ } };
 
 /* 自分が詳細を見られる範囲（担当している区域・受け持っている再訪問） */
 function permSig() {
@@ -1658,7 +1667,7 @@ const IDB = {
     if (this.db) return Promise.resolve(this.db);
     return new Promise((res, rej) => {
       if (!window.indexedDB) { rej(new Error('no indexedDB')); return; }
-      const r = indexedDB.open('kuiki-map', 1);
+      const r = indexedDB.open(NS ? 'kuiki-map-' + NS : 'kuiki-map', 1);
       r.onupgradeneeded = () => r.result.createObjectStore('kv');
       r.onsuccess = () => { this.db = r.result; res(this.db); };
       r.onerror = () => rej(r.error);
@@ -2291,7 +2300,12 @@ async function api(action, extra, opt) {
     noteError(action, e); throw e;
   } finally { clearTimeout(timer); }
   if (!res.ok) {
-    const e = Object.assign(new Error('http' + res.status), { code: 'http' + res.status, retry: res.status >= 429 });
+    // 404：サーバーの処理は終わっているのに、Googleの受け渡し先から返事を受け取れなかったことがある → 送り直す
+    let where = '';
+    try { const u = new URL(res.url); where = u.host + u.pathname.replace(/\/macros\/s\/[^/]+/, '/macros/s/…'); } catch (x) { /* 何もしない */ }
+    const what = action + (extra && extra.part ? `:${extra.part}${extra.offset ? '@' + extra.offset : ''}` : '');
+    const e = Object.assign(new Error('http' + res.status), { code: 'http' + res.status, retry: res.status >= 429 || res.status === 404,
+      sample: `${what}・${where}${res.redirected ? '（転送あり）' : ''}・${String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)}` });
     noteError(action, e); throw e;
   }
   let j;
@@ -2650,7 +2664,10 @@ const ERR_TEXT = {
 function showLoadError(e) {
   showBlocking('読み込めませんでした', (ERR_TEXT[e && e.code] || '通信がうまくいきませんでした。') + '少し時間をおいて「もう一度読み込む」を押してください。');
   const d = $('#blockDetail');
-  d.textContent = `続くときは、区域係にこの番号を伝えてください：${(e && (e.code || e.message)) || 'unknown'}` + (e && e.sample ? `（${e.sample}）` : '');
+  d.textContent = `続くときは、区域係にこの番号を伝えてください：${(e && (e.code || e.message)) || 'unknown'}` + (e && e.sample ? `（${e.sample}）` : '') +
+    `\n［${API_URL ? API_URL.slice(-12) : 'URLなし'}・${APP_VERSION}］`;
+  d.style.whiteSpace = 'pre-line';
+  if (NS) d.textContent += `・保存場所「${NS}」`;
   d.hidden = false;
   $('#blockRetry').hidden = false;
   $('#blockRetry').onclick = () => location.reload();
@@ -4621,7 +4638,12 @@ function purgeMemos() {
    withMine のときは、奉仕時間・自分の予定（本人だけの記録）も消す（「この端末から消す」のとき） */
 function clearAllMemos(withMine) {
   const pre = [MEMO_PREFIX, 'kuiki_pins_'].concat(withMine ? ['kuiki_my_'] : []);
-  try { Object.keys(localStorage).filter(x => pre.some(p => x.indexOf(p) === 0)).forEach(lsDel); } catch (e) { /* 何もしない */ }
+  try {
+    Object.keys(localStorage).forEach(x => {
+      const y = NS ? (x.indexOf(NS + '::') === 0 ? x.slice(NS.length + 2) : null) : (x.indexOf('::') < 0 ? x : null);
+      if (y && pre.some(p => y.indexOf(p) === 0)) localStorage.removeItem(x);
+    });
+  } catch (e) { /* 何もしない */ }
 }
 const memoShort = m => { const t = m.text.split('\n')[0]; return t.length > 40 || m.text.includes('\n') ? t.slice(0, 40) + '…' : t; };
 function openMemo(k, back) {
@@ -9953,7 +9975,7 @@ const TAB_ID = uid();
 function claimTab() {
   if (!LIVE || typeof BroadcastChannel !== 'function') return;
   let ch;
-  try { ch = new BroadcastChannel('kuiki-map'); } catch (e) { return; }
+  try { ch = new BroadcastChannel(NS ? 'kuiki-map-' + NS : 'kuiki-map'); } catch (e) { return; }
   ch.onmessage = e => { if (e.data && e.data.t === 'open' && e.data.id !== TAB_ID) yieldTab(); };
   ch.postMessage({ t: 'open', id: TAB_ID });
 }
@@ -10029,7 +10051,8 @@ async function init() {
   // 前回からの変更があれば先にお知らせを見せ、押したらあいさつ → ふだんの画面
   showNewsIfAny(() => { splashAt = Date.now(); hideSplash(); });
   if (LIVE) {
-    $('#modePill').hidden = true;
+    $('#modePill').hidden = !NS; // テスト用のページは「テスト版」と出す（本番とまちがえないように）
+    if (NS) { $('#modePill').textContent = 'テスト版'; $('#modePill').style.background = '#C2410C'; $('#modePill').style.color = '#fff'; document.title = '【テスト】' + document.title; }
     $('#whoSel').hidden = true; $('#whoLabel').hidden = true;
     $('#whoName').hidden = false; $('#whoName').textContent = `${me().name}さん`;
     $('#liveTools').hidden = false;
