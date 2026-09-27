@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.28"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.29"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -801,9 +801,13 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .s13tbl td.s13-cur{background:#E3F0FC}
 .s13tbl td small{color:var(--ink2);font-size:11px}
 #printArea{display:none}
+/* 印刷するのは、いつも「印刷用の紙面（#printArea）」だけ。画面（地図・係の画面など）は印刷しない。
+   以前は印刷のあいだだけ切りかえていたが、ブラウザが印刷のプレビューを作り直したときに
+   係の画面（地図と3万件の家）を印刷しようとして、固まることがあった */
 @media print{
-  body.printing > *:not(#printArea){display:none!important}
-  body.printing #printArea{display:block!important}
+  body > *:not(#printArea){display:none!important}
+  #printArea{display:block!important}
+  #printArea:empty::before{content:'印刷は、区域マップの各画面の「印刷」ボタンから行ってください。';display:block;padding:20mm;font-size:14pt}
   html,body{height:auto!important;background:#fff!important}
 }
 .pdoc{font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic",Meiryo,"Noto Sans CJK JP",sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -3078,6 +3082,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.29', items: [
+    ['直', '印刷のとき、すぐに係の画面が印刷されそうになったり、2回目の印刷で画面が止まったりすることがあったのを直しました']
+  ] },
   { v: '2026.10.28', items: [
     ['印', '区域係：「状況」から、紙の区域カード（S-12）を印刷できるようになりました。区域の線・家・拒否の家とまわりの建物が表に、集合住宅の部屋が裏に出ます']
   ] },
@@ -9565,17 +9572,25 @@ function handoffHtml() {
 /* =========================================================
    印刷（PDFとしても保存できる）
    ========================================================= */
+/* ・印刷用の紙面は、印刷が終わってもそのまま残す（次に印刷するときに入れかえる）。
+     印刷のプレビューが作り直されても、同じ紙面が出るように
+   ・地図などの画像は、読み終えてから印刷の画面を出す（最大8秒待つ）
+   ・続けて押されたときは、いちばん新しい紙面だけを印刷する（印刷の画面が2つ出ないように） */
+let printSeq = 0;
 function printDoc(html, landscape, pageCss) {
+  const my = ++printSeq;
   const box = $('#printArea');
   box.innerHTML = html;
   let st = $('#printPageStyle');
   if (!st) { st = document.createElement('style'); st.id = 'printPageStyle'; document.head.appendChild(st); }
   st.textContent = pageCss || `@page{size:A4 ${landscape ? 'landscape' : 'portrait'};margin:${landscape ? '8mm 9mm' : '9mm 10mm 7mm'}}`;
-  document.body.classList.add('printing');
-  const done = () => { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
-  window.addEventListener('afterprint', done);
+  document.body.classList.add('printing'); // 以前の形との互換のため（印刷の切りかえには使っていない）
   toast('印刷の画面で「PDFとして保存」をえらぶと、PDFにできます');
-  setTimeout(() => window.print(), 300);
+  const srcs = [...new Set($$('image, img', box).map(x => x.getAttribute('href') || x.getAttribute('src')).filter(Boolean))];
+  const ready = Promise.all(srcs.map(u => { const im = new Image(); im.src = u; return (im.decode ? im.decode() : Promise.resolve()).catch(() => {}); }));
+  Promise.race([ready, wait(8000)])
+    .then(() => wait(250))
+    .then(() => { if (my === printSeq) window.print(); });
 }
 
 /* =========================================================
@@ -9961,7 +9976,13 @@ function s12SheetsHtml(fronts, backs, S, sz) {
   }
   return out;
 }
+let s12Busy = false;
 async function printS12(ids, sz, back) {
+  if (s12Busy) return;
+  s12Busy = true;
+  try { await printS12Run(ids, sz, back); } finally { s12Busy = false; }
+}
+async function printS12Run(ids, sz, back) {
   const S = S12_SIZE[sz];
   const byT = new Map();
   D().houses.forEach(h => { if (!h.terrId) return; let a = byT.get(h.terrId); if (!a) byT.set(h.terrId, a = []); a.push(h); });
