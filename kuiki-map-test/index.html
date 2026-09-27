@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.29"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.30"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -475,6 +475,7 @@ body.strong .pin.st-plain{border-width:4px}
 .s12pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:0 14px;margin:6px 0 14px}
 .s12pick .check{min-height:46px;font-size:16px}
 .s12pick small{font-size:13px}
+.s12parts .btn+.btn{margin-top:8px}
 .s12measure{position:absolute;left:-99999px;top:0;visibility:hidden}
 .s12measure.a6{width:148.5mm}.s12measure.a5{width:210mm}
 .s12sheet{position:relative;display:grid;overflow:hidden;background:#fff;page-break-after:always;break-after:page}
@@ -801,6 +802,9 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .s13tbl td.s13-cur{background:#E3F0FC}
 .s13tbl td small{color:var(--ink2);font-size:11px}
 #printArea{display:none}
+#printReady{position:fixed;inset:0;z-index:5100;background:#0006;display:grid;place-items:center;padding:24px}
+#printReady[hidden]{display:none}
+#printReady .blockbox .btn+.btn{margin-top:10px}
 /* 印刷するのは、いつも「印刷用の紙面（#printArea）」だけ。画面（地図・係の画面など）は印刷しない。
    以前は印刷のあいだだけ切りかえていたが、ブラウザが印刷のプレビューを作り直したときに
    係の画面（地図と3万件の家）を印刷しようとして、固まることがあった */
@@ -3082,6 +3086,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.30', items: [
+    ['印', 'iPhone・iPadでは、準備ができたら「印刷する」ボタンを押して印刷の画面を出すようにしました（ブラウザに止められないように）'],
+    ['分', '区域係：スマホで区域カード（S-12）を印刷するときは、8区域ずつに分けて印刷するようにしました']
+  ] },
   { v: '2026.10.29', items: [
     ['直', '印刷のとき、すぐに係の画面が印刷されそうになったり、2回目の印刷で画面が止まったりすることがあったのを直しました']
   ] },
@@ -9576,7 +9584,11 @@ function handoffHtml() {
      印刷のプレビューが作り直されても、同じ紙面が出るように
    ・地図などの画像は、読み終えてから印刷の画面を出す（最大8秒待つ）
    ・続けて押されたときは、いちばん新しい紙面だけを印刷する（印刷の画面が2つ出ないように） */
+/* ・iPhone・iPad（Safari・Braveなど）とMacのSafariでは、準備が終わったら「印刷する」ボタンを出し、
+     押したその場で印刷の画面を出す。準備（地図の読み込み）のあとに自動で印刷の画面を出すと、
+     ブラウザが「勝手に印刷しようとしている」と判断して、止める確認を出すことがあるため */
 let printSeq = 0;
+const printNeedsTap = () => isIOS() || /^((?!chrome|chromium|crios|fxios|edg|android).)*safari/i.test(navigator.userAgent);
 function printDoc(html, landscape, pageCss) {
   const my = ++printSeq;
   const box = $('#printArea');
@@ -9585,12 +9597,30 @@ function printDoc(html, landscape, pageCss) {
   if (!st) { st = document.createElement('style'); st.id = 'printPageStyle'; document.head.appendChild(st); }
   st.textContent = pageCss || `@page{size:A4 ${landscape ? 'landscape' : 'portrait'};margin:${landscape ? '8mm 9mm' : '9mm 10mm 7mm'}}`;
   document.body.classList.add('printing'); // 以前の形との互換のため（印刷の切りかえには使っていない）
-  toast('印刷の画面で「PDFとして保存」をえらぶと、PDFにできます');
   const srcs = [...new Set($$('image, img', box).map(x => x.getAttribute('href') || x.getAttribute('src')).filter(Boolean))];
   const ready = Promise.all(srcs.map(u => { const im = new Image(); im.src = u; return (im.decode ? im.decode() : Promise.resolve()).catch(() => {}); }));
-  Promise.race([ready, wait(8000)])
-    .then(() => wait(250))
-    .then(() => { if (my === printSeq) window.print(); });
+  const loaded = Promise.race([ready, wait(8000)]).then(() => wait(250));
+  if (printNeedsTap()) {
+    showPrintReady(false);
+    loaded.then(() => { if (my === printSeq) showPrintReady(true); });
+    return;
+  }
+  toast('印刷の画面で「PDFとして保存」をえらぶと、PDFにできます');
+  loaded.then(() => { if (my === printSeq) window.print(); });
+}
+/* 「印刷の準備ができました」の画面（この画面は印刷されない） */
+function showPrintReady(ok) {
+  let el = $('#printReady');
+  if (!el) { el = document.createElement('div'); el.id = 'printReady'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="blockbox" role="dialog" aria-modal="true" aria-labelledby="prTitle">
+      <h2 id="prTitle">${ok ? '印刷の準備ができました' : '印刷の準備をしています…'}</h2>
+      <p>${ok ? '「印刷する」を押すと、印刷の画面が出ます。' : '地図の画像を読み込んでいます。少しお待ちください。'}</p>
+      <button type="button" class="btn primary block" id="prGo"${ok ? '' : ' disabled'}>印刷する</button>
+      <button type="button" class="btn block" id="prNo">やめる</button></div>`;
+  el.hidden = false;
+  $('#prNo').onclick = () => { printSeq++; el.hidden = true; };
+  // 押したその場で呼ぶ（あとで呼ぶと、ブラウザに止められることがある）
+  if (ok) $('#prGo').onclick = () => { el.hidden = true; window.print(); };
 }
 
 /* =========================================================
@@ -9772,6 +9802,8 @@ const S12_SIZE = {
 const S12_KCH = { office: '社', shop: '店', biz: '事', factory: '工', school: '学', gov: '役', police: '警', fire: '消' };
 const S12_TILES = new Map(); // 地図の画像（一度受け取ったものは、この画面を開いているあいだ使い回す）
 let s12Opt = { size: 'a6', back: true, sel: null };
+const S12_MOBILE_MAX = 8;   // スマホで一度に印刷する区域の数
+const s12Done = new Set();  // スマホで、分けて印刷し終えた組（この画面を開いているあいだ）
 
 /* 緯度・経度 → 地図の画素（ズーム z のときの、世界全体での位置） */
 function s12Px(lat, lng, z) {
@@ -10030,15 +10062,30 @@ function openS12() {
     if (h.type === 'apt') c.a++; else c.h++;
     cnt.set(h.terrId, c);
   });
-  const nSel = () => terrs.filter(t => s12Opt.sel.has(t.id)).length;
-  const goText = () => {
-    const n = nSel(), S = S12_SIZE[s12Opt.size];
-    return `印刷する（${n}区域・A4で${Math.ceil(n / S.per) * (s12Opt.back ? 2 : 1)}ページ）`;
-  };
+  const selIds = () => terrs.filter(t => s12Opt.sel.has(t.id)).map(t => t.id);
+  const go = ids => printS12(ids, s12Opt.size, s12Opt.back)
+    .catch(e => { hideBlocking(); toast('印刷の準備がうまくいきませんでした：' + (e && e.message || e)); });
+  // スマホで一度に印刷するのは、S12_MOBILE_MAX 区域まで（地図の画像が多いと、ブラウザが止まることがあるため）
   const refresh = () => {
-    $('#s12Go').textContent = goText();
-    $('#s12Go').disabled = !nSel();
-    $('#s12Cnt').textContent = `${nSel()} / ${terrs.length}`;
+    const ids = selIds(), n = ids.length, S = S12_SIZE[s12Opt.size];
+    const pages = k => Math.ceil(k / S.per) * (s12Opt.back ? 2 : 1);
+    $('#s12Cnt').textContent = `${n} / ${terrs.length}`;
+    const box = $('#s12GoBox');
+    if (!n) { box.innerHTML = '<button type="button" class="btn primary block" disabled>印刷する区域を選んでください</button>'; return; }
+    if (isMobile() && n > S12_MOBILE_MAX) {
+      const parts = [];
+      for (let i = 0; i < n; i += S12_MOBILE_MAX) parts.push(ids.slice(i, i + S12_MOBILE_MAX));
+      box.innerHTML = `<p class="hint">スマホでは、一度に${S12_MOBILE_MAX}区域ずつ印刷します（多いと止まることがあるため）。上から順に押してください。<br>
+          まとめて印刷するときは、パソコンから印刷するか、ドライブに毎週保存されるPDFを使ってください。</p>
+        <div class="s12parts">${parts.map((p, i) => {
+          const done = s12Done.has(p.join(','));
+          return `<button type="button" class="btn block${done ? '' : ' primary'}" data-s12part="${i}">${done ? '✓ ' : ''}区域${esc(terrById(p[0]).no)}〜${esc(terrById(p[p.length - 1]).no)}を印刷（A4で${pages(p.length)}ページ）</button>`;
+        }).join('')}</div>`;
+      $$('[data-s12part]', box).forEach(b => b.onclick = () => { const p = parts[Number(b.dataset.s12part)]; s12Done.add(p.join(',')); go(p); });
+    } else {
+      box.innerHTML = `<button type="button" class="btn primary block" id="s12Go">印刷する（${n}区域・A4で${pages(n)}ページ）</button>`;
+      $('#s12Go').onclick = () => go(ids);
+    }
   };
   const paint = () => {
     const S = S12_SIZE[s12Opt.size];
@@ -10055,7 +10102,7 @@ function openS12() {
         const c = cnt.get(t.id) || { h: 0, a: 0 };
         return `<label class="check"><input type="checkbox" data-s12t="${esc(t.id)}"${s12Opt.sel.has(t.id) ? ' checked' : ''}><span><b>${esc(t.no)}</b> ${esc(t.name || '')} <small class="muted">家${c.h}・集合住宅${c.a}</small></span></label>`;
       }).join('')}</div>
-      <button type="button" class="btn primary block" id="s12Go"></button>
+      <div id="s12GoBox"></div>
       <p class="hint">区域が多いと、地図の準備に1〜2分かかります。印刷の画面で「PDFとして保存」を選ぶと、PDFにもできます。パソコンからの印刷がおすすめです。</p>`);
     refresh();
     $$('#sheet [data-s12size]').forEach(b => b.onclick = () => { s12Opt.size = b.dataset.s12size; sheetKeep = true; paint(); });
@@ -10063,8 +10110,6 @@ function openS12() {
     $$('#sheet [data-s12t]').forEach(x => x.onchange = () => { if (x.checked) s12Opt.sel.add(x.dataset.s12t); else s12Opt.sel.delete(x.dataset.s12t); refresh(); });
     $('#s12All').onclick = () => { terrs.forEach(t => s12Opt.sel.add(t.id)); $$('#sheet [data-s12t]').forEach(x => { x.checked = true; }); refresh(); };
     $('#s12None').onclick = () => { s12Opt.sel.clear(); $$('#sheet [data-s12t]').forEach(x => { x.checked = false; }); refresh(); };
-    $('#s12Go').onclick = () => printS12(terrs.filter(t => s12Opt.sel.has(t.id)).map(t => t.id), s12Opt.size, s12Opt.back)
-      .catch(e => { hideBlocking(); toast('印刷の準備がうまくいきませんでした：' + (e && e.message || e)); });
   };
   paint();
 }
