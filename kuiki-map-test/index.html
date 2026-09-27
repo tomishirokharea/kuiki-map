@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.30"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.02"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -476,6 +476,7 @@ body.strong .pin.st-plain{border-width:4px}
 .s12pick .check{min-height:46px;font-size:16px}
 .s12pick small{font-size:13px}
 .s12parts .btn+.btn{margin-top:8px}
+.loadlog{white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.5;background:var(--card,#f6f6f6);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:55vh;overflow:auto}
 .s12measure{position:absolute;left:-99999px;top:0;visibility:hidden}
 .s12measure.a6{width:148.5mm}.s12measure.a5{width:210mm}
 .s12sheet{position:relative;display:grid;overflow:hidden;background:#fff;page-break-after:always;break-after:page}
@@ -1330,7 +1331,8 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
         <div id="adDataSet"></div>
         <div id="adDummy"></div>
         <div class="setrow"><span>このスマホでの動作の速さ<br><small class="hint">今のデータのまま、よく使う処理の時間を測ります（データは変わりません）。数秒かかります</small></span>
-          <button type="button" class="btn small" id="adPerf">速さを測る</button></div>
+          <button type="button" class="btn small" id="adPerf">速さを測る</button>
+          <button type="button" class="btn small" id="adLoadLog">読み込みの記録</button></div>
         <div class="row">
           <button class="btn" id="adCsv">訪問記録をCSVで書き出す</button>
           <button class="btn danger" id="adReset">試作データに戻す</button>
@@ -2079,13 +2081,17 @@ const Store = {
       return 'cache';
     }
     let last = { pct: 0, stage: 'meta', eta: null };
+    loadLog = { t0: Date.now(), reqs: [], marks: [] };
     const j = await loadAll(
       p => { last = p; showLoadProgress(p, 0); },
-      n => showLoadProgress(last, n));
+      n => showLoadProgress(last, n),
+      { parallel: 6 });
     await new Promise(r => setTimeout(r, 60)); // 「仕上げ」の表示を先に出してから、重い処理をする
     this.setServer(j);
     this.markAll();
     this.saveCacheSoon();
+    loadMark('finish');
+    setTimeout(loadLogDone, 0); // 最初の画面を描いたあとに締める
     return 'server';
   }
 };
@@ -2366,6 +2372,7 @@ function noteError(action, e) {
 const wait = ms => new Promise(r => setTimeout(r, ms));
 async function api(action, extra, opt) {
   const o = opt || {};
+  const T = Date.now(), what = loadLog ? reqName(action, extra) : '';
   const ctl = typeof AbortController === 'function' ? new AbortController() : null;
   const timer = ctl ? setTimeout(() => ctl.abort(), o.timeout || 60000) : null;
   let res, text;
@@ -2381,6 +2388,7 @@ async function api(action, extra, opt) {
   } catch (err) {
     const code = err && err.name === 'AbortError' ? 'timeout' : 'network';
     const e = Object.assign(new Error(code), { code, retry: true });
+    logReq(what, T, code, 0, 0);
     noteError(action, e); throw e;
   } finally { clearTimeout(timer); }
   if (!res.ok) {
@@ -2390,13 +2398,16 @@ async function api(action, extra, opt) {
     const what = action + (extra && extra.part ? `:${extra.part}${extra.offset ? '@' + extra.offset : ''}` : '');
     const e = Object.assign(new Error('http' + res.status), { code: 'http' + res.status, retry: res.status >= 429 || res.status === 404,
       sample: `${what}・${where}${res.redirected ? '（転送あり）' : ''}・${String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)}` });
+    logReq(what, T, 'http' + res.status, (text || '').length, 0);
     noteError(action, e); throw e;
   }
   let j;
   try { j = JSON.parse(text); } catch (err) {
     const e = Object.assign(new Error('nonjson'), { code: 'nonjson', retry: true, sample: String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) });
+    logReq(what, T, 'nonjson：' + e.sample.slice(0, 60), text.length, 0);
     noteError(action, e); throw e;
   }
+  logReq(what, T, j.ok ? (j.snap ? 'ok（まとめ）' : 'ok') : j.error, text.length, Array.isArray(j.rows) ? j.rows.length : 0);
   if (!j.ok) {
     if (j.error === 'auth') authLost();
     const e = Object.assign(new Error(j.error || 'error'), { code: j.error, retry: j.error === 'server' || j.error === 'busy' });
@@ -2406,6 +2417,63 @@ async function api(action, extra, opt) {
   Store.syncAt = Date.now();
   lsSet(SYNC_KEY, String(Store.syncAt));
   return j;
+}
+/* ---------- はじめての読み込みの記録（遅いときに、どこで時間がかかったかを調べるため） ----------
+   ・通信1回ごとに「何を・いつ始めて・何秒かかって・大きさ・結果」を残す。住所や名前は残さない
+   ・終わったら、この端末の中だけに保存する（設定 → 区域係の画面「読み込みの記録」、または終わったときの知らせから見られる） */
+const LOADLOG_KEY = 'kuiki_load_log';
+let loadLog = null;
+function reqName(action, extra) {
+  const x = extra || {};
+  const names = { meta: '区域・設定など', houses: '家', visits: '訪問の記録', tv: '区域の記録' };
+  if (action === 'load' && x.part) return (names[x.part] || x.part) + (x.snap ? '（まとめた一覧）' : x.offset ? `（${x.offset}件目から）` : '');
+  return action;
+}
+function logReq(what, T, res, len, rows) {
+  if (!loadLog || !what) return;
+  loadLog.reqs.push({ what, s: (T - loadLog.t0) / 1000, sec: (Date.now() - T) / 1000, kb: Math.round((len || 0) / 1024), rows: rows || 0, res: String(res || '') });
+}
+function loadMark(name) { if (loadLog) loadLog.marks.push({ name, s: (Date.now() - loadLog.t0) / 1000 }); }
+function loadLogDone() {
+  if (!loadLog) return;
+  const L = loadLog; loadLog = null;
+  L.total = (Date.now() - L.t0) / 1000;
+  L.pageSec = Math.round(performance.now()) / 1000; // ページを開いてから使えるまで
+  L.at = new Date().toISOString();
+  L.ua = deviceLabel() + '・' + (navigator.userAgent.match(/(Edg|CriOS|FxiOS|Chrome|Firefox|Version)\/[\d.]+/) || [''])[0] + (/Brave/.test(navigator.userAgent) || navigator.brave ? '（Brave）' : '');
+  L.net = navigator.connection && navigator.connection.effectiveType ? navigator.connection.effectiveType : '';
+  lsSet(LOADLOG_KEY, JSON.stringify(L));
+  if (L.pageSec > 30) toast(`はじめての読み込みに${Math.round(L.pageSec)}秒かかりました`, null, { label: '記録を見る', fn: openLoadLog });
+}
+function loadLogText(L) {
+  const f = n => (Math.round(n * 10) / 10).toFixed(1);
+  const ms = {}; L.marks.forEach(m => { ms[m.name] = m.s; });
+  const retries = L.reqs.filter(r => !/^ok/.test(r.res));
+  const lines = [
+    `はじめての読み込みの記録（${new Date(L.at).toLocaleString('ja-JP')}・${APP_VERSION}）`,
+    `端末：${L.ua}${L.net ? '・回線 ' + L.net : ''}`,
+    `ページを開いてから使えるまで：${f(L.pageSec)}秒（そのうち読み込み ${f(L.total)}秒）`,
+    `区域・設定など：${ms.meta != null ? f(ms.meta) + '秒で届く' : '-'}　家：${ms.houses != null ? f(ms.houses) + '秒で届く' : '-'}　記録：${ms.visits != null ? f(ms.visits) + '秒で届く' : '-'}　仕上げ（端末の中）：${ms.finish != null && ms.visits != null ? f(L.total - ms.visits) + '秒' : '-'}`,
+    `やり直し：${retries.length}回${retries.length ? '（' + retries.map(r => r.res).join('、') + '）' : ''}`,
+    '',
+    '開始　かかった　内容　件数　大きさ　結果',
+    ...L.reqs.map(r => `${f(r.s)}秒　${f(r.sec)}秒　${r.what}　${r.rows || ''}　${r.kb}KB　${r.res}`)
+  ];
+  return lines.join('\n');
+}
+function openLoadLog() {
+  let L = null;
+  try { L = JSON.parse(lsGet(LOADLOG_KEY) || "null"); } catch (e) { L = null; }
+  if (!L) { toast('まだ記録がありません（この端末ではじめて開いたときに残ります）'); return; }
+  const txt = loadLogText(L);
+  setSheet(headHtml(null, 'はじめての読み込みの記録', 'この端末で、はじめて開いたときの通信の記録') + `
+    <pre class="loadlog">${esc(txt)}</pre>
+    <button type="button" class="btn primary block" id="llCopy">コピーする</button>
+    <p class="hint">遅かったときは、コピーして区域係（または作った人）に送ってください。住所や名前は入っていません。</p>`);
+  $('#llCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText(txt); toast('コピーしました'); }
+    catch (e) { const r = document.createRange(); r.selectNodeContents($('#sheet .loadlog')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('選んだ状態にしました。長押しでコピーしてください'); }
+  };
 }
 /* 初回や読み直しは、分けて受け取る（件数が多くても止まらないように） */
 function expandHouse(a) {
@@ -2441,37 +2509,83 @@ async function apiRetry(action, extra, onRetry, valid) {
 }
 /* 全部を読み込む。onProgress には { pct, stage, eta（残りの秒・わからないときは null） } をわたす
    段階：meta（区域など）→ houses（家）→ visits（訪問の記録）→ finish（仕上げ：スマホの中で整える） */
-async function loadAll(onProgress, onRetry) {
+/* はじめての読み込み（家3万件・記録数十万件でも、なるべく短く）
+   ・家は、サーバーがまとめた一覧（house-snap.gs）を用意していれば1回で全部届く。
+     これは区域・設定など（meta）と同時に取りに行く（一覧には、それを作った時点の変更番号 seq がつく）
+   ・記録は、meta で件数がわかったら、同時にいくつか取りに行く（1つずつ待たない）
+   ・まとめた一覧がないとき（古いサーバー）は、家も記録と同じように、同時にいくつか取りに行く
+   ・1回に返る件数は、サーバー（GAS）の PART_LIMIT と同じ。ちがっていたら、その種類だけ順に取り直す
+   ・差分は、meta とまとめた一覧のうち古いほうの番号から受け取る（そのあいだの変更を取りこぼさない）
+   ・opt.parallel … 同時に取りに行く数（はじめて開くとき6、全員の読み直しのときは2にして、サーバーを混ませない） */
+const PART_STEP = { houses: 5000, visits: 20000 };
+async function runPool(tasks, n) {
+  const out = new Array(tasks.length);
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, n), tasks.length) }, async () => {
+    while (i < tasks.length) { const k = i++; out[k] = await tasks[k](); }
+  }));
+  return out;
+}
+async function loadAll(onProgress, onRetry, opt) {
+  const par = Math.max(2, (opt && opt.parallel) || 2);
   const prog = o => { if (onProgress) onProgress(o); };
+  const valid = j => !!(j && Array.isArray(j.rows));
   prog({ pct: 1, stage: 'meta', eta: null });
+  // 家のまとめた一覧は、meta と同時に（使えないときは null）
+  const snapP = apiRetry('load', { part: 'houses', offset: 0, snap: 1 }, null, valid).catch(() => null);
   const meta = await apiRetry('load', { part: 'meta' }, onRetry, j => !!(j && j.state && Array.isArray(j.state.territories)));
+  loadMark('meta');
   const st = meta.state;
-  st.houses = [];
-  const vis = [];
   const cnt = meta.counts || { houses: 0, visits: 0 };
+  if (loadLog) loadLog.counts = cnt;
   const total = Math.max(1, cnt.houses + cnt.visits);
   const finishSec = 2 + total / 60000; // 仕上げ（スマホの中で整える）にかかるおおよその秒数
   const t0 = Date.now();
-  let done = 0;
+  let done = 0, housesDone = false;
+  const tick = () => {
+    const el = (Date.now() - t0) / 1000;
+    const eta = done > 0 && el > 2 ? Math.round((total - done) * el / done + finishSec) : null;
+    prog({ pct: Math.min(95, 4 + Math.round(done / total * 91)), stage: housesDone || !cnt.houses ? 'visits' : 'houses', eta });
+  };
   prog({ pct: 4, stage: 'houses', eta: null });
-  for (const part of ['houses', 'visits']) {
-    let off = 0;
-    while (off !== null) {
-      const r = await apiRetry('load', { part, offset: off }, onRetry, j => !!(j && Array.isArray(j.rows)));
-      if (part === 'houses') r.rows.forEach(a => st.houses.push(expandHouse(a)));
-      else r.rows.forEach(a => vis.push(a));
-      done += r.rows.length;
-      off = r.next;
-      // 残りの時間：ここまでの速さから計算（はじめの1回は、まだ当てにならないので出さない）
-      const el = (Date.now() - t0) / 1000, calls = Math.ceil(done / 5000);
-      const eta = done > 0 && el > 1.5 && calls >= 2 ? Math.round((total - done) * el / done + finishSec) : null;
-      const stage = part === 'houses' && off !== null ? 'houses' : (part === 'houses' && cnt.visits ? 'visits' : part);
-      prog({ pct: Math.min(95, 4 + Math.round(done / total * 91)), stage, eta });
-    }
+  const fetchPart = (part, offset) => apiRetry('load', { part, offset }, onRetry, valid)
+    .then(r => { done += r.rows.length; tick(); return r; });
+  const inOrder = async (part, off, chunks) => { // 1つずつ順に
+    while (off !== null && off !== undefined) { const r = await fetchPart(part, off); chunks.push(r.rows); off = r.next; }
+    return chunks;
+  };
+  const loadPart = async (part, n) => { // 件数から、取りに行く位置を決めて同時に
+    const step = PART_STEP[part], offs = [];
+    for (let o = 0; o < Math.max(1, cnt[part] || 0); o += step) offs.push(o);
+    const rs = await runPool(offs.map(o => () => fetchPart(part, o)), n);
+    if (rs.some((r, k) => r.next !== null && r.next !== undefined && r.next !== offs[k] + step)) return inOrder(part, 0, []); // サーバーの件数がちがう
+    const chunks = rs.map(r => r.rows), lastR = rs[rs.length - 1];
+    return lastR.next !== null && lastR.next !== undefined ? inOrder(part, lastR.next, chunks) : chunks; // 読み込みのあいだに増えた分
+  };
+  const snap = await snapP;
+  const snapOk = !!(snap && snap.snap && snap.next === null && isFinite(Number(snap.seq)));
+  let hc, vc;
+  if (snapOk) {
+    done += snap.rows.length; housesDone = true; tick(); loadMark('houses');
+    hc = [snap.rows];
+    vc = await loadPart('visits', par);
+  } else {
+    const half = Math.ceil(par / 2);
+    [hc, vc] = await Promise.all([
+      loadPart('houses', half).then(c => { housesDone = true; loadMark('houses'); return c; }),
+      loadPart('visits', half)
+    ]);
   }
+  loadMark('visits');
+  // 同じ家・記録が2回届いても、1つにする（読み込みのあいだに行がずれたとき）
+  st.houses = [];
+  const hs = new Set();
+  hc.forEach(rows => rows.forEach(a => { if (hs.has(a[0])) return; hs.add(a[0]); st.houses.push(expandHouse(a)); }));
+  const vis = [], vs = new Set();
+  vc.forEach(rows => rows.forEach(a => { if (vs.has(a[0])) return; vs.add(a[0]); vis.push(a); }));
   prog({ pct: 96, stage: 'finish', eta: Math.round(finishSec) });
   st.visitsC = vis;
-  return { mode: 'full', seq: meta.seq, state: st };
+  return { mode: 'full', seq: snapOk ? Math.min(meta.seq, Number(snap.seq)) : meta.seq, state: st };
 }
 let reloading = false;
 async function reloadAll(delay) {
@@ -2480,7 +2594,7 @@ async function reloadAll(delay) {
   try {
     // 全員が同時に3万件を読み直すとサーバーが混むので、0〜15秒ずらす
     if (delay) { updateSyncBadge('最新の情報を用意しています…'); await wait(Math.random() * 15000); }
-    const j = await loadAll(p => updateSyncBadge(`読み込み中 ${p.pct}%`));
+    const j = await loadAll(p => updateSyncBadge(`読み込み中 ${p.pct}%`), null, { parallel: 2 });
     Store.needFull = false; Store.needMeta = false;
     Store.inbox = [j];
     applyInbox();
@@ -2771,7 +2885,7 @@ function showLoadProgress(p, retry) {
       `<span class="${i < si ? 'done' : i === si ? 'now' : ''}">${x[1]}</span>`).join('<i>›</i>')}</div>
     <div class="ldbar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="読み込みの進み具合"><i style="width:${p.pct}%"></i></div>
     <p class="ldpct"><b>${p.pct}%</b><span>${p.stage === 'finish' ? 'スマホの中でデータを整えています' : fmtEta(p.eta)}</span></p>
-    ${retry ? `<p class="ldnote warn">通信が混み合っています。自動でもう一度ためしています（${retry}回目）</p>` : ''}
+    ${retry ? `<p class="ldnote warn">サーバーからの返事がうまく届かなかったので、自動でもう一度ためしています（${retry}回目）</p>` : ''}
     <p class="ldnote">初めて開くときだけ、時間がかかります。次からはすぐに開きます。画面を閉じずに、このままお待ちください。</p>`;
   const sp = $('#splash');
   if (sp && !sp.hidden) {
@@ -3086,6 +3200,13 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.11.02', items: [
+    ['測', 'はじめて開いたときの通信の記録を残すようにしました。30秒より長くかかったときは知らせが出て、記録を見てコピーできます（区域係は「状況」の「読み込みの記録」からも見られます）']
+  ] },
+  { v: '2026.11.01', items: [
+    ['速', 'はじめて開くときの読み込みを速くしました（家の一覧をまとめて1回で受け取り、記録は同時にいくつか受け取ります）'],
+    ['印', '区域係：区域カード（S-12）に、マンション・学校などの名前を、自分の地図の設定と同じように出すようにしました。裏面の「例：拒否の部屋」は、集合住宅があるときだけ出ます']
+  ] },
   { v: '2026.10.30', items: [
     ['印', 'iPhone・iPadでは、準備ができたら「印刷する」ボタンを押して印刷の画面を出すようにしました（ブラウザに止められないように）'],
     ['分', '区域係：スマホで区域カード（S-12）を印刷するときは、8区域ずつに分けて印刷するようにしました']
@@ -9866,6 +9987,13 @@ function s12Prep(t, S, byT) {
   return { t, hs, poly, v, apts, latC, tiles: v ? s12Tiles(v) : [] };
 }
 const s12Dnc = () => D().dnc || {};
+/* 名前のある建物（「名前を出す範囲」が「地図に見えている全体」のとき、ほかの区域の建物の名前も出すため） */
+let s12LabeledMemo = null;
+function s12Labeled() {
+  const hs = D().houses;
+  if (!s12LabeledMemo || s12LabeledMemo.src !== hs || s12LabeledMemo.len !== hs.length) s12LabeledMemo = { src: hs, len: hs.length, list: hs.filter(h => h.label) };
+  return s12LabeledMemo.list;
+}
 function s12RefCount(c) {
   const dnc = s12Dnc();
   return c.hs.reduce((n, h) => n + (h.type === 'apt' ? h.units.filter(u => dnc[K(h.id, u)]).length : (dnc[K(h.id, '')] ? 1 : 0)), 0);
@@ -9933,7 +10061,24 @@ function s12MapSvg(c, tileUrl) {
       L1.push(`<circle cx="${x}" cy="${y}" r="${mm(0.8)}" fill="#fff" stroke="${h.prov ? '#888' : '#222'}" stroke-width="${mm(0.22)}"/>`);
     }
   });
-  s += L1.join('') + L2.join('') + L3.join('') + L4.join('');
+  s += L1.join('') + L2.join('') + L3.join('');
+  // 建物の名前：その人の設定（設定 → 地図の「マンション・アパートの名前」「学校・役所・お店などの名前」「名前を出す範囲」）と同じにする
+  const showApt = UI.aptName === 'on', showFc = UI.fcName === 'on';
+  if (showApt || showFc) {
+    const list = UI.nameScope === 'all' ? s12Labeled() : c.hs;
+    let n = 0;
+    for (const h of list) {
+      if (!h.label || n >= 150) continue;
+      const k = h.type === 'apt' ? aptKind(h) : kindOf(h), isFc = k !== 'home';
+      if (h.type === 'apt' ? !(showApt || (showFc && isFc)) : !(showFc && isFc)) continue; // 一戸建ての「目印」は出さない（地図と同じ）
+      const [x, y] = P(h.lat, h.lng).map(f);
+      if (!inView(x, y)) continue;
+      n++;
+      const name = h.label.length > 12 ? h.label.slice(0, 11) + '…' : h.label;
+      s += `<text x="${x}" y="${f(y + mm(h.type === 'apt' ? 2.2 : 1.5))}" font-size="${mm(1.9)}" font-weight="700" fill="${isFc ? '#4A148C' : '#263238'}" text-anchor="middle" dominant-baseline="hanging" ${halo}>${esc(name)}</text>`;
+    }
+  }
+  s += L4.join('');
   // 方位（北）
   const nx = v.w - mm(5), ny = mm(5.5);
   s += `<g><circle cx="${nx}" cy="${ny}" r="${mm(3.6)}" fill="#fff" fill-opacity=".85"/>` +
@@ -9978,7 +10123,7 @@ function s12BackHtml(c, S, fs) {
   return `<div class="s12card back">
     <p class="s12bh"><b>区域番号 ${esc(t.no)}</b>${t.name ? `<span class="nm">${esc(t.name)}</span>` : ''}<span class="r">集合住宅（番号は表の地図）</span></p>
     <div class="s12apts" data-s12fit="${esc(t.id)}" style="column-count:${S.backCols};font-size:${fs}pt">${body}</div>
-    <p class="s12ft"><span class="lg"><span class="rm x">101</span> 拒否の部屋（訪問しない）　社・店など：住居以外の部屋</span></p>
+    ${c.apts.length ? `<p class="s12ft"><span class="lg">例：<span class="rm x">101</span> 拒否の部屋（訪問しない）${c.apts.some(h => h.units.some(u => unitKind(h, u) !== 'home')) ? '　社・店など：住居以外の部屋' : ''}</span></p>` : ''}
   </div>`;
 }
 /* 裏面の文字の大きさ：部屋が多い区域は、入りきるまで小さくする */
@@ -10292,6 +10437,7 @@ function bindStatic() {
   $('#adS13').onclick = () => openS13();
   $('#adS12').onclick = () => openS12();
   $('#adPerf').onclick = () => { toast('測っています…'); setTimeout(runPerfCheck, 50); };
+  $('#adLoadLog').onclick = () => openLoadLog();
   document.addEventListener('click', e => {
     const o = e.target.closest('[data-asgopen], [data-asgok]'); if (!o) return;
     asgMarkSeen(String(o.dataset.asgkeys || o.dataset.asgok || '').split(' ').filter(Boolean));
