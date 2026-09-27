@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.22"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.10.31"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -450,6 +450,80 @@ body.strong .pin.st-plain{border-width:4px}
 @keyframes spUp{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
 @keyframes spBar{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
 @media (prefers-reduced-motion:reduce){.sp-pin,.sp-hi,.sp-main,.sp-sub{animation:none}.sp-pin::after,.sp-bar i{animation:none}}
+/* はじめての読み込みの進み具合 */
+#splash.loading .sp-bar{display:none}
+.ldprog{margin:24px auto 0;width:min(340px,86vw);text-align:left}
+.ldsteps{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:15px;margin:0 0 10px;opacity:.95}
+.ldsteps span{padding:2px 8px;border-radius:99px;border:1.5px solid #ffffff66;opacity:.7}
+.ldsteps span.done{opacity:1;background:#ffffff26}
+.ldsteps span.done::before{content:'✓ '}
+.ldsteps span.now{opacity:1;background:#fff;color:var(--brand);font-weight:700;border-color:#fff}
+.ldsteps i{font-style:normal;opacity:.6}
+.ldbar{height:14px;border-radius:99px;background:#ffffff40;overflow:hidden}
+.ldbar i{display:block;height:100%;background:#fff;border-radius:99px;transition:width .6s ease}
+.ldpct{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:8px 0 0;font-size:17px}
+.ldpct b{font-size:30px;font-weight:700;line-height:1}
+.ldnote{font-size:15px;line-height:1.6;margin:12px 0 0;opacity:.92}
+.ldnote.warn{background:#ffffff26;border-radius:10px;padding:6px 10px;opacity:1}
+.ldprog.light{margin:14px 0 0;width:auto}
+.ldprog.light .ldsteps span{border-color:var(--line);opacity:.8}
+.ldprog.light .ldsteps span.done{background:var(--terr-soft);color:var(--terr)}
+.ldprog.light .ldsteps span.now{background:var(--brand);color:#fff;border-color:var(--brand)}
+.ldprog.light .ldbar{background:#E0E6E3}
+.ldprog.light .ldbar i{background:var(--terr)}
+/* ===== 区域地図のカード（S-12）の印刷 ===== */
+.s12pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:0 14px;margin:6px 0 14px}
+.s12pick .check{min-height:46px;font-size:16px}
+.s12pick small{font-size:13px}
+.s12parts .btn+.btn{margin-top:8px}
+.s12measure{position:absolute;left:-99999px;top:0;visibility:hidden}
+.s12measure.a6{width:148.5mm}.s12measure.a5{width:210mm}
+.s12sheet{position:relative;display:grid;overflow:hidden;background:#fff;page-break-after:always;break-after:page}
+.s12sheet:last-child{page-break-after:auto;break-after:auto}
+.s12sheet.a6{width:297mm;height:209.5mm;grid-template-columns:148.5mm 148.5mm;grid-template-rows:104.75mm 104.75mm}
+.s12sheet.a5{width:210mm;height:296.5mm;grid-template-columns:210mm;grid-template-rows:148.25mm 148.25mm}
+.s12sheet .cm{position:absolute;background:#000}
+.s12sheet .cm.v{width:.2mm;height:5mm;left:148.5mm}.s12sheet .cm.v.t{top:0}.s12sheet .cm.v.b{bottom:0}
+.s12sheet.a5 .cm.v{display:none}
+.s12sheet .cm.h{height:.2mm;width:5mm;top:104.75mm}.s12sheet.a5 .cm.h{top:148.25mm}
+.s12sheet .cm.h.l{left:0}.s12sheet .cm.h.r{right:0}
+.s12card{box-sizing:border-box;padding:5mm 5.75mm 3.5mm;display:flex;flex-direction:column;overflow:hidden;font-size:7.5pt;line-height:1.3;color:#000}
+.a5 .s12card{padding:7mm 7mm 5mm;font-size:9pt}
+.s12card p{margin:0}
+.s12ttl{text-align:center;font-weight:700;font-size:10pt;letter-spacing:.12em;margin:0 0 1mm!important}
+.a5 .s12ttl{font-size:12.5pt}
+.s12row{display:flex;align-items:flex-end;gap:1.5mm;margin:0 0 1.5mm;font-weight:700;font-size:8.5pt}
+.a5 .s12row{font-size:10.5pt}
+.s12row .ln{flex:1;border-bottom:.25mm dotted #000;font-weight:400;padding:0 1mm;min-height:1.1em;white-space:nowrap;overflow:hidden}
+.s12row .ln.no{flex:0 0 24mm;text-align:center;font-weight:700;font-size:10.5pt}
+.s12map{flex:none;border:.25mm solid #000;overflow:hidden;background:#F4F4F2}
+.a6 .s12map{width:137mm;height:72mm}.a5 .s12map{width:196mm;height:108mm}
+.s12svg{display:block;width:100%;height:100%;font-family:inherit}
+.s12none{display:flex;align-items:center;justify-content:center;height:100%;color:#333}
+.s12ft{display:flex;justify-content:space-between;align-items:center;gap:2mm;margin:.9mm 0 0!important;font-size:6.2pt;white-space:nowrap}
+.a5 .s12ft{font-size:7.8pt}
+.s12ft svg{width:2.5mm;height:2.5mm;vertical-align:-.45mm;margin:0 .3mm 0 .8mm}
+.s12ft .lg{overflow:hidden}
+.s12note{margin:.5mm 0 0!important;font-size:6.2pt;font-weight:700}
+.a5 .s12note{font-size:7.8pt}
+.s12bh{display:flex;align-items:baseline;gap:2.5mm;border-bottom:.3mm solid #000;padding:0 0 .8mm;margin:0 0 1.5mm!important;font-size:9.5pt}
+.a5 .s12bh{font-size:11pt}
+.s12bh .r{margin-left:auto;font-size:.75em}
+.s12apts{overflow:hidden;column-fill:auto;column-gap:3mm;line-height:1.35}
+.a6 .s12apts{height:81mm}.a5 .s12apts{height:120mm}
+.s12apts .ab{margin:0 0 1.4mm}
+.s12apts .an{font-weight:700;break-after:avoid;page-break-after:avoid;margin:0 0 .4mm!important}
+.s12apts .an i{display:inline-block;min-width:1.3em;padding:0 .3em;margin-right:.4em;background:#263238;color:#fff;border-radius:.3em;text-align:center;font-style:normal}
+.s12apts .an small{font-weight:400;margin-left:.5em;font-size:.88em}
+.s12apts .fl{display:grid;grid-template-columns:2.4em 1fr;align-items:start;margin:0 0 .5mm;break-inside:avoid;page-break-inside:avoid}
+.s12apts .fl.one{grid-template-columns:1fr}
+.s12apts .fn{font-weight:700;font-size:.9em;line-height:1.55}
+.s12apts .rs{display:flex;flex-wrap:wrap;gap:.5mm}
+.s12card .rm{display:inline-block;border:.2mm solid #000;border-radius:.4mm;padding:0 .35em;min-width:1.6em;text-align:center;line-height:1.35}
+.s12card .rm.x{background:#000;color:#fff}
+.s12card .rm small{font-size:.8em;margin-left:.15em}
+.s12apts .an .rm{margin-left:.6em;font-size:.85em}
+.s12empty,.s12apts .nr{color:#333}
 /* ===== 区域カードの中のタブ ===== */
 .subtabs{display:flex;width:100%;margin:2px 0 12px}
 .subtabs button{flex:1;min-height:56px;font-size:17px;position:relative}
@@ -728,9 +802,16 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .s13tbl td.s13-cur{background:#E3F0FC}
 .s13tbl td small{color:var(--ink2);font-size:11px}
 #printArea{display:none}
+#printReady{position:fixed;inset:0;z-index:5100;background:#0006;display:grid;place-items:center;padding:24px}
+#printReady[hidden]{display:none}
+#printReady .blockbox .btn+.btn{margin-top:10px}
+/* 印刷するのは、いつも「印刷用の紙面（#printArea）」だけ。画面（地図・係の画面など）は印刷しない。
+   以前は印刷のあいだだけ切りかえていたが、ブラウザが印刷のプレビューを作り直したときに
+   係の画面（地図と3万件の家）を印刷しようとして、固まることがあった */
 @media print{
-  body.printing > *:not(#printArea){display:none!important}
-  body.printing #printArea{display:block!important}
+  body > *:not(#printArea){display:none!important}
+  #printArea{display:block!important}
+  #printArea:empty::before{content:'印刷は、区域マップの各画面の「印刷」ボタンから行ってください。';display:block;padding:20mm;font-size:14pt}
   html,body{height:auto!important;background:#fff!important}
 }
 .pdoc{font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic",Meiryo,"Noto Sans CJK JP",sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -1212,6 +1293,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
         <div class="apane" data-apane="people" hidden><div id="adPeople"></div></div>
         <div class="apane" data-apane="status" hidden>
         <button class="btn primary block" id="adS13">区域割り当ての記録（S-13）を見る・印刷する</button>
+        <button class="btn block" id="adS12">区域カード（S-12）を印刷する</button>
         <h2 class="sec">全体の状況</h2>
         <div class="tiles" id="adTiles"></div>
         <h2 class="sec">時間帯ごとの「会えた」割合（直近180日）</h2>
@@ -1277,12 +1359,13 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
   <h1 class="sp-main">さぁ、奉仕に行こう！</h1>
   <p class="sp-sub" id="spSub"></p>
   <div class="sp-bar"><i></i></div>
+  <div class="ldprog" id="spProg" hidden></div>
 </div></div>
 <div id="news" hidden></div>
 <div id="s13View" hidden></div>
 <div id="printArea" class="pdoc"></div>
 <div id="joinScreen" hidden></div>
-<div id="blocker" hidden><div class="blockbox" role="alert"><h2 id="blockTitle"></h2><p id="blockMsg"></p><p class="muted" id="blockDetail" hidden></p><button type="button" class="btn primary block" id="blockRetry" hidden>もう一度読み込む</button></div></div>
+<div id="blocker" hidden><div class="blockbox" role="alert"><h2 id="blockTitle"></h2><p id="blockMsg"></p><div class="ldprog light" id="blockProg" hidden></div><p class="muted" id="blockDetail" hidden></p><button type="button" class="btn primary block" id="blockRetry" hidden>もう一度読み込む</button></div></div>
 
 <script>
 'use strict';
@@ -1989,10 +2072,11 @@ const Store = {
       if (legacy) { this.markAll(); this.saveCacheSoon(); } // 新しい形で保存し直す
       return 'cache';
     }
-    let pct = 0;
+    let last = { pct: 0, stage: 'meta', eta: null };
     const j = await loadAll(
-      p => { pct = p; showBlocking('読み込んでいます…', `初めて開くときは少し時間がかかります（${p}%）`, true); },
-      n => showBlocking('読み込んでいます…', `通信が混み合っています。もう一度ためしています（${n}回目・${pct}%）`, true));
+      p => { last = p; showLoadProgress(p, 0); },
+      n => showLoadProgress(last, n));
+    await new Promise(r => setTimeout(r, 60)); // 「仕上げ」の表示を先に出してから、重い処理をする
     this.setServer(j);
     this.markAll();
     this.saveCacheSoon();
@@ -2294,7 +2378,12 @@ async function api(action, extra, opt) {
     noteError(action, e); throw e;
   } finally { clearTimeout(timer); }
   if (!res.ok) {
-    const e = Object.assign(new Error('http' + res.status), { code: 'http' + res.status, retry: res.status >= 429 });
+    // 404：サーバーの処理は終わっているのに、Googleの受け渡し先から返事を受け取れなかったことがある → 送り直す
+    let where = '';
+    try { const u = new URL(res.url); where = u.host + u.pathname.replace(/\/macros\/s\/[^/]+/, '/macros/s/…'); } catch (x) { /* 何もしない */ }
+    const what = action + (extra && extra.part ? `:${extra.part}${extra.offset ? '@' + extra.offset : ''}` : '');
+    const e = Object.assign(new Error('http' + res.status), { code: 'http' + res.status, retry: res.status >= 429 || res.status === 404,
+      sample: `${what}・${where}${res.redirected ? '（転送あり）' : ''}・${String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)}` });
     noteError(action, e); throw e;
   }
   let j;
@@ -2324,34 +2413,57 @@ function expandHouse(a) {
     ul: a[13] ? (() => { try { return JSON.parse(a[13]); } catch (e) { return undefined; } })() : undefined
   };
 }
-async function apiRetry(action, extra, onRetry) {
+/* valid：返事の形を確かめる（まちがった形の返事が来たときも、送り直す） */
+async function apiRetry(action, extra, onRetry, valid) {
   const waits = [2000, 5000, 10000];
   for (let i = 0; ; i++) {
-    try { return await api(action, extra, { timeout: 120000 }); } catch (e) {
+    try {
+      const j = await api(action, extra, { timeout: 120000 });
+      if (valid && !valid(j)) {
+        const what = action + (extra && extra.part ? `:${extra.part}${extra.offset ? '@' + extra.offset : ''}` : '');
+        const e = Object.assign(new Error('badreply'), { code: 'badreply', retry: true,
+          sample: `${what}・返事の中身：${Object.keys(j || {}).join(',')}${j && j.mode ? '・mode=' + j.mode : ''}${j && j.app ? '・GETとして届いた' : ''}` });
+        noteError(action, e); throw e;
+      }
+      return j;
+    } catch (e) {
       if (!e.retry || i >= waits.length) throw e;
       if (onRetry) onRetry(i + 1, e);
       await wait(waits[i] + Math.random() * 1500); // みんなが同時にやり直さないよう、少しずらす
     }
   }
 }
+/* 全部を読み込む。onProgress には { pct, stage, eta（残りの秒・わからないときは null） } をわたす
+   段階：meta（区域など）→ houses（家）→ visits（訪問の記録）→ finish（仕上げ：スマホの中で整える） */
 async function loadAll(onProgress, onRetry) {
-  const meta = await apiRetry('load', { part: 'meta' }, onRetry);
+  const prog = o => { if (onProgress) onProgress(o); };
+  prog({ pct: 1, stage: 'meta', eta: null });
+  const meta = await apiRetry('load', { part: 'meta' }, onRetry, j => !!(j && j.state && Array.isArray(j.state.territories)));
   const st = meta.state;
   st.houses = [];
   const vis = [];
-  const total = Math.max(1, (meta.counts ? meta.counts.houses + meta.counts.visits : 0));
+  const cnt = meta.counts || { houses: 0, visits: 0 };
+  const total = Math.max(1, cnt.houses + cnt.visits);
+  const finishSec = 2 + total / 60000; // 仕上げ（スマホの中で整える）にかかるおおよその秒数
+  const t0 = Date.now();
   let done = 0;
+  prog({ pct: 4, stage: 'houses', eta: null });
   for (const part of ['houses', 'visits']) {
     let off = 0;
     while (off !== null) {
-      const r = await apiRetry('load', { part, offset: off }, onRetry);
+      const r = await apiRetry('load', { part, offset: off }, onRetry, j => !!(j && Array.isArray(j.rows)));
       if (part === 'houses') r.rows.forEach(a => st.houses.push(expandHouse(a)));
       else r.rows.forEach(a => vis.push(a));
       done += r.rows.length;
       off = r.next;
-      if (onProgress) onProgress(Math.min(99, Math.round(done / total * 100)));
+      // 残りの時間：ここまでの速さから計算（はじめの1回は、まだ当てにならないので出さない）
+      const el = (Date.now() - t0) / 1000, calls = Math.ceil(done / 5000);
+      const eta = done > 0 && el > 1.5 && calls >= 2 ? Math.round((total - done) * el / done + finishSec) : null;
+      const stage = part === 'houses' && off !== null ? 'houses' : (part === 'houses' && cnt.visits ? 'visits' : part);
+      prog({ pct: Math.min(95, 4 + Math.round(done / total * 91)), stage, eta });
     }
   }
+  prog({ pct: 96, stage: 'finish', eta: Math.round(finishSec) });
   st.visitsC = vis;
   return { mode: 'full', seq: meta.seq, state: st };
 }
@@ -2362,7 +2474,7 @@ async function reloadAll(delay) {
   try {
     // 全員が同時に3万件を読み直すとサーバーが混むので、0〜15秒ずらす
     if (delay) { updateSyncBadge('最新の情報を用意しています…'); await wait(Math.random() * 15000); }
-    const j = await loadAll(p => updateSyncBadge(`読み込み中 ${p}%`));
+    const j = await loadAll(p => updateSyncBadge(`読み込み中 ${p.pct}%`));
     Store.needFull = false; Store.needMeta = false;
     Store.inbox = [j];
     applyInbox();
@@ -2637,10 +2749,37 @@ function openSyncSheet() {
     Store.needFull = true; reloadAll(false).catch(() => {});
   };
 }
+/* ---------- はじめての読み込みの進み具合（あいさつの画面と、読み込み中の画面に出す） ---------- */
+const LD_STAGES = [['meta', '区域'], ['houses', '家'], ['visits', '訪問の記録'], ['finish', '仕上げ']];
+function fmtEta(sec) {
+  if (sec == null) return '残りの時間を計算しています…';
+  if (sec < 10) return 'まもなく終わります';
+  if (sec < 60) return `あと約${Math.ceil(sec / 10) * 10}秒`;
+  const m = Math.floor(sec / 60), r = Math.round((sec % 60) / 10) * 10;
+  return `あと約${m}分${r ? r + '秒' : ''}`;
+}
+function showLoadProgress(p, retry) {
+  const si = Math.max(0, LD_STAGES.findIndex(x => x[0] === p.stage));
+  const html = `<div class="ldsteps" aria-hidden="true">${LD_STAGES.map((x, i) =>
+      `<span class="${i < si ? 'done' : i === si ? 'now' : ''}">${x[1]}</span>`).join('<i>›</i>')}</div>
+    <div class="ldbar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="読み込みの進み具合"><i style="width:${p.pct}%"></i></div>
+    <p class="ldpct"><b>${p.pct}%</b><span>${p.stage === 'finish' ? 'スマホの中でデータを整えています' : fmtEta(p.eta)}</span></p>
+    ${retry ? `<p class="ldnote warn">通信が混み合っています。自動でもう一度ためしています（${retry}回目）</p>` : ''}
+    <p class="ldnote">初めて開くときだけ、時間がかかります。次からはすぐに開きます。画面を閉じずに、このままお待ちください。</p>`;
+  const sp = $('#splash');
+  if (sp && !sp.hidden) {
+    sp.classList.add('loading');
+    const b = $('#spProg'); b.innerHTML = html; b.hidden = false;
+  }
+  showBlocking('読み込んでいます…', '', true);
+  const bp = $('#blockProg'); bp.innerHTML = html; bp.hidden = false;
+}
 function showBlocking(title, msg, keepSplash) {
   if (!keepSplash) hideSplash(true); // 読み込み中は、あいさつの画面をそのまま出しておく
   $('#blockTitle').textContent = title;
   $('#blockMsg').textContent = msg;
+  $('#blockMsg').hidden = !msg;
+  if (msg && $('#blockProg')) $('#blockProg').hidden = true; // ほかの知らせのときは、進み具合を消す
   $('#blocker').hidden = false;
 }
 function hideBlocking() { $('#blocker').hidden = true; }
@@ -2648,12 +2787,15 @@ const ERR_TEXT = {
   timeout: 'サーバーの返事が遅く、時間切れになりました。',
   network: 'サーバーにつながりませんでした。',
   nonjson: 'サーバーが混み合っていて、正しい返事が来ませんでした。',
-  server: 'サーバーの中でエラーが起きました。'
+  server: 'サーバーの中でエラーが起きました。',
+  badreply: 'サーバーから、思っていたのとちがう形の返事が来ました。'
 };
 function showLoadError(e) {
   showBlocking('読み込めませんでした', (ERR_TEXT[e && e.code] || '通信がうまくいきませんでした。') + '少し時間をおいて「もう一度読み込む」を押してください。');
   const d = $('#blockDetail');
-  d.textContent = `続くときは、区域係にこの番号を伝えてください：${(e && (e.code || e.message)) || 'unknown'}` + (e && e.sample ? `（${e.sample}）` : '');
+  d.textContent = `続くときは、区域係にこの番号を伝えてください：${(e && (e.code || e.message)) || 'unknown'}` + (e && e.sample ? `（${e.sample}）` : '') +
+    `\n［${API_URL ? API_URL.slice(-12) : 'URLなし'}・${APP_VERSION}］`;
+  d.style.whiteSpace = 'pre-line';
   d.hidden = false;
   $('#blockRetry').hidden = false;
   $('#blockRetry').onclick = () => location.reload();
@@ -2926,6 +3068,11 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.10.31', items: [
+    ['進', '初めて開くときの読み込みで、バーと％、残りの時間が出るようになりました'],
+    ['印', '区域係：「状況」から、紙の区域カード（S-12）を印刷できるようになりました。区域の線・家・拒否の家とまわりの建物が表に、集合住宅の部屋が裏に出ます（スマホでは8区域ずつ）'],
+    ['直', '印刷のとき、係の画面が印刷されそうになったり、画面が止まったりすることがあったのを直しました。iPhone・iPadでは「印刷する」ボタンを押して印刷の画面を出します']
+  ] },
   { v: '2026.10.22', items: [
     ['推', '「おすすめ」を、下のタブ（ホーム・区域カード・地図のならび）に移しました']
   ] },
@@ -9630,17 +9777,47 @@ function handoffHtml() {
 /* =========================================================
    印刷（PDFとしても保存できる）
    ========================================================= */
-function printDoc(html, landscape) {
+/* ・印刷用の紙面は、印刷が終わってもそのまま残す（次に印刷するときに入れかえる）。
+     印刷のプレビューが作り直されても、同じ紙面が出るように
+   ・地図などの画像は、読み終えてから印刷の画面を出す（最大8秒待つ）
+   ・続けて押されたときは、いちばん新しい紙面だけを印刷する（印刷の画面が2つ出ないように） */
+/* ・iPhone・iPad（Safari・Braveなど）とMacのSafariでは、準備が終わったら「印刷する」ボタンを出し、
+     押したその場で印刷の画面を出す。準備（地図の読み込み）のあとに自動で印刷の画面を出すと、
+     ブラウザが「勝手に印刷しようとしている」と判断して、止める確認を出すことがあるため */
+let printSeq = 0;
+const printNeedsTap = () => isIOS() || /^((?!chrome|chromium|crios|fxios|edg|android).)*safari/i.test(navigator.userAgent);
+function printDoc(html, landscape, pageCss) {
+  const my = ++printSeq;
   const box = $('#printArea');
   box.innerHTML = html;
   let st = $('#printPageStyle');
   if (!st) { st = document.createElement('style'); st.id = 'printPageStyle'; document.head.appendChild(st); }
-  st.textContent = `@page{size:A4 ${landscape ? 'landscape' : 'portrait'};margin:${landscape ? '8mm 9mm' : '9mm 10mm 7mm'}}`;
-  document.body.classList.add('printing');
-  const done = () => { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
-  window.addEventListener('afterprint', done);
+  st.textContent = pageCss || `@page{size:A4 ${landscape ? 'landscape' : 'portrait'};margin:${landscape ? '8mm 9mm' : '9mm 10mm 7mm'}}`;
+  document.body.classList.add('printing'); // 以前の形との互換のため（印刷の切りかえには使っていない）
+  const srcs = [...new Set($$('image, img', box).map(x => x.getAttribute('href') || x.getAttribute('src')).filter(Boolean))];
+  const ready = Promise.all(srcs.map(u => { const im = new Image(); im.src = u; return (im.decode ? im.decode() : Promise.resolve()).catch(() => {}); }));
+  const loaded = Promise.race([ready, wait(8000)]).then(() => wait(250));
+  if (printNeedsTap()) {
+    showPrintReady(false);
+    loaded.then(() => { if (my === printSeq) showPrintReady(true); });
+    return;
+  }
   toast('印刷の画面で「PDFとして保存」をえらぶと、PDFにできます');
-  setTimeout(() => window.print(), 300);
+  loaded.then(() => { if (my === printSeq) window.print(); });
+}
+/* 「印刷の準備ができました」の画面（この画面は印刷されない） */
+function showPrintReady(ok) {
+  let el = $('#printReady');
+  if (!el) { el = document.createElement('div'); el.id = 'printReady'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="blockbox" role="dialog" aria-modal="true" aria-labelledby="prTitle">
+      <h2 id="prTitle">${ok ? '印刷の準備ができました' : '印刷の準備をしています…'}</h2>
+      <p>${ok ? '「印刷する」を押すと、印刷の画面が出ます。' : '地図の画像を読み込んでいます。少しお待ちください。'}</p>
+      <button type="button" class="btn primary block" id="prGo"${ok ? '' : ' disabled'}>印刷する</button>
+      <button type="button" class="btn block" id="prNo">やめる</button></div>`;
+  el.hidden = false;
+  $('#prNo').onclick = () => { printSeq++; el.hidden = true; };
+  // 押したその場で呼ぶ（あとで呼ぶと、ブラウザに止められることがある）
+  if (ok) $('#prGo').onclick = () => { el.hidden = true; window.print(); };
 }
 
 /* =========================================================
@@ -9805,6 +9982,333 @@ function openS13Edit(tid, editId) {
   $('#s13Prev').onclick = () => { if (pos > 0) openS13Edit(order[pos - 1].id); };
   $('#s13Next').onclick = () => { if (pos < order.length - 1) openS13Edit(order[pos + 1].id); };
   $('#s13Done').onclick = () => { closeSheet(); openS13(y); };
+}
+
+/* =========================================================
+   区域地図のカード（S-12）の印刷 … 紙で運用するときの予備
+   ・大きさは S-12 と同じ A6（A4に4枚）か、地図を大きくした A5（A4に2枚）
+   ・表：区域の線・家・拒否の家と、まわりの建物（国土地理院の淡色地図）。留守などの記録は出さない
+   ・裏：集合住宅の部屋（拒否の部屋は黒）。両面印刷で表と裏が重なる並びにする
+   ・地図の画像は、すべて受け取ってから印刷する（印刷で地図が欠けないように）
+   ========================================================= */
+const S12_TILE = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png';
+const S12_SIZE = {
+  a6: { label: 'A6（S-12と同じ・A4に4枚）', page: 'A4 landscape', per: 4, mapW: 137, mapH: 72, kMin: 3.2, backCols: 2, font: 7.5, order: [1, 0, 3, 2], bind: '短辺とじ（短い辺で綴じる）' },
+  a5: { label: 'A5（A4に2枚・地図が大きい）', page: 'A4 portrait', per: 2, mapW: 196, mapH: 108, kMin: 2.6, backCols: 3, font: 9, order: [0, 1], bind: '長辺とじ（長い辺で綴じる）' }
+};
+const S12_KCH = { office: '社', shop: '店', biz: '事', factory: '工', school: '学', gov: '役', police: '警', fire: '消' };
+const S12_TILES = new Map(); // 地図の画像（一度受け取ったものは、この画面を開いているあいだ使い回す）
+let s12Opt = { size: 'a6', back: true, sel: null };
+const S12_MOBILE_MAX = 8;   // スマホで一度に印刷する区域の数
+const s12Done = new Set();  // スマホで、分けて印刷し終えた組（この画面を開いているあいだ）
+
+/* 緯度・経度 → 地図の画素（ズーム z のときの、世界全体での位置） */
+function s12Px(lat, lng, z) {
+  const n = 256 * Math.pow(2, z), s = Math.sin(lat * Math.PI / 180);
+  return [(lng + 180) / 360 * n, (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n];
+}
+/* 地図の範囲：区域がちょうど入り、まわりの建物の名前が読める大きさになるズームを選ぶ
+   k … 印刷したときの 1mm あたりの画素（おおよそ3〜6 のあいだにすると、地図の文字が読みやすい） */
+function s12View(pts, W, H, kMin) {
+  for (let z = 18; z >= 11; z--) {
+    const xy = pts.map(p => s12Px(p[0], p[1], z));
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    xy.forEach(p => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); });
+    const k0 = Math.max(((x1 - x0) * 1.12 + 24) / W, ((y1 - y0) * 1.12 + 24) / H);
+    if (k0 <= 6 || z === 11) {
+      const k = Math.max(k0, kMin || 3.2); // 小さい区域は、まわりを広めに見せる
+      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+      return { z, k, x: cx - W * k / 2, y: cy - H * k / 2, w: W * k, h: H * k };
+    }
+  }
+  return null;
+}
+function s12Tiles(v) {
+  const out = [];
+  for (let tx = Math.floor(v.x / 256); tx <= Math.floor((v.x + v.w) / 256); tx++) {
+    for (let ty = Math.floor(v.y / 256); ty <= Math.floor((v.y + v.h) / 256); ty++) {
+      out.push({ url: S12_TILE.replace('{z}', v.z).replace('{x}', tx).replace('{y}', ty), x: tx * 256 - v.x, y: ty * 256 - v.y });
+    }
+  }
+  return out;
+}
+/* 地図の画像を受け取る。受け取れたら端末の中の画像に、海などで画像がないときは ''、失敗したら元のURL */
+function s12Tile(url) {
+  if (S12_TILES.has(url)) return S12_TILES.get(url);
+  const p = (async () => {
+    for (let i = 0; i < 2; i++) {
+      const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const tm = setTimeout(() => { if (ctl) ctl.abort(); }, 15000);
+      try {
+        const r = await fetch(url, { mode: 'cors', signal: ctl ? ctl.signal : undefined });
+        if (r.status === 404) return '';
+        if (r.ok) return URL.createObjectURL(await r.blob());
+      } catch (e) { /* もう一度ためす */ } finally { clearTimeout(tm); }
+      await wait(800);
+    }
+    S12_TILES.delete(url); // 次に印刷するときに、もう一度受け取る
+    return url;
+  })();
+  S12_TILES.set(url, p);
+  return p;
+}
+/* 1区域ぶんの材料 */
+function s12Prep(t, S, byT) {
+  const hs = byT.get(t.id) || [];
+  const poly = okPoly(t.polygon) ? t.polygon : null;
+  const pts = poly || hs.map(h => [h.lat, h.lng]);
+  const v = pts.length ? s12View(pts, S.mapW, S.mapH, S.kMin) : null;
+  const apts = hs.filter(h => h.type === 'apt').sort((a, b) => b.lat - a.lat || a.lng - b.lng); // 北から順に番号
+  const latC = pts.length ? pts.reduce((s, p) => s + p[0], 0) / pts.length : 26;
+  return { t, hs, poly, v, apts, latC, tiles: v ? s12Tiles(v) : [] };
+}
+const s12Dnc = () => D().dnc || {};
+function s12RefCount(c) {
+  const dnc = s12Dnc();
+  return c.hs.reduce((n, h) => n + (h.type === 'apt' ? h.units.filter(u => dnc[K(h.id, u)]).length : (dnc[K(h.id, '')] ? 1 : 0)), 0);
+}
+/* 凡例の小さな印 */
+const S12_ICO = {
+  house: '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="3" fill="#fff" stroke="#222" stroke-width="1"/></svg>',
+  kind: '<svg viewBox="0 0 10 10"><rect x="1.8" y="1.8" width="6.4" height="6.4" fill="#fff" stroke="#222" stroke-width="1"/></svg>',
+  apt: '<svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9" rx="1.5" fill="#263238"/><text x="5" y="5.3" font-size="7" font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="central">1</text></svg>',
+  ref: '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4.4" fill="#D32F2F"/><path d="M3.2 3.2l3.6 3.6M6.8 3.2l-3.6 3.6" stroke="#fff" stroke-width="1.3"/></svg>',
+  line: '<svg viewBox="0 0 10 10"><path d="M0 5h10" stroke="#C62828" stroke-width="2.4"/></svg>'
+};
+/* 表の地図（すべて SVG で描くので、線や印は印刷してもくっきり出る） */
+function s12MapSvg(c, tileUrl) {
+  const { v, t, poly } = c;
+  if (!v) return '<div class="s12none">区域の線も家も、まだ登録されていません</div>';
+  const k = v.k, f = n => Math.round(n * 10) / 10, mm = n => f(n * k);
+  const P = (lat, lng) => { const p = s12Px(lat, lng, v.z); return [p[0] - v.x, p[1] - v.y]; };
+  const pts = arr => arr.map(p => P(p[0], p[1]).map(f).join(',')).join(' ');
+  const halo = `stroke="#fff" stroke-width="${mm(0.7)}" paint-order="stroke" stroke-linejoin="round"`;
+  let s = `<svg class="s12svg" viewBox="0 0 ${f(v.w)} ${f(v.h)}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">`;
+  s += c.tiles.map(ti => { const u = tileUrl(ti.url); return u ? `<image href="${esc(u)}" x="${f(ti.x)}" y="${f(ti.y)}" width="256.8" height="256.8" preserveAspectRatio="none"/>` : ''; }).join('');
+  // 区域の外を少し白くして、区域を目立たせる（まわりの建物は見えるまま）
+  if (poly) s += `<path d="M-20,-20 H${f(v.w + 20)} V${f(v.h + 20)} H-20 Z M${pts(poly).replace(/ /g, ' L')} Z" fill="#fff" fill-opacity=".42" fill-rule="evenodd"/>`;
+  // となりの区域の線と番号（うすい点線）
+  polyTerrs().forEach(o => {
+    if (o.id === t.id) return;
+    const q = o.polygon.map(p => P(p[0], p[1]));
+    let a = Infinity, b = -Infinity, cc = Infinity, d = -Infinity;
+    q.forEach(p => { a = Math.min(a, p[0]); b = Math.max(b, p[0]); cc = Math.min(cc, p[1]); d = Math.max(d, p[1]); });
+    if (b < 0 || a > v.w || d < 0 || cc > v.h) return;
+    s += `<polygon points="${q.map(p => p.map(f).join(',')).join(' ')}" fill="none" stroke="#666" stroke-width="${mm(0.3)}" stroke-dasharray="${mm(1.2)} ${mm(0.8)}"/>`;
+    const m = P(...center(o.polygon));
+    if (m[0] > mm(4) && m[0] < v.w - mm(4) && m[1] > mm(3) && m[1] < v.h - mm(3)) {
+      s += `<text x="${f(m[0])}" y="${f(m[1])}" font-size="${mm(2.6)}" font-weight="700" fill="#555" text-anchor="middle" dominant-baseline="central" ${halo}>${esc(o.no)}</text>`;
+    }
+  });
+  // この区域の線（白いふちの上に赤い線。白黒で印刷しても濃い線になる）
+  if (poly) {
+    s += `<polygon points="${pts(poly)}" fill="none" stroke="#fff" stroke-width="${mm(1.5)}" stroke-linejoin="round"/>`;
+    s += `<polygon points="${pts(poly)}" fill="none" stroke="#C62828" stroke-width="${mm(0.7)}" stroke-linejoin="round"/>`;
+  }
+  // 家：ふつうの家 → 住居以外 → 集合住宅 → 拒否 の順に重ねる（拒否がいちばん上）
+  const dnc = s12Dnc(), inView = (x, y) => x > -mm(3) && y > -mm(3) && x < v.w + mm(3) && y < v.h + mm(3);
+  const aptNo = new Map(c.apts.map((h, i) => [h.id, i + 1]));
+  const L1 = [], L2 = [], L3 = [], L4 = [];
+  c.hs.forEach(h => {
+    const [x, y] = P(h.lat, h.lng).map(f);
+    if (!inView(x, y)) return;
+    if (h.type === 'apt') {
+      const n = aptNo.get(h.id), w = mm(String(n).length > 1 ? 4.6 : 3.6), hh = mm(3.6);
+      const anyRef = h.units.some(u => dnc[K(h.id, u)]) || dnc[K(h.id, '')];
+      L3.push(`<rect x="${f(x - w / 2)}" y="${f(y - hh / 2)}" width="${w}" height="${hh}" rx="${mm(0.6)}" fill="#263238" stroke="#fff" stroke-width="${mm(0.3)}"/>` +
+        `<text x="${x}" y="${f(y + mm(0.1))}" font-size="${mm(2.6)}" font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="central">${n}</text>` +
+        (anyRef ? `<circle cx="${f(x + w / 2)}" cy="${f(y - hh / 2)}" r="${mm(0.8)}" fill="#D32F2F" stroke="#fff" stroke-width="${mm(0.25)}"/>` : ''));
+    } else if (dnc[K(h.id, '')]) {
+      const r = mm(1.25), a = mm(0.55);
+      L4.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="#D32F2F" stroke="#fff" stroke-width="${mm(0.3)}"/>` +
+        `<path d="M${f(x - a)},${f(y - a)} L${f(x + a)},${f(y + a)} M${f(x + a)},${f(y - a)} L${f(x - a)},${f(y + a)}" stroke="#fff" stroke-width="${mm(0.35)}"/>`);
+    } else if (kindOf(h) !== 'home') {
+      const w = mm(2.1);
+      L2.push(`<rect x="${f(x - w / 2)}" y="${f(y - w / 2)}" width="${w}" height="${w}" fill="#fff" stroke="#222" stroke-width="${mm(0.22)}"/>` +
+        `<text x="${x}" y="${f(y + mm(0.05))}" font-size="${mm(1.6)}" fill="#222" text-anchor="middle" dominant-baseline="central">${S12_KCH[kindOf(h)] || ''}</text>`);
+    } else {
+      L1.push(`<circle cx="${x}" cy="${y}" r="${mm(0.8)}" fill="#fff" stroke="${h.prov ? '#888' : '#222'}" stroke-width="${mm(0.22)}"/>`);
+    }
+  });
+  s += L1.join('') + L2.join('') + L3.join('') + L4.join('');
+  // 方位（北）
+  const nx = v.w - mm(5), ny = mm(5.5);
+  s += `<g><circle cx="${nx}" cy="${ny}" r="${mm(3.6)}" fill="#fff" fill-opacity=".85"/>` +
+    `<path d="M${nx},${f(ny - mm(3))} L${f(nx + mm(1.5))},${f(ny + mm(1.2))} L${nx},${f(ny + mm(0.4))} L${f(nx - mm(1.5))},${f(ny + mm(1.2))} Z" fill="#222"/>` +
+    `<text x="${nx}" y="${f(ny + mm(2.6))}" font-size="${mm(1.9)}" font-weight="700" fill="#222" text-anchor="middle" dominant-baseline="central">N</text></g>`;
+  // 縮尺（15mm 前後になる、きりのよい長さ）
+  const mPerMm = 156543.03392 * Math.cos(c.latC * Math.PI / 180) / Math.pow(2, v.z) * k;
+  const meters = [20, 50, 100, 200, 250, 500, 1000, 2000].find(x => x / mPerMm >= 12) || 2000;
+  const len = meters / mPerMm * k, bx = mm(2.5), by = v.h - mm(2.5);
+  s += `<g><rect x="${f(bx - mm(1))}" y="${f(by - mm(4))}" width="${f(len + mm(9))}" height="${mm(5)}" fill="#fff" fill-opacity=".85"/>` +
+    `<path d="M${bx},${f(by - mm(1.4))} V${by} H${f(bx + len)} V${f(by - mm(1.4))}" fill="none" stroke="#222" stroke-width="${mm(0.35)}"/>` +
+    `<text x="${f(bx + len + mm(1))}" y="${f(by - mm(0.6))}" font-size="${mm(2)}" fill="#222">${meters >= 1000 ? meters / 1000 + 'km' : meters + 'm'}</text></g>`;
+  // 出典
+  s += `<text x="${f(v.w - mm(1.5))}" y="${f(v.h - mm(1.3))}" font-size="${mm(1.7)}" fill="#333" text-anchor="end" ${halo}>出典：国土地理院（淡色地図）</text>`;
+  return s + '</svg>';
+}
+function s12FrontHtml(c, tileUrl, stamp) {
+  const t = c.t, nH = c.hs.filter(h => h.type !== 'apt').length;
+  return `<div class="s12card">
+    <p class="s12ttl">区域地図のカード</p>
+    <div class="s12row"><span>場所</span><span class="ln">${esc(t.name || '')}</span><span>区域番号</span><span class="ln no">${esc(t.no)}</span></div>
+    <div class="s12map">${s12MapSvg(c, tileUrl)}</div>
+    <div class="s12ft"><span class="lg">${S12_ICO.line}区域の線 ${S12_ICO.house}家 ${S12_ICO.kind}住居以外 ${S12_ICO.apt}集合住宅（番号は裏面） ${S12_ICO.ref}拒否（訪問しない）</span>
+      <span class="dt">家${nH}・集合住宅${c.apts.length}・拒否${s12RefCount(c)}／${stamp}時点</span></div>
+    <p class="s12note">封筒に入れて持ち歩き、汚さないようにしてください。回り終えたら区域係に知らせてください。</p>
+  </div>`;
+}
+function s12BackHtml(c, S, fs) {
+  const t = c.t, dnc = s12Dnc();
+  const room = (h, u) => {
+    const uk = unitKind(h, u);
+    return `<span class="rm${dnc[K(h.id, u)] ? ' x' : ''}">${esc(uName(h, u))}${uk !== 'home' ? `<small>${S12_KCH[uk] || ''}</small>` : ''}</span>`;
+  };
+  const body = !c.apts.length ? '<p class="s12empty">この区域には、集合住宅の登録はありません。</p>' : c.apts.map((h, i) => {
+    const groups = unitGroups(h);
+    const rows = !h.units.length ? '<p class="nr">部屋の登録がありません</p>'
+      : groups.length > 1 ? groups.map(([g, us]) => `<div class="fl"><span class="fn">${esc(g || 'そのほか')}</span><span class="rs">${us.map(u => room(h, u)).join('')}</span></div>`).join('')
+      : `<div class="fl one"><span class="rs">${h.units.map(u => room(h, u)).join('')}</span></div>`;
+    const info = [kindOf(h) !== 'home' ? kindName(kindOf(h)) : '', h.lock ? 'オートロック' : '', `${h.units.length}部屋`].filter(Boolean).join('・');
+    return `<div class="ab"><p class="an"><i>${i + 1}</i>${esc(h.label || '集合住宅')}<small>${info}</small>${dnc[K(h.id, '')] ? '<b class="rm x">建物ごと拒否</b>' : ''}</p>${rows}</div>`;
+  }).join('');
+  return `<div class="s12card back">
+    <p class="s12bh"><b>区域番号 ${esc(t.no)}</b>${t.name ? `<span class="nm">${esc(t.name)}</span>` : ''}<span class="r">集合住宅（番号は表の地図）</span></p>
+    <div class="s12apts" data-s12fit="${esc(t.id)}" style="column-count:${S.backCols};font-size:${fs}pt">${body}</div>
+    <p class="s12ft"><span class="lg"><span class="rm x">101</span> 拒否の部屋（訪問しない）　社・店など：住居以外の部屋</span></p>
+  </div>`;
+}
+/* 裏面の文字の大きさ：部屋が多い区域は、入りきるまで小さくする */
+function s12FitBacks(cards, S, sz) {
+  const box = document.createElement('div');
+  box.className = 'pdoc s12measure ' + sz;
+  box.innerHTML = cards.map(c => s12BackHtml(c, S, S.font)).join('');
+  document.body.appendChild(box);
+  const res = new Map(), over = [];
+  $$('[data-s12fit]', box).forEach(el => {
+    let fs = S.font;
+    const full = () => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
+    while (full() && fs > 5) { fs = Math.round((fs - 0.5) * 10) / 10; el.style.fontSize = fs + 'pt'; }
+    if (full()) over.push(el.dataset.s12fit);
+    res.set(el.dataset.s12fit, fs);
+  });
+  box.remove();
+  return { size: res, over };
+}
+function s12SheetsHtml(fronts, backs, S, sz) {
+  const blank = '<div class="s12card blank"></div>';
+  const marks = '<i class="cm v t"></i><i class="cm v b"></i><i class="cm h l"></i><i class="cm h r"></i>';
+  let out = '';
+  for (let i = 0; i < fronts.length; i += S.per) {
+    out += `<div class="s12sheet ${sz}">${Array.from({ length: S.per }, (_, j) => fronts[i + j] || blank).join('')}${marks}</div>`;
+    if (backs) out += `<div class="s12sheet ${sz}">${S.order.map(j => backs[i + j] || blank).join('')}${marks}</div>`;
+  }
+  return out;
+}
+let s12Busy = false;
+async function printS12(ids, sz, back) {
+  if (s12Busy) return;
+  s12Busy = true;
+  try { await printS12Run(ids, sz, back); } finally { s12Busy = false; }
+}
+async function printS12Run(ids, sz, back) {
+  const S = S12_SIZE[sz];
+  const byT = new Map();
+  D().houses.forEach(h => { if (!h.terrId) return; let a = byT.get(h.terrId); if (!a) byT.set(h.terrId, a = []); a.push(h); });
+  const cards = ids.map(terrById).filter(Boolean).sort(byNo).map(t => s12Prep(t, S, byT));
+  if (!cards.length) return;
+  const urls = [...new Set(cards.flatMap(c => c.tiles.map(x => x.url)))];
+  closeSheet();
+  const got = new Map();
+  let done = 0, bad = 0, next = 0;
+  const show = () => showBlocking('区域カードを準備しています…', `地図の画像を受け取っています（${done} / ${urls.length}）`, true);
+  show();
+  try {
+    const worker = async () => {
+      while (next < urls.length) {
+        const u = urls[next++], r = await s12Tile(u);
+        got.set(u, r); if (r === u) bad++;
+        done++; if (done % 4 === 0 || done === urls.length) show();
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(6, urls.length) }, worker));
+  } finally { hideBlocking(); }
+  const now = new Date(), stamp = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
+  const tileUrl = u => got.get(u);
+  const fronts = cards.map(c => s12FrontHtml(c, tileUrl, stamp));
+  let backs = null, over = [];
+  if (back) {
+    const fit = s12FitBacks(cards, S, sz);
+    backs = cards.map(c => s12BackHtml(c, S, fit.size.get(c.t.id) || S.font));
+    over = fit.over.map(id => (terrById(id) || {}).no).filter(Boolean);
+  }
+  printDoc(`<div class="s12doc">${s12SheetsHtml(fronts, backs, S, sz)}</div>`, false, `@page{size:${S.page};margin:0}`);
+  const warn = [];
+  if (bad) warn.push(`地図の画像${bad}枚を受け取れませんでした。地図が欠けていたら、もう一度印刷してください`);
+  if (over.length) warn.push(`区域${over.join('・')}は、裏面に部屋が入りきりませんでした。大きさをA5にしてください`);
+  if (warn.length) setTimeout(() => toast(warn.join('。')), 3800);
+}
+function openS12() {
+  if (!isAdmin()) return;
+  const terrs = D().territories.filter(t => !t.dummy).slice().sort(byNo);
+  if (!s12Opt.sel) s12Opt.sel = new Set(terrs.map(t => t.id));
+  const cnt = new Map();
+  D().houses.forEach(h => {
+    if (!h.terrId) return;
+    const c = cnt.get(h.terrId) || { h: 0, a: 0 };
+    if (h.type === 'apt') c.a++; else c.h++;
+    cnt.set(h.terrId, c);
+  });
+  const selIds = () => terrs.filter(t => s12Opt.sel.has(t.id)).map(t => t.id);
+  const go = ids => printS12(ids, s12Opt.size, s12Opt.back)
+    .catch(e => { hideBlocking(); toast('印刷の準備がうまくいきませんでした：' + (e && e.message || e)); });
+  // スマホで一度に印刷するのは、S12_MOBILE_MAX 区域まで（地図の画像が多いと、ブラウザが止まることがあるため）
+  const refresh = () => {
+    const ids = selIds(), n = ids.length, S = S12_SIZE[s12Opt.size];
+    const pages = k => Math.ceil(k / S.per) * (s12Opt.back ? 2 : 1);
+    $('#s12Cnt').textContent = `${n} / ${terrs.length}`;
+    const box = $('#s12GoBox');
+    if (!n) { box.innerHTML = '<button type="button" class="btn primary block" disabled>印刷する区域を選んでください</button>'; return; }
+    if (isMobile() && n > S12_MOBILE_MAX) {
+      const parts = [];
+      for (let i = 0; i < n; i += S12_MOBILE_MAX) parts.push(ids.slice(i, i + S12_MOBILE_MAX));
+      box.innerHTML = `<p class="hint">スマホでは、一度に${S12_MOBILE_MAX}区域ずつ印刷します（多いと止まることがあるため）。上から順に押してください。<br>
+          まとめて印刷するときは、パソコンから印刷するか、ドライブに毎週保存されるPDFを使ってください。</p>
+        <div class="s12parts">${parts.map((p, i) => {
+          const done = s12Done.has(p.join(','));
+          return `<button type="button" class="btn block${done ? '' : ' primary'}" data-s12part="${i}">${done ? '✓ ' : ''}区域${esc(terrById(p[0]).no)}〜${esc(terrById(p[p.length - 1]).no)}を印刷（A4で${pages(p.length)}ページ）</button>`;
+        }).join('')}</div>`;
+      $$('[data-s12part]', box).forEach(b => b.onclick = () => { const p = parts[Number(b.dataset.s12part)]; s12Done.add(p.join(',')); go(p); });
+    } else {
+      box.innerHTML = `<button type="button" class="btn primary block" id="s12Go">印刷する（${n}区域・A4で${pages(n)}ページ）</button>`;
+      $('#s12Go').onclick = () => go(ids);
+    }
+  };
+  const paint = () => {
+    const S = S12_SIZE[s12Opt.size];
+    setSheet(headHtml(null, '区域カード（S-12）を印刷する', '紙で運用するときの予備') + `
+      <p class="hint">区域の線・家・拒否の家と、まわりの建物（国土地理院の淡色地図）を印刷します。留守などの記録は出しません。</p>
+      <p class="q">カードの大きさ</p>
+      <div class="seg" role="group" aria-label="カードの大きさ">${Object.entries(S12_SIZE).map(([key, o]) =>
+        `<button type="button" data-s12size="${key}" aria-pressed="${s12Opt.size === key}">${o.label}</button>`).join('')}</div>
+      <label class="check"><input type="checkbox" id="s12Back"${s12Opt.back ? ' checked' : ''}>裏面に集合住宅の部屋を印刷する（両面印刷）</label>
+      ${s12Opt.back ? `<p class="hint">プリンターの両面印刷は「${S.bind}」を選ぶと、表と裏の区域がそろいます。拒否の部屋は黒で出ます。</p>` : ''}
+      <p class="q">印刷する区域（<span id="s12Cnt"></span>）</p>
+      <div class="row"><button type="button" class="btn small" id="s12All">すべて選ぶ</button><button type="button" class="btn small" id="s12None">すべて外す</button></div>
+      <div class="s12pick">${terrs.map(t => {
+        const c = cnt.get(t.id) || { h: 0, a: 0 };
+        return `<label class="check"><input type="checkbox" data-s12t="${esc(t.id)}"${s12Opt.sel.has(t.id) ? ' checked' : ''}><span><b>${esc(t.no)}</b> ${esc(t.name || '')} <small class="muted">家${c.h}・集合住宅${c.a}</small></span></label>`;
+      }).join('')}</div>
+      <div id="s12GoBox"></div>
+      <p class="hint">区域が多いと、地図の準備に1〜2分かかります。印刷の画面で「PDFとして保存」を選ぶと、PDFにもできます。パソコンからの印刷がおすすめです。</p>`);
+    refresh();
+    $$('#sheet [data-s12size]').forEach(b => b.onclick = () => { s12Opt.size = b.dataset.s12size; sheetKeep = true; paint(); });
+    $('#s12Back').onchange = e => { s12Opt.back = e.target.checked; sheetKeep = true; paint(); };
+    $$('#sheet [data-s12t]').forEach(x => x.onchange = () => { if (x.checked) s12Opt.sel.add(x.dataset.s12t); else s12Opt.sel.delete(x.dataset.s12t); refresh(); });
+    $('#s12All').onclick = () => { terrs.forEach(t => s12Opt.sel.add(t.id)); $$('#sheet [data-s12t]').forEach(x => { x.checked = true; }); refresh(); };
+    $('#s12None').onclick = () => { s12Opt.sel.clear(); $$('#sheet [data-s12t]').forEach(x => { x.checked = false; }); refresh(); };
+  };
+  paint();
 }
 
 /* =========================================================
@@ -9984,6 +10488,7 @@ function bindStatic() {
     else if ((x = q('[data-fstamp]'))) stampFollow(x.dataset.key, x.dataset.fstamp, null, renderFollowList);
   });
   $('#adS13').onclick = () => openS13();
+  $('#adS12').onclick = () => openS12();
   document.addEventListener('click', e => {
     const o = e.target.closest('[data-asgopen], [data-asgok]'); if (!o) return;
     asgMarkSeen(String(o.dataset.asgkeys || o.dataset.asgok || '').split(' ').filter(Boolean));
