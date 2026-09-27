@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.10.31"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.06"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -143,7 +143,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 
 /* ===== 下から出る入力画面 ===== */
 #backdrop{position:fixed;inset:0;background:#00000066;z-index:2000}
-#sheet{position:fixed;left:0;right:0;bottom:0;z-index:2001;background:var(--paper);border-radius:20px 20px 0 0;max-height:88vh;max-height:88dvh;overflow:auto;padding:14px 16px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px #0003}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:2001;background:var(--paper);border-radius:20px 20px 0 0;max-height:calc(88vh / var(--z,1));max-height:calc(88dvh / var(--z,1));overflow:auto;padding:14px 16px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px #0003}
 @media (min-width:760px){#sheet{left:calc(50% - 320px);right:auto;width:640px;bottom:16px;border-radius:20px}}
 .sheet-head{display:flex;align-items:center;gap:12px;margin-bottom:8px}
 .sheet-head h2{font-size:22px;outline:none}
@@ -302,7 +302,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .seg.small button{flex:1;min-height:44px;padding:0 6px;font-size:15px}
 #map .pin{transform:scale(var(--pin,1))}
 #map.drawing .pin{transform:scale(calc(var(--pin,1) * .78));opacity:.9}
-.cardbar{font-size:15px;padding:8px 10px;max-height:48vh;overflow:auto}
+.cardbar{font-size:15px;padding:8px 10px;max-height:calc(48vh / var(--z,1));overflow:auto}
 .cardbar .btn.small{min-height:42px;font-size:15px;padding:0 12px}
 .cardbar .seg{margin:6px 0 0}
 .cardbar .seg button{min-height:40px;padding:0 14px;font-size:15px}
@@ -476,6 +476,7 @@ body.strong .pin.st-plain{border-width:4px}
 .s12pick .check{min-height:46px;font-size:16px}
 .s12pick small{font-size:13px}
 .s12parts .btn+.btn{margin-top:8px}
+.loadlog{white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.5;background:var(--card,#f6f6f6);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:55vh;overflow:auto}
 .s12measure{position:absolute;left:-99999px;top:0;visibility:hidden}
 .s12measure.a6{width:148.5mm}.s12measure.a5{width:210mm}
 .s12sheet{position:relative;display:grid;overflow:hidden;background:#fff;page-break-after:always;break-after:page}
@@ -895,7 +896,7 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 /* ===== 確認の画面 ===== */
 #askBox{position:fixed;inset:0;z-index:3500}
 #askBox .askback{position:absolute;inset:0;background:#00000066}
-#askBox .asksheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-radius:20px 20px 0 0;padding:14px 18px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;box-shadow:0 -6px 20px #0003;zoom:var(--z,1);max-height:90vh;overflow:auto}
+#askBox .asksheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-radius:20px 20px 0 0;padding:14px 18px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;box-shadow:0 -6px 20px #0003;zoom:var(--z,1);max-height:calc(90vh / var(--z,1));overflow:auto}
 @media (min-width:760px){#askBox .asksheet{left:calc(50% - 280px);right:auto;width:560px;bottom:24px;border-radius:20px}}
 #askBox .grab{margin:0 auto}
 .askhead{display:flex;align-items:center;gap:12px}
@@ -1034,12 +1035,12 @@ img,canvas,video{max-width:100%}
   nav.tabs svg{width:22px;height:22px}
   .tabbadge{top:2px}
   .view{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
-  #sheet{max-height:94vh;max-height:94dvh;bottom:6px}
-  .cardbar{max-height:58vh;right:max(76px,calc(env(safe-area-inset-right) + 76px));left:max(10px,env(safe-area-inset-left));bottom:10px}
+  #sheet{max-height:calc(94vh / var(--z,1));max-height:calc(94dvh / var(--z,1));bottom:6px}
+  .cardbar{max-height:calc(58vh / var(--z,1));right:max(76px,calc(env(safe-area-inset-right) + 76px));left:max(10px,env(safe-area-inset-left));bottom:10px}
   .helpbtn{bottom:76px}
   .locbtn{bottom:12px}
   .legend{max-height:80%;bottom:10px}
-  .modebar{max-height:70vh;overflow:auto}
+  .modebar{max-height:calc(70vh / var(--z,1));overflow:auto}
   #toast{bottom:calc(60px + env(safe-area-inset-bottom))}
   .choice{min-height:64px}
 }
@@ -1071,7 +1072,7 @@ img,canvas,video{max-width:100%}
   .tabbadge{top:8px;left:calc(50% + 10px)}
   #toast{bottom:calc(24px + env(safe-area-inset-bottom))}
   /* 入力画面は、画面のまん中あたりに浮かせる */
-  #sheet{max-height:calc(100dvh - 48px);bottom:24px;left:calc(50% - 320px + 56px)}
+  #sheet{max-height:calc((100dvh - 48px) / var(--z,1));bottom:24px;left:calc(50% - 320px + 56px)}
   /* ホームは左右2段に（左：時間と目標、右：予定） */
   #view-home .wrap{max-width:1180px}
   .homegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:0 28px;align-items:start}
@@ -1114,6 +1115,57 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
 @media (min-width:1400px){
   #myCards,#allCards,#adTerrs{grid-template-columns:repeat(3,1fr)}
 }
+
+/* ===== 文字を大きくしたとき（年配の方向け）の見せ方・押しやすさ ===== */
+/* 上の帯：名前は1行。入りきらないときは「…」で切る（縦に1文字ずつ並んで、帯が高くならないように） */
+header.top h1,header.top .pill{flex:none;white-space:nowrap}
+.who{flex:0 1 auto;min-width:0;overflow:hidden}
+#whoLabel{white-space:nowrap}
+#whoName{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 下のタブ：文字を折り返さない。大きい文字では「区域カード」を「カード」にする */
+nav.tabs button{white-space:nowrap;overflow:hidden}
+body.big nav.tabs button{font-size:14px}
+body.big nav.tabs.many button{font-size:11.5px;letter-spacing:-.06em}
+body.big nav.tabs .tl-long{display:none}
+/* ホームの「今日やること」：大きい文字では、ボタンを下に広く置く（まん中の文字がつぶれないように） */
+body.big .todo{flex-wrap:wrap}
+body.big .todo .tbody2{flex:1 1 0}
+body.big .todo>.btn{flex:1 1 100%;order:5;min-height:56px;font-size:17px}
+body.big .todo.terr .progress{order:4}
+/* 上の帯：大きい文字では名前を出さない（ホームと区域カードの画面に大きく出ているため。帯を1行に保つ） */
+body.big .who:has(#whoName:not([hidden])){display:none}
+/* 区域カードの見出し：大きい文字では「地図 ›」の印をやめて、区域の名前を広く（見出し全体を押すと地図がひらく） */
+body.big .tgo{display:none}
+body.big .tcard.tc2 .stamp:not(.xs){width:52px;height:52px;font-size:24px}
+/* 説明つきの2つのボタン（回り終えました／途中まで など）は、大きい文字では1つずつ縦に並べる */
+body.big .choices.two:has(small){grid-template-columns:1fr}
+body.big .choices.two:has(small) .choice{min-height:72px}
+/* えらぶボタン：大きい文字では3つ並びを2つ並びに、字を少しだけ小さくして変な折り返しを減らす */
+body.big .choices.three,body.big .linecolors{grid-template-columns:repeat(2,1fr)}
+body.big .choice{font-size:17px}
+/* 拒否のボタン：「拒否」は1行で、説明はその下に */
+.refbtn{flex-wrap:wrap;white-space:nowrap;row-gap:2px}
+.refbtn small{white-space:normal;flex-basis:100%;text-align:center}
+/* 文字の大きさは zoom で変えている。zoom をかけた部品では画面の高さ（vh）も大きくなるので、
+   高さの上限は zoom で割っている（大きい文字で、下から出る画面の上の「×」が画面の外に出ていたため） */
+/* 下から出る画面：見出しと「×」は、下に動かしても上に見えたままにする（長い一覧でも、すぐもどれるように） */
+#sheet .sheet-head{position:sticky;top:0;z-index:5;background:var(--paper);margin:-14px -16px 8px;padding:14px 16px 10px;box-shadow:0 1px 0 var(--line)}
+/* 大きい文字では「×」に「もどる」の文字をそえる（×だけでは、もどるボタンだと分かりにくいため） */
+body.big .sheet-head .icon-btn[data-close]{width:auto;min-width:52px;padding:0 12px 0 10px;border-radius:26px;display:flex;align-items:center;gap:4px;font-size:26px}
+body.big .sheet-head .icon-btn[data-close]::after{content:'もどる';font-size:15px;font-weight:700}
+/* 大きい文字では、1行目に区域の番号と「× もどる」、2行目に見出しを広く（見出しが1文字ずつ折り返さないように） */
+body.big .sheet-head{flex-wrap:wrap;row-gap:4px}
+body.big .sheet-head>div{flex:1 1 100%;order:3;min-width:0}
+body.big .sheet-head h2{font-size:21px}
+/* 下から出る画面を開いているあいだ、お知らせは上に出す（画面の下のボタンを隠さないように） */
+body.sheet-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
+/* 見出しや問いかけの最後の1文字だけが次の行に行かないように（対応しているブラウザだけ） */
+h2,h3,.q{text-wrap:pretty}
+.iosguide{text-align:left;margin-top:10px}
+.iosguide ol{margin:6px 0 6px 1.4em;padding:0}
+.iosguide li{margin:2px 0}
+/* お知らせ（下に出る黒い帯）：「取り消す」などのボタン以外のところ（文字など）をさわると、すぐ消える */
+#toast{cursor:pointer;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
 </style>
 </head>
 <body>
@@ -1330,6 +1382,9 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
         <h2 class="sec">データ</h2>
         <div id="adDataSet"></div>
         <div id="adDummy"></div>
+        <div class="setrow"><span>このスマホでの動作の速さ<br><small class="hint">今のデータのまま、よく使う処理の時間を測ります（データは変わりません）。数秒かかります</small></span>
+          <button type="button" class="btn small" id="adPerf">速さを測る</button>
+          <button type="button" class="btn small" id="adLoadLog">読み込みの記録</button></div>
         <div class="row">
           <button class="btn" id="adCsv">訪問記録をCSVで書き出す</button>
           <button class="btn danger" id="adReset">試作データに戻す</button>
@@ -1341,7 +1396,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
 
   <nav class="tabs" id="tabs" aria-label="画面の切りかえ">
     <button data-view="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5h4v5"/></svg>ホーム</button>
-    <button data-view="cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h6M7 14h10"/></svg>区域カード</button>
+    <button data-view="cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h6M7 14h10"/></svg><span><span class="tl-long">区域</span>カード</span></button>
     <button data-view="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>地図</button>
     <button data-view="reco" id="tabReco" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>おすすめ</button>
     <button data-view="follow" id="tabFollow" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7"/><path d="M20 4v4.7h-4.7"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.3"/><path d="M4 20v-4.7h4.7"/></svg>再訪問</button>
@@ -1670,9 +1725,18 @@ const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'r
 const MAP_COLS = ['dnc', 'follows', 'released'];
 const RES_NAME = { m: 'met', a: 'away', r: 'refused' };
 const clone = o => JSON.parse(JSON.stringify(o));
-const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
-const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
-const lsDel = k => { try { localStorage.removeItem(k); } catch (e) { /* 何もしない */ } };
+/* 保存場所の名札：テスト用のページ（config.js に ns: 'test' があるか、URLに「test」が入っている）は、
+   本番とは別の場所に保存する。同じ github.io の中では、本番とテストの保存場所がまざってしまうため
+   （まざると、本番の登録や、まだ送っていない記録が、テスト用のサーバーに送られてしまう） */
+const NS = (function () {
+  const c = window.KUIKI_CONFIG && window.KUIKI_CONFIG.ns;
+  if (typeof c === 'string' && c.trim()) return c.replace(/[^\w-]/g, '').slice(0, 20);
+  return /test/i.test(location.pathname) ? 'test' : '';
+})();
+const nsKey = k => (NS ? NS + '::' + k : k);
+const lsGet = k => { try { return localStorage.getItem(nsKey(k)); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(nsKey(k), v); return true; } catch (e) { return false; } };
+const lsDel = k => { try { localStorage.removeItem(nsKey(k)); } catch (e) { /* 何もしない */ } };
 
 /* 自分が詳細を見られる範囲（担当している区域・受け持っている再訪問） */
 function permSig() {
@@ -1744,7 +1808,7 @@ const IDB = {
     if (this.db) return Promise.resolve(this.db);
     return new Promise((res, rej) => {
       if (!window.indexedDB) { rej(new Error('no indexedDB')); return; }
-      const r = indexedDB.open('kuiki-map', 1);
+      const r = indexedDB.open(NS ? 'kuiki-map-' + NS : 'kuiki-map', 1);
       r.onupgradeneeded = () => r.result.createObjectStore('kv');
       r.onsuccess = () => { this.db = r.result; res(this.db); };
       r.onerror = () => rej(r.error);
@@ -1859,9 +1923,10 @@ const Store = {
     this.fp = fp;
   },
   /* 控えと比べて、変わった分だけを取り出す（取り出した分は控えに入れる） */
-  collectChanges() {
+  collectChanges(skipVisits) {
     const out = {}, d = this.data, fp = this.fp;
     ARR_COLS.forEach(c => {
+      if (c === 'visits' && skipVisits) return; // 記録を変えていない編集では、数十万件の記録を調べない
       const f = fp[c], up = [], del = [], seen = new Set();
       for (const x of d[c] || []) {
         seen.add(x.id);
@@ -1888,12 +1953,12 @@ const Store = {
     if (sj !== fp.settings) { out.settings = JSON.parse(sj); fp.settings = sj; }
     return out;
   },
-  save() {
+  save(skipVisits) {
     if (!LIVE) {
       if (!lsSet(this.key, JSON.stringify(this.data))) toast('この端末に保存できませんでした');
       return;
     }
-    const ch = this.collectChanges();
+    const ch = this.collectChanges(skipVisits);
     if (!Object.keys(ch).length) return;
     Object.keys(ch).forEach(c => this.markCol(c));
     this.queue.push(ch);
@@ -2073,13 +2138,17 @@ const Store = {
       return 'cache';
     }
     let last = { pct: 0, stage: 'meta', eta: null };
+    loadLog = { t0: Date.now(), reqs: [], marks: [] };
     const j = await loadAll(
       p => { last = p; showLoadProgress(p, 0); },
-      n => showLoadProgress(last, n));
+      n => showLoadProgress(last, n),
+      { parallel: 6 });
     await new Promise(r => setTimeout(r, 60)); // 「仕上げ」の表示を先に出してから、重い処理をする
     this.setServer(j);
     this.markAll();
     this.saveCacheSoon();
+    loadMark('finish');
+    setTimeout(loadLogDone, 0); // 最初の画面を描いたあとに締める
     return 'server';
   }
 };
@@ -2360,6 +2429,7 @@ function noteError(action, e) {
 const wait = ms => new Promise(r => setTimeout(r, ms));
 async function api(action, extra, opt) {
   const o = opt || {};
+  const T = Date.now(), rqName = loadLog ? reqName(action, extra) : '';
   const ctl = typeof AbortController === 'function' ? new AbortController() : null;
   const timer = ctl ? setTimeout(() => ctl.abort(), o.timeout || 60000) : null;
   let res, text;
@@ -2375,6 +2445,7 @@ async function api(action, extra, opt) {
   } catch (err) {
     const code = err && err.name === 'AbortError' ? 'timeout' : 'network';
     const e = Object.assign(new Error(code), { code, retry: true });
+    logReq(rqName, T, code, 0, 0);
     noteError(action, e); throw e;
   } finally { clearTimeout(timer); }
   if (!res.ok) {
@@ -2384,13 +2455,17 @@ async function api(action, extra, opt) {
     const what = action + (extra && extra.part ? `:${extra.part}${extra.offset ? '@' + extra.offset : ''}` : '');
     const e = Object.assign(new Error('http' + res.status), { code: 'http' + res.status, retry: res.status >= 429 || res.status === 404,
       sample: `${what}・${where}${res.redirected ? '（転送あり）' : ''}・${String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)}` });
+    logReq(rqName, T, 'http' + res.status, (text || '').length, 0);
+    if (res.status === 404) relayLost = true;
     noteError(action, e); throw e;
   }
   let j;
   try { j = JSON.parse(text); } catch (err) {
     const e = Object.assign(new Error('nonjson'), { code: 'nonjson', retry: true, sample: String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) });
+    logReq(rqName, T, 'nonjson：' + e.sample.slice(0, 60), text.length, 0);
     noteError(action, e); throw e;
   }
+  logReq(rqName, T, j.ok ? (j.snap ? 'ok（まとめ）' : 'ok') : j.error, text.length, Array.isArray(j.rows) ? j.rows.length : 0);
   if (!j.ok) {
     if (j.error === 'auth') authLost();
     const e = Object.assign(new Error(j.error || 'error'), { code: j.error, retry: j.error === 'server' || j.error === 'busy' });
@@ -2400,6 +2475,70 @@ async function api(action, extra, opt) {
   Store.syncAt = Date.now();
   lsSet(SYNC_KEY, String(Store.syncAt));
   return j;
+}
+/* ---------- はじめての読み込みの記録（遅いときに、どこで時間がかかったかを調べるため） ----------
+   ・通信1回ごとに「何を・いつ始めて・何秒かかって・大きさ・結果」を残す。住所や名前は残さない
+   ・終わったら、この端末の中だけに保存する（設定 → 区域係の画面「読み込みの記録」、または終わったときの知らせから見られる） */
+const LOADLOG_KEY = 'kuiki_load_log';
+let relayLost = false; // Google の受け渡しで返事がなくなった（iPhone の設定が原因のことがある）
+let loadLog = null;
+function reqName(action, extra) {
+  const x = extra || {};
+  const names = { meta: '区域・設定など', houses: '家', visits: '訪問の記録', tv: '区域の記録' };
+  if (action === 'load' && x.part) return (names[x.part] || x.part) + (x.snap || x.vsnap ? '（まとめた一覧' + (x.offset ? `・${x.offset}件目から` : '') + '）' : x.offset ? `（${x.offset}件目から）` : '');
+  return action;
+}
+function logReq(what, T, res, len, rows) {
+  if (!loadLog || !what) return;
+  loadLog.reqs.push({ what, s: (T - loadLog.t0) / 1000, sec: (Date.now() - T) / 1000, kb: Math.round((len || 0) / 1024), rows: rows || 0, res: String(res || '') });
+}
+function loadMark(name) { if (loadLog) loadLog.marks.push({ name, s: (Date.now() - loadLog.t0) / 1000 }); }
+function loadLogClose(e) {
+  if (!loadLog) return null;
+  const L = loadLog; loadLog = null;
+  L.total = (Date.now() - L.t0) / 1000;
+  L.pageSec = Math.round(performance.now()) / 1000; // ページを開いてから使えるまで
+  L.at = new Date().toISOString();
+  L.ua = deviceLabel() + '・' + (navigator.userAgent.match(/(Edg|CriOS|FxiOS|Chrome|Firefox|Version)\/[\d.]+/) || [''])[0] + (/Brave/.test(navigator.userAgent) || navigator.brave ? '（Brave）' : '');
+  L.net = navigator.connection && navigator.connection.effectiveType ? navigator.connection.effectiveType : '';
+  if (e) L.error = String(e.code || e.message || 'unknown') + (e.sample ? `（${e.sample}）` : '');
+  lsSet(LOADLOG_KEY, JSON.stringify(L));
+  return L;
+}
+function loadLogDone() {
+  const L = loadLogClose(null);
+  if (L && L.pageSec > 30) toast(`はじめての読み込みに${Math.round(L.pageSec)}秒かかりました`, null, { label: '記録を見る', fn: openLoadLog });
+}
+function loadLogText(L) {
+  const f = n => (Math.round(n * 10) / 10).toFixed(1);
+  const ms = {}; L.marks.forEach(m => { ms[m.name] = m.s; });
+  const retries = L.reqs.filter(r => !/^ok/.test(r.res));
+  const lines = [
+    `はじめての読み込みの記録（${new Date(L.at).toLocaleString('ja-JP')}・${APP_VERSION}）`,
+    `端末：${L.ua}${L.net ? '・回線 ' + L.net : ''}`,
+    `ページを開いてから使えるまで：${f(L.pageSec)}秒（そのうち読み込み ${f(L.total)}秒）`,
+    `区域・設定など：${ms.meta != null ? f(ms.meta) + '秒で届く' : '-'}　家：${ms.houses != null ? f(ms.houses) + '秒で届く' : '-'}　記録：${ms.visits != null ? f(ms.visits) + '秒で届く' : '-'}　仕上げ（端末の中）：${ms.finish != null && ms.visits != null ? f(L.total - ms.visits) + '秒' : '-'}`,
+    `やり直し：${retries.length}回${retries.length ? '（' + retries.map(r => r.res).join('、') + '）' : ''}`,
+    ...(L.error ? [`結果：読み込めませんでした（${L.error}）`] : []),
+    '',
+    '開始　かかった　内容　件数　大きさ　結果',
+    ...L.reqs.map(r => `${f(r.s)}秒　${f(r.sec)}秒　${r.what}　${r.rows || ''}　${r.kb}KB　${r.res}`)
+  ];
+  return lines.join('\n');
+}
+function openLoadLog() {
+  let L = null;
+  try { L = JSON.parse(lsGet(LOADLOG_KEY) || "null"); } catch (e) { L = null; }
+  if (!L) { toast('まだ記録がありません（この端末ではじめて開いたときに残ります）'); return; }
+  const txt = loadLogText(L);
+  setSheet(headHtml(null, 'はじめての読み込みの記録', 'この端末で、はじめて開いたときの通信の記録') + `
+    <pre class="loadlog">${esc(txt)}</pre>
+    <button type="button" class="btn primary block" id="llCopy">コピーする</button>
+    <p class="hint">遅かったときは、コピーして区域係（または作った人）に送ってください。住所や名前は入っていません。</p>`);
+  $('#llCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText(txt); toast('コピーしました'); }
+    catch (e) { const r = document.createRange(); r.selectNodeContents($('#sheet .loadlog')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('選んだ状態にしました。長押しでコピーしてください'); }
+  };
 }
 /* 初回や読み直しは、分けて受け取る（件数が多くても止まらないように） */
 function expandHouse(a) {
@@ -2415,12 +2554,13 @@ function expandHouse(a) {
 }
 /* valid：返事の形を確かめる（まちがった形の返事が来たときも、送り直す） */
 async function apiRetry(action, extra, onRetry, valid) {
-  const waits = [2000, 5000, 10000];
+  const waits = [2000, 5000, 10000, 20000];
   for (let i = 0; ; i++) {
     try {
       const j = await api(action, extra, { timeout: 120000 });
       if (valid && !valid(j)) {
         const what = action + (extra && extra.part ? `:${extra.part}${extra.offset ? '@' + extra.offset : ''}` : '');
+        relayLost = true;
         const e = Object.assign(new Error('badreply'), { code: 'badreply', retry: true,
           sample: `${what}・返事の中身：${Object.keys(j || {}).join(',')}${j && j.mode ? '・mode=' + j.mode : ''}${j && j.app ? '・GETとして届いた' : ''}` });
         noteError(action, e); throw e;
@@ -2435,37 +2575,94 @@ async function apiRetry(action, extra, onRetry, valid) {
 }
 /* 全部を読み込む。onProgress には { pct, stage, eta（残りの秒・わからないときは null） } をわたす
    段階：meta（区域など）→ houses（家）→ visits（訪問の記録）→ finish（仕上げ：スマホの中で整える） */
-async function loadAll(onProgress, onRetry) {
+/* はじめての読み込み（家3万件・記録数十万件でも、短く・確実に）
+   ・家と訪問の記録は、サーバーが用意した「まとめた一覧」（house-snap.gs）から受け取る。
+     1回の処理が数秒で終わるので、Google の受け渡しで返事がなくなる（http404・GETとして届く）ことが起きにくい
+   ・区域・設定など（meta）と、家の一覧、記録の一覧の最初の分を、同時に取りに行く
+   ・一覧には、それを作った時点の変更番号 seq がつく。差分は、いちばん古い番号から受け取る（取りこぼさない）
+   ・一覧が使えないとき（古いサーバーなど）は、これまでどおりシートから分けて受け取る（meta のあとに）
+   ・opt.parallel … 同時に取りに行く数の目安（はじめて開くとき6、全員の読み直しのときは2） */
+const PART_STEP = { houses: 5000, visits: 20000 };
+async function runPool(tasks, n) {
+  const out = new Array(tasks.length);
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, n), tasks.length) }, async () => {
+    while (i < tasks.length) { const k = i++; out[k] = await tasks[k](); }
+  }));
+  return out;
+}
+async function loadAll(onProgress, onRetry, opt) {
+  const par = Math.max(2, (opt && opt.parallel) || 2);
   const prog = o => { if (onProgress) onProgress(o); };
+  const valid = j => !!(j && Array.isArray(j.rows));
   prog({ pct: 1, stage: 'meta', eta: null });
+  // まとめた一覧は、meta と同時に（使えないときは null）
+  const hsnapP = apiRetry('load', { part: 'houses', offset: 0, snap: 1 }, null, valid).catch(() => null);
+  const vsnapP = apiRetry('load', { part: 'visits', offset: 0, vsnap: 1 }, null, valid).catch(() => null);
   const meta = await apiRetry('load', { part: 'meta' }, onRetry, j => !!(j && j.state && Array.isArray(j.state.territories)));
+  loadMark('meta');
   const st = meta.state;
-  st.houses = [];
-  const vis = [];
   const cnt = meta.counts || { houses: 0, visits: 0 };
+  if (loadLog) loadLog.counts = cnt;
   const total = Math.max(1, cnt.houses + cnt.visits);
   const finishSec = 2 + total / 60000; // 仕上げ（スマホの中で整える）にかかるおおよその秒数
   const t0 = Date.now();
-  let done = 0;
+  let done = 0, housesDone = false;
+  const seqs = [Number(meta.seq)];
+  const tick = () => {
+    const el = (Date.now() - t0) / 1000;
+    const eta = done > 0 && el > 2 ? Math.round(Math.max(0, total - done) * el / done + finishSec) : null;
+    prog({ pct: Math.min(95, 4 + Math.round(done / total * 91)), stage: housesDone || !cnt.houses ? 'visits' : 'houses', eta });
+  };
   prog({ pct: 4, stage: 'houses', eta: null });
-  for (const part of ['houses', 'visits']) {
-    let off = 0;
-    while (off !== null) {
-      const r = await apiRetry('load', { part, offset: off }, onRetry, j => !!(j && Array.isArray(j.rows)));
-      if (part === 'houses') r.rows.forEach(a => st.houses.push(expandHouse(a)));
-      else r.rows.forEach(a => vis.push(a));
-      done += r.rows.length;
-      off = r.next;
-      // 残りの時間：ここまでの速さから計算（はじめの1回は、まだ当てにならないので出さない）
-      const el = (Date.now() - t0) / 1000, calls = Math.ceil(done / 5000);
-      const eta = done > 0 && el > 1.5 && calls >= 2 ? Math.round((total - done) * el / done + finishSec) : null;
-      const stage = part === 'houses' && off !== null ? 'houses' : (part === 'houses' && cnt.visits ? 'visits' : part);
-      prog({ pct: Math.min(95, 4 + Math.round(done / total * 91)), stage, eta });
+  const fetchPart = (part, offset, extra) => apiRetry('load', Object.assign({ part, offset }, extra || {}), onRetry, valid)
+    .then(r => { done += r.rows.length; tick(); return r; });
+  const inOrder = async (part, off, chunks) => { // 1つずつ順に
+    while (off !== null && off !== undefined) { const r = await fetchPart(part, off); chunks.push(r.rows); off = r.next; }
+    return chunks;
+  };
+  // シートから分けて受け取る（meta のあとに読むので、変更番号の順は正しい）
+  const loadPart = async (part, n) => {
+    const step = PART_STEP[part], offs = [];
+    for (let o = 0; o < Math.max(1, cnt[part] || 0); o += step) offs.push(o);
+    const rs = await runPool(offs.map(o => () => fetchPart(part, o)), n);
+    if (rs.some((r, k) => r.next !== null && r.next !== undefined && r.next !== offs[k] + step)) return inOrder(part, 0, []); // サーバーの件数がちがう
+    const chunks = rs.map(r => r.rows), lastR = rs[rs.length - 1];
+    return lastR.next !== null && lastR.next !== undefined ? inOrder(part, lastR.next, chunks) : chunks; // 読み込みのあいだに増えた分
+  };
+  const isSnap = r => !!(r && r.snap && !r.gone && isFinite(Number(r.seq)));
+  // 記録の一覧：最初の分から全体の件数がわかるので、残りを同時に（3つまで）
+  const visitsFromSnap = async first => {
+    if (!isSnap(first)) return null;
+    done += first.rows.length; tick();
+    const chunks = [first.rows];
+    if (first.next !== null && first.next !== undefined) {
+      const step = Number(first.next), offs = [];
+      for (let o = step; o < (Number(first.total) || 0); o += step) offs.push(o);
+      const rs = await runPool(offs.map(o => () => fetchPart('visits', o, { vsnap: 1, ver: first.ver })), 3);
+      if (rs.some(r => !isSnap(r))) return null; // 途中で一覧が作り直された → シートから
+      rs.forEach(r => chunks.push(r.rows));
     }
-  }
+    seqs.push(Number(first.seq));
+    return chunks;
+  };
+  const [hc, vc] = await Promise.all([
+    hsnapP.then(h => {
+      if (isSnap(h) && (h.next === null || h.next === undefined)) { done += h.rows.length; seqs.push(Number(h.seq)); return [h.rows]; }
+      return loadPart('houses', Math.ceil(par / 2));
+    }).then(c => { housesDone = true; loadMark('houses'); tick(); return c; }),
+    vsnapP.then(visitsFromSnap).then(c => c || loadPart('visits', 2))
+  ]);
+  loadMark('visits');
+  // 同じ家・記録が2回届いても、1つにする（読み込みのあいだに行がずれたとき）
+  st.houses = [];
+  const hs = new Set();
+  hc.forEach(rows => rows.forEach(a => { if (hs.has(a[0])) return; hs.add(a[0]); st.houses.push(expandHouse(a)); }));
+  const vis = [], vs = new Set();
+  vc.forEach(rows => rows.forEach(a => { if (vs.has(a[0])) return; vs.add(a[0]); vis.push(a); }));
   prog({ pct: 96, stage: 'finish', eta: Math.round(finishSec) });
   st.visitsC = vis;
-  return { mode: 'full', seq: meta.seq, state: st };
+  return { mode: 'full', seq: Math.min(...seqs.filter(x => isFinite(x))), state: st };
 }
 let reloading = false;
 async function reloadAll(delay) {
@@ -2474,7 +2671,7 @@ async function reloadAll(delay) {
   try {
     // 全員が同時に3万件を読み直すとサーバーが混むので、0〜15秒ずらす
     if (delay) { updateSyncBadge('最新の情報を用意しています…'); await wait(Math.random() * 15000); }
-    const j = await loadAll(p => updateSyncBadge(`読み込み中 ${p.pct}%`));
+    const j = await loadAll(p => updateSyncBadge(`読み込み中 ${p.pct}%`), null, { parallel: 2 });
     Store.needFull = false; Store.needMeta = false;
     Store.inbox = [j];
     applyInbox();
@@ -2749,6 +2946,7 @@ function openSyncSheet() {
     Store.needFull = true; reloadAll(false).catch(() => {});
   };
 }
+
 /* ---------- はじめての読み込みの進み具合（あいさつの画面と、読み込み中の画面に出す） ---------- */
 const LD_STAGES = [['meta', '区域'], ['houses', '家'], ['visits', '訪問の記録'], ['finish', '仕上げ']];
 function fmtEta(sec) {
@@ -2764,7 +2962,8 @@ function showLoadProgress(p, retry) {
       `<span class="${i < si ? 'done' : i === si ? 'now' : ''}">${x[1]}</span>`).join('<i>›</i>')}</div>
     <div class="ldbar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="読み込みの進み具合"><i style="width:${p.pct}%"></i></div>
     <p class="ldpct"><b>${p.pct}%</b><span>${p.stage === 'finish' ? 'スマホの中でデータを整えています' : fmtEta(p.eta)}</span></p>
-    ${retry ? `<p class="ldnote warn">通信が混み合っています。自動でもう一度ためしています（${retry}回目）</p>` : ''}
+    ${retry ? `<p class="ldnote warn">サーバーからの返事がうまく届かなかったので、自動でもう一度ためしています（${retry}回目）</p>` : ''}
+    ${retry && relayLost && isIOS() ? `<p class="ldnote warn"><b>iPhoneの設定が原因のことがあります。</b>「設定」→「Wi‑Fi」→ つないでいるWi‑Fiの「ⓘ」→「IPアドレスのトラッキングを制限」をオフにしてから、この画面を開き直してください。</p>` : ''}
     <p class="ldnote">初めて開くときだけ、時間がかかります。次からはすぐに開きます。画面を閉じずに、このままお待ちください。</p>`;
   const sp = $('#splash');
   if (sp && !sp.hidden) {
@@ -2796,9 +2995,34 @@ function showLoadError(e) {
   d.textContent = `続くときは、区域係にこの番号を伝えてください：${(e && (e.code || e.message)) || 'unknown'}` + (e && e.sample ? `（${e.sample}）` : '') +
     `\n［${API_URL ? API_URL.slice(-12) : 'URLなし'}・${APP_VERSION}］`;
   d.style.whiteSpace = 'pre-line';
+  if (NS) d.textContent += `・保存場所「${NS}」`;
   d.hidden = false;
   $('#blockRetry').hidden = false;
   $('#blockRetry').onclick = () => location.reload();
+  // iPhone・iPad で、Google の受け渡しで返事がなくなったとき（http404・GETとして届いた）は、設定の案内を出す
+  //（「IPアドレスのトラッキングを制限」がオンだと起きることを、2026.9.27 に確かめた）
+  let g = $('#blockIosGuide');
+  if (isIOS() && e && /^(http404|badreply)/.test(String(e.code || ''))) {
+    if (!g) { g = document.createElement('div'); g.id = 'blockIosGuide'; g.className = 'notice warn iosguide'; $('#blockDetail').before(g); }
+    g.innerHTML = `<p><b>iPhoneの設定を1か所変えると、読み込めるようになります。</b></p>
+      <ol><li>「設定」を開く</li><li>「Wi‑Fi」→ つないでいるWi‑Fiの右の「ⓘ」</li><li>「IPアドレスのトラッキングを制限」をオフ</li><li>ここにもどって「もう一度読み込む」</li></ol>
+      <p class="hint">モバイル通信のときは「設定」→「モバイル通信」→「通信のオプション」の中にあります。</p>`;
+    g.hidden = false;
+  } else if (g) g.hidden = true;
+  // 通信の記録（どこで止まったか）を見て、コピーできるようにする
+  const L = loadLogClose(e);
+  if (L) {
+    let b = $('#blockLogBtn');
+    if (!b) { b = document.createElement('button'); b.id = 'blockLogBtn'; b.type = 'button'; b.className = 'btn block'; b.style.marginTop = '10px'; $('#blockRetry').after(b); }
+    b.textContent = '通信の記録を見る・コピーする';
+    b.hidden = false;
+    b.onclick = () => {
+      let pre = $('#blockLog');
+      if (!pre) { pre = document.createElement('pre'); pre.id = 'blockLog'; pre.className = 'loadlog'; b.after(pre); }
+      pre.textContent = loadLogText(L);
+      if (navigator.clipboard) navigator.clipboard.writeText(pre.textContent).then(() => { b.textContent = 'コピーしました（区域係に送ってください）'; }, () => {});
+    };
+  }
 }
 async function logout() {
   const n = Store.queue.length;
@@ -2856,9 +3080,12 @@ const canDelHouse = h => isAdmin() || h.createdBy === me().id;
    （そのあいだに届いた、ほかの人の記録や変更は消さない） */
 function commit(msg, fn, onUndo) {
   const snapOf = () => JSON.stringify(Object.assign({}, D(), { visits: undefined, currentUser: undefined }));
-  const preJson = snapOf(), preVisits = D().visits.slice();
-  fn(); Store.save(); renderAll();
-  const postJson = snapOf(), postIds = new Set(D().visits.map(v => v.id));
+  const preJson = snapOf(), vArr = D().visits, vLen = vArr.length, preVisits = vArr.slice();
+  fn();
+  // ほとんどの編集（区域・家・予定など）は記録を変えない。そのときは記録の調べ直しと索引の作り直しをはぶく
+  const vSame = D().visits === vArr && vArr.length === vLen;
+  Store.save(vSame); renderAll(vSame ? 'houses' : undefined);
+  const postJson = snapOf(), postIds = vSame ? null : new Set(D().visits.map(v => v.id));
   toast(msg, () => {
     closeSheet();
     if (onUndo) onUndo();
@@ -2886,6 +3113,7 @@ function undoChange(pre, post, preVisits, postIds) {
     });
   });
   if (!same(pre.settings, post.settings)) d.settings = pre.settings;
+  if (!postIds) return; // 記録は変えていなかった
   const preIds = new Set(preVisits.map(v => v.id));
   const added = new Set([...postIds].filter(id => !preIds.has(id)));
   const removed = preVisits.filter(v => !postIds.has(v.id));
@@ -2902,15 +3130,20 @@ function slotOfVisit(v) {
   if (!s) { s = slotOf(new Date(v.at)); SLOT_MEMO.set(v, s); }
   return s;
 }
-function buildIndex() {
+/* 記録の索引をつくったときの記録の一覧（同じ一覧・同じ件数なら、記録の索引は作り直さなくてよい） */
+let IDX_SRC = null, IDX_LEN = -1;
+function buildIndex(only) {
   AGE_CACHE = null; RATE_CACHE = null; SHARE_CACHE = null; CHANCE_CACHE = null; RECO_CACHE = null;
-  IDX = new Map(); HBT = new Map(); SUM = new Map(); HID = new Map(); TID = new Map();
+  HBT = new Map(); HID = new Map(); TID = new Map();
   for (const t of D().territories) TID.set(t.id, t);
   for (const h of D().houses) {
     HID.set(h.id, h);
     if (!HBT.has(h.terrId)) HBT.set(h.terrId, []);
     HBT.get(h.terrId).push(h);
   }
+  if (only === 'houses' && IDX_SRC === D().visits && IDX_LEN === D().visits.length) return; // 記録は変わっていない
+  IDX = new Map(); SUM = new Map();
+  IDX_SRC = D().visits; IDX_LEN = D().visits.length;
   for (const v of D().visits) {
     const k = K(v.houseId, v.unit);
     if (!IDX.has(k)) IDX.set(k, []);
@@ -2946,6 +3179,7 @@ function idxAddVisit(v) {
   if (!IDX.has(k)) IDX.set(k, []);
   IDX.get(k).push(v);
   sumKey(k);
+  if (IDX_SRC === D().visits) IDX_LEN = D().visits.length; // 1件ずつ直したので、索引は今の記録と合っている
 }
 function idxDelVisit(v) {
   const k = K(v.houseId, v.unit), a = IDX.get(k);
@@ -3068,15 +3302,68 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
-  { v: '2026.10.31', items: [
+  { v: '2026.11.06', only: 'prod', items: [
+    ['速', 'はじめて開くときの読み込みを、速く・確実にしました。家が3万件あっても、画面の動きが重くならないようにしました'],
+    ['見', '文字を大きくしたときの画面を見やすくしました。「とても大きく」にすると、地図の家の印も大きくなります'],
+    ['消', '下に出るお知らせ（黒い帯）は、「取り消す」以外のところをさわると、すぐ消えます。地図で記録したあとに出る「次のおすすめ」の枠も、ボタン以外のところをさわると閉じます'],
+    ['直', '下から出る画面で、見出しと「×」がいつも上に出るようにしました（下に動かすと、もどれなくなることがあったのを直しました）'],
+    ['案', 'iPhoneで読み込めないときに、直し方を画面に出すようにしました'],
+    ['推', '区域係：「おすすめ」を出す・出さない、出す種類などの設定が保存されるようになりました（これまでは、しばらくすると元にもどっていました）。「おすすめから訪ねた記録」の集計も出ます'],
+    ['印', '区域係：区域カード（S-12）に、マンション・学校などの名前を出せるようになりました。「設定・データ」の「速さを測る」、「状況」の「読み込みの記録」も使えます']
+  ] },
+  { v: '2026.11.06', only: 'test', items: [
+    ['消', '下に出るお知らせ（黒い帯）は、「取り消す」以外のところをさわると、すぐ消えます。地図で記録したあとに出る「次のおすすめ」の枠も、ボタン以外のところをさわると閉じます'],
+    ['推', '本番版にある「おすすめ」のタブ（出すかどうか・種類は区域係が決めます）と、再訪問のメモの「次の約束」を、テスト版にも入れました'],
+    ['今', 'ホームの「今日やること」は、歯車の設定の「使う機能」で、出す・出さないをえらべます（はじめは出しません）']
+  ] },
+  { v: '2026.11.05', only: 'test', items: [
+    ['直', '下から出る画面（区域カードをもらう など）で、下に動かすと「×」が見えなくなり、もどれなくなることがあったのを直しました。見出しと「×」はいつも上に出ます。文字を大きくしたときは「× もどる」と出ます']
+  ] },
+  { v: '2026.11.04', only: 'test', items: [
+    ['見', '文字を大きくしたときの画面を見やすくしました（上の帯の名前・下のタブ・ホームのボタン・区域カード・拒否のボタンなど）'],
+    ['押', '文字を「とても大きく」にすると、地図の家の印も大きくなります。お知らせは長い文ほど長く出し、下のボタンを押すじゃまをしないようにしました'],
+    ['案', 'iPhoneで読み込めないときに、直し方（「IPアドレスのトラッキングを制限」をオフ）を画面に出すようにしました']
+  ] },
+  { v: '2026.11.03', only: 'test', items: [
+    ['速', 'はじめて開くとき、訪問の記録もサーバーのまとめた一覧から受け取るようにしました（読み込めないことが起きにくくなります）'],
+    ['測', '読み込めなかったときも、画面の「通信の記録を見る・コピーする」から、どこで止まったかを見られるようにしました']
+  ] },
+  { v: '2026.11.02', only: 'test', items: [
+    ['測', 'はじめて開いたときの通信の記録を残すようにしました。30秒より長くかかったときは知らせが出て、記録を見てコピーできます（区域係は「状況」の「読み込みの記録」からも見られます）']
+  ] },
+  { v: '2026.11.01', only: 'test', items: [
+    ['速', 'はじめて開くときの読み込みを速くしました（家の一覧をまとめて1回で受け取り、記録は同時にいくつか受け取ります）'],
+    ['印', '区域係：区域カード（S-12）に、マンション・学校などの名前を、自分の地図の設定と同じように出すようにしました。裏面の「例：拒否の部屋」は、集合住宅があるときだけ出ます']
+  ] },
+  { v: '2026.10.30', only: 'test', items: [
+    ['印', 'iPhone・iPadでは、準備ができたら「印刷する」ボタンを押して印刷の画面を出すようにしました（ブラウザに止められないように）'],
+    ['分', '区域係：スマホで区域カード（S-12）を印刷するときは、8区域ずつに分けて印刷するようにしました']
+  ] },
+  { v: '2026.10.29', only: 'test', items: [
+    ['直', '印刷のとき、すぐに係の画面が印刷されそうになったり、2回目の印刷で画面が止まったりすることがあったのを直しました']
+  ] },
+  { v: '2026.10.28', only: 'test', items: [
+    ['印', '区域係：「状況」から、紙の区域カード（S-12）を印刷できるようになりました。区域の線・家・拒否の家とまわりの建物が表に、集合住宅の部屋が裏に出ます']
+  ] },
+  { v: '2026.10.26', only: 'test', items: [
+    ['進', '初めて開くときの読み込みで、バーと％、残りの時間が出るようになりました']
+  ] },
+  { v: '2026.10.22', only: 'test', items: [
+    ['速', '記録が何十万件あっても、区域や家の編集がすぐ終わるようにしました']
+  ] },
+  { v: '2026.10.21', only: 'test', items: [
+    ['速', '家が3万件あるときでも、係の画面・ホーム・会える見込みの計算が速くなるようにしました'],
+    ['測', '区域係：「設定・データ」の「速さを測る」で、そのスマホでの動作の速さを確かめられます']
+  ] },
+  { v: '2026.10.31', only: 'prod', items: [
     ['進', '初めて開くときの読み込みで、バーと％、残りの時間が出るようになりました'],
     ['印', '区域係：「状況」から、紙の区域カード（S-12）を印刷できるようになりました。区域の線・家・拒否の家とまわりの建物が表に、集合住宅の部屋が裏に出ます（スマホでは8区域ずつ）'],
     ['直', '印刷のとき、係の画面が印刷されそうになったり、画面が止まったりすることがあったのを直しました。iPhone・iPadでは「印刷する」ボタンを押して印刷の画面を出します']
   ] },
-  { v: '2026.10.22', items: [
+  { v: '2026.10.22', only: 'prod', items: [
     ['推', '「おすすめ」を、下のタブ（ホーム・区域カード・地図のならび）に移しました']
   ] },
-  { v: '2026.10.21', items: [
+  { v: '2026.10.21', only: 'prod', items: [
     ['今', '設定の「使う機能」で、ホームの「今日やること」を出す・出さないをえらべるようにしました（はじめは出しません）。出すと、自分の予定と再訪問の約束も出ます'],
     ['約', '再訪問のメモに「次の約束」の日と時刻を入れられるようになりました。カレンダーと「今日やること」に出ます'],
     ['推', '下のタブに「おすすめ」がもどりました。空いた時間に、近くの家や長く会えていない家を2〜3件回れます（出すかどうか・種類は区域係が決めます）']
@@ -3275,7 +3562,8 @@ function showNewsIfAny(then) {
   const seen = lsGet(SEEN_VER);
   lsSet(SEEN_VER, APP_VERSION);
   if (!seen) { then(); return; } // はじめて使う人には出さない
-  const items = CHANGELOG.filter(c => c.v > seen).flatMap(c => c.items);
+  const who = NS ? 'test' : 'prod'; // only のあるお知らせは、テスト版・本番版のどちらかだけに出す
+  const items = CHANGELOG.filter(c => c.v > seen && (!c.only || c.only === who)).flatMap(c => c.items);
   if (!items.length) { then(); return; }
   const el = $('#news');
   el.innerHTML = `<div class="newsbox"><div class="newshead"><p>アップデートのお知らせ</p><h2>区域マップが新しくなりました</h2></div>
@@ -3335,9 +3623,13 @@ function toast(msg, undoFn, action) {
   const act = action || (undoFn ? { label: '取り消す', fn: undoFn } : null);
   el.innerHTML = `<span>${esc(msg)}</span>` + (act ? `<button type="button">${esc(act.label)}</button>` : '');
   el.hidden = false;
-  if (act) el.querySelector('button').onclick = () => { el.hidden = true; act.fn(); };
+  if (act) el.querySelector('button').onclick = () => { clearTimeout(toastTimer); el.hidden = true; act.fn(); };
+  // 「取り消す」などのボタン以外のところ（文字など）をさわると、すぐ消す
+  el.onclick = e => { if (e.target.closest('button')) return; clearTimeout(toastTimer); el.hidden = true; };
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, act ? 12000 : 3500);
+  const big = document.body.classList.contains('big') ? 1.4 : 1;
+  const ms = act ? 12000 * big : Math.min(10000, Math.max(3500, String(msg).length * 180) * big); // 1文字0.18秒の目安
+  toastTimer = setTimeout(() => { el.hidden = true; }, ms);
 }
 
 
@@ -3391,6 +3683,10 @@ document.addEventListener('click', e => {
 }, true);
 function setSheet(html) {
   const s = $('#sheet');
+  document.body.classList.add('sheet-open');
+  // ただのお知らせ（取り消すボタンのないもの）は、画面の下のボタンを隠さないように消す
+  const tt = $('#toast');
+  if (tt && !tt.hidden && !tt.querySelector('button')) tt.hidden = true;
   const keep = sheetKeep && !s.hidden; sheetKeep = false;
   const top = s.scrollTop;
   let focusSel = '';
@@ -3417,6 +3713,7 @@ function closeSheet() {
   qrWatching = false;
   if (homeUrlDirty) { cleanUrl(); homeUrlDirty = false; } // URLに戻したコードは、画面を閉じたら消す
   $('#sheet').hidden = true; $('#backdrop').hidden = true;
+  document.body.classList.remove('sheet-open');
   $('#sheet').dataset.swipe = ''; $('#sheet').style.transform = '';
   if (tmpMarker && map) { map.removeLayer(tmpMarker); tmpMarker = null; }
   if (LIVE && Store.inbox.length) setTimeout(applyInbox, 0);
@@ -4595,6 +4892,8 @@ function paintNextPanel() {
       : `<p class="okmsg"><b>このあたりのおすすめの家は、ぜんぶ回りました。</b></p>
       <div class="npbtns"><button type="button" class="btn npclose" id="npClose">閉じる</button></div>`}`;
   el.hidden = false;
+  // ボタン以外のところ（文字など）をさわると、枠を閉じる
+  el.onclick = e => { if (e.target.closest('button, a, input, select, label')) return; hideNextPanel(); };
   if ($('#npUndo')) $('#npUndo').onclick = () => { const u = st.undo; hideNextPanel(); u(); };
   if ($('#npClose')) $('#npClose').onclick = hideNextPanel;
   if ($('#npSkip')) $('#npSkip').onclick = () => { st.skip.add(nx.h.id); paintNextPanel(); };
@@ -4763,7 +5062,12 @@ function purgeMemos() {
    withMine のときは、奉仕時間・自分の予定（本人だけの記録）も消す（「この端末から消す」のとき） */
 function clearAllMemos(withMine) {
   const pre = [MEMO_PREFIX, 'kuiki_pins_'].concat(withMine ? ['kuiki_my_'] : []);
-  try { Object.keys(localStorage).filter(x => pre.some(p => x.indexOf(p) === 0)).forEach(lsDel); } catch (e) { /* 何もしない */ }
+  try {
+    Object.keys(localStorage).forEach(x => {
+      const y = NS ? (x.indexOf(NS + '::') === 0 ? x.slice(NS.length + 2) : null) : (x.indexOf('::') < 0 ? x : null);
+      if (y && pre.some(p => y.indexOf(p) === 0)) localStorage.removeItem(x);
+    });
+  } catch (e) { /* 何もしない */ }
 }
 const memoShort = m => { const t = m.text.split('\n')[0]; return t.length > 40 || m.text.includes('\n') ? t.slice(0, 40) + '…' : t; };
 function openMemo(k, back) {
@@ -7363,7 +7667,9 @@ const uiSave = () => lsSet(uiKey(), JSON.stringify(UI));
 /* かんたんモードでは、文字の大きさ以外は標準にもどして使う */
 function uiEff() {
   if (UI.mode === 'detail') return UI;
-  return Object.assign({}, UI_DEFAULT, { size: UI.size === 'small' ? 'normal' : UI.size });
+  const size = UI.size === 'small' ? 'normal' : UI.size;
+  // かんたん表示で「とても大きく」にしたときは、地図の家の印も大きくする（指で押しやすく）
+  return Object.assign({}, UI_DEFAULT, { size, pin: size === 'xlarge' ? 'large' : 'normal' });
 }
 const accentColor = () => themeOf(uiEff())[1];
 /* 区域の線の色（各自の設定） */
@@ -7415,6 +7721,7 @@ function applyUi() {
   document.body.classList.toggle('compact', e.density === 'compact');
   document.body.classList.toggle('nohints', e.hints === 'hide');
   document.body.classList.toggle('strong', e.contrast === 'strong');
+  document.body.classList.toggle('big', zoomOf(e) >= 1.14); // 文字を大きくしたとき（並べ方を変える）
   if (map) { renderTerrs(); setTimeout(() => map.invalidateSize(), 30); }
 }
 /* 円形のカラー：角度で色あい、中心からの距離であざやかさ */
@@ -8225,10 +8532,10 @@ const mixIdx = (mx, slot) => { const w = HOME_W[slot], s = (mx.y + mx.m + mx.o) 
 /* 区域×時間帯の実際の記録（直近1年）と、全体の会えた割合 */
 function rateStats() {
   if (RATE_CACHE) return RATE_CACHE;
-  const now = Date.now(), per = new Map();
+  const per = new Map(), cut = new Date(Date.now() - 365 * DAY).toISOString();
   let n = 0, m = 0;
   for (const v of D().visits) {
-    if (now - Date.parse(v.at) > 365 * DAY) continue;
+    if (v.at < cut) continue; // 日時の文字どうしで比べる（速い）
     const h = HID.get(v.houseId); if (!h || !h.terrId) continue;
     const key = h.terrId + '|' + slotOfVisit(v);
     const c = per.get(key) || { n: 0, m: 0 };
@@ -8532,6 +8839,40 @@ function bindAgeAdmin() {
   });
 }
 
+
+/* ---------- このスマホで、動作の速さを測る（区域係の「設定・データ」） ----------
+   今のデータ（家・記録の件数そのまま）で、よく使う処理の時間を測る。データは変えない */
+function runPerfCheck() {
+  const res = [];
+  const T = (name, fn, n) => {
+    const k = n || 1, t0 = performance.now();
+    try { for (let i = 0; i < k; i++) fn(); } catch (e) { res.push([name, -1]); return; }
+    res.push([name, (performance.now() - t0) / k]);
+  };
+  const mineT = D().territories.find(t => t.holder) || D().territories[0];
+  T('起動のときの索引づくり', () => buildIndex());
+  T('索引づくり（2回目から）', () => buildIndex(), 2);
+  T('区域カードの画面', () => renderCards());
+  T('ホーム（今日やること）', () => { CHANCE_CACHE = null; RATE_CACHE = null; todayTodoHtml([]); });
+  if (mineT) T('おすすめ順（1区域）', () => roundPlan(roundInfo(mineT.id, true)), 3);
+  T('留守宅カードの候補', () => awaySuggestions(me().id, [slotOf(new Date())]), 2);
+  T('会える見込みの集計', () => { RATE_CACHE = null; rateStats(); }, 2);
+  if (map) T('地図の家の印（今の画面）', () => renderHouses(), 3);
+  T('編集の保存の準備（取り消し用の控え）', () => JSON.stringify(Object.assign({}, D(), { visits: undefined })));
+  if (LIVE && Store.fp) T('編集の保存（変わった分をさがす）', () => Store.collectChanges());
+  const cnt = { h: D().houses.length, u: D().houses.reduce((a, h) => a + targets(h).length, 0), v: D().visits.length };
+  const mark = ms => (ms < 0 ? '×（エラー）' : ms < 100 ? '◎ 速い' : ms < 300 ? '○ ふつう' : ms < 1000 ? '△ 少し待つ' : '× 重い');
+  setSheet(headHtml(null, '動作の速さ', `このスマホ・家 ${cnt.h}件（部屋をふくめ ${cnt.u}）・記録 ${cnt.v}件`) + `
+    <div class="scroll"><table class="slots narrow"><tr><th>処理</th><th>時間</th><th>判定</th></tr>
+      ${res.map(([n, ms]) => `<tr><th style="text-align:left">${esc(n)}</th><td>${ms < 0 ? '—' : Math.round(ms) + 'ms'}</td><td>${mark(ms)}</td></tr>`).join('')}</table></div>
+    <p class="hint">◎ 0.1秒未満・○ 0.3秒未満・△ 1秒未満・× 1秒以上。いちばん古いスマホで測ってください。△や×があるときは、この画面を写真にとって、開発した人に知らせてください。</p>
+    <button class="btn block primary" id="pfCopy">結果をコピーする</button>
+    <button class="btn block" data-close>閉じる</button>`);
+  const text = `区域マップ 動作の速さ（${navigator.userAgent.slice(0, 80)}）\n家${cnt.h} 部屋込み${cnt.u} 記録${cnt.v}\n` + res.map(([n, ms]) => `${n}: ${ms < 0 ? 'エラー' : Math.round(ms) + 'ms'}`).join('\n');
+  $('#pfCopy').onclick = () => copyText(text).then(ok => toast(ok ? 'コピーしました' : 'コピーできませんでした'));
+  renderAll();
+}
+
 function renderDataSet() {
   renderDummy();
   renderRecoAdmin();
@@ -8550,15 +8891,17 @@ function renderDataSet() {
     row('syncGroupSec', '一緒に回っているとき、ほかの人の記録を取りに行く間隔', '秒', 1, '短いほど早く反映されますが、サーバーが混みます。80人が同時に使っても、7秒なら余裕があります') +
     row('syncNormalSec', '区域カード・地図を見ているとき、取りに行く間隔', '秒', 5, 'ふだんの間隔です。混むときは長くしてください');
 }
+/* 係の画面：開いているタブの中身だけを作る（3万件のとき、全部のタブを毎回作ると重いため） */
 function renderAdmin() {
-  renderSchedAdmin(); renderPeople();
   setAdPane(adPane);
-  renderDevices();
-  renderInbox();
+  renderInbox(); // 承認待ちの数（タブの数字）は、いつも数える
   $('#adInbox').insertAdjacentHTML('afterbegin', ageNoticeHtml());
-  renderDataSet();
-  renderAwayAdmin();
-  renderMeetAdmin();
+  if (adPane === 'inbox') renderDevices();
+  if (adPane === 'sched') renderSchedAdmin();
+  if (adPane === 'people') renderPeople();
+  if (adPane === 'set') renderDataSet();
+  if (adPane === 'status') { renderAwayAdmin(); renderMeetAdmin(); }
+  if (adPane !== 'status' && adPane !== 'terr') return;
   const now = Date.now();
   const ts = D().territories.slice().sort(byNo);
   let targetsN = 0, met90 = 0;
@@ -8577,10 +8920,10 @@ function renderAdmin() {
     ${D().houses.some(h => h.prov) ? `<div class="tile alert"><b>${D().houses.filter(h => h.prov).length}</b>まだ確かめていない仮の家</div>` : ''}`;
 
   // 時間帯ごとの会えた割合
-  const cell = {};
+  const cell = {}, cut180 = new Date(now - 180 * DAY).toISOString();
   for (const v of D().visits) {
-    if (now - Date.parse(v.at) > 180 * DAY) continue;
-    const d = new Date(v.at), key = dayTypeOf(d) + bandOf(d);
+    if (v.at < cut180) continue; // 日時の文字どうしで比べる（1件ずつ日付に直すより速い）
+    const key = slotOfVisit(v).replace('・', '');
     cell[key] = cell[key] || { n: 0, m: 0 };
     cell[key].n++; if (v.result === 'met') cell[key].m++;
   }
@@ -10063,6 +10406,13 @@ function s12Prep(t, S, byT) {
   return { t, hs, poly, v, apts, latC, tiles: v ? s12Tiles(v) : [] };
 }
 const s12Dnc = () => D().dnc || {};
+/* 名前のある建物（「名前を出す範囲」が「地図に見えている全体」のとき、ほかの区域の建物の名前も出すため） */
+let s12LabeledMemo = null;
+function s12Labeled() {
+  const hs = D().houses;
+  if (!s12LabeledMemo || s12LabeledMemo.src !== hs || s12LabeledMemo.len !== hs.length) s12LabeledMemo = { src: hs, len: hs.length, list: hs.filter(h => h.label) };
+  return s12LabeledMemo.list;
+}
 function s12RefCount(c) {
   const dnc = s12Dnc();
   return c.hs.reduce((n, h) => n + (h.type === 'apt' ? h.units.filter(u => dnc[K(h.id, u)]).length : (dnc[K(h.id, '')] ? 1 : 0)), 0);
@@ -10130,7 +10480,24 @@ function s12MapSvg(c, tileUrl) {
       L1.push(`<circle cx="${x}" cy="${y}" r="${mm(0.8)}" fill="#fff" stroke="${h.prov ? '#888' : '#222'}" stroke-width="${mm(0.22)}"/>`);
     }
   });
-  s += L1.join('') + L2.join('') + L3.join('') + L4.join('');
+  s += L1.join('') + L2.join('') + L3.join('');
+  // 建物の名前：その人の設定（設定 → 地図の「マンション・アパートの名前」「学校・役所・お店などの名前」「名前を出す範囲」）と同じにする
+  const showApt = UI.aptName === 'on', showFc = UI.fcName === 'on';
+  if (showApt || showFc) {
+    const list = UI.nameScope === 'all' ? s12Labeled() : c.hs;
+    let n = 0;
+    for (const h of list) {
+      if (!h.label || n >= 150) continue;
+      const k = h.type === 'apt' ? aptKind(h) : kindOf(h), isFc = k !== 'home';
+      if (h.type === 'apt' ? !(showApt || (showFc && isFc)) : !(showFc && isFc)) continue; // 一戸建ての「目印」は出さない（地図と同じ）
+      const [x, y] = P(h.lat, h.lng).map(f);
+      if (!inView(x, y)) continue;
+      n++;
+      const name = h.label.length > 12 ? h.label.slice(0, 11) + '…' : h.label;
+      s += `<text x="${x}" y="${f(y + mm(h.type === 'apt' ? 2.2 : 1.5))}" font-size="${mm(1.9)}" font-weight="700" fill="${isFc ? '#4A148C' : '#263238'}" text-anchor="middle" dominant-baseline="hanging" ${halo}>${esc(name)}</text>`;
+    }
+  }
+  s += L4.join('');
   // 方位（北）
   const nx = v.w - mm(5), ny = mm(5.5);
   s += `<g><circle cx="${nx}" cy="${ny}" r="${mm(3.6)}" fill="#fff" fill-opacity=".85"/>` +
@@ -10175,7 +10542,7 @@ function s12BackHtml(c, S, fs) {
   return `<div class="s12card back">
     <p class="s12bh"><b>区域番号 ${esc(t.no)}</b>${t.name ? `<span class="nm">${esc(t.name)}</span>` : ''}<span class="r">集合住宅（番号は表の地図）</span></p>
     <div class="s12apts" data-s12fit="${esc(t.id)}" style="column-count:${S.backCols};font-size:${fs}pt">${body}</div>
-    <p class="s12ft"><span class="lg"><span class="rm x">101</span> 拒否の部屋（訪問しない）　社・店など：住居以外の部屋</span></p>
+    ${c.apts.length ? `<p class="s12ft"><span class="lg">例：<span class="rm x">101</span> 拒否の部屋（訪問しない）${c.apts.some(h => h.units.some(u => unitKind(h, u) !== 'home')) ? '　社・店など：住居以外の部屋' : ''}</span></p>` : ''}
   </div>`;
 }
 /* 裏面の文字の大きさ：部屋が多い区域は、入りきるまで小さくする */
@@ -10386,13 +10753,15 @@ function updateTabs() {
   $('#tabReco').hidden = !recoOn();
   $('#tabAdminLabel').textContent = isAdmin() ? '係の画面' : 'グループ';
   $('#tabs').classList.remove('three');
-  $('#tabs').style.setProperty('--tabs', $$('#tabs > button').filter(b => !b.hidden).length);
+  const nTabs = $$('#tabs > button').filter(b => !b.hidden).length;
+  $('#tabs').style.setProperty('--tabs', nTabs);
+  $('#tabs').classList.toggle('many', nTabs >= 6); // 6つのときは、大きい文字でも名前が切れないように少し小さく
 }
 function fillWho() {
   $('#whoSel').innerHTML = D().users.map(u => `<option value="${u.id}"${u.id === D().currentUser ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
 }
 function renderAll(skipIndex) {
-  if (!skipIndex) buildIndex(); // ほかの人の記録だけが届いたときは、索引を1件ずつ直してあるので作り直さない
+  if (skipIndex !== true) buildIndex(skipIndex === 'houses' ? 'houses' : undefined); // true：記録だけが届いた（索引は1件ずつ直してある）／'houses'：記録は変わっていない
   updateTabs();
   if (currentView === 'reco' && !recoOn()) { showView('home'); return; }
   if (currentView === 'reco') renderRecoView();
@@ -10424,7 +10793,12 @@ function openTerr(id) {
 /* ---------- ボタンの動き ---------- */
 function bindStatic() {
   $$('#tabs button').forEach(b => b.onclick = () => showView(b.dataset.view));
-  $('#adTabs').addEventListener('click', e => { const b = e.target.closest('[data-ap]'); if (b) { setAdPane(b.dataset.ap); $('#view-admin').scrollTop = 0; } });
+  $('#adTabs').addEventListener('click', e => {
+    const b = e.target.closest('[data-ap]'); if (!b) return;
+    setAdPane(b.dataset.ap);
+    if (isAdmin()) renderAdmin(); else if (isOverseer()) renderOverseer(); // えらんだタブの中身を、そのとき作る
+    $('#view-admin').scrollTop = 0;
+  });
   bindHome();
   bindReco();
   bindSwipe();
@@ -10489,6 +10863,8 @@ function bindStatic() {
   });
   $('#adS13').onclick = () => openS13();
   $('#adS12').onclick = () => openS12();
+  $('#adPerf').onclick = () => { toast('測っています…'); setTimeout(runPerfCheck, 50); };
+  $('#adLoadLog').onclick = () => openLoadLog();
   document.addEventListener('click', e => {
     const o = e.target.closest('[data-asgopen], [data-asgok]'); if (!o) return;
     asgMarkSeen(String(o.dataset.asgkeys || o.dataset.asgok || '').split(' ').filter(Boolean));
@@ -10670,7 +11046,7 @@ const TAB_ID = uid();
 function claimTab() {
   if (!LIVE || typeof BroadcastChannel !== 'function') return;
   let ch;
-  try { ch = new BroadcastChannel('kuiki-map'); } catch (e) { return; }
+  try { ch = new BroadcastChannel(NS ? 'kuiki-map-' + NS : 'kuiki-map'); } catch (e) { return; }
   ch.onmessage = e => { if (e.data && e.data.t === 'open' && e.data.id !== TAB_ID) yieldTab(); };
   ch.postMessage({ t: 'open', id: TAB_ID });
 }
@@ -10746,7 +11122,8 @@ async function init() {
   // 前回からの変更があれば先にお知らせを見せ、押したらあいさつ → ふだんの画面
   showNewsIfAny(() => { splashAt = Date.now(); hideSplash(); });
   if (LIVE) {
-    $('#modePill').hidden = true;
+    $('#modePill').hidden = !NS; // テスト用のページは「テスト版」と出す（本番とまちがえないように）
+    if (NS) { $('#modePill').textContent = 'テスト版'; $('#modePill').style.background = '#C2410C'; $('#modePill').style.color = '#fff'; document.title = '【テスト】' + document.title; }
     $('#whoSel').hidden = true; $('#whoLabel').hidden = true;
     $('#whoName').hidden = false; $('#whoName').textContent = `${me().name}さん`;
     $('#liveTools').hidden = false;
