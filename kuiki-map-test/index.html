@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.03"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.04"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -1104,6 +1104,44 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
 @media (min-width:1400px){
   #myCards,#allCards,#adTerrs{grid-template-columns:repeat(3,1fr)}
 }
+
+/* ===== 文字を大きくしたとき（年配の方向け）の見せ方・押しやすさ ===== */
+/* 上の帯：名前は1行。入りきらないときは「…」で切る（縦に1文字ずつ並んで、帯が高くならないように） */
+header.top h1,header.top .pill{flex:none;white-space:nowrap}
+.who{flex:0 1 auto;min-width:0;overflow:hidden}
+#whoLabel{white-space:nowrap}
+#whoName{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 下のタブ：文字を折り返さない。大きい文字では「区域カード」を「カード」にする */
+nav.tabs button{white-space:nowrap;overflow:hidden}
+body.big nav.tabs button{font-size:14px}
+body.big nav.tabs .tl-long{display:none}
+/* ホームの「今日やること」：大きい文字では、ボタンを下に広く置く（まん中の文字がつぶれないように） */
+body.big .todo{flex-wrap:wrap}
+body.big .todo .tbody2{flex:1 1 0}
+body.big .todo>.btn{flex:1 1 100%;order:5;min-height:56px;font-size:17px}
+body.big .todo.terr .progress{order:4}
+/* 上の帯：大きい文字では名前を出さない（ホームと区域カードの画面に大きく出ているため。帯を1行に保つ） */
+body.big .who:has(#whoName:not([hidden])){display:none}
+/* 区域カードの見出し：大きい文字では「地図 ›」の印をやめて、区域の名前を広く（見出し全体を押すと地図がひらく） */
+body.big .tgo{display:none}
+body.big .tcard.tc2 .stamp:not(.xs){width:52px;height:52px;font-size:24px}
+/* 説明つきの2つのボタン（回り終えました／途中まで など）は、大きい文字では1つずつ縦に並べる */
+body.big .choices.two:has(small){grid-template-columns:1fr}
+body.big .choices.two:has(small) .choice{min-height:72px}
+/* えらぶボタン：大きい文字では3つ並びを2つ並びに、字を少しだけ小さくして変な折り返しを減らす */
+body.big .choices.three,body.big .linecolors{grid-template-columns:repeat(2,1fr)}
+body.big .choice{font-size:17px}
+/* 拒否のボタン：「拒否」は1行で、説明はその下に */
+.refbtn{flex-wrap:wrap;white-space:nowrap;row-gap:2px}
+.refbtn small{white-space:normal;flex-basis:100%;text-align:center}
+/* 見出しや問いかけの最後の1文字だけが次の行に行かないように（対応しているブラウザだけ） */
+h2,h3,.q{text-wrap:pretty}
+.iosguide{text-align:left;margin-top:10px}
+.iosguide ol{margin:6px 0 6px 1.4em;padding:0}
+.iosguide li{margin:2px 0}
+/* お知らせ（下に出る黒い帯）は、下にあるボタンを押すじゃまをしない（「取り消す」などのボタンだけ押せる） */
+#toast{pointer-events:none}
+#toast button{pointer-events:auto}
 </style>
 </head>
 <body>
@@ -1344,7 +1382,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
 
   <nav class="tabs" id="tabs" aria-label="画面の切りかえ">
     <button data-view="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5h4v5"/></svg>ホーム</button>
-    <button data-view="cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h6M7 14h10"/></svg>区域カード</button>
+    <button data-view="cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h6M7 14h10"/></svg><span><span class="tl-long">区域</span>カード</span></button>
     <button data-view="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>地図</button>
     <button data-view="follow" id="tabFollow" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7"/><path d="M20 4v4.7h-4.7"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.3"/><path d="M4 20v-4.7h4.7"/></svg>再訪問</button>
     <button data-view="admin" id="tabAdmin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 20h18M6 17v-6M11 17V6M16 17v-9"/></svg><span id="tabAdminLabel">係の画面</span><b class="tabbadge" id="tabBadge" hidden>0</b></button>
@@ -2399,6 +2437,7 @@ async function api(action, extra, opt) {
     const e = Object.assign(new Error('http' + res.status), { code: 'http' + res.status, retry: res.status >= 429 || res.status === 404,
       sample: `${what}・${where}${res.redirected ? '（転送あり）' : ''}・${String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)}` });
     logReq(rqName, T, 'http' + res.status, (text || '').length, 0);
+    if (res.status === 404) relayLost = true;
     noteError(action, e); throw e;
   }
   let j;
@@ -2422,6 +2461,7 @@ async function api(action, extra, opt) {
    ・通信1回ごとに「何を・いつ始めて・何秒かかって・大きさ・結果」を残す。住所や名前は残さない
    ・終わったら、この端末の中だけに保存する（設定 → 区域係の画面「読み込みの記録」、または終わったときの知らせから見られる） */
 const LOADLOG_KEY = 'kuiki_load_log';
+let relayLost = false; // Google の受け渡しで返事がなくなった（iPhone の設定が原因のことがある）
 let loadLog = null;
 function reqName(action, extra) {
   const x = extra || {};
@@ -2501,6 +2541,7 @@ async function apiRetry(action, extra, onRetry, valid) {
       const j = await api(action, extra, { timeout: 120000 });
       if (valid && !valid(j)) {
         const what = action + (extra && extra.part ? `:${extra.part}${extra.offset ? '@' + extra.offset : ''}` : '');
+        relayLost = true;
         const e = Object.assign(new Error('badreply'), { code: 'badreply', retry: true,
           sample: `${what}・返事の中身：${Object.keys(j || {}).join(',')}${j && j.mode ? '・mode=' + j.mode : ''}${j && j.app ? '・GETとして届いた' : ''}` });
         noteError(action, e); throw e;
@@ -2903,6 +2944,7 @@ function showLoadProgress(p, retry) {
     <div class="ldbar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="読み込みの進み具合"><i style="width:${p.pct}%"></i></div>
     <p class="ldpct"><b>${p.pct}%</b><span>${p.stage === 'finish' ? 'スマホの中でデータを整えています' : fmtEta(p.eta)}</span></p>
     ${retry ? `<p class="ldnote warn">サーバーからの返事がうまく届かなかったので、自動でもう一度ためしています（${retry}回目）</p>` : ''}
+    ${retry && relayLost && isIOS() ? `<p class="ldnote warn"><b>iPhoneの設定が原因のことがあります。</b>「設定」→「Wi‑Fi」→ つないでいるWi‑Fiの「ⓘ」→「IPアドレスのトラッキングを制限」をオフにしてから、この画面を開き直してください。</p>` : ''}
     <p class="ldnote">初めて開くときだけ、時間がかかります。次からはすぐに開きます。画面を閉じずに、このままお待ちください。</p>`;
   const sp = $('#splash');
   if (sp && !sp.hidden) {
@@ -2938,6 +2980,16 @@ function showLoadError(e) {
   d.hidden = false;
   $('#blockRetry').hidden = false;
   $('#blockRetry').onclick = () => location.reload();
+  // iPhone・iPad で、Google の受け渡しで返事がなくなったとき（http404・GETとして届いた）は、設定の案内を出す
+  //（「IPアドレスのトラッキングを制限」がオンだと起きることを、2026.9.27 に確かめた）
+  let g = $('#blockIosGuide');
+  if (isIOS() && e && /^(http404|badreply)/.test(String(e.code || ''))) {
+    if (!g) { g = document.createElement('div'); g.id = 'blockIosGuide'; g.className = 'notice warn iosguide'; $('#blockDetail').before(g); }
+    g.innerHTML = `<p><b>iPhoneの設定を1か所変えると、読み込めるようになります。</b></p>
+      <ol><li>「設定」を開く</li><li>「Wi‑Fi」→ つないでいるWi‑Fiの右の「ⓘ」</li><li>「IPアドレスのトラッキングを制限」をオフ</li><li>ここにもどって「もう一度読み込む」</li></ol>
+      <p class="hint">モバイル通信のときは「設定」→「モバイル通信」→「通信のオプション」の中にあります。</p>`;
+    g.hidden = false;
+  } else if (g) g.hidden = true;
   // 通信の記録（どこで止まったか）を見て、コピーできるようにする
   const L = loadLogClose(e);
   if (L) {
@@ -3231,6 +3283,11 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.11.04', items: [
+    ['見', '文字を大きくしたときの画面を見やすくしました（上の帯の名前・下のタブ・ホームのボタン・区域カード・拒否のボタンなど）'],
+    ['押', '文字を「とても大きく」にすると、地図の家の印も大きくなります。お知らせは長い文ほど長く出し、下のボタンを押すじゃまをしないようにしました'],
+    ['案', 'iPhoneで読み込めないときに、直し方（「IPアドレスのトラッキングを制限」をオフ）を画面に出すようにしました']
+  ] },
   { v: '2026.11.03', items: [
     ['速', 'はじめて開くとき、訪問の記録もサーバーのまとめた一覧から受け取るようにしました（読み込めないことが起きにくくなります）'],
     ['測', '読み込めなかったときも、画面の「通信の記録を見る・コピーする」から、どこで止まったかを見られるようにしました']
@@ -3518,7 +3575,9 @@ function toast(msg, undoFn, action) {
   el.hidden = false;
   if (act) el.querySelector('button').onclick = () => { el.hidden = true; act.fn(); };
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, act ? 12000 : 3500);
+  const big = document.body.classList.contains('big') ? 1.4 : 1;
+  const ms = act ? 12000 * big : Math.min(10000, Math.max(3500, String(msg).length * 180) * big); // 1文字0.18秒の目安
+  toastTimer = setTimeout(() => { el.hidden = true; }, ms);
 }
 
 
@@ -3572,6 +3631,9 @@ document.addEventListener('click', e => {
 }, true);
 function setSheet(html) {
   const s = $('#sheet');
+  // ただのお知らせ（取り消すボタンのないもの）は、画面の下のボタンを隠さないように消す
+  const tt = $('#toast');
+  if (tt && !tt.hidden && !tt.querySelector('button')) tt.hidden = true;
   const keep = sheetKeep && !s.hidden; sheetKeep = false;
   const top = s.scrollTop;
   let focusSel = '';
@@ -7539,7 +7601,9 @@ const uiSave = () => lsSet(uiKey(), JSON.stringify(UI));
 /* かんたんモードでは、文字の大きさ以外は標準にもどして使う */
 function uiEff() {
   if (UI.mode === 'detail') return UI;
-  return Object.assign({}, UI_DEFAULT, { size: UI.size === 'small' ? 'normal' : UI.size });
+  const size = UI.size === 'small' ? 'normal' : UI.size;
+  // かんたん表示で「とても大きく」にしたときは、地図の家の印も大きくする（指で押しやすく）
+  return Object.assign({}, UI_DEFAULT, { size, pin: size === 'xlarge' ? 'large' : 'normal' });
 }
 const accentColor = () => themeOf(uiEff())[1];
 /* 区域の線の色（各自の設定） */
@@ -7591,6 +7655,7 @@ function applyUi() {
   document.body.classList.toggle('compact', e.density === 'compact');
   document.body.classList.toggle('nohints', e.hints === 'hide');
   document.body.classList.toggle('strong', e.contrast === 'strong');
+  document.body.classList.toggle('big', zoomOf(e) >= 1.14); // 文字を大きくしたとき（並べ方を変える）
   if (map) { renderTerrs(); setTimeout(() => map.invalidateSize(), 30); }
 }
 /* 円形のカラー：角度で色あい、中心からの距離であざやかさ */
