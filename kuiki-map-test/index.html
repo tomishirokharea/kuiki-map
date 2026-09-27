@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.04"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.05"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -143,7 +143,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 
 /* ===== 下から出る入力画面 ===== */
 #backdrop{position:fixed;inset:0;background:#00000066;z-index:2000}
-#sheet{position:fixed;left:0;right:0;bottom:0;z-index:2001;background:var(--paper);border-radius:20px 20px 0 0;max-height:88vh;max-height:88dvh;overflow:auto;padding:14px 16px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px #0003}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:2001;background:var(--paper);border-radius:20px 20px 0 0;max-height:calc(88vh / var(--z,1));max-height:calc(88dvh / var(--z,1));overflow:auto;padding:14px 16px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px #0003}
 @media (min-width:760px){#sheet{left:calc(50% - 320px);right:auto;width:640px;bottom:16px;border-radius:20px}}
 .sheet-head{display:flex;align-items:center;gap:12px;margin-bottom:8px}
 .sheet-head h2{font-size:22px;outline:none}
@@ -302,7 +302,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .seg.small button{flex:1;min-height:44px;padding:0 6px;font-size:15px}
 #map .pin{transform:scale(var(--pin,1))}
 #map.drawing .pin{transform:scale(calc(var(--pin,1) * .78));opacity:.9}
-.cardbar{font-size:15px;padding:8px 10px;max-height:48vh;overflow:auto}
+.cardbar{font-size:15px;padding:8px 10px;max-height:calc(48vh / var(--z,1));overflow:auto}
 .cardbar .btn.small{min-height:42px;font-size:15px;padding:0 12px}
 .cardbar .seg{margin:6px 0 0}
 .cardbar .seg button{min-height:40px;padding:0 14px;font-size:15px}
@@ -896,7 +896,7 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 /* ===== 確認の画面 ===== */
 #askBox{position:fixed;inset:0;z-index:3500}
 #askBox .askback{position:absolute;inset:0;background:#00000066}
-#askBox .asksheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-radius:20px 20px 0 0;padding:14px 18px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;box-shadow:0 -6px 20px #0003;zoom:var(--z,1);max-height:90vh;overflow:auto}
+#askBox .asksheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-radius:20px 20px 0 0;padding:14px 18px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;box-shadow:0 -6px 20px #0003;zoom:var(--z,1);max-height:calc(90vh / var(--z,1));overflow:auto}
 @media (min-width:760px){#askBox .asksheet{left:calc(50% - 280px);right:auto;width:560px;bottom:24px;border-radius:20px}}
 #askBox .grab{margin:0 auto}
 .askhead{display:flex;align-items:center;gap:12px}
@@ -1024,12 +1024,12 @@ img,canvas,video{max-width:100%}
   nav.tabs svg{width:22px;height:22px}
   .tabbadge{top:2px}
   .view{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
-  #sheet{max-height:94vh;max-height:94dvh;bottom:6px}
-  .cardbar{max-height:58vh;right:max(76px,calc(env(safe-area-inset-right) + 76px));left:max(10px,env(safe-area-inset-left));bottom:10px}
+  #sheet{max-height:calc(94vh / var(--z,1));max-height:calc(94dvh / var(--z,1));bottom:6px}
+  .cardbar{max-height:calc(58vh / var(--z,1));right:max(76px,calc(env(safe-area-inset-right) + 76px));left:max(10px,env(safe-area-inset-left));bottom:10px}
   .helpbtn{bottom:76px}
   .locbtn{bottom:12px}
   .legend{max-height:80%;bottom:10px}
-  .modebar{max-height:70vh;overflow:auto}
+  .modebar{max-height:calc(70vh / var(--z,1));overflow:auto}
   #toast{bottom:calc(60px + env(safe-area-inset-bottom))}
   .choice{min-height:64px}
 }
@@ -1061,7 +1061,7 @@ img,canvas,video{max-width:100%}
   .tabbadge{top:8px;left:calc(50% + 10px)}
   #toast{bottom:calc(24px + env(safe-area-inset-bottom))}
   /* 入力画面は、画面のまん中あたりに浮かせる */
-  #sheet{max-height:calc(100dvh - 48px);bottom:24px;left:calc(50% - 320px + 56px)}
+  #sheet{max-height:calc((100dvh - 48px) / var(--z,1));bottom:24px;left:calc(50% - 320px + 56px)}
   /* ホームは左右2段に（左：時間と目標、右：予定） */
   #view-home .wrap{max-width:1180px}
   .homegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:0 28px;align-items:start}
@@ -1134,6 +1134,19 @@ body.big .choice{font-size:17px}
 /* 拒否のボタン：「拒否」は1行で、説明はその下に */
 .refbtn{flex-wrap:wrap;white-space:nowrap;row-gap:2px}
 .refbtn small{white-space:normal;flex-basis:100%;text-align:center}
+/* 文字の大きさは zoom で変えている。zoom をかけた部品では画面の高さ（vh）も大きくなるので、
+   高さの上限は zoom で割っている（大きい文字で、下から出る画面の上の「×」が画面の外に出ていたため） */
+/* 下から出る画面：見出しと「×」は、下に動かしても上に見えたままにする（長い一覧でも、すぐもどれるように） */
+#sheet .sheet-head{position:sticky;top:0;z-index:5;background:var(--paper);margin:-14px -16px 8px;padding:14px 16px 10px;box-shadow:0 1px 0 var(--line)}
+/* 大きい文字では「×」に「もどる」の文字をそえる（×だけでは、もどるボタンだと分かりにくいため） */
+body.big .sheet-head .icon-btn[data-close]{width:auto;min-width:52px;padding:0 12px 0 10px;border-radius:26px;display:flex;align-items:center;gap:4px;font-size:26px}
+body.big .sheet-head .icon-btn[data-close]::after{content:'もどる';font-size:15px;font-weight:700}
+/* 大きい文字では、1行目に区域の番号と「× もどる」、2行目に見出しを広く（見出しが1文字ずつ折り返さないように） */
+body.big .sheet-head{flex-wrap:wrap;row-gap:4px}
+body.big .sheet-head>div{flex:1 1 100%;order:3;min-width:0}
+body.big .sheet-head h2{font-size:21px}
+/* 下から出る画面を開いているあいだ、お知らせは上に出す（画面の下のボタンを隠さないように） */
+body.sheet-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
 /* 見出しや問いかけの最後の1文字だけが次の行に行かないように（対応しているブラウザだけ） */
 h2,h3,.q{text-wrap:pretty}
 .iosguide{text-align:left;margin-top:10px}
@@ -3283,6 +3296,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.11.05', items: [
+    ['直', '下から出る画面（区域カードをもらう など）で、下に動かすと「×」が見えなくなり、もどれなくなることがあったのを直しました。見出しと「×」はいつも上に出ます。文字を大きくしたときは「× もどる」と出ます']
+  ] },
   { v: '2026.11.04', items: [
     ['見', '文字を大きくしたときの画面を見やすくしました（上の帯の名前・下のタブ・ホームのボタン・区域カード・拒否のボタンなど）'],
     ['押', '文字を「とても大きく」にすると、地図の家の印も大きくなります。お知らせは長い文ほど長く出し、下のボタンを押すじゃまをしないようにしました'],
@@ -3631,6 +3647,7 @@ document.addEventListener('click', e => {
 }, true);
 function setSheet(html) {
   const s = $('#sheet');
+  document.body.classList.add('sheet-open');
   // ただのお知らせ（取り消すボタンのないもの）は、画面の下のボタンを隠さないように消す
   const tt = $('#toast');
   if (tt && !tt.hidden && !tt.querySelector('button')) tt.hidden = true;
@@ -3660,6 +3677,7 @@ function closeSheet() {
   qrWatching = false;
   if (homeUrlDirty) { cleanUrl(); homeUrlDirty = false; } // URLに戻したコードは、画面を閉じたら消す
   $('#sheet').hidden = true; $('#backdrop').hidden = true;
+  document.body.classList.remove('sheet-open');
   $('#sheet').dataset.swipe = ''; $('#sheet').style.transform = '';
   if (tmpMarker && map) { map.removeLayer(tmpMarker); tmpMarker = null; }
   if (LIVE && Store.inbox.length) setTimeout(applyInbox, 0);
