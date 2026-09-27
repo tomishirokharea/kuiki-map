@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.02"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.03"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -2372,7 +2372,7 @@ function noteError(action, e) {
 const wait = ms => new Promise(r => setTimeout(r, ms));
 async function api(action, extra, opt) {
   const o = opt || {};
-  const T = Date.now(), what = loadLog ? reqName(action, extra) : '';
+  const T = Date.now(), rqName = loadLog ? reqName(action, extra) : '';
   const ctl = typeof AbortController === 'function' ? new AbortController() : null;
   const timer = ctl ? setTimeout(() => ctl.abort(), o.timeout || 60000) : null;
   let res, text;
@@ -2388,7 +2388,7 @@ async function api(action, extra, opt) {
   } catch (err) {
     const code = err && err.name === 'AbortError' ? 'timeout' : 'network';
     const e = Object.assign(new Error(code), { code, retry: true });
-    logReq(what, T, code, 0, 0);
+    logReq(rqName, T, code, 0, 0);
     noteError(action, e); throw e;
   } finally { clearTimeout(timer); }
   if (!res.ok) {
@@ -2398,16 +2398,16 @@ async function api(action, extra, opt) {
     const what = action + (extra && extra.part ? `:${extra.part}${extra.offset ? '@' + extra.offset : ''}` : '');
     const e = Object.assign(new Error('http' + res.status), { code: 'http' + res.status, retry: res.status >= 429 || res.status === 404,
       sample: `${what}・${where}${res.redirected ? '（転送あり）' : ''}・${String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)}` });
-    logReq(what, T, 'http' + res.status, (text || '').length, 0);
+    logReq(rqName, T, 'http' + res.status, (text || '').length, 0);
     noteError(action, e); throw e;
   }
   let j;
   try { j = JSON.parse(text); } catch (err) {
     const e = Object.assign(new Error('nonjson'), { code: 'nonjson', retry: true, sample: String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) });
-    logReq(what, T, 'nonjson：' + e.sample.slice(0, 60), text.length, 0);
+    logReq(rqName, T, 'nonjson：' + e.sample.slice(0, 60), text.length, 0);
     noteError(action, e); throw e;
   }
-  logReq(what, T, j.ok ? (j.snap ? 'ok（まとめ）' : 'ok') : j.error, text.length, Array.isArray(j.rows) ? j.rows.length : 0);
+  logReq(rqName, T, j.ok ? (j.snap ? 'ok（まとめ）' : 'ok') : j.error, text.length, Array.isArray(j.rows) ? j.rows.length : 0);
   if (!j.ok) {
     if (j.error === 'auth') authLost();
     const e = Object.assign(new Error(j.error || 'error'), { code: j.error, retry: j.error === 'server' || j.error === 'busy' });
@@ -2426,7 +2426,7 @@ let loadLog = null;
 function reqName(action, extra) {
   const x = extra || {};
   const names = { meta: '区域・設定など', houses: '家', visits: '訪問の記録', tv: '区域の記録' };
-  if (action === 'load' && x.part) return (names[x.part] || x.part) + (x.snap ? '（まとめた一覧）' : x.offset ? `（${x.offset}件目から）` : '');
+  if (action === 'load' && x.part) return (names[x.part] || x.part) + (x.snap || x.vsnap ? '（まとめた一覧' + (x.offset ? `・${x.offset}件目から` : '') + '）' : x.offset ? `（${x.offset}件目から）` : '');
   return action;
 }
 function logReq(what, T, res, len, rows) {
@@ -2434,16 +2434,21 @@ function logReq(what, T, res, len, rows) {
   loadLog.reqs.push({ what, s: (T - loadLog.t0) / 1000, sec: (Date.now() - T) / 1000, kb: Math.round((len || 0) / 1024), rows: rows || 0, res: String(res || '') });
 }
 function loadMark(name) { if (loadLog) loadLog.marks.push({ name, s: (Date.now() - loadLog.t0) / 1000 }); }
-function loadLogDone() {
-  if (!loadLog) return;
+function loadLogClose(e) {
+  if (!loadLog) return null;
   const L = loadLog; loadLog = null;
   L.total = (Date.now() - L.t0) / 1000;
   L.pageSec = Math.round(performance.now()) / 1000; // ページを開いてから使えるまで
   L.at = new Date().toISOString();
   L.ua = deviceLabel() + '・' + (navigator.userAgent.match(/(Edg|CriOS|FxiOS|Chrome|Firefox|Version)\/[\d.]+/) || [''])[0] + (/Brave/.test(navigator.userAgent) || navigator.brave ? '（Brave）' : '');
   L.net = navigator.connection && navigator.connection.effectiveType ? navigator.connection.effectiveType : '';
+  if (e) L.error = String(e.code || e.message || 'unknown') + (e.sample ? `（${e.sample}）` : '');
   lsSet(LOADLOG_KEY, JSON.stringify(L));
-  if (L.pageSec > 30) toast(`はじめての読み込みに${Math.round(L.pageSec)}秒かかりました`, null, { label: '記録を見る', fn: openLoadLog });
+  return L;
+}
+function loadLogDone() {
+  const L = loadLogClose(null);
+  if (L && L.pageSec > 30) toast(`はじめての読み込みに${Math.round(L.pageSec)}秒かかりました`, null, { label: '記録を見る', fn: openLoadLog });
 }
 function loadLogText(L) {
   const f = n => (Math.round(n * 10) / 10).toFixed(1);
@@ -2455,6 +2460,7 @@ function loadLogText(L) {
     `ページを開いてから使えるまで：${f(L.pageSec)}秒（そのうち読み込み ${f(L.total)}秒）`,
     `区域・設定など：${ms.meta != null ? f(ms.meta) + '秒で届く' : '-'}　家：${ms.houses != null ? f(ms.houses) + '秒で届く' : '-'}　記録：${ms.visits != null ? f(ms.visits) + '秒で届く' : '-'}　仕上げ（端末の中）：${ms.finish != null && ms.visits != null ? f(L.total - ms.visits) + '秒' : '-'}`,
     `やり直し：${retries.length}回${retries.length ? '（' + retries.map(r => r.res).join('、') + '）' : ''}`,
+    ...(L.error ? [`結果：読み込めませんでした（${L.error}）`] : []),
     '',
     '開始　かかった　内容　件数　大きさ　結果',
     ...L.reqs.map(r => `${f(r.s)}秒　${f(r.sec)}秒　${r.what}　${r.rows || ''}　${r.kb}KB　${r.res}`)
@@ -2489,7 +2495,7 @@ function expandHouse(a) {
 }
 /* valid：返事の形を確かめる（まちがった形の返事が来たときも、送り直す） */
 async function apiRetry(action, extra, onRetry, valid) {
-  const waits = [2000, 5000, 10000];
+  const waits = [2000, 5000, 10000, 20000];
   for (let i = 0; ; i++) {
     try {
       const j = await api(action, extra, { timeout: 120000 });
@@ -2509,14 +2515,13 @@ async function apiRetry(action, extra, onRetry, valid) {
 }
 /* 全部を読み込む。onProgress には { pct, stage, eta（残りの秒・わからないときは null） } をわたす
    段階：meta（区域など）→ houses（家）→ visits（訪問の記録）→ finish（仕上げ：スマホの中で整える） */
-/* はじめての読み込み（家3万件・記録数十万件でも、なるべく短く）
-   ・家は、サーバーがまとめた一覧（house-snap.gs）を用意していれば1回で全部届く。
-     これは区域・設定など（meta）と同時に取りに行く（一覧には、それを作った時点の変更番号 seq がつく）
-   ・記録は、meta で件数がわかったら、同時にいくつか取りに行く（1つずつ待たない）
-   ・まとめた一覧がないとき（古いサーバー）は、家も記録と同じように、同時にいくつか取りに行く
-   ・1回に返る件数は、サーバー（GAS）の PART_LIMIT と同じ。ちがっていたら、その種類だけ順に取り直す
-   ・差分は、meta とまとめた一覧のうち古いほうの番号から受け取る（そのあいだの変更を取りこぼさない）
-   ・opt.parallel … 同時に取りに行く数（はじめて開くとき6、全員の読み直しのときは2にして、サーバーを混ませない） */
+/* はじめての読み込み（家3万件・記録数十万件でも、短く・確実に）
+   ・家と訪問の記録は、サーバーが用意した「まとめた一覧」（house-snap.gs）から受け取る。
+     1回の処理が数秒で終わるので、Google の受け渡しで返事がなくなる（http404・GETとして届く）ことが起きにくい
+   ・区域・設定など（meta）と、家の一覧、記録の一覧の最初の分を、同時に取りに行く
+   ・一覧には、それを作った時点の変更番号 seq がつく。差分は、いちばん古い番号から受け取る（取りこぼさない）
+   ・一覧が使えないとき（古いサーバーなど）は、これまでどおりシートから分けて受け取る（meta のあとに）
+   ・opt.parallel … 同時に取りに行く数の目安（はじめて開くとき6、全員の読み直しのときは2） */
 const PART_STEP = { houses: 5000, visits: 20000 };
 async function runPool(tasks, n) {
   const out = new Array(tasks.length);
@@ -2531,8 +2536,9 @@ async function loadAll(onProgress, onRetry, opt) {
   const prog = o => { if (onProgress) onProgress(o); };
   const valid = j => !!(j && Array.isArray(j.rows));
   prog({ pct: 1, stage: 'meta', eta: null });
-  // 家のまとめた一覧は、meta と同時に（使えないときは null）
-  const snapP = apiRetry('load', { part: 'houses', offset: 0, snap: 1 }, null, valid).catch(() => null);
+  // まとめた一覧は、meta と同時に（使えないときは null）
+  const hsnapP = apiRetry('load', { part: 'houses', offset: 0, snap: 1 }, null, valid).catch(() => null);
+  const vsnapP = apiRetry('load', { part: 'visits', offset: 0, vsnap: 1 }, null, valid).catch(() => null);
   const meta = await apiRetry('load', { part: 'meta' }, onRetry, j => !!(j && j.state && Array.isArray(j.state.territories)));
   loadMark('meta');
   const st = meta.state;
@@ -2542,19 +2548,21 @@ async function loadAll(onProgress, onRetry, opt) {
   const finishSec = 2 + total / 60000; // 仕上げ（スマホの中で整える）にかかるおおよその秒数
   const t0 = Date.now();
   let done = 0, housesDone = false;
+  const seqs = [Number(meta.seq)];
   const tick = () => {
     const el = (Date.now() - t0) / 1000;
-    const eta = done > 0 && el > 2 ? Math.round((total - done) * el / done + finishSec) : null;
+    const eta = done > 0 && el > 2 ? Math.round(Math.max(0, total - done) * el / done + finishSec) : null;
     prog({ pct: Math.min(95, 4 + Math.round(done / total * 91)), stage: housesDone || !cnt.houses ? 'visits' : 'houses', eta });
   };
   prog({ pct: 4, stage: 'houses', eta: null });
-  const fetchPart = (part, offset) => apiRetry('load', { part, offset }, onRetry, valid)
+  const fetchPart = (part, offset, extra) => apiRetry('load', Object.assign({ part, offset }, extra || {}), onRetry, valid)
     .then(r => { done += r.rows.length; tick(); return r; });
   const inOrder = async (part, off, chunks) => { // 1つずつ順に
     while (off !== null && off !== undefined) { const r = await fetchPart(part, off); chunks.push(r.rows); off = r.next; }
     return chunks;
   };
-  const loadPart = async (part, n) => { // 件数から、取りに行く位置を決めて同時に
+  // シートから分けて受け取る（meta のあとに読むので、変更番号の順は正しい）
+  const loadPart = async (part, n) => {
     const step = PART_STEP[part], offs = [];
     for (let o = 0; o < Math.max(1, cnt[part] || 0); o += step) offs.push(o);
     const rs = await runPool(offs.map(o => () => fetchPart(part, o)), n);
@@ -2562,20 +2570,29 @@ async function loadAll(onProgress, onRetry, opt) {
     const chunks = rs.map(r => r.rows), lastR = rs[rs.length - 1];
     return lastR.next !== null && lastR.next !== undefined ? inOrder(part, lastR.next, chunks) : chunks; // 読み込みのあいだに増えた分
   };
-  const snap = await snapP;
-  const snapOk = !!(snap && snap.snap && snap.next === null && isFinite(Number(snap.seq)));
-  let hc, vc;
-  if (snapOk) {
-    done += snap.rows.length; housesDone = true; tick(); loadMark('houses');
-    hc = [snap.rows];
-    vc = await loadPart('visits', par);
-  } else {
-    const half = Math.ceil(par / 2);
-    [hc, vc] = await Promise.all([
-      loadPart('houses', half).then(c => { housesDone = true; loadMark('houses'); return c; }),
-      loadPart('visits', half)
-    ]);
-  }
+  const isSnap = r => !!(r && r.snap && !r.gone && isFinite(Number(r.seq)));
+  // 記録の一覧：最初の分から全体の件数がわかるので、残りを同時に（3つまで）
+  const visitsFromSnap = async first => {
+    if (!isSnap(first)) return null;
+    done += first.rows.length; tick();
+    const chunks = [first.rows];
+    if (first.next !== null && first.next !== undefined) {
+      const step = Number(first.next), offs = [];
+      for (let o = step; o < (Number(first.total) || 0); o += step) offs.push(o);
+      const rs = await runPool(offs.map(o => () => fetchPart('visits', o, { vsnap: 1, ver: first.ver })), 3);
+      if (rs.some(r => !isSnap(r))) return null; // 途中で一覧が作り直された → シートから
+      rs.forEach(r => chunks.push(r.rows));
+    }
+    seqs.push(Number(first.seq));
+    return chunks;
+  };
+  const [hc, vc] = await Promise.all([
+    hsnapP.then(h => {
+      if (isSnap(h) && (h.next === null || h.next === undefined)) { done += h.rows.length; seqs.push(Number(h.seq)); return [h.rows]; }
+      return loadPart('houses', Math.ceil(par / 2));
+    }).then(c => { housesDone = true; loadMark('houses'); tick(); return c; }),
+    vsnapP.then(visitsFromSnap).then(c => c || loadPart('visits', 2))
+  ]);
   loadMark('visits');
   // 同じ家・記録が2回届いても、1つにする（読み込みのあいだに行がずれたとき）
   st.houses = [];
@@ -2585,7 +2602,7 @@ async function loadAll(onProgress, onRetry, opt) {
   vc.forEach(rows => rows.forEach(a => { if (vs.has(a[0])) return; vs.add(a[0]); vis.push(a); }));
   prog({ pct: 96, stage: 'finish', eta: Math.round(finishSec) });
   st.visitsC = vis;
-  return { mode: 'full', seq: snapOk ? Math.min(meta.seq, Number(snap.seq)) : meta.seq, state: st };
+  return { mode: 'full', seq: Math.min(...seqs.filter(x => isFinite(x))), state: st };
 }
 let reloading = false;
 async function reloadAll(delay) {
@@ -2921,6 +2938,20 @@ function showLoadError(e) {
   d.hidden = false;
   $('#blockRetry').hidden = false;
   $('#blockRetry').onclick = () => location.reload();
+  // 通信の記録（どこで止まったか）を見て、コピーできるようにする
+  const L = loadLogClose(e);
+  if (L) {
+    let b = $('#blockLogBtn');
+    if (!b) { b = document.createElement('button'); b.id = 'blockLogBtn'; b.type = 'button'; b.className = 'btn block'; b.style.marginTop = '10px'; $('#blockRetry').after(b); }
+    b.textContent = '通信の記録を見る・コピーする';
+    b.hidden = false;
+    b.onclick = () => {
+      let pre = $('#blockLog');
+      if (!pre) { pre = document.createElement('pre'); pre.id = 'blockLog'; pre.className = 'loadlog'; b.after(pre); }
+      pre.textContent = loadLogText(L);
+      if (navigator.clipboard) navigator.clipboard.writeText(pre.textContent).then(() => { b.textContent = 'コピーしました（区域係に送ってください）'; }, () => {});
+    };
+  }
 }
 async function logout() {
   const n = Store.queue.length;
@@ -3200,6 +3231,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.11.03', items: [
+    ['速', 'はじめて開くとき、訪問の記録もサーバーのまとめた一覧から受け取るようにしました（読み込めないことが起きにくくなります）'],
+    ['測', '読み込めなかったときも、画面の「通信の記録を見る・コピーする」から、どこで止まったかを見られるようにしました']
+  ] },
   { v: '2026.11.02', items: [
     ['測', 'はじめて開いたときの通信の記録を残すようにしました。30秒より長くかかったときは知らせが出て、記録を見てコピーできます（区域係は「状況」の「読み込みの記録」からも見られます）']
   ] },
