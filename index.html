@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.12"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.13"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -657,15 +657,20 @@ body.strong .pin.st-plain{border-width:4px}
 @media (prefers-reduced-motion:reduce){.locbtn.busy svg{animation:none;opacity:.5}}
 .helpbtn{bottom:92px}
 /* 地図を回したときだけ出る「北」のボタン（押すと北が上にもどる）。針と「北」の字は、地図の北の向きを指す */
-.gpin{position:relative;width:26px;height:34px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 34'%3E%3Cpath d='M13 33S2 19.5 2 12a11 11 0 0 1 22 0c0 7.5-11 21-11 21z' fill='%237B1FA2' stroke='%23fff' stroke-width='2'/%3E%3Ccircle cx='13' cy='12' r='4.2' fill='%23fff'/%3E%3C/svg%3E") no-repeat center/contain;filter:drop-shadow(0 1px 2px #0006)}
-.gpin span{position:absolute;left:50%;top:36px;transform:translateX(-50%);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#ffffffeb;border:1.5px solid #7B1FA2;border-radius:7px;padding:0 6px;font-size:12px;font-weight:700;color:#4A148C;font-family:"BIZ UDPGothic",sans-serif;line-height:1.5}
-.gpin.lg{display:inline-block;flex:none;margin:4px 12px}
-.gpinbtn{min-height:52px;border-radius:12px;border:2px solid #7B1FA2;background:#fff;color:#4A148C;font-weight:700;font-size:15px;display:inline-flex;align-items:center;gap:6px;padding:0 12px 0 8px}
-.gpinbtn svg{width:20px;height:26px;flex:none}
-.gpinbtn small{font-size:12px;font-weight:400;margin-left:2px}
-.gpinbtn[aria-pressed="false"]{border-color:var(--line);color:var(--ink2)}
-.gpnote{background:#F5ECF9;border:2px solid #9C6BD1;margin:8px 0}
-.gpdot{display:inline-block;width:12px;height:12px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#7B1FA2;margin-right:8px;vertical-align:middle}
+/* 再訪問のタブの右上：バックアップ・復元の雲のボタン */
+.fhead2{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.fbk{display:flex;gap:6px;flex:none;margin-top:14px}
+.bkbtn{width:66px;min-height:54px;border-radius:12px;border:2px solid var(--line);background:#fff;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:4px 2px}
+.bkbtn svg{width:26px;height:26px}
+.bkbtn small{font-size:10px;font-weight:700;line-height:1.2;white-space:nowrap}
+.bkbtn:active{background:var(--terr-soft)}
+.bkpick{margin-bottom:8px}
+/* 画面には出さず、読み上げだけに使う見出し */
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* 下から出る画面の上：つまみと、小さな「×」（帯にはしない） */
+.grabrow{position:relative;min-height:22px}
+.grabrow .grab{margin:4px auto 6px}
+.xmini{position:absolute;right:-6px;top:-8px;width:40px;height:40px;border-radius:50%;border:0;background:transparent;color:var(--ink2);font-size:26px;line-height:1}
 .northbtn{position:absolute;right:10px;bottom:152px;z-index:520;width:48px;height:48px;border-radius:50%;border:2px solid var(--ink);background:#fff;color:var(--ink);box-shadow:0 2px 6px #0003;padding:0;display:grid;place-items:center}
 .northbtn .ndl{display:block;width:40px;height:40px;rotate:var(--ndeg,0deg)}
 .northbtn svg{width:40px;height:40px;display:block}
@@ -1167,7 +1172,7 @@ body.big .choice{font-size:17px}
 /* 文字の大きさは zoom で変えている。zoom をかけた部品では画面の高さ（vh）も大きくなるので、
    高さの上限は zoom で割っている（大きい文字で、下から出る画面の上の「×」が画面の外に出ていたため） */
 /* 下から出る画面：見出しと「×」は、下に動かしても上に見えたままにする（長い一覧でも、すぐもどれるように） */
-#sheet .sheet-head{position:sticky;top:0;z-index:5;background:var(--paper);margin:-14px -16px 8px;padding:14px 16px 10px;box-shadow:0 1px 0 var(--line)}
+#sheet .sheet-head{position:static;margin:0 0 8px;padding:0;background:none;box-shadow:none} /* 帯にはしない（下にスワイプで閉じる） */
 /* コンパクト見出し（設定画面）：上下の余白を減らして、その分だけ本文を広く使えるようにする */
 #sheet .sheet-head.sheet-head-mini{padding:8px 16px 6px}
 /* 大きい文字では「×」に「もどる」の文字をそえる（×だけでは、もどるボタンだと分かりにくいため） */
@@ -1240,7 +1245,7 @@ h2,h3,.q{text-wrap:pretty}
     <!-- 再訪問 -->
     <section class="view" id="view-follow" hidden>
       <div class="wrap">
-        <h2 class="sec">再訪問</h2>
+        <div class="fhead2"><h2 class="sec">再訪問</h2><div class="fbk" id="followBk"></div></div>
         <p class="hint">「再訪問する」をえらんだ家です。「会えた」「留守」を押すと、区域の地図にも記録されます。<span id="followWhere">メモはこのスマホの中だけに残ります。</span></p>
         <div id="paneFollow"><div id="followAlert"></div><div id="myFollows"></div></div>
       </div>
@@ -1253,7 +1258,6 @@ h2,h3,.q{text-wrap:pretty}
       <div class="maptools" id="mapTools">
         <select id="terrJump" aria-label="区域をえらぶ"></select>
         <button class="btn primary adv" id="btnAdd">＋ 家を追加</button>
-        <button type="button" class="gpinbtn" id="btnGpin" hidden aria-pressed="true" aria-label="自分のGoogleマップのピンを出す・かくす"></button>
       </div>
       <button type="button" class="zoomhint" id="zoomHint" hidden>地図を拡大すると家の印が出ます<span aria-hidden="true">×</span></button>
       <div class="cardbar" id="cardBar" hidden></div>
@@ -1276,7 +1280,6 @@ h2,h3,.q{text-wrap:pretty}
           <span><i class="pin st-plain locked"></i>自分の区域以外（選べません）</span>
           <span><i class="pin st-plain biz" id="lgBiz"></i>住居でない建物（会社・店舗・事務所・工場・学校・役所・警察・消防）</span>
           <span><i class="pin apt" id="lgLock">集</i>オートロックの集合住宅</span>
-          <span><i class="gpin lg"></i>自分のGoogleマップのピン（このスマホだけ・左上の「自分のピン」で出す・かくす）</span>
         </div>
         <p class="hint">地図を縮めているときは、家は<b>小さな点</b>で出ます（白＝まだ、緑＝今回訪ねた、青＝最近会えた、赤＝拒否、点線＝仮の家）。拡大すると、くわしい印になります。</p>
         <p class="hint">色と文字は、この区域を受け取ってからの結果です。それより前の記録は、家をタップすると見られます。</p>
@@ -3337,6 +3340,12 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.11.13', items: [
+    ['雲', '再訪問のバックアップと復元は、再訪問のタブの右上の雲のボタンになりました（設定の画面からは外しました）。はじめの1回だけ保存先をたしかめ、あとはボタンを押すだけでバックアップできます'],
+    ['戻', '復元を押すと、保存したバックアップをさがして、いつのものかを見せてから戻します。いくつかあるときは、えらべます'],
+    ['下', '下から出る画面の上の帯をなくしました。どの画面も、下にスワイプすると閉じます'],
+    ['外', '「自分のGoogleマップのピン」を取り込む機能は、外しました（スマホに残っていたピンのデータも消しました）']
+  ] },
   { v: '2026.11.12', items: [
     ['直', '再訪問の「復元」で「このファイルは戻せません」と出ることがあったのを直しました。うまくいかないときは、えらんだファイルの名前と理由が出ます'],
     ['戻', '再訪問のリストから外した家も、復元するとリストにもどるようにしました（はじめからチェックが入っています）']
@@ -3760,7 +3769,8 @@ function setSheet(html) {
     if (attrs.length) focusSel = a.tagName.toLowerCase() + attrs.map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join('');
   }
   if (typeof dayCtx !== 'undefined') dayCtx = null;
-  s.dataset.swipe = ''; // 下にスワイプで閉じるのは、表示の設定のときだけ
+  s.dataset.swipe = ''; // '1'＝設定の画面（閉じたとき「保存しました」と出す）。どの画面も、下にスワイプで閉じる
+  if (html.indexOf('class="grab"') < 0) html = '<span class="grab" aria-hidden="true"></span>' + html; // 上のつまみ（下にスワイプで閉じる印）
   s.style.transform = '';
   $('#sheetBody').innerHTML = html;
   s.hidden = false; $('#backdrop').hidden = false;
@@ -4502,7 +4512,6 @@ function iconFade() {
 }
 function renderHouses() {
   if (!map) return;
-  renderGpins(); // 自分のGoogleマップのピン（このスマホだけ）
   houseLayer.clearLayers();
   const fkeys = followMap ? new Set(myFollowKeys()) : null;
   const ff = fkeys ? (k => (fkeys.has(k) ? 'hl' : 'dim')) : focusFn();
@@ -4967,7 +4976,6 @@ function openTarget(hid, unit, fromBuilding, review) {
     const blocked = (dnc && !isAdmin()) || (other && !isAdmin() && !st.override && recentMet(k));
     let b = headHtml(t, title, sub);
     if (fromBuilding) b += `<button class="btn small" id="backBld">← 部屋の一覧にもどる</button>`;
-    b += gpinNoteHtml(h); // 自分のGoogleマップのピン（このスマホだけ）
     if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
     else if (other) b += `<div class="notice warn"><b>ほかの人が再訪問している${unit ? '部屋' : '家'}です。</b>${recentMet(k) ? '最近会えているので、訪問は控えてください。' : 'しばらく会えていないので、訪ねてもかまいません。'}${blocked ? '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
 
@@ -5371,6 +5379,7 @@ function purgeMemos() {
 function clearAllMemos(withMine) {
   const pre = [MEMO_PREFIX, 'kuiki_pins_', 'kuiki_gpins_', MSYNC_PREFIX, MKEY_PREFIX].concat(withMine ? ['kuiki_my_'] : []);
   if (typeof MemoSync === 'object') MemoSync.key = null;
+  IDB.del('bkgens').catch(() => {}); // このスマホの中に残した、再訪問のバックアップ
   try {
     Object.keys(localStorage).forEach(x => {
       const y = NS ? (x.indexOf(NS + '::') === 0 ? x.slice(NS.length + 2) : null) : (x.indexOf('::') < 0 ? x : null);
@@ -5727,13 +5736,24 @@ function shareMemo(k, how, back) {
 }
 
 /* =========================================================
-   再訪問のバックアップ・復元（設定 → 使う機能 → 再訪問）
-   ・メモ・次の約束・📌・自分のGoogleマップのピンを、1つのファイルにして、本人がえらんだ場所に保存する
-   ・パスワードをつけると、ファイルの中身を暗号化する（PBKDF2＋AES-GCM）。つけないと、だれでも読める
-   ・ほかの人のバックアップは戻せない（名前ではなく、使う人の番号で確かめる）
-   ・ファイルはサーバーに送らない。受け持ち（だれが再訪問しているか）は、サーバーにあるものがそのまま使われる
+   再訪問のバックアップ・復元（再訪問のタブの右上の、雲のボタン）
+   ・保存するもの：受け持っている再訪問のメモ・次の約束・📌（本人の分だけ）
+   ・保存のしかた（端末によってちがう）
+     dir      … 保存するフォルダをえらべる端末（パソコンのChrome・Edgeなど）。はじめの1回だけフォルダをえらび、
+                 あとはボタンを押すだけで、そのフォルダに日時の名前のファイルを作る（古いものは新しい10個を残して消す）
+     download … フォルダをえらべない端末（スマホ）。はじめの1回だけ保存先を案内し、あとはボタンだけで「ダウンロード」に保存する
+                 （iPhoneのSafariでは、Safari自身の「ダウンロードしますか」の確認が毎回出る）
+     share    … iPhoneのホーム画面から開いているとき。共有の画面から保存する
+   ・どの端末でも、このスマホの中にも新しい5回分を残す（まちがえてリストから外したときに、すぐ戻せるように）
+   ・ファイルはサーバーに送らない。ほかの人のバックアップは戻せない（使う人の番号で確かめる）
+   ・以前のパスワードつきのバックアップも、パスワードを入れると戻せる
    ========================================================= */
 const BK_KIND = 'kuiki-follow-backup';
+const BK_PREFIX = '区域マップ_再訪問_';
+const BK_LOCAL_MAX = 5, BK_DIR_MAX = 10;
+const bkMode = () => (window.showDirectoryPicker ? 'dir' : isIOS() && isStandalone() ? 'share' : 'download');
+const bkSetupKey = () => 'kuiki_bk_setup_' + me().id;
+const bkLastKey = () => 'kuiki_bk_at_' + me().id;
 function backupPayload() {
   const fs = D().follows || {}, mine = Object.keys(fs).filter(k => fs[k] && fs[k].by === me().id);
   const houses = {};
@@ -5743,91 +5763,152 @@ function backupPayload() {
     houses[k] = { n: h.type === 'apt' ? `${h.label || '集合住宅'} ${uName(h, unit)}` : (h.label || '家'), t: t ? t.no : '', lat: h.lat, lng: h.lng };
   });
   return { app: 'kuiki-map', kind: BK_KIND, v: 1, uid: me().id, name: me().name, at: new Date().toISOString(),
-    memos: memoAll(), pins: [...pinsAll()], follows: mine, houses, gpins: gpinsGet() };
+    memos: memoAll(), pins: [...pinsAll()], follows: mine, houses };
 }
+const bkFileName = at => { const d = new Date(at); return `${BK_PREFIX}${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.json`; };
+const bkSummary = o => { const n = Object.keys(o.memos || {}).length; return `再訪問 ${(o.follows || []).length}件・メモ ${n}件`; };
+/* パスワードつきの古いバックアップを開く */
 async function bkKey(pass, salt) {
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 200000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
-}
-async function bkEncrypt(obj, pass) {
-  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await bkKey(pass, salt), new TextEncoder().encode(JSON.stringify(obj)));
-  return { app: 'kuiki-map', kind: BK_KIND, v: 1, enc: { salt: mB64(salt), iv: mB64(iv), ct: mB64(new Uint8Array(ct)) } };
 }
 async function bkDecrypt(o, pass) {
   const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: mUnB64(o.enc.iv) }, await bkKey(pass, mUnB64(o.enc.salt)), mUnB64(o.enc.ct));
   return JSON.parse(new TextDecoder().decode(pt));
 }
-const bkCryptoOk = () => !!(window.crypto && crypto.subtle && window.TextEncoder);
-/* ファイルを保存する：パソコンは保存先をえらぶ画面、スマホは共有の画面（「ファイルに保存」「ドライブ」など）、どちらもないときはダウンロード。
-   押したその場で呼ぶこと（あとで呼ぶと、ブラウザに止められることがある） */
-async function saveFileAs(blob, name) {
-  if (window.showSaveFilePicker && !isMobile()) {
-    try {
-      const h = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: '区域マップのバックアップ', accept: { 'application/json': ['.json'] } }] });
-      const w = await h.createWritable(); await w.write(blob); await w.close();
-      return 'saved';
-    } catch (e) { if (e && e.name === 'AbortError') return 'cancel'; }
-  }
+/* このスマホの中に残すバックアップ（新しい5回分）。「この端末から消す」ときは一緒に消える */
+async function bkLocalAll() { try { return (await IDB.get('bkgens')) || {}; } catch (e) { return {}; } }
+async function bkLocalList() { const a = await bkLocalAll(); return Array.isArray(a[me().id]) ? a[me().id] : []; }
+async function bkLocalAdd(o) {
+  try { const a = await bkLocalAll(); a[me().id] = [o].concat(Array.isArray(a[me().id]) ? a[me().id] : []).slice(0, BK_LOCAL_MAX); await IDB.set('bkgens', a); } catch (e) { /* 残せなくても、ファイルの保存は続ける */ }
+}
+/* フォルダ（パソコンなど） */
+async function bkDirHandle() { try { return (await IDB.get('bkdir_' + me().id)) || null; } catch (e) { return null; } }
+async function bkDirPermit(h, write) {
+  const opt = { mode: write ? 'readwrite' : 'read' };
   try {
-    const file = new File([blob], name, { type: 'application/json' });
-    if (isMobile() && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file] }); // 題名をつけると、iPhoneでは題名だけの別のファイルもできてしまうため、ファイルだけを渡す
-      return 'shared';
-    }
-  } catch (e) { if (e && e.name === 'AbortError') return 'cancel'; }
+    if ((await h.queryPermission(opt)) === 'granted') return true;
+    return (await h.requestPermission(opt)) === 'granted';
+  } catch (e) { return false; }
+}
+async function bkWriteDir(h, o) {
+  const fh = await h.getFileHandle(bkFileName(o.at), { create: true });
+  const w = await fh.createWritable();
+  await w.write(JSON.stringify(o)); await w.close();
+  // 古いバックアップは、新しい10個を残して消す（このアプリが作ったファイルだけ）
+  const names = [];
+  for await (const [name, e] of h.entries()) if (e.kind === 'file' && name.indexOf(BK_PREFIX) === 0 && /\.json$/.test(name)) names.push(name);
+  names.sort().reverse().slice(BK_DIR_MAX).forEach(n => { h.removeEntry(n).catch(() => {}); });
+}
+function bkDownload(o) {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = name;
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(o)], { type: 'application/json' }));
+  a.download = bkFileName(o.at);
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 8000);
-  return 'download';
 }
-function openBackupSheet() {
-  const o = backupPayload(), nMemo = Object.keys(o.memos).length, nG = o.gpins ? o.gpins.list.length : 0;
-  const d = new Date(), name = `区域マップ_再訪問_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.json`;
-  setSheet(headHtml(null, '再訪問のバックアップ', '本人がえらんだ場所に、ファイルで保存します') + `
-    <p>保存するもの：受け持っている再訪問 <b>${o.follows.length}件</b>・メモ <b>${nMemo}件</b>・📌 ${o.pins.length}件${nG ? `・自分のGoogleマップのピン ${nG}件` : ''}</p>
-    ${bkCryptoOk() ? `<label class="field"><span>パスワード（おすすめ・4文字以上）</span><input type="password" id="bkPass" autocomplete="new-password" maxlength="64" placeholder="なくても保存できます">
-      <small class="hint">パスワードをつけると、ファイルを開いてもメモは読めません。<b>パスワードを忘れると、戻せなくなります。</b></small></label>
-    <label class="field"><span>パスワードをもう一度</span><input type="password" id="bkPass2" autocomplete="new-password" maxlength="64"></label>` : ''}
-    <div class="notice warn">メモには、住んでいる方のことが書かれていることがあります。保存したファイルは、自分だけが使う場所（自分のスマホ・自分のドライブなど）に置き、人に送らないでください。いらなくなったら消してください。</div>
-    <div id="bkGoBox"><button class="btn primary block" id="bkPrep">保存の準備をする</button></div>
+async function bkShare(o) {
+  const file = new File([JSON.stringify(o)], bkFileName(o.at), { type: 'application/json' });
+  if (!(navigator.canShare && navigator.canShare({ files: [file] }))) { bkDownload(o); return true; }
+  try { await navigator.share({ files: [file] }); return true; } // 題名はつけない（題名だけの別ファイルができるため）
+  catch (e) { return !(e && e.name === 'AbortError') && (bkDownload(o), true); }
+}
+const bkDone = o => { lsSet(bkLastKey(), o.at); paintFollowBk(); toast(`バックアップしました（${bkSummary(o)}）`); };
+/* バックアップのボタン：はじめの1回だけ保存先をたしかめ、あとはボタンだけ */
+async function quickBackup() {
+  if (!featFollow()) return;
+  const o = backupPayload(), mode = bkMode();
+  if (!(o.follows.length + Object.keys(o.memos).length)) { toast('バックアップする再訪問がありません'); return; }
+  const setup = lsGet(bkSetupKey());
+  if (mode === 'dir') {
+    const h = setup === 'dir' ? await bkDirHandle() : null;
+    if (!h) { bkFirstSheet(); return; }
+    if (!await bkDirPermit(h, true)) { toast('フォルダに保存できませんでした。もう一度押してください'); return; }
+    try { await bkWriteDir(h, o); } catch (e) { lsDel(bkSetupKey()); bkFirstSheet('前に決めたフォルダに保存できませんでした。もう一度えらんでください。'); return; }
+    await bkLocalAdd(o); bkDone(o); return;
+  }
+  if (setup !== mode) { bkFirstSheet(); return; }
+  await bkLocalAdd(o);
+  if (mode === 'share') { if (await bkShare(o)) bkDone(o); return; }
+  bkDownload(o); bkDone(o);
+}
+function bkFirstSheet(note) {
+  const mode = bkMode();
+  const where = mode === 'dir'
+    ? '<p>はじめに、バックアップを保存する<b>フォルダ</b>をえらびます。次からは、ボタンを押すだけで、そのフォルダに保存します。</p><p class="hint">例：「ドキュメント」の中に「区域マップ」というフォルダを作って、えらんでください。Googleドライブのフォルダにすると、パソコンをなくしても残ります。</p>'
+    : mode === 'share'
+      ? '<p>ボタンを押すと、共有の画面が出ます。<b>「"ファイル"に保存」</b>をえらび、保存する場所（おすすめ：iCloud Drive）を決めてください。</p><p class="hint">ホーム画面から開いているときは、保存のたびに場所をえらぶ画面が出ます。</p>'
+      : isIOS()
+        ? '<p>次からは、ボタンを押すだけで、Safariの<b>「ダウンロード」</b>に保存します（Safariの「ダウンロードしますか」の確認だけ出ます）。</p><p class="hint">iPhoneの「設定」→「アプリ」→「Safari」→「ダウンロード」を<b>「iCloud Drive」</b>にしておくと、スマホをなくしても残ります。</p>'
+        : '<p>次からは、ボタンを押すだけで、スマホの<b>「ダウンロード」</b>フォルダに保存します。</p><p class="hint">スマホをなくしたときに備えて、ときどき「ダウンロード」のファイルをGoogleドライブなどに移しておくと安心です。</p>';
+  setSheet(headHtml(null, 'バックアップの保存先', '') + (note ? `<div class="notice warn">${esc(note)}</div>` : '') + where + `
+    <p class="hint">このスマホの中にも、新しい${BK_LOCAL_MAX}回分を残します。ファイルにはメモがそのまま入るので、自分だけが使う場所に保存し、人に送らないでください。</p>
+    <button class="btn primary block" id="bkFirst">${mode === 'dir' ? '保存するフォルダをえらぶ' : 'わかりました。バックアップする'}</button>
     <button class="btn block" data-close>やめる</button>`);
-  $('#bkPrep').onclick = async () => {
-    const p1 = $('#bkPass') ? $('#bkPass').value : '', p2 = $('#bkPass2') ? $('#bkPass2').value : '';
-    if (p1 && p1.length < 4) { toast('パスワードは4文字以上にしてください'); return; }
-    if (p1 !== p2) { toast('2つのパスワードがちがいます'); return; }
-    if (!p1 && !await ask('パスワードなしで保存しますか？', { body: 'ファイルを開くと、だれでもメモを読めます。', ok: 'パスワードなしで保存', danger: false })) return;
-    $('#bkPrep').disabled = true; $('#bkPrep').textContent = '準備しています…';
-    let blob;
-    try {
-      const body = p1 ? await bkEncrypt(backupPayload(), p1) : backupPayload();
-      blob = new Blob([JSON.stringify(body)], { type: 'application/json' });
-    } catch (e) { toast('準備できませんでした。もう一度ためしてください'); $('#bkPrep').disabled = false; $('#bkPrep').textContent = '保存の準備をする'; return; }
-    // 準備（暗号化）のあと、押したその場で保存の画面を出す
-    $('#bkGoBox').innerHTML = `<p class="okmsg"><b>準備ができました。</b>下のボタンを押して、保存する場所をえらんでください。${isIOS() ? '（iPhoneでは「\"ファイル\"に保存」をえらびます）' : ''}</p>
-      <button class="btn primary block" id="bkGo">ファイルに保存する</button>`;
-    $('#bkGo').onclick = async () => {
-      const r = await saveFileAs(blob, name);
-      if (r === 'cancel') return;
-      lsSet('kuiki_bk_at_' + me().id, new Date().toISOString());
-      closeSheet();
-      toast(r === 'download' ? 'バックアップを「ダウンロード」に保存しました' : 'バックアップを保存しました');
-    };
+  $('#bkFirst').onclick = async () => {
+    const o = backupPayload();
+    if (mode === 'dir') {
+      let h;
+      try { h = await window.showDirectoryPicker({ id: 'kuiki-backup', mode: 'readwrite', startIn: 'documents' }); }
+      catch (e) { if (e && e.name !== 'AbortError') toast('フォルダをえらべませんでした'); return; }
+      try { await bkWriteDir(h, o); } catch (e) { toast('そのフォルダには保存できませんでした。別のフォルダをえらんでください'); return; }
+      try { await IDB.set('bkdir_' + me().id, h); } catch (e) { /* 次にまたえらぶ */ }
+      lsSet(bkSetupKey(), 'dir'); closeSheet(); await bkLocalAdd(o); bkDone(o); return;
+    }
+    lsSet(bkSetupKey(), mode);
+    closeSheet(); await bkLocalAdd(o);
+    if (mode === 'share') { if (await bkShare(o)) bkDone(o); return; }
+    bkDownload(o); bkDone(o);
   };
 }
-/* 復元：ファイルをえらぶ → （パスワード）→ 中身を確かめる → 戻す */
+/* 復元のボタン：保存したフォルダ（とこのスマホの中）を見て、1つならいつのものかを見せて確かめ、複数ならえらんでもらう */
+async function quickRestore() {
+  if (!featFollow()) return;
+  let list = [];
+  const h = bkMode() === 'dir' && lsGet(bkSetupKey()) === 'dir' ? await bkDirHandle() : null;
+  let dirOk = false;
+  if (h && await bkDirPermit(h, false)) {
+    dirOk = true;
+    try {
+      for await (const [name, e] of h.entries()) {
+        if (e.kind !== 'file' || !/\.json$/i.test(name)) continue;
+        try {
+          const o = JSON.parse(await (await e.getFile()).text());
+          if (o && o.app === 'kuiki-map' && o.kind === BK_KIND) list.push({ o, src: 'フォルダ', name });
+        } catch (x) { /* ほかのファイルはとばす */ }
+      }
+    } catch (e) { dirOk = false; }
+  }
+  if (!dirOk) (await bkLocalList()).forEach(o => list.push({ o, src: 'このスマホ' }));
+  list = list.filter(x => !x.o.uid || x.o.uid === me().id).sort((a, b) => (String(a.o.at) < String(b.o.at) ? 1 : -1));
+  const pick = `<label class="btn block">ほかのファイルをえらぶ<input type="file" id="bkFile" hidden></label>`;
+  if (!list.length) {
+    setSheet(headHtml(null, 'バックアップから戻す', '') + `<p>${dirOk ? '保存したフォルダに' : 'このスマホの中に'}、バックアップが見つかりませんでした。保存したファイルをえらんでください。</p>` +
+      pick.replace('class="btn block"', 'class="btn primary block"') + '<button class="btn block" data-close>やめる</button>');
+  } else if (list.length === 1) {
+    const x = list[0];
+    setSheet(headHtml(null, 'このバックアップを戻しますか？', '') + `
+      <div class="schedbox"><p class="rt">${fmtDate(x.o.at)} のバックアップ</p><p class="muted">${bkSummary(x.o)}（${x.src}）</p></div>
+      <button class="btn primary block" id="bkOne">このバックアップを戻す</button>${pick}<button class="btn block" data-close>やめる</button>`);
+    $('#bkOne').onclick = () => checkRestore(x.o);
+  } else {
+    setSheet(headHtml(null, 'どのバックアップを戻しますか？', `${list.length}件あります（新しい順）`) +
+      list.slice(0, 20).map((x, i) => `<button class="choice wide bkpick" data-bki="${i}">${fmtDate(x.o.at)}<small>${bkSummary(x.o)}（${x.src}）${i === 0 ? '・いちばん新しい' : ''}</small></button>`).join('') +
+      pick + '<button class="btn block" data-close>やめる</button>');
+    $$('[data-bki]', $('#sheet')).forEach(b => b.onclick = () => checkRestore(list[Number(b.dataset.bki)].o));
+  }
+  $('#bkFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) restoreFromFile(f); };
+}
 /* ファイルの中身を文字で読む（古いiPhoneでも読めるように） */
 function readFileText(file) {
   if (file.text) return file.text();
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result || '')); r.onerror = () => rej(r.error); r.readAsText(file); });
 }
-/* 復元：ファイルをえらぶ → （パスワード）→ 中身を確かめる → 戻す */
+/* えらんだファイルから戻す */
 async function restoreFromFile(file) {
   const fname = String(file && file.name || '（名前なし）'), kb = Math.max(1, Math.round((file && file.size || 0) / 1024));
   const bad = why => infoSheet('このファイルは戻せません', `えらんだファイル：<b>${esc(fname)}</b>（${kb}KB）<br>${why}<br><br>
-    バックアップのファイルは「<b>区域マップ_再訪問_日付.json</b>」という名前です（最後が .json）。
-    iPhoneでは、同じ場所に「再訪問のバックアップ」という別のファイルができていることがあります。そちらではなく、.json のファイルをえらんでください。`);
+    バックアップのファイルは「<b>${BK_PREFIX}日付.json</b>」という名前です（最後が .json）。`);
   if (!file || !file.size) { bad('ファイルが空です（中身がありません）。'); return; }
   if (file.size > 10 * 1024 * 1024) { bad('ファイルが大きすぎます。'); return; }
   let text;
@@ -5838,18 +5919,14 @@ async function restoreFromFile(file) {
     const i = text.indexOf('{'), j = text.lastIndexOf('}'); // まわりに別の文字がついていても、中のバックアップを取り出す
     if (i >= 0 && j > i) { try { o = JSON.parse(text.slice(i, j + 1)); } catch (e2) { o = null; } }
   }
-  if (!o) {
-    bad(text[0] === '<' ? 'これは地図のピンのファイル（KMLなど）のようです。ピンは「自分のGoogleマップのピン」から取り込みます。'
-      : `中身が、区域マップのバックアップの形ではありません（はじめの文字：「${esc(text.slice(0, 20))}」）。`);
-    return;
-  }
+  if (!o) { bad(`中身が、区域マップのバックアップの形ではありません（はじめの文字：「${esc(text.slice(0, 20))}」）。`); return; }
   if (o.app !== 'kuiki-map' || o.kind !== BK_KIND) { bad('区域マップの、再訪問のバックアップではありません。'); return; }
   if (o.enc) { askBackupPass(o); return; }
   checkRestore(o);
 }
 function askBackupPass(enc) {
-  if (!bkCryptoOk()) { infoSheet('この端末では開けません', 'パスワードつきのファイルを開くしくみが、このブラウザにありません。'); return; }
-  setSheet(headHtml(null, 'パスワードを入れてください', 'バックアップを保存したときのパスワード') + `
+  if (!(window.crypto && crypto.subtle)) { infoSheet('この端末では開けません', 'パスワードつきのファイルを開くしくみが、このブラウザにありません。'); return; }
+  setSheet(headHtml(null, 'パスワードを入れてください', '以前、パスワードをつけて保存したバックアップです') + `
     <label class="field"><span>パスワード</span><input type="password" id="rsPass" autocomplete="current-password" maxlength="64"></label>
     <button class="btn primary block" id="rsGo">開く</button><button class="btn block" data-close>やめる</button>`);
   $('#rsGo').onclick = async () => {
@@ -5869,293 +5946,58 @@ function cleanMemoRec(m) {
 function checkRestore(b) {
   if (!b || b.kind !== BK_KIND || typeof b.memos !== 'object') { infoSheet('このファイルは戻せません', 'ファイルの中身が読めませんでした。'); return; }
   if (b.uid && b.uid !== me().id) { infoSheet('ほかの人のバックアップです', `このファイルは${esc(b.name || 'ほかの人')}さんのバックアップです。本人のバックアップだけ戻せます。`); return; }
-  const fs = D().follows || {}, keys = Object.keys(b.memos || {}).concat(b.pins || []).filter((k, i, a) => a.indexOf(k) === i);
+  const fs = D().follows || {};
+  const keys = Object.keys(b.memos || {}).concat(b.pins || [], b.follows || []).filter((k, i, a) => a.indexOf(k) === i);
   const mine = keys.filter(k => fs[k] && fs[k].by === me().id);
   const free = keys.filter(k => !fs[k] && houseById(parseKey(k)[0]) && !D().dnc[k]); // だれも受け持っていない家
   const other = keys.length - mine.length - free.length;
-  const nG = b.gpins && Array.isArray(b.gpins.list) ? b.gpins.list.length : 0, curG = gpinsGet();
-  setSheet(headHtml(null, 'バックアップから戻す', `${b.at ? fmtDate(b.at) + 'に保存' : ''}`) + `
+  setSheet(headHtml(null, 'バックアップから戻す', `${b.at ? fmtDate(b.at) + 'のバックアップ' : ''}`) + `
     <p>今も受け持っている家：<b>${mine.length}件</b>（メモ・約束・📌を戻します。今のメモも消さずに合わせます）</p>
     ${!mine.length && !free.length ? '<div class="notice warn">戻せる家がありません。ほかの人が受け持っているか、家がなくなっています。</div>' : ''}
     ${free.length ? `<label class="check"><input type="checkbox" id="rsRevive" checked>受け持ちが外れている家 ${free.length}件も、再訪問にもどす</label>
       <p class="hint">だれも受け持っていない家だけです。もどすと、ほかの人にも「再訪問している家」として伝わります。</p>` : ''}
     ${other ? `<p class="muted">ほかの人が受け持っている家・もうない家 ${other}件は、戻しません。</p>` : ''}
-    ${nG ? `<label class="check"><input type="checkbox" id="rsGpin"${curG ? '' : ' checked'}>自分のGoogleマップのピン ${nG}件も戻す${curG ? `（今の${curG.list.length}件と入れかえ）` : ''}</label>` : ''}
     <button class="btn primary block" id="rsApply">戻す</button><button class="btn block" data-close>やめる</button>`);
   $('#rsApply').onclick = () => {
     const revive = $('#rsRevive') && $('#rsRevive').checked ? free : [];
-    const withG = $('#rsGpin') && $('#rsGpin').checked;
     closeSheet();
-    const apply = () => {
-      const f2 = D().follows || {}, ok = new Set(Object.keys(f2).filter(k => f2[k] && f2[k].by === me().id));
-      const o = memoAll(), p = pinsAll();
-      let n = 0;
-      Object.keys(b.memos || {}).forEach(k => {
-        if (!ok.has(k)) return;
-        const m = cleanMemoRec(b.memos[k]); if (!m) return;
-        const c = o[k];
-        if (!c) o[k] = m;
-        else if (c.text !== m.text || JSON.stringify(c.next || null) !== JSON.stringify(m.next || null)) {
-          const newer = (Date.parse(c.at) || 0) >= (Date.parse(m.at) || 0) ? c : m, older = newer === c ? m : c;
-          o[k] = Object.assign({ text: mergeMemoText(newer.text, older.text), at: newer.at }, newer.next || older.next ? { next: newer.next || older.next } : {});
-        }
-        n++;
-      });
-      (b.pins || []).forEach(k => { if (ok.has(k)) p.add(k); });
-      memoSaveAll(o); pinsSave(p);
-      if (withG) gpinsSet(b.gpins);
-      renderAll(); if (map) renderGpins();
-      toast(`戻しました（メモ ${n}件${revive.length ? `・再訪問にもどした家 ${revive.length}件` : ''}${withG ? `・ピン ${nG}件` : ''}）`);
-    };
     if (revive.length) commit(`再訪問を${revive.length}件もどしました`, () => { revive.forEach(k => { if (!D().follows[k]) startFollow(k, me().id); }); });
-    apply();
-  };
-}
-
-/* =========================================================
-   自分のGoogleマップのピン（希望する人だけ・このスマホの中だけ）
-   ・Googleマイマップで書き出したKML/KMZ、Googleデータエクスポートの「保存済み」（GeoJSON・CSV）を読む
-   ・名前・メモ・位置は、このスマホの中（localStorage）だけに置く。サーバー・区域係には送らない
-   ・「この端末から消す」「長く通信がないとき」「スマホが使えなくなったとき」は、再訪問のメモと一緒に消える
-   ・地図の上の「自分のピン」ボタンで、出す・出さないをすぐ切りかえられる
-   ========================================================= */
-const GPIN_MAX = 3000;
-const gpinKey = () => 'kuiki_gpins_' + me().id;
-const gpinShowKey = () => 'kuiki_gpshow_' + me().id;
-function gpinsGet() {
-  try { const o = JSON.parse(lsGet(gpinKey()) || 'null'); return o && Array.isArray(o.list) && o.list.length ? o : null; } catch (e) { return null; }
-}
-function gpinsSet(o) {
-  if (!o || !Array.isArray(o.list) || !o.list.length) { lsDel(gpinKey()); return true; }
-  const list = o.list.slice(0, GPIN_MAX).map((p, i) => ({ i, n: String(p.n || '').slice(0, 60), d: String(p.d || '').slice(0, 300), g: String(p.g || '').slice(0, 40), lat: Number(p.lat), lng: Number(p.lng) }))
-    .filter(p => isFinite(p.lat) && isFinite(p.lng) && Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180);
-  return lsSet(gpinKey(), JSON.stringify({ at: o.at || new Date().toISOString(), file: String(o.file || '').slice(0, 80), list }));
-}
-const gpinOn = () => lsGet(gpinShowKey()) !== '0';
-/* 文字だけを取り出す（説明欄のHTMLを、画面で動かさないように読む） */
-function gpText(s, n) {
-  const t = /[<&]/.test(String(s || '')) ? (new DOMParser().parseFromString(String(s).replace(/<br\s*\/?>/gi, '\n'), 'text/html').body.textContent || '') : String(s || '');
-  return t.replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, n);
-}
-function llFromUrl(u) {
-  const s = String(u || '');
-  const m = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/.exec(s) || /[?&](?:q|query|ll|center)=(-?\d+\.\d+)(?:,|%2C)\s*(-?\d+\.\d+)/i.exec(s) || /@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(s);
-  return m ? [Number(m[1]), Number(m[2])] : null;
-}
-function parseGpinKml(text) {
-  const doc = new DOMParser().parseFromString(text, 'application/xml');
-  if (doc.getElementsByTagName('parsererror').length) throw new Error('xml');
-  const out = [];
-  for (const pm of doc.getElementsByTagNameNS('*', 'Placemark')) {
-    const pt = pm.getElementsByTagNameNS('*', 'Point')[0]; if (!pt) continue;
-    const c = kmlCoords(pt)[0]; if (!c) continue;
-    const child = n => { const e = [...pm.children].find(x => x.localName === n); return e ? e.textContent : ''; };
-    let g = '', p = pm.parentElement;
-    while (p) { if (p.localName === 'Folder') { const ne = [...p.children].find(x => x.localName === 'name'); g = ne ? ne.textContent.trim() : ''; break; } p = p.parentElement; }
-    out.push({ n: gpText(child('name'), 60) || '（名前なし）', d: gpText(child('description'), 300), g, lat: c[0], lng: c[1] });
-  }
-  return { list: out, skip: 0 };
-}
-function parseGpinJson(o) {
-  const fs = o && o.type === 'FeatureCollection' ? o.features : Array.isArray(o) ? o : null;
-  if (!fs) throw new Error('json');
-  const out = []; let skip = 0;
-  fs.forEach(f => {
-    const pr = (f && f.properties) || {}, loc = pr.location || pr.Location || {};
-    let ll = f && f.geometry && f.geometry.type === 'Point' && Array.isArray(f.geometry.coordinates) ? [Number(f.geometry.coordinates[1]), Number(f.geometry.coordinates[0])] : null;
-    if (!ll || !isFinite(ll[0]) || (ll[0] === 0 && ll[1] === 0)) ll = llFromUrl(pr.google_maps_url || pr['Google Maps URL'] || pr.url);
-    if (!ll) { skip++; return; }
-    const n = pr.name || pr.Title || pr.title || loc.name || loc['Business Name'] || loc.address || loc.Address || '（名前なし）';
-    const d = pr.Comment || pr.comment || pr.description || pr.Note || loc.address || loc.Address || '';
-    out.push({ n: gpText(n, 60), d: gpText(d, 300), g: '', lat: ll[0], lng: ll[1] });
-  });
-  return { list: out, skip };
-}
-function parseGpinCsv(text, fname) {
-  const rows = parseCsvText(text).filter(r => r.some(c => String(c).trim()));
-  if (rows.length < 2) throw new Error('csv');
-  const h = rows[0].map(c => String(c).normalize('NFKC').trim().toLowerCase());
-  const col = re => h.findIndex(c => re.test(c));
-  const ci = { n: col(/^(title|name|名前|タイトル|名称)$/), d: col(/^(note|comment|メモ|コメント|説明)$/), u: col(/url/), la: col(/^(lat|latitude|緯度)$/), lo: col(/^(lng|lon|long|longitude|経度)$/) };
-  const out = []; let skip = 0;
-  rows.slice(1).forEach(r => {
-    let ll = ci.la >= 0 && ci.lo >= 0 ? [Number(r[ci.la]), Number(r[ci.lo])] : null;
-    if (!ll || !isFinite(ll[0]) || !isFinite(ll[1])) ll = ci.u >= 0 ? llFromUrl(r[ci.u]) : null;
-    if (!ll) { skip++; return; }
-    out.push({ n: gpText(ci.n >= 0 ? r[ci.n] : '', 60) || '（名前なし）', d: gpText(ci.d >= 0 ? r[ci.d] : '', 300), g: String(fname || '').replace(/\.csv$/i, '').slice(0, 40), lat: ll[0], lng: ll[1] });
-  });
-  return { list: out, skip };
-}
-async function readGpinFile(file) {
-  if (file.size > 20 * 1024 * 1024) throw new Error('big');
-  const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
-  if (head[0] === 0x50 && head[1] === 0x4B) { // KMZ（圧縮されたKML）
-    await loadScript(LIB.zip);
-    const zip = await window.JSZip.loadAsync(file);
-    const f = zip.file('doc.kml') || zip.file(/\.kml$/i)[0];
-    if (!f) throw new Error('nokml');
-    return parseGpinKml(await f.async('string'));
-  }
-  let text = await file.text();
-  text = text.replace(/^\uFEFF/, '');
-  const t = text.trim();
-  if (t[0] === '<') return parseGpinKml(t);
-  if (t[0] === '{' || t[0] === '[') return parseGpinJson(JSON.parse(t));
-  return parseGpinCsv(text, file.name);
-}
-function openGpinSheet() {
-  const o = gpinsGet();
-  setSheet(headHtml(null, '自分のGoogleマップのピン', 'このスマホの中だけで使います') + `
-    ${o ? `<div class="setrow"><span>今のピン：<b>${o.list.length}件</b><br><small class="hint">${fmtDate(o.at)}に取り込み${o.file ? '・' + esc(o.file) : ''}</small></span>
-      <div class="seg" role="group" aria-label="地図に出す"><button type="button" data-gpshow="1" aria-pressed="${gpinOn()}">地図に出す</button><button type="button" data-gpshow="0" aria-pressed="${!gpinOn()}">出さない</button></div></div>` : ''}
-    <p>自分のGoogleマップに立てたピン（再訪問先など）を、区域マップの地図に<b>紫のしずく形の印</b>で出します。</p>
-    <ol class="hsteps">
-      <li><span class="hnum">1</span><div><p>パソコンかスマホのブラウザで <b>Googleマイマップ</b> を開き、ピンを入れた地図をえらびます。</p>
-        <a class="btn small" href="https://www.google.com/maps/d/" target="_blank" rel="noopener">マイマップを開く</a></div></li>
-      <li><span class="hnum">2</span><div><p>地図の名前の横の「︙」→ <b>「KMLにエクスポート」</b>（KML/KMZにエクスポート）でファイルを保存します。</p></div></li>
-      <li><span class="hnum">3</span><div><p>下の「ファイルをえらぶ」で、そのファイルをえらびます。</p></div></li>
-    </ol>
-    <p class="hint">Googleのデータエクスポート（Takeout）で書き出した「保存済み」のファイル（.json・.csv）も読めます。ただし、位置の入っていないピンは取り込めません。</p>
-    <label class="btn primary block">ファイルをえらぶ${o ? '（今のピンと入れかえ）' : ''}<input type="file" id="gpFile" hidden></label>
-    <div class="notice info">ピンの名前やメモは、<b>このスマホの中だけ</b>に置きます。サーバーや区域係には送りません。「この端末から消す」を押したときや、長く通信がないときは、再訪問のメモと一緒に消えます。</div>
-    ${o ? '<button class="btn danger block" id="gpDel">このスマホからピンを消す</button>' : ''}
-    <button class="btn block" data-close>閉じる</button>`);
-  const S = $('#sheet');
-  $$('[data-gpshow]', S).forEach(b => b.onclick = () => { lsSet(gpinShowKey(), b.dataset.gpshow); renderGpins(); openGpinSheet(); });
-  $('#gpFile').onchange = async e => {
-    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-    let r;
-    try { toast('読み込んでいます…'); r = await readGpinFile(f); }
-    catch (err) { infoSheet('このファイルは読めませんでした', 'Googleマイマップの「KMLにエクスポート」で保存したファイル（.kml・.kmz）をえらんでください。KMZのときは、インターネットにつながっている必要があります。'); return; }
-    if (!r.list.length) { infoSheet('ピンが見つかりませんでした', (r.skip ? `位置の入っていないピンが${r.skip}件ありました。` : '') + 'Googleマイマップで、ピン（場所の印）を入れた地図を書き出してください。'); return; }
-    const over = r.list.length > GPIN_MAX;
-    setSheet(headHtml(null, 'この内容で取り込みますか', esc(f.name)) + `
-      <p>ピン <b>${Math.min(r.list.length, GPIN_MAX)}件</b>${r.skip ? `（位置がなくて取り込めないもの ${r.skip}件）` : ''}${over ? `<br><span class="tag-warn">${GPIN_MAX}件までです。残りは取り込みません</span>` : ''}</p>
-      <ul class="history">${r.list.slice(0, 8).map(p => `<li><span>📍</span><span><b>${esc(p.n)}</b>${p.d ? `<br><small class="muted">${esc(p.d.split('\n')[0].slice(0, 40))}</small>` : ''}</span></li>`).join('')}</ul>
-      ${r.list.length > 8 ? `<p class="muted">ほか ${r.list.length - 8}件</p>` : ''}
-      <button class="btn primary block" id="gpSave">取り込む</button><button class="btn block" id="gpBack">もどる</button>`);
-    $('#gpBack').onclick = openGpinSheet;
-    $('#gpSave').onclick = () => {
-      if (!gpinsSet({ at: new Date().toISOString(), file: f.name, list: r.list })) { toast('このスマホに保存できませんでした（ピンが多すぎます）'); return; }
-      lsSet(gpinShowKey(), '1');
-      closeSheet(); renderGpins();
-      if (currentView === 'follow') renderFollowList();
-      toast(`ピンを${Math.min(r.list.length, GPIN_MAX)}件取り込みました。地図の「自分のピン」で出す・出さないを切りかえられます`);
-    };
-  };
-  if ($('#gpDel')) $('#gpDel').onclick = async () => {
-    if (!await ask('このスマホから、自分のGoogleマップのピンを消します。Googleマップのピンは消えません。よろしいですか？')) return;
-    gpinsSet(null); closeSheet(); renderGpins();
-    if (currentView === 'follow') renderFollowList();
-    toast('ピンを消しました');
-  };
-}
-/* 地図の上の「自分のピン」ボタン */
-function updateGpinBtn(o) {
-  const b = $('#btnGpin'); if (!b) return;
-  b.hidden = !o || mode !== 'normal';
-  const on = gpinOn();
-  b.setAttribute('aria-pressed', String(on));
-  b.innerHTML = `<svg viewBox="0 0 26 34" aria-hidden="true"><path d="M13 32S3 19.5 3 12a10 10 0 0 1 20 0c0 7.5-10 20-10 20z" fill="${on ? '#7B1FA2' : '#fff'}" stroke="#7B1FA2" stroke-width="2.5"/><circle cx="13" cy="12" r="3.6" fill="${on ? '#fff' : '#7B1FA2'}"/></svg>自分のピン<small>${on ? '表示中' : 'かくす'}</small>`;
-}
-let gpinLayer = null;
-/* 地図に出す：家の上にあるピンは、家の印の上に見えるように出すが、押すと家の記録が開く（家の記録の画面に、そのピンのメモも出る）。
-   家から離れたピンは、押すとピンのメモが開く */
-function renderGpins() {
-  if (!map) return;
-  if (!gpinLayer) gpinLayer = L.layerGroup().addTo(map);
-  gpinLayer.clearLayers();
-  const o = gpinsGet();
-  updateGpinBtn(o);
-  if (!o || !gpinOn() || mode !== 'normal') return; // 線引き・範囲分けなどの最中は出さない（家のタップのじゃまをしない）
-  const b = map.getBounds().pad(0.2), vis = rotVisTest(0.2), named = map.getZoom() >= 18;
-  const pins = [];
-  for (const p of o.list) {
-    if (!b.contains([p.lat, p.lng]) || (vis && !vis(p.lat, p.lng))) continue;
-    pins.push(p); if (pins.length >= 500) break;
-  }
-  if (!pins.length) return;
-  // 家から12m以内のピンは「家の上のピン」（家を区切りのます目に入れて、近くのます目だけを調べる）
-  const G = 0.0002, grid = new Map();
-  D().houses.forEach(h => {
-    if (!b.contains([h.lat, h.lng])) return;
-    const k = Math.floor(h.lat / G) + ':' + Math.floor(h.lng / G);
-    if (!grid.has(k)) grid.set(k, []); grid.get(k).push(h);
-  });
-  const onHouse = p => { const a = Math.floor(p.lat / G), c = Math.floor(p.lng / G);
-    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
-      const l = grid.get((a + i) + ':' + (c + j));
-      if (l && l.some(h => distM([p.lat, p.lng], [h.lat, h.lng]) <= 12)) return true;
-    }
-    return false; };
-  pins.forEach(p => {
-    const over = onHouse(p);
-    const m = L.marker([p.lat, p.lng], {
-      icon: L.divIcon({ className: '', html: `<div class="gpin">${named ? `<span>${esc(p.n)}</span>` : ''}</div>`, iconSize: [26, 34], iconAnchor: [13, 34] }),
-      keyboard: false, title: p.n, interactive: !over, pane: over ? 'labelPane' : 'markerPane', zIndexOffset: 1500
+    const f2 = D().follows || {}, ok = new Set(Object.keys(f2).filter(k => f2[k] && f2[k].by === me().id));
+    const o = memoAll(), p = pinsAll();
+    let n = 0;
+    Object.keys(b.memos || {}).forEach(k => {
+      if (!ok.has(k)) return;
+      const m = cleanMemoRec(b.memos[k]); if (!m) return;
+      const c = o[k];
+      if (!c) o[k] = m;
+      else if (c.text !== m.text || JSON.stringify(c.next || null) !== JSON.stringify(m.next || null)) {
+        const newer = (Date.parse(c.at) || 0) >= (Date.parse(m.at) || 0) ? c : m, older = newer === c ? m : c;
+        o[k] = Object.assign({ text: mergeMemoText(newer.text, older.text), at: newer.at }, newer.next || older.next ? { next: newer.next || older.next } : {});
+      }
+      n++;
     });
-    if (!over) m.on('click', () => openGpin(p));
-    m.addTo(gpinLayer);
-  });
+    (b.pins || []).forEach(k => { if (ok.has(k)) p.add(k); });
+    memoSaveAll(o); pinsSave(p);
+    renderAll();
+    toast(`戻しました（メモ ${n}件${revive.length ? `・再訪問にもどした家 ${revive.length}件` : ''}）`);
+  };
 }
-/* 家の記録の画面に出す：その家の近く（20m以内）にある自分のピン */
-function gpinNoteHtml(h) {
-  const o = gpinsGet(); if (!o || !h) return '';
-  const near = o.list.filter(p => Math.abs(p.lat - h.lat) < 0.0003 && Math.abs(p.lng - h.lng) < 0.0003 && distM([p.lat, p.lng], [h.lat, h.lng]) <= 20).slice(0, 3);
-  return near.map(p => `<div class="notice gpnote"><b><span class="gpdot" aria-hidden="true"></span>自分のピン：${esc(p.n)}</b>${p.d ? `<br>${esc(p.d.split('\n').slice(0, 2).join('　').slice(0, 80))}` : ''}
-    <span class="actions"><button type="button" class="btn small" data-gpopen="${p.i}">ピンのメモを見る</button></span></div>`).join('');
+/* 再訪問のタブの右上の、雲のボタン（前回の日時は、ボタンの説明に入れる） */
+const BK_ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 12.5a4 4 0 0 1-.4-8 5.2 5.2 0 0 1 10 1.2 3.4 3.4 0 0 1 .4 6.8"/><path d="M12 22v-9"/><path d="M8.5 16.2 12 12.7l3.5 3.5"/></svg>';
+const BK_ICON_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 12.5a4 4 0 0 1-.4-8 5.2 5.2 0 0 1 10 1.2 3.4 3.4 0 0 1 .4 6.8"/><path d="M12 12.5v9"/><path d="M8.5 18.2 12 21.7l3.5-3.5"/></svg>';
+function paintFollowBk() {
+  const box = $('#followBk'); if (!box) return;
+  const last = lsGet(bkLastKey());
+  box.innerHTML = `<button type="button" class="bkbtn" id="fbkSave" aria-label="再訪問をバックアップ${last ? '（前回 ' + fmtDate(last) + '）' : ''}" title="バックアップ${last ? '（前回 ' + fmtDate(last) + '）' : ''}">${BK_ICON_UP}<small>バックアップ</small></button>
+    <button type="button" class="bkbtn" id="fbkLoad" aria-label="バックアップから復元" title="復元">${BK_ICON_DOWN}<small>復元</small></button>`;
+  $('#fbkSave').onclick = quickBackup;
+  $('#fbkLoad').onclick = quickRestore;
 }
-function openGpin(p) {
-  // いちばん近い家（40m以内）：その家の記録やメモをすぐ開けるように
-  let near = null, nd = 40;
-  D().houses.forEach(h => {
-    if (Math.abs(h.lat - p.lat) > 0.0005 || Math.abs(h.lng - p.lng) > 0.0006) return;
-    const d = distM([p.lat, p.lng], [h.lat, h.lng]); if (d < nd) { nd = d; near = h; }
-  });
-  const nt = near && terrById(near.terrId);
-  const fk = near ? targets(near).map(u => K(near.id, u)).find(k => { const f = fol(k); return f && f.by === me().id; }) : null;
-  const ll = p.lat.toFixed(6) + ',' + p.lng.toFixed(6);
-  setSheet(headHtml(null, esc(p.n), '自分のGoogleマップのピン（このスマホだけ）') + `
-    ${p.g ? `<p class="muted">${esc(p.g)}</p>` : ''}
-    ${p.d ? `<div class="fmemo" style="max-height:none">${esc(p.d)}</div>` : '<p class="muted">メモはありません。</p>'}
-    <div class="dirbtns" style="margin-top:12px"><a class="btn primary" href="https://www.google.com/maps/dir/?api=1&destination=${ll}&travelmode=walking" target="_blank" rel="noopener">${MAP_ICON}歩いて</a>
-      <a class="btn" href="https://www.google.com/maps/search/?api=1&query=${ll}" target="_blank" rel="noopener">Googleマップ</a></div>
-    ${near && canTapHouse(near) ? `<button class="btn block" id="gpHouse">近くの家を開く（${nt ? '区域' + esc(nt.no) + '　' : ''}${esc(near.label || (near.type === 'apt' ? '集合住宅' : '家'))}・約${Math.round(nd)}m）</button>` : ''}
-    ${fk ? '<button class="btn block" id="gpMemo">その家の再訪問メモを開く</button>' : ''}
-    <button class="btn block" data-close>閉じる</button>`);
-  if ($('#gpHouse')) $('#gpHouse').onclick = () => { closeSheet(); onHouseTap(near.id); };
-  if ($('#gpMemo')) $('#gpMemo').onclick = () => openMemo(fk);
-}
-/* 再訪問のタブの下：自分のGoogleマップのピンの一覧 */
-let gpSecOpen = false;
-function gpinSectionHtml() {
-  const o = gpinsGet(); if (!o) return '';
-  const q = followQ.toLowerCase();
-  let list = o.list.filter(p => !q || [p.n, p.d, p.g].some(v => v && v.toLowerCase().includes(q)));
-  if (myPos) list = list.map(p => Object.assign({ dist: distM(myPos, [p.lat, p.lng]) }, p)).sort((a, b) => a.dist - b.dist);
-  const more = list.length - 100;
-  return `<details class="more gpsec" id="gpSec"${gpSecOpen || q ? ' open' : ''}><summary>自分のGoogleマップのピン（${list.length}件・このスマホだけ）</summary>
-    ${list.slice(0, 100).map(p => `<article class="ritem gpitem"><div><p class="rt"><span class="gpdot" aria-hidden="true"></span>${esc(p.n)}</p>
-      ${p.d ? `<p class="muted">${esc(p.d.split('\n')[0].slice(0, 60))}</p>` : ''}${p.dist != null ? `<p class="muted">ここから約${fmtDist(p.dist)}</p>` : ''}</div>
-      <button type="button" class="btn small" data-gpgo="${p.i}">地図で見る</button></article>`).join('') || '<p class="muted">見つかりませんでした。</p>'}
-    ${more > 0 ? `<p class="muted">ほか ${more}件。上の虫めがねでさがせます。</p>` : ''}
-    <div class="row"><button type="button" class="btn small" data-gpset>ピンの取り込み・設定</button></div></details>`;
-}
-function goGpin(i) {
-  const o = gpinsGet(), p = o && o.list.find(x => x.i === i); if (!p) return;
-  lsSet(gpinShowKey(), '1');
-  clearTarget(); followMap = false; focusCard = null; roundTerr = null; curTerr = null; firstMapShow = false;
-  showView('map');
-  $('#terrJump').value = '';
-  setTimeout(() => { map.invalidateSize(); map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 18), { duration: 0.8 }); renderTerrs(); renderHouses(); }, 80);
-}
-/* 設定の「使う機能」に出す行 */
-function followToolsHtml() {
-  const o = gpinsGet(), bkAt = lsGet('kuiki_bk_at_' + me().id);
-  return (featFollow() ? `<div class="featrow"><p><b>再訪問のバックアップ</b><small>メモ・約束・📌を、ファイルにして自分で保存します。スマホを替えたとき・なくしたときに戻せます${bkAt ? `（前回：${fmtDate(bkAt)}）` : ''}</small></p>
-      <div class="row"><button type="button" class="btn small" id="bkSave">バックアップ</button><label class="btn small">復元<input type="file" id="bkLoad" hidden></label></div></div>` : '') +
-    `<div class="featrow"><p><b>自分のGoogleマップのピン</b><small>Googleマイマップのピン（再訪問先など）を、区域マップの地図に出します（このスマホだけ）${o ? `。今 ${o.list.length}件・${gpinOn() ? '地図に出しています' : '地図に出していません'}` : ''}</small></p>
-      <div class="row"><button type="button" class="btn small" id="gpOpen">${o ? 'ピンの設定' : 'ピンを取り込む'}</button></div></div>`;
+/* 以前の「自分のGoogleマップのピン」（機能は外しました）がスマホに残っていたら消す */
+function dropOldGpins() {
+  try {
+    Object.keys(localStorage).forEach(x => { if (/(^|::)kuiki_(gpins|gpshow)_/.test(x)) localStorage.removeItem(x); });
+  } catch (e) { /* 何もしない */ }
 }
 
 /* ---------- 再訪問の受け持ちの操作 ---------- */
@@ -6416,7 +6258,6 @@ function openAptSeq(hid, startUnit) {
     const h = houseById(hid); if (!h) { closeSheet(); return; }
     const n = h.units.length, cnt = h.units.filter(doneToday).length, need = h.units.filter(u => !isRef(u)).length;
     let b = headHtml(t, esc(h.label || '集合住宅'), `${inRound ? '受け取ってから訪ねた部屋' : '今日入力した部屋'} ${cnt} / ${need}`);
-    b += gpinNoteHtml(h); // 自分のGoogleマップのピン（このスマホだけ）
     b += `<div class="unitstrip">${h.units.map((u, i) => {
       const s = statusOf(K(hid, u));
       const uk = unitKind(h, u);
@@ -7648,8 +7489,8 @@ function renderFollowList() {
   list.sort((a, b) => (pins.has(b[0]) ? 1 : 0) - (pins.has(a[0]) ? 1 : 0) || (cmp[sort] || cmp.idle)(a, b)); // ピン留めはいつも上
   box.innerHTML = (list.length ? list.map(([k, f]) => followCard(k, f, pins.has(k))).join('')
     : (followQ ? '<div class="empty">見つかりませんでした。</div>'
-      : '<div class="empty">受け持っている再訪問はありません。<br>また訪ねたい方に会えたら、記録のときに「私が再訪問します」を選べます。</div>')) + (followQ ? '' : handoffHtml()) + gpinSectionHtml();
-  const gs = $('#gpSec'); if (gs) gs.ontoggle = () => { gpSecOpen = gs.open; };
+      : '<div class="empty">受け持っている再訪問はありません。<br>また訪ねたい方に会えたら、記録のときに「私が再訪問します」を選べます。</div>')) + (followQ ? '' : handoffHtml());
+  paintFollowBk();
 }
 function followCard(k, f, pinned) {
   const [hid, unit] = parseKey(k), h = houseById(hid), t = terrById(h.terrId);
@@ -8771,25 +8612,31 @@ function bindWheel() {
 /* 表示の設定：いちばん上までスクロールした状態で下にスワイプすると、設定をそのまま残して閉じる */
 function bindSheetSwipe() {
   const s = $('#sheet');
-  let y0 = null, dy = 0;
+  let y0 = null, x0 = 0, dy = 0, on = false;
   s.addEventListener('touchstart', e => {
-    if (s.dataset.swipe !== '1' || s.scrollTop > 0 || e.touches.length !== 1) { y0 = null; return; }
-    if (e.target.closest('.wheel, input[type=range], textarea, select')) { y0 = null; return; }
-    y0 = e.touches[0].clientY; dy = 0;
+    // いちばん上までスクロールしているときだけ。色の輪・スライダー・入力欄・左右にスワイプする行の上では動かさない
+    if (s.scrollTop > 0 || e.touches.length !== 1 || e.target.closest('.wheel, input, textarea, select, .swipe-body')) { y0 = null; return; }
+    y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; dy = 0; on = false;
   }, { passive: true });
   s.addEventListener('touchmove', e => {
     if (y0 === null) return;
     dy = e.touches[0].clientY - y0;
-    if (dy <= 0) { s.style.transform = ''; return; }
+    const dx = e.touches[0].clientX - x0;
+    if (!on) {
+      if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return;
+      if (dy <= 0 || Math.abs(dx) > Math.abs(dy)) { y0 = null; return; } // 上や横に動かしたときは、ふつうのスクロール
+      on = true;
+    }
     e.preventDefault(); // 画面全体が動かないようにする
     s.classList.add('dragging');
-    s.style.transform = `translateY(${dy}px)`;
+    s.style.transform = `translateY(${Math.max(0, dy)}px)`;
   }, { passive: false });
   s.addEventListener('touchend', () => {
     if (y0 === null) return;
     y0 = null;
+    if (!on) return;
     s.classList.remove('dragging');
-    if (dy > 90) { closeSheet(); toast('表示の設定を保存しました'); return; }
+    if (dy > 90) { const set = s.dataset.swipe === '1'; closeSheet(); if (set) toast('表示の設定を保存しました'); return; }
     s.classList.add('snap'); s.style.transform = '';
     setTimeout(() => s.classList.remove('snap'), 220);
   });
@@ -8826,7 +8673,6 @@ function openUiSheet() {
       <p class="hint">はじめは、区域を回って「会えた・留守」を記録するだけの、かんたんな形です。必要な機能だけ「使う」にしてください。</p>
       <div class="featrow"><p><b>奉仕時間</b><small>時間をはかる・今月の目標・カレンダーに時間を残す</small></p>${seg('fTime', [['off', '使わない'], ['on', '使う']])}</div>
       <div class="featrow"><p><b>再訪問</b><small>会えたあとに「再訪問する」をえらぶと、メモを残して、下の「再訪問」タブで管理できます（メモは${memoSyncOn() ? '暗号化して、同じ人のほかの端末とも同じになります' : 'このスマホの中だけ'}）</small></p>${seg('fFollow', [['off', '使わない'], ['on', '使う']])}</div>
-      ${followToolsHtml()}
       <h3 class="sub">ホームに出すもの</h3>
       <div class="featrow"><p><b>今日やること</b><small>今日の集まり・自分の予定・再訪問の約束・区域カード・今がチャンスの留守宅カードを、ホームのいちばん上にまとめます</small></p>${seg('todayOn', [['off', '出さない'], ['on', '出す']])}</div>
       <h3 class="sub">区域カードに出すもの</h3>
@@ -8897,17 +8743,14 @@ function openUiSheet() {
     // 「画面の見え方」をいちばん上に（地図の画面では、地図の見た目のすぐ下）
     // ①の対応：説明文つきの通常の見出し（headHtml）ではなく、タイトルだけのコンパクトな見出しにして画面を広く使う。
     // 閉じる✕ボタンはこれまでと同じ場所・同じ動きのまま（スクロールしても上に固定）。
-    let b = `<div class="sheet-head sheet-head-mini"><div><h2 id="sheetTitle">設定</h2></div><button class="icon-btn" data-close aria-label="閉じる">×</button></div>` + S_BASE + S_VIEW + S_FEAT;
+    // 帯（見出しの行）はなし。下にスワイプすると、設定を残して閉じる（小さな「×」と、いちばん下の「閉じる」でも閉じられる）
+    let b = `<h2 id="sheetTitle" class="vh">設定</h2>` + S_BASE + S_VIEW + S_FEAT;
     b += `<button class="btn block" id="uiReset">見え方を最初にもどす</button><button class="btn primary block" data-close>閉じる</button>`;
-    b = `<span class="grab" aria-hidden="true"></span><p class="grabhint">下にスワイプすると、設定を残して閉じます</p>` + b;
+    b = `<div class="grabrow"><span class="grab" aria-hidden="true"></span><button type="button" class="xmini" data-close aria-label="閉じる">×</button></div><p class="grabhint">下にスワイプすると、設定を残して閉じます</p>` + b;
     setSheet(b);
     $('#sheet').dataset.swipe = '1';
     if (keep) $('#sheet').scrollTop = top;
     if ($('#wheel')) bindWheel();
-    // 再訪問のバックアップ・復元、自分のGoogleマップのピン
-    if ($('#bkSave')) $('#bkSave').onclick = openBackupSheet;
-    if ($('#bkLoad')) $('#bkLoad').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) restoreFromFile(f); };
-    if ($('#gpOpen')) $('#gpOpen').onclick = openGpinSheet;
     if ($('#uiSplash')) {
       const rs = $('#uiSplash');
       rs.oninput = () => { $('#uiSplashOut').textContent = rs.value + '秒'; };
@@ -11895,17 +11738,7 @@ function bindStatic() {
     else if ((x = q('[data-fact]'))) followAction(x.dataset.fact, x.dataset.key);
     else if ((x = q('[data-pin]'))) togglePin(x.dataset.pin);
     else if ((x = q('[data-fstamp]'))) stampFollow(x.dataset.key, x.dataset.fstamp, null, renderFollowList);
-    else if ((x = q('[data-gpgo]'))) goGpin(Number(x.dataset.gpgo));
-    else if (q('[data-gpset]')) openGpinSheet();
   });
-  document.addEventListener('click', e => { // 家の記録の画面の「ピンのメモを見る」
-    const x = e.target.closest('[data-gpopen]'); if (!x) return;
-    const o = gpinsGet(), p = o && o.list.find(y => y.i === Number(x.dataset.gpopen)); if (p) openGpin(p);
-  });
-  $('#btnGpin').onclick = () => {
-    const on = !gpinOn(); lsSet(gpinShowKey(), on ? '1' : '0'); renderGpins();
-    toast(on ? '自分のGoogleマップのピンを出しました' : '自分のGoogleマップのピンをかくしました');
-  };
   $('#adS13').onclick = () => openS13();
   $('#adS12').onclick = () => openS12();
   $('#adPerf').onclick = () => { toast('測っています…'); setTimeout(runPerfCheck, 50); };
@@ -12161,6 +11994,7 @@ async function init() {
     Store.load();
   }
   uiLoad(); applyUi();
+  dropOldGpins(); // 外した「自分のGoogleマップのピン」のデータが残っていたら消す
   initMap();
   bindStatic();
   fillWho();
