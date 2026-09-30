@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.11"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.12"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -3337,6 +3337,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.11.12', items: [
+    ['直', '再訪問の「復元」で「このファイルは戻せません」と出ることがあったのを直しました。うまくいかないときは、えらんだファイルの名前と理由が出ます'],
+    ['戻', '再訪問のリストから外した家も、復元するとリストにもどるようにしました（はじめからチェックが入っています）']
+  ] },
   { v: '2026.11.11', items: [
     ['保', '歯車の設定の「使う機能」に、再訪問の「バックアップ」「復元」ができました。メモ・約束・📌をファイルにして、自分でえらんだ場所に保存できます（パスワードをつけると、中身が読めなくなります）'],
     ['📍', '自分のGoogleマイマップのピン（再訪問先など）を、区域マップの地図に紫の印で出せるようになりました（歯車の設定の「自分のGoogleマップのピン」から取り込みます）。地図の左上の「自分のピン」で、出す・かくすを切りかえられます。再訪問のタブの下にも一覧が出ます'],
@@ -5768,7 +5772,7 @@ async function saveFileAs(blob, name) {
   try {
     const file = new File([blob], name, { type: 'application/json' });
     if (isMobile() && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: '再訪問のバックアップ' });
+      await navigator.share({ files: [file] }); // 題名をつけると、iPhoneでは題名だけの別のファイルもできてしまうため、ファイルだけを渡す
       return 'shared';
     }
   } catch (e) { if (e && e.name === 'AbortError') return 'cancel'; }
@@ -5813,13 +5817,33 @@ function openBackupSheet() {
   };
 }
 /* 復元：ファイルをえらぶ → （パスワード）→ 中身を確かめる → 戻す */
+/* ファイルの中身を文字で読む（古いiPhoneでも読めるように） */
+function readFileText(file) {
+  if (file.text) return file.text();
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result || '')); r.onerror = () => rej(r.error); r.readAsText(file); });
+}
+/* 復元：ファイルをえらぶ → （パスワード）→ 中身を確かめる → 戻す */
 async function restoreFromFile(file) {
-  let o;
-  try {
-    if (file.size > 10 * 1024 * 1024) throw new Error('big');
-    o = JSON.parse(await file.text());
-  } catch (e) { infoSheet('このファイルは戻せません', '区域マップで保存した、再訪問のバックアップのファイルをえらんでください。'); return; }
-  if (!o || o.app !== 'kuiki-map' || o.kind !== BK_KIND) { infoSheet('このファイルは戻せません', '区域マップで保存した、再訪問のバックアップのファイルをえらんでください。'); return; }
+  const fname = String(file && file.name || '（名前なし）'), kb = Math.max(1, Math.round((file && file.size || 0) / 1024));
+  const bad = why => infoSheet('このファイルは戻せません', `えらんだファイル：<b>${esc(fname)}</b>（${kb}KB）<br>${why}<br><br>
+    バックアップのファイルは「<b>区域マップ_再訪問_日付.json</b>」という名前です（最後が .json）。
+    iPhoneでは、同じ場所に「再訪問のバックアップ」という別のファイルができていることがあります。そちらではなく、.json のファイルをえらんでください。`);
+  if (!file || !file.size) { bad('ファイルが空です（中身がありません）。'); return; }
+  if (file.size > 10 * 1024 * 1024) { bad('ファイルが大きすぎます。'); return; }
+  let text;
+  try { text = await readFileText(file); } catch (e) { bad('ファイルを読めませんでした。いったん閉じて、もう一度えらんでください。'); return; }
+  text = String(text || '').replace(/^\uFEFF/, '').trim();
+  let o = null;
+  try { o = JSON.parse(text); } catch (e) {
+    const i = text.indexOf('{'), j = text.lastIndexOf('}'); // まわりに別の文字がついていても、中のバックアップを取り出す
+    if (i >= 0 && j > i) { try { o = JSON.parse(text.slice(i, j + 1)); } catch (e2) { o = null; } }
+  }
+  if (!o) {
+    bad(text[0] === '<' ? 'これは地図のピンのファイル（KMLなど）のようです。ピンは「自分のGoogleマップのピン」から取り込みます。'
+      : `中身が、区域マップのバックアップの形ではありません（はじめの文字：「${esc(text.slice(0, 20))}」）。`);
+    return;
+  }
+  if (o.app !== 'kuiki-map' || o.kind !== BK_KIND) { bad('区域マップの、再訪問のバックアップではありません。'); return; }
   if (o.enc) { askBackupPass(o); return; }
   checkRestore(o);
 }
@@ -5852,7 +5876,8 @@ function checkRestore(b) {
   const nG = b.gpins && Array.isArray(b.gpins.list) ? b.gpins.list.length : 0, curG = gpinsGet();
   setSheet(headHtml(null, 'バックアップから戻す', `${b.at ? fmtDate(b.at) + 'に保存' : ''}`) + `
     <p>今も受け持っている家：<b>${mine.length}件</b>（メモ・約束・📌を戻します。今のメモも消さずに合わせます）</p>
-    ${free.length ? `<label class="check"><input type="checkbox" id="rsRevive">受け持ちが外れている家 ${free.length}件も、再訪問にもどす</label>
+    ${!mine.length && !free.length ? '<div class="notice warn">戻せる家がありません。ほかの人が受け持っているか、家がなくなっています。</div>' : ''}
+    ${free.length ? `<label class="check"><input type="checkbox" id="rsRevive" checked>受け持ちが外れている家 ${free.length}件も、再訪問にもどす</label>
       <p class="hint">だれも受け持っていない家だけです。もどすと、ほかの人にも「再訪問している家」として伝わります。</p>` : ''}
     ${other ? `<p class="muted">ほかの人が受け持っている家・もうない家 ${other}件は、戻しません。</p>` : ''}
     ${nG ? `<label class="check"><input type="checkbox" id="rsGpin"${curG ? '' : ' checked'}>自分のGoogleマップのピン ${nG}件も戻す${curG ? `（今の${curG.list.length}件と入れかえ）` : ''}</label>` : ''}
