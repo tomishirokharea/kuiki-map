@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.06"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.07"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -147,6 +147,9 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 @media (min-width:760px){#sheet{left:calc(50% - 320px);right:auto;width:640px;bottom:16px;border-radius:20px}}
 .sheet-head{display:flex;align-items:center;gap:12px;margin-bottom:8px}
 .sheet-head h2{font-size:22px;outline:none}
+/* 設定画面など、説明文なしで見出しを小さくまとめたいときの見た目（①の対応：見出しをコンパクトにして画面を広く使う） */
+.sheet-head-mini{margin-bottom:2px}
+.sheet-head-mini h2{font-size:17px;outline:none}
 .q{font-size:20px;font-weight:700;margin:14px 0 8px}
 .choices{display:grid;gap:10px}
 .choices.three{grid-template-columns:repeat(3,1fr)}
@@ -1150,6 +1153,8 @@ body.big .choice{font-size:17px}
    高さの上限は zoom で割っている（大きい文字で、下から出る画面の上の「×」が画面の外に出ていたため） */
 /* 下から出る画面：見出しと「×」は、下に動かしても上に見えたままにする（長い一覧でも、すぐもどれるように） */
 #sheet .sheet-head{position:sticky;top:0;z-index:5;background:var(--paper);margin:-14px -16px 8px;padding:14px 16px 10px;box-shadow:0 1px 0 var(--line)}
+/* コンパクト見出し（設定画面）：上下の余白を減らして、その分だけ本文を広く使えるようにする */
+#sheet .sheet-head.sheet-head-mini{padding:8px 16px 6px}
 /* 大きい文字では「×」に「もどる」の文字をそえる（×だけでは、もどるボタンだと分かりにくいため） */
 body.big .sheet-head .icon-btn[data-close]{width:auto;min-width:52px;padding:0 12px 0 10px;border-radius:26px;display:flex;align-items:center;gap:4px;font-size:26px}
 body.big .sheet-head .icon-btn[data-close]::after{content:'もどる';font-size:15px;font-weight:700}
@@ -1188,6 +1193,7 @@ h2,h3,.q{text-wrap:pretty}
         <div id="homeMonthEnd"></div>
         </div><div class="homemain">
         <h2 class="sec">奉仕の予定</h2>
+        <div id="homeSchedTools"></div>
         <div id="homeCal"></div>
         <p class="hint">自分で入れた予定や時間は、このスマホの中だけに保存されます。係やほかの人には送られません。</p>
         </div></div>
@@ -3302,6 +3308,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.11.07', items: [
+    ['設', '設定画面のいちばん上の見出しを小さくして、画面を広く使えるようにしました（下にスワイプ・「×」で閉じるのは、これまでと同じです）'],
+    ['予', 'グループ監督・司会者の「グループ」タブをなくしました。集まりの予定を入れる機能はホーム画面に残っています（日付を押すと「＋ この日に集まりを入れる」から入れられます）。月の予定の印刷も、ホームからできるようになりました']
+  ] },
   { v: '2026.11.06', only: 'prod', items: [
     ['速', 'はじめて開くときの読み込みを、速く・確実にしました。家が3万件あっても、画面の動きが重くならないようにしました'],
     ['見', '文字を大きくしたときの画面を見やすくしました。「とても大きく」にすると、地図の家の印も大きくなります'],
@@ -7875,7 +7885,9 @@ function openUiSheet() {
       S_VIEW += (tab === 'map' ? [S_MAP, S_TEXT, S_COLOR, S_SCREEN, S_ICON] : tab === 'reco' || tab === 'cards' ? [S_TEXT, S_COLOR, S_SCREEN, S_ICON, S_MAP] : [S_TEXT, S_SCREEN, S_COLOR, S_ICON, S_MAP]).join('');
     }
     // 「画面の見え方」をいちばん上に（地図の画面では、地図の見た目のすぐ下）
-    let b = headHtml(null, '設定', 'このスマホで、あなたにだけ使われる設定です') + S_BASE + S_VIEW + S_FEAT;
+    // ①の対応：説明文つきの通常の見出し（headHtml）ではなく、タイトルだけのコンパクトな見出しにして画面を広く使う。
+    // 閉じる✕ボタンはこれまでと同じ場所・同じ動きのまま（スクロールしても上に固定）。
+    let b = `<div class="sheet-head sheet-head-mini"><div><h2 id="sheetTitle">設定</h2></div><button class="icon-btn" data-close aria-label="閉じる">×</button></div>` + S_BASE + S_VIEW + S_FEAT;
     b += `<button class="btn block" id="uiReset">見え方を最初にもどす</button><button class="btn primary block" data-close>閉じる</button>`;
     b = `<span class="grab" aria-hidden="true"></span><p class="grabhint">下にスワイプすると、設定を残して閉じます</p>` + b;
     setSheet(b);
@@ -9720,6 +9732,9 @@ function renderHome() {
   $('#homeMonthEnd').innerHTML = monthEndHtml(o);
   }
   $('#homeCal').innerHTML = calHtml(o);
+  // ②の対応：グループ監督の「グループ」タブをなくしたので、そこにあった月の予定印刷（掲示板用）をホームに置く
+  $('#homeSchedTools').innerHTML = (isAdmin() || isOverseer())
+    ? `<button class="btn block" id="homeScPrint">${(new Date().getMonth() + 1) % 12 + 1}月の予定を印刷する（掲示板用）</button>` : '';
 }
 /* スワイプの動き（指でもマウスでも）：左に半分以上ずらすと開き、ほかをさわると閉じる */
 const SWIPE_W = 176;
@@ -9809,6 +9824,7 @@ function bindHome() {
     else if ((x = q('[data-cm]'))) { const b = calMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1); calMonth = new Date(b.getFullYear(), b.getMonth() + Number(x.dataset.cm), 1); renderHome(); }
     else if ((x = q('[data-day]'))) openDay(x.dataset.day);
     else if ((x = q('[data-calmode]'))) { calMode = x.dataset.calmode; renderHome(); }
+    else if (q('#homeScPrint')) { const n = new Date(); const d = new Date(n.getFullYear(), n.getMonth() + 1, 1); printMonthSchedule(d.getFullYear(), d.getMonth()); }
   });
 }
 
@@ -10709,7 +10725,7 @@ async function printMonthSchedule(y, m) {
 let currentView = 'cards';
 function showView(name) {
   if (name === 'reco' && !recoOn()) name = 'home'; // 区域係が「おすすめを出さない」にしているとき
-  if (name === 'admin' && !isAdmin() && !isOverseer()) name = 'cards';
+  if (name === 'admin' && !isAdmin()) name = 'cards'; // ②の対応：グループ監督は「グループ」タブがなくなったため、係の画面には入れない
   if (name === 'follow' && !featFollow()) name = 'cards';
   if (currentView === 'map' && name !== 'map' && mode !== 'normal') { if (draw) endDraw(); else setMode('normal'); }
   if (name !== 'map') { clearTarget(); followMap = false; hideNextPanel(); }
@@ -10747,11 +10763,13 @@ function renderOverseer() {
   renderSchedAdmin(); renderPeople(); setAdPane(adPane);
 }
 function updateTabs() {
-  const show = isAdmin() || isOverseer();
+  // ②の対応：グループ監督・司会者用の「グループ」タブは廃止。タブは区域係だけに表示する
+  // （集まりの予定を入れる機能はホーム画面に残り、グループの人一覧はいったんなし）
+  const show = isAdmin();
   $('#tabAdmin').hidden = !show;
   $('#tabFollow').hidden = !featFollow();
   $('#tabReco').hidden = !recoOn();
-  $('#tabAdminLabel').textContent = isAdmin() ? '係の画面' : 'グループ';
+  $('#tabAdminLabel').textContent = '係の画面';
   $('#tabs').classList.remove('three');
   const nTabs = $$('#tabs > button').filter(b => !b.hidden).length;
   $('#tabs').style.setProperty('--tabs', nTabs);
