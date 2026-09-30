@@ -656,11 +656,6 @@ body.strong .pin.st-plain{border-width:4px}
 @keyframes locBusy{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.locbtn.busy svg{animation:none;opacity:.5}}
 .helpbtn{bottom:92px}
-/* 地図を回したときだけ出る「北」のボタン（押すと北が上にもどる）。針と「北」の字は、地図の北の向きを指す */
-.northbtn{position:absolute;right:10px;bottom:152px;z-index:520;width:48px;height:48px;border-radius:50%;border:2px solid var(--ink);background:#fff;color:var(--ink);box-shadow:0 2px 6px #0003;padding:0;display:grid;place-items:center}
-.northbtn .ndl{display:block;width:40px;height:40px;rotate:var(--ndeg,0deg)}
-.northbtn svg{width:40px;height:40px;display:block}
-.northbtn svg text{font:700 12px/1 "BIZ UDPGothic","Hiragino Sans",sans-serif}
 .cardbar{right:76px}
 /* 設定：地図の見た目 */
 .basepick .choice{min-height:96px}
@@ -1046,7 +1041,6 @@ img,canvas,video{max-width:100%}
   #sheet{max-height:calc(94vh / var(--z,1));max-height:calc(94dvh / var(--z,1));bottom:6px}
   .cardbar{max-height:calc(58vh / var(--z,1));right:max(76px,calc(env(safe-area-inset-right) + 76px));left:max(10px,env(safe-area-inset-left));bottom:10px}
   .helpbtn{bottom:76px}
-  .northbtn{bottom:134px}
   .locbtn{bottom:12px}
   .legend{max-height:80%;bottom:10px}
   .modebar{max-height:calc(70vh / var(--z,1));overflow:auto}
@@ -1232,7 +1226,7 @@ h2,h3,.q{text-wrap:pretty}
     <section class="view" id="view-follow" hidden>
       <div class="wrap">
         <h2 class="sec">再訪問</h2>
-        <p class="hint">「再訪問する」をえらんだ家です。「会えた」「留守」を押すと、区域の地図にも記録されます。メモはこのスマホの中だけに残ります。</p>
+        <p class="hint">「再訪問する」をえらんだ家です。「会えた」「留守」を押すと、区域の地図にも記録されます。<span id="followWhere">メモはこのスマホの中だけに残ります。</span></p>
         <div id="paneFollow"><div id="followAlert"></div><div id="myFollows"></div></div>
       </div>
     </section>
@@ -1249,7 +1243,6 @@ h2,h3,.q{text-wrap:pretty}
       <div class="cardbar" id="cardBar" hidden></div>
       <div class="nextpanel" id="nextPanel" hidden role="region" aria-label="記録のあと"></div>
       <button type="button" class="locbtn" id="btnLocate" aria-label="現在地を表示"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></button>
-      <button type="button" class="northbtn" id="btnNorth" hidden aria-label="地図の北を上にもどす" title="北を上にもどす"><span class="ndl" aria-hidden="true"><svg viewBox="0 0 40 40"><text x="20" y="12" text-anchor="middle" fill="#D32F2F">北</text><path d="M20 14 24.5 25.5H15.5z" fill="#D32F2F"/><path d="M20 37 24.5 25.5H15.5z" fill="#90A4AE"/></svg></span></button>
       <button type="button" class="helpbtn" id="legendBtn" aria-label="この区域のようすと、印の見かた" aria-expanded="false" aria-controls="legend">?</button>
       <div class="legend" id="legend" hidden role="dialog" aria-labelledby="legendTitle">
         <div class="legendhead"><b id="legendTitle">この区域のようす</b><button type="button" class="foldbtn" id="legendClose">閉じる</button></div>
@@ -1486,10 +1479,10 @@ const followAskHtml = () => `<p class="q">会えた方を、また訪ねます�
 /* 再訪問のメモ（このスマホの中だけ） */
 function memoStepHtml(k) {
   const m = memoOf(k);
-  return `<p class="q">メモ <span class="muted" style="font-size:15px">（このスマホの中だけに残ります）</span></p>
+  return `<p class="q">メモ <span class="muted" style="font-size:15px">（${memoScope()}）</span></p>
     <label class="field"><textarea id="stepMemo" rows="5" maxlength="1000" placeholder="例：次は土曜の午前に。前回の話の続きから">${esc(m ? m.text : '')}</textarea></label>
     ${nextInputsHtml('stepNext', m && m.next)}
-    <p class="hint">住んでいる人の名前・電話番号は書かないでください。メモは係やほかの人には送られません。</p>
+    <p class="hint">住んでいる人の名前・電話番号は書かないでください。${memoPrivacyNote()}</p>
     <button class="btn primary block" data-memosave>記録する</button>
     <button class="btn block" data-back="result">← 結果の選択にもどる</button>`;
 }
@@ -1731,6 +1724,7 @@ const LIVE = !!API_URL;
 const JOIN_KEY = 'kuiki_join', PENDING_KEY = 'kuiki_pending';
 const HOME_KEY = 'kuiki_home_code', HOME_SEEN = 'kuiki_home_seen', HOME_OFF = 'kuiki_home_banner_off', FIRST_OK = 'kuiki_first_ok', HOME_WELCOME = 'kuiki_home_welcome';
 const TOKEN_KEY = 'kuiki_token', QUEUE_KEY = 'kuiki_queue', OLD_CACHE_KEY = 'kuiki_cache', SYNC_KEY = 'kuiki_sync_at', LOCK_KEY = 'kuiki_lock_ok';
+let onMemoVer = null; // 再訪問メモの合図を受け取る（MemoSync が入れる）
 const DATA_VER = 2; // データの種類が増えたら上げる（端末が一度だけ全部を読み直す）
 const CACHE_KEYS = ['c2_meta', 'c2_houses', 'c2_visits']; // 端末の保存：3つに分けて、変わった分だけ書く
 const FAILED_KEY = 'kuiki_failed'; // 何度送っても受け付けられなかった変更（捨てずに取っておく）
@@ -1925,7 +1919,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1 }, d.settings || {});
     d.s13 = d.s13 || [];
     d.agedata = d.agedata || [];
   },
@@ -2490,6 +2484,7 @@ async function api(action, extra, opt) {
   }
   Store.syncAt = Date.now();
   lsSet(SYNC_KEY, String(Store.syncAt));
+  if (j.mv && onMemoVer) onMemoVer(j.mv); // 再訪問メモが、ほかの端末で変わった合図
   return j;
 }
 /* ---------- はじめての読み込みの記録（遅いときに、どこで時間がかかったかを調べるため） ----------
@@ -3325,9 +3320,9 @@ function terrStats(t, sinceMs) {
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
   { v: '2026.11.09', items: [
-    ['回', '地図を、2本の指でひねるように動かすと、向きを変えられるようになりました。少しひねっただけでは回りません。回したときは右下に「北」のボタンが出て、押すと北が上にもどります（北の近くで指をはなしても、北にもどります）'],
-    ['字', '地図を回しても、家の印・区域の番号・名前の文字は、まっすぐ立ったまま見えます。家をタップして記録する・範囲を分ける・線を引くなどは、回したままでも使えます'],
-    ['設', '回したくない人は、地図の画面の歯車の設定で「2本指で地図を回す」を「回さない」にできます']
+    ['同', '再訪問のメモ・次の約束・📌が、同じ人のほかの端末（スマホとiPadなど）でも同じになるようにしました。どちらで書いても、もう一方に届きます'],
+    ['鍵', 'メモは端末の中で暗号化してから保管するので、係の画面やシートでは読めません。区域係の設定で、この機能を使わないようにもできます'],
+    ['合', '2つの端末で同時に書きかえたときは、どちらも消さずに「別の端末で書いた内容」として合わせます']
   ] },
   { v: '2026.11.08', items: [
     ['分', 'グループ奉仕の「回る範囲を分ける」を押すと、すぐ地図で囲めるようにしました。わたした範囲の取り消しは、下の「わたした範囲を見る・取り消す」からできます'],
@@ -3767,237 +3762,9 @@ let dotRenderer = null;
 let map, terrLayer, houseLayer, baseLayers, baseName = 'pale', mode = 'normal';
 let tmpMarker = null, draw = null, myPos = null, posMarker = null, firstMapShow = true, zoomCtl = null;
 
-/* ---------- 地図の回転（2本の指でひねる） ----------
-   しくみ：Leafletの計算（位置・タップ・拡大・区域に合わせる）は、いつも「北が上」のまま行い、
-   見た目だけを、地図の真ん中を軸に回す（地図の土台 mapPane に CSS の rotate をかける）。
-   回したときに合わせて直すもの：
-   ・指でさわった場所 → 地図の上の場所（家のタップ・長押し・線引き・範囲分け・なぞり）
-   ・1本指で動かす向き（家の追加・線の点を動かすときも）
-   ・画面の四すみまで地図と家の点を出す（見える範囲を広げて読み込む）
-   ・区域に合わせるとき、回した向きで画面に入る大きさにする
-   ・家の印・区域の番号・名前・道順の吹き出しは、文字がまっすぐ立ったまま
-   区域カード（S-12）の印刷は、この地図とは別に描くので、回転の影響を受けない */
-const ROT_START = 12; // これ以上ひねったら回し始める（度）。拡大のつもりで回ってしまわないように
-const ROT_SNAP = 8;   // 北からこの角度以内で指をはなしたら、北にもどす（度）
-let mapDeg = 0, rotEndAt = 0, rotAnim = 0, lastMoveEnd = 0;
-const rotSupported = () => !!(window.CSS && CSS.supports && CSS.supports('rotate', '1deg'));
-const rotAllowed = () => rotSupported() && UI.mapRot !== 'off';
-const rotPt = (p, rad) => { const c = Math.cos(rad), s = Math.sin(rad); return L.point(p.x * c - p.y * s, p.x * s + p.y * c); };
-const degNorm = d => ((d % 360) + 540) % 360 - 180; // -180〜180度に
-(function patchLeafletForRotation() {
-  const MP = L.Map.prototype;
-  // 指でさわった場所：画面の位置を、回した分だけもどしてから地図の位置にする
-  const me2cp = MP.mouseEventToContainerPoint;
-  MP.mouseEventToContainerPoint = function (e) {
-    const p = me2cp.call(this, e);
-    if (!this._kmRad) return p;
-    const c = this.getSize().divideBy(2);
-    return rotPt(p.subtract(c), -this._kmRad).add(c);
-  };
-  // 画面の対角線の半分（回したとき、この円の中がいつも画面にかかる）
-  MP._kmHalf = function () { const s = this.getSize(); return Math.ceil(Math.hypot(s.x, s.y) / 2); };
-  // 見えている範囲：回した画面の四すみが入る範囲
-  const getBounds = MP.getBounds;
-  MP.getBounds = function () {
-    if (!this._kmRad) return getBounds.call(this);
-    const s = this.getSize(), c = s.divideBy(2), th = -this._kmRad;
-    return L.latLngBounds([[0, 0], [s.x, 0], [s.x, s.y], [0, s.y]]
-      .map(q => this.containerPointToLatLng(rotPt(L.point(q).subtract(c), th).add(c))));
-  };
-  // 地図の画像：回しても四すみが空かないように、画面の対角線ぶんの正方形を読み込む
-  const tiled = L.GridLayer.prototype._getTiledPixelBounds;
-  L.GridLayer.prototype._getTiledPixelBounds = function (center) {
-    const m = this._map;
-    if (!m._kmRad) return tiled.call(this, center);
-    const z = m._animatingZoom ? Math.max(m._animateToZoom, m.getZoom()) : m.getZoom();
-    const h = m._kmHalf() / m.getZoomScale(z, this._tileZoom), pc = m.project(center, this._tileZoom).floor();
-    return L.bounds(pc.subtract([h, h]), pc.add([h, h]));
-  };
-  // 区域の線・家の点を描く面：同じく対角線ぶん（iPhoneで描けなくならないよう、大きくなりすぎない）
-  const rUpd = L.Renderer.prototype._update;
-  L.Renderer.prototype._update = function () {
-    const m = this._map;
-    if (!m._kmRad) return rUpd.call(this);
-    const r = m._kmHalf(), px = L.Browser.retina ? 2 : 1;
-    const pad = Math.max(0, Math.min(this.options.padding || 0, (3800 / px / (2 * r) - 1) / 2));
-    const half = Math.round(r * (1 + 2 * pad)), c = m.getSize().divideBy(2);
-    const min = m.containerPointToLayerPoint(c.subtract([half, half])).round();
-    this._bounds = L.bounds(min, min.add([2 * half, 2 * half]));
-    this._center = m.getCenter();
-    this._zoom = m.getZoom();
-  };
-  // 区域に合わせる：回した向きのまま、画面（上下の案内の分をのぞく）に入る大きさと中心
-  const bcz = MP._getBoundsCenterZoom;
-  MP._getBoundsCenterZoom = function (bounds, options) {
-    if (!this._kmRad) return bcz.call(this, bounds, options);
-    options = options || {};
-    bounds = bounds.getBounds ? bounds.getBounds() : L.latLngBounds(bounds);
-    const tl = L.point(options.paddingTopLeft || options.padding || [0, 0]),
-      br = L.point(options.paddingBottomRight || options.padding || [0, 0]);
-    const z0 = this.getZoom(), th = this._kmRad;
-    const ps = [bounds.getNorthWest(), bounds.getNorthEast(), bounds.getSouthEast(), bounds.getSouthWest()].map(ll => rotPt(this.project(ll, z0), th));
-    const xs = ps.map(p => p.x), ys = ps.map(p => p.y);
-    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-    const av = this.getSize().subtract(tl).subtract(br);
-    let zoom = this.getScaleZoom(Math.min(av.x / Math.max(1, x1 - x0), av.y / Math.max(1, y1 - y0)), z0);
-    const snap = this.options.zoomSnap;
-    if (snap) { zoom = Math.round(zoom / (snap / 100)) * (snap / 100); zoom = Math.floor(zoom / snap) * snap; }
-    zoom = Math.max(this.getMinZoom(), Math.min(this.getMaxZoom(), zoom));
-    if (typeof options.maxZoom === 'number') zoom = Math.min(options.maxZoom, zoom);
-    if (!isFinite(zoom)) return bcz.call(this, bounds, options);
-    const cs = L.point((x0 + x1) / 2, (y0 + y1) / 2).multiplyBy(this.getZoomScale(zoom, z0)).add(br.subtract(tl).divideBy(2));
-    return { center: this.unproject(rotPt(cs, -th), zoom), zoom };
-  };
-  // 1本指で動かす（地図・線の点）：指の動きを、回した分だけもどして動かす
-  const DP = L.Draggable.prototype, dMove = DP._onMove;
-  DP._onMove = function (e) {
-    const m = typeof map !== 'undefined' ? map : null;
-    if (!m || !m._kmRad || !this._enabled || !(this._element === m._mapPane || m._mapPane.contains(this._element))) return dMove.call(this, e);
-    if (e.touches && e.touches.length > 1) { this._moved = true; return; }
-    const first = e.touches && e.touches.length === 1 ? e.touches[0] : e;
-    let off = L.point(first.clientX, first.clientY)._subtract(this._startPoint);
-    if (!off.x && !off.y) return;
-    if (Math.abs(off.x) + Math.abs(off.y) < this.options.clickTolerance) return;
-    off = rotPt(L.point(off.x / this._parentScale.x, off.y / this._parentScale.y), -m._kmRad);
-    L.DomEvent.preventDefault(e);
-    if (!this._moved) {
-      this.fire('dragstart');
-      this._moved = true;
-      L.DomUtil.addClass(document.body, 'leaflet-dragging');
-      this._lastTarget = e.target || e.srcElement;
-      if (window.SVGElementInstance && this._lastTarget instanceof window.SVGElementInstance) this._lastTarget = this._lastTarget.correspondingUseElement;
-      L.DomUtil.addClass(this._lastTarget, 'leaflet-drag-target');
-    }
-    this._newPos = this._startPos.add(off);
-    this._moving = true;
-    this._lastEvent = e;
-    this._updatePosition();
-  };
-  // 家の印・区域の番号・名前：印の位置（根元）を軸に、地図と逆に回して、まっすぐ立たせる
-  const setPos = L.Marker.prototype._setPos;
-  L.Marker.prototype._setPos = function (pos) {
-    setPos.call(this, pos);
-    const ic = this._icon;
-    if (!ic || !this._map || !this._map._kmRotOn) return;
-    ic.style.transformOrigin = `${-(parseFloat(ic.style.marginLeft) || 0)}px ${-(parseFloat(ic.style.marginTop) || 0)}px`;
-    ic.style[L.DomUtil.TRANSFORM] += ' rotate(var(--km-unrot,0deg))';
-  };
-  // 道順の吹き出し：吹き出しの先を軸に、まっすぐ立たせる
-  const upright = o => {
-    const m = o._map, el = o._container;
-    if (!m || !el || !m._kmRotOn || !o._zoomAnimated) return;
-    const mb = parseFloat(getComputedStyle(el).marginBottom) || 0;
-    el.style.transformOrigin = `${-(o._containerLeft || 0)}px ${el.offsetHeight + mb + (o._containerBottom || 0)}px`;
-    el.style[L.DomUtil.TRANSFORM] += ' rotate(var(--km-unrot,0deg))';
-  };
-  const pUpd = L.Popup.prototype._updatePosition, pAnim = L.Popup.prototype._animateZoom;
-  L.Popup.prototype._updatePosition = function () { pUpd.call(this); upright(this); };
-  L.Popup.prototype._animateZoom = function (e) { pAnim.call(this, e); upright(this); };
-})();
-/* 地図の向きを変える（deg：北から時計回りに何度回したか。0＝北が上） */
-function setMapDeg(deg) {
-  if (!map) return;
-  deg = degNorm(deg);
-  if (Math.abs(deg) < 0.05) deg = 0;
-  const was = !!map._kmRad;
-  mapDeg = deg;
-  map._kmRad = deg * Math.PI / 180;
-  const pane = map.getPane('mapPane'), s = map.getSize();
-  pane.style.transformOrigin = `${s.x / 2}px ${s.y / 2}px`;
-  pane.style.rotate = deg ? `${deg}deg` : '';
-  map.getContainer().style.setProperty('--km-unrot', `${-deg}deg`);
-  if (was !== !!deg) rotCover();
-  const nb = $('#btnNorth');
-  if (nb) { nb.hidden = !deg; nb.style.setProperty('--ndeg', `${deg}deg`); }
-}
-/* 回し始め・北にもどしたとき：地図の画像と点を描く範囲を、あらためて読み込む */
-function rotCover() {
-  map.eachLayer(l => {
-    if (!l._map) return;
-    if (l instanceof L.GridLayer) l._update();
-    else if (l instanceof L.Renderer) l._update();
-  });
-}
-/* なめらかに向きを変える（北のボタン・北の近くで指をはなしたとき） */
-function animateMapDeg(to, after) {
-  cancelAnimationFrame(rotAnim);
-  const from = mapDeg, d = degNorm(to - from);
-  const done = () => { setMapDeg(to); renderHouses(); if (after) after(); };
-  if (!d || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { done(); return; }
-  const t0 = performance.now(), ms = 280;
-  const step = now => {
-    const k = Math.min(1, (now - t0) / ms);
-    setMapDeg(from + d * (1 - Math.pow(1 - k, 3)));
-    if (k < 1) rotAnim = requestAnimationFrame(step); else done();
-  };
-  rotAnim = requestAnimationFrame(step);
-}
-/* 回した画面の中（まわりに少し余裕）に入っているか。回していないときは null（いつもの範囲の計算だけで足りる） */
-function rotVisTest(pad) {
-  if (!map || !map._kmRad) return null;
-  const s = map.getSize(), c = s.divideBy(2), cs = Math.cos(map._kmRad), sn = Math.sin(map._kmRad);
-  const px = s.x * pad, py = s.y * pad;
-  return (lat, lng) => {
-    const p = map.latLngToContainerPoint([lat, lng]), dx = p.x - c.x, dy = p.y - c.y;
-    const x = dx * cs - dy * sn + c.x, y = dx * sn + dy * cs + c.y;
-    return x >= -px && x <= s.x + px && y >= -py && y <= s.y + py;
-  };
-}
-/* 2本の指でひねると回す（拡大・縮小・移動は、これまでどおりLeafletが行う） */
-function bindRotate() {
-  const el = map.getContainer(), pts = new Map();
-  let g = null;
-  const ang = () => { const [a, b] = [...pts.values()]; return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI; };
-  el.addEventListener('pointerdown', e => {
-    if (e.pointerType === 'mouse') return;
-    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    g = pts.size === 2 && rotAllowed() ? { a0: ang(), d0: mapDeg, on: false, base: 0 } : null;
-  }, true);
-  document.addEventListener('pointermove', e => {
-    const p = pts.get(e.pointerId);
-    if (!p) return;
-    p.x = e.clientX; p.y = e.clientY;
-    if (!g || pts.size !== 2) return;
-    const d = degNorm(ang() - g.a0);
-    if (!g.on) {
-      if (Math.abs(d) < ROT_START) return;
-      g.on = true; g.base = d;
-      cancelAnimationFrame(rotAnim);
-      map.closePopup();
-    }
-    setMapDeg(g.d0 + degNorm(d - g.base));
-  }, true);
-  const up = e => {
-    if (!pts.delete(e.pointerId)) return;
-    if (g && g.on) {
-      rotEndAt = Date.now();
-      if (Math.abs(mapDeg) <= ROT_SNAP) animateMapDeg(0);
-      else {
-        // 拡大・移動がともなわなかったときも、四すみの家の印を出す
-        setTimeout(() => { if (lastMoveEnd < rotEndAt) renderHouses(); }, 450);
-        if (!lsGet('kuiki_rot_tip')) { lsSet('kuiki_rot_tip', '1'); toast('地図を回しました。右下の「北」のボタンを押すと、北が上にもどります'); }
-      }
-    }
-    if (pts.size < 2) g = null;
-  };
-  document.addEventListener('pointerup', up, true);
-  document.addEventListener('pointercancel', up, true);
-  // 回した直後に指をはなしたときの「タップ」で、家の記録の画面が出ないように
-  el.addEventListener('click', e => { if (Date.now() - rotEndAt < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
-  map.on('resize', () => { if (mapDeg) setMapDeg(mapDeg); });
-  map.on('moveend', () => { lastMoveEnd = Date.now(); });
-  $('#btnNorth').onclick = () => animateMapDeg(0);
-}
-/* 設定で「回さない」にしたとき */
-function applyRotSetting() {
-  if (!rotAllowed() && mapDeg) { cancelAnimationFrame(rotAnim); setMapDeg(0); renderHouses(); }
-}
-
 function initMap() {
   map = L.map('map', { zoomControl: false, zoomSnap: 0.125, zoomDelta: 1, wheelPxPerZoomLevel: 120, doubleClickZoom: false }).setView(HOME_VIEW, 17);
-  map._kmRotOn = rotSupported(); // 回せる端末では、家の印などを「まっすぐ立たせる」準備をしておく（回していないときは何も変わらない）
   bindDoubleTap();
-  bindRotate();
   map.createPane('cardPane'); // 古いカードの写真（地図の下）
   map.getPane('cardPane').style.zIndex = 150;
   map.getPane('cardPane').style.pointerEvents = 'none';
@@ -4029,7 +3796,7 @@ function initMap() {
 function openDirPopup(latlng) {
   const ll = latlng.lat.toFixed(6) + ',' + latlng.lng.toFixed(6);
   const url = mode => `https://www.google.com/maps/dir/?api=1&destination=${ll}&travelmode=${mode}`;
-  const pop = L.popup({ className: 'dirpop', closeButton: true, closeOnClick: false, autoPan: !mapDeg, autoPanPadding: [20, 90], maxWidth: 280 })
+  const pop = L.popup({ className: 'dirpop', closeButton: true, closeOnClick: false, autoPanPadding: [20, 90], maxWidth: 280 })
     .setLatLng(latlng)
     .setContent(`<p class="dirtitle">ここへの道順（Googleマップ）</p>
       <div class="dirbtns"><a class="btn primary" href="${url('walking')}" target="_blank" rel="noopener">${MAP_ICON}歩いて</a>
@@ -4049,8 +3816,9 @@ function bindLongPress() {
     cancel();
     timer = setTimeout(() => {
       timer = null;
+      const r = el.getBoundingClientRect();
       if (navigator.vibrate) { try { navigator.vibrate(15); } catch (x) { /* 何もしない */ } }
-      openDirPopup(map.mouseEventToLatLng({ clientX: sx, clientY: sy })); // 地図を回していても、指の場所になる
+      openDirPopup(map.containerPointToLatLng([sx - r.left, sy - r.top]));
     }, 550);
   }, true);
   el.addEventListener('pointermove', e => { if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) cancel(); }, true);
@@ -4116,12 +3884,13 @@ function bindDoubleTap() {
   let down = null, last = null;
   el.addEventListener('pointerdown', e => { down = e.isPrimary ? { x: e.clientX, y: e.clientY } : null; }, true);
   el.addEventListener('pointerup', e => {
-    if (!e.isPrimary || !down || mode !== 'normal' || Date.now() - rotEndAt < 450) { last = null; return; } // 回した直後は数えない
+    if (!e.isPrimary || !down || mode !== 'normal') { last = null; return; }
     if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 12) { last = null; return; } // 地図を動かしたときは数えない
     const now = Date.now();
     if (last && now - last.t < 350 && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 40) {
       last = null;
-      map.setZoomAround(map.mouseEventToContainerPoint(e), Math.min(map.getMaxZoom(), Math.round(map.getZoom()) + 1)); // 回していても、タップした場所を中心に
+      const r = el.getBoundingClientRect();
+      map.setZoomAround(L.point(e.clientX - r.left, e.clientY - r.top), Math.min(map.getMaxZoom(), Math.round(map.getZoom()) + 1));
       return;
     }
     last = { t: now, x: e.clientX, y: e.clientY };
@@ -4481,12 +4250,12 @@ function renderHouses() {
   renderCardBar();
   if (mode === 'draw' && drawTap === 'line' && !drawShowHouses) { setZoomHint(false); return; } // 線引き中は写真が見えるように家の印を隠す
   const fade = fkeys ? 1 : iconFade();
-  const b = map.getBounds().pad(0.2), vis = rotVisTest(0.2); // vis：地図を回しているときの、画面に入っているかの確かめ
+  const b = map.getBounds().pad(0.2);
   const sel = mode === 'normal' ? selTerrId() : null; // 区域をえらんでいるときは、その区域の家だけ
   const list = fkeys
     ? D().houses.filter(h => targets(h).some(u => fkeys.has(K(h.id, u)))) // 再訪問を地図で見る：自分の再訪問だけ
     : fade > 0.05
-      ? D().houses.filter(h => (!sel || h.terrId === sel) && b.contains([h.lat, h.lng]) && (!vis || vis(h.lat, h.lng)))
+      ? D().houses.filter(h => (!sel || h.terrId === sel) && b.contains([h.lat, h.lng]))
       : null;
   const show = !!list && list.length <= 4000; // 小さな点なら多くても軽い。それ以上は拡大してから出す
   setZoomHint(!show);
@@ -5315,29 +5084,33 @@ async function declineDel(id) {
 }
 
 /* ---------- 再訪問のメモ ----------
-   ・受け持っている本人のスマホの中（localStorage）だけに保存。サーバーには送らず、係も見られない
+   ・受け持っている本人のスマホの中（localStorage）に保存する
+   ・会衆の設定（memoSync）が「使う」のときは、端末の中で暗号化して、同じ人のほかの端末とも合わせる（下の MemoSync）
    ・受け持ちが終わった家のメモは自動で消す。「この端末から消す」や、長く通信がないときも消す */
 const MEMO_PREFIX = 'kuiki_memo_';
 const memoKey = () => MEMO_PREFIX + me().id;
 function memoAll() { try { return JSON.parse(lsGet(memoKey()) || '{}') || {}; } catch (e) { return {}; } }
-function memoSaveAll(o) {
+function memoSaveRaw(o) {
   if (!Object.keys(o).length) { lsDel(memoKey()); return true; }
   return lsSet(memoKey(), JSON.stringify(o));
 }
+function memoSaveAll(o) { const r = memoSaveRaw(o); if (onMemoVer) MemoSync.soon(); return r; }
 const memoOf = k => memoAll()[k] || null;
 function purgeMemos() {
-  const o = memoAll();
-  let ch = false;
-  Object.keys(o).forEach(k => { const f = fol(k); if (!f || f.by !== me().id) { delete o[k]; ch = true; } });
-  if (ch) memoSaveAll(o);
+  const o = memoAll(), gone = [];
+  Object.keys(o).forEach(k => { const f = fol(k); if (!f || f.by !== me().id) { delete o[k]; gone.push(k); } });
+  if (gone.length) memoSaveRaw(o);
   const p = pinsAll(); let pc = false;
-  [...p].forEach(k => { const f = fol(k); if (!f || f.by !== me().id) { p.delete(k); pc = true; } });
-  if (pc) lsSet(pinKey(), JSON.stringify([...p]));
+  [...p].forEach(k => { const f = fol(k); if (!f || f.by !== me().id) { p.delete(k); pc = true; gone.push(k); } });
+  if (pc) pinsSaveRaw(p);
+  // 受け持ちが終わった家は、ほかの端末と合わせる記録からも外す（サーバーのメモは、サーバーが消す）
+  if (gone.length) MemoSync.forget(gone);
 }
 /* メモ・ピン留めを消す（住んでいる人に関わる記録）。
    withMine のときは、奉仕時間・自分の予定（本人だけの記録）も消す（「この端末から消す」のとき） */
 function clearAllMemos(withMine) {
-  const pre = [MEMO_PREFIX, 'kuiki_pins_'].concat(withMine ? ['kuiki_my_'] : []);
+  const pre = [MEMO_PREFIX, 'kuiki_pins_', MSYNC_PREFIX, MKEY_PREFIX].concat(withMine ? ['kuiki_my_'] : []);
+  if (typeof MemoSync === 'object') MemoSync.key = null;
   try {
     Object.keys(localStorage).forEach(x => {
       const y = NS ? (x.indexOf(NS + '::') === 0 ? x.slice(NS.length + 2) : null) : (x.indexOf('::') < 0 ? x : null);
@@ -5345,6 +5118,216 @@ function clearAllMemos(withMine) {
     });
   } catch (e) { /* 何もしない */ }
 }
+/* ---------- 再訪問メモを、同じ人のほかの端末（iPadなど）と合わせる ----------
+   ・メモ・次の約束・📌を、家ごとに、この端末の中で暗号化（AES-GCM）してからサーバーへ送る。
+     サーバー・係の画面・シートには、読めない文字列しか残らない
+   ・鍵は本人ごとに1つ。サーバーが、その人の承認済みの端末にだけ渡す（端末には kuiki_mkey_ として置く）
+   ・端末に置く「前回合わせたときの様子」（kuiki_msync_）：
+       since＝サーバーの時刻、rows＝家ごとの { v 版, h 中身の印, del 消した }、checked＝全部を確かめた受け持ち
+   ・両方の端末で書きかえたときは、新しいほうを上にして、もう一方も「別の端末で書いた内容」として下に残す（消さない）
+   ・会衆の設定（memoSync）が「使わない」のとき・古いサーバーのときは、これまでどおり、このスマホの中だけ
+   ・送っていない記録（受け持ちなど）を送り終えてから合わせる（サーバーが受け持ちを知ってから、メモが届くように） */
+const MSYNC_PREFIX = 'kuiki_msync_', MKEY_PREFIX = 'kuiki_mkey_';
+const memoSyncOn = () => LIVE && !!(Store.data && Store.data.settings) && Store.data.settings.memoSync !== 0 &&
+  !!(window.crypto && window.crypto.subtle && window.TextEncoder && window.TextDecoder);
+const memoScope = () => (memoSyncOn() ? '本人の端末だけ' : 'このスマホだけ');
+const memoPrivacyNote = () => (memoSyncOn()
+  ? 'メモは暗号化して保管され、同じ人のほかの端末（iPadなど）でも見られます。係の画面やシートでは見られません。'
+  : 'メモはこのスマホの中だけに保存され、係やほかの人には送られません。');
+/* 2つのメモを、どちらも消さずに合わせる（a が新しいほう） */
+function mergeMemoText(a, b) {
+  a = String(a || ''); b = String(b || '');
+  if (!b || a === b || a.indexOf(b) >= 0) return a;
+  if (!a || b.indexOf(a) >= 0) return b;
+  return (a + '\n―― 別の端末で書いた内容 ――\n' + b).slice(0, 3000);
+}
+/* 家1件分の中身（メモ・約束・📌）。何もなければ null */
+function memoPl(memos, pins, k) {
+  const m = memos[k], p = pins.has(k);
+  if (!m && !p) return null;
+  return { t: m ? String(m.text || '') : '', at: m ? String(m.at || '') : '', n: m && m.next ? m.next : null, p: p ? 1 : 0 };
+}
+function memoPlHash(pl) {
+  if (!pl) return '';
+  const s = JSON.stringify([pl.t, pl.at, pl.n, pl.p]);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36) + '.' + s.length;
+}
+function memoPlApply(memos, pins, k, pl) {
+  if (pl && (pl.t || pl.n)) {
+    memos[k] = { text: pl.t, at: pl.at || new Date().toISOString() };
+    if (pl.n) memos[k].next = pl.n;
+  } else delete memos[k];
+  if (pl && pl.p) pins.add(k); else pins.delete(k);
+}
+function memoPlMerge(a, b) {
+  const an = Date.parse(a.at) || 0, bn = Date.parse(b.at) || 0;
+  const nw = an >= bn ? a : b, od = nw === a ? b : a;
+  return { t: mergeMemoText(nw.t, od.t), at: nw.at || od.at, n: nw.n || od.n || null, p: a.p || b.p ? 1 : 0 };
+}
+const mB64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const mUnB64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const mAad = (uid, k) => new TextEncoder().encode(uid + '|' + k); // 暗号文を、この人・この家に結びつける（入れかえ防止）
+async function memoEnc(key, k, pl) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: mAad(key.uid, k) }, key.ck, new TextEncoder().encode(JSON.stringify(pl)));
+  return 'v1.' + mB64(iv) + '.' + mB64(new Uint8Array(ct));
+}
+async function memoDec(key, k, s) {
+  const p = String(s || '').split('.');
+  if (p.length !== 3 || p[0] !== 'v1') throw new Error('fmt');
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: mUnB64(p[1]), additionalData: mAad(key.uid, k) }, key.ck, mUnB64(p[2]));
+  const o = JSON.parse(new TextDecoder().decode(pt)) || {};
+  const n = o.n && /^\d{4}-\d{2}-\d{2}$/.test(String(o.n.date || '')) ? { date: String(o.n.date), time: /^\d{1,2}:\d{2}$/.test(String(o.n.time || '')) ? String(o.n.time) : '' } : null;
+  return { t: String(o.t || '').slice(0, 3000), at: String(o.at || ''), n, p: o.p ? 1 : 0 };
+}
+const MemoSync = {
+  busy: false,
+  dueAt: 0,       // この時刻になったら合わせる（0＝予定なし）
+  pull: false,    // 送るものがなくても、サーバーの変更を取りに行く
+  seenMv: '',     // 最後に取り込んだ「メモが変わった」合図
+  lastAt: 0,      // 最後に合わせた時刻
+  fails: 0,
+  stopUntil: 0,   // サーバーが対応していない・設定で止めているとき、しばらく聞かない
+  key: null,      // { uid, kid, ck }
+  editing: null,  // メモの画面で開いている家
+  offDone: false,
+  stKey() { return MSYNC_PREFIX + me().id; },
+  load() {
+    try { const o = JSON.parse(lsGet(this.stKey()) || 'null'); if (o && o.rows) { o.checked = Array.isArray(o.checked) ? o.checked : []; return o; } } catch (e) { /* 作り直す */ }
+    return { since: 0, rows: {}, checked: [], kid: '' };
+  },
+  save(st) { lsSet(this.stKey(), JSON.stringify(st)); },
+  reset() { lsDel(MSYNC_PREFIX + me().id); lsDel(MKEY_PREFIX + me().id); this.key = null; },
+  soon(ms) { const t = Date.now() + (ms == null ? 2000 : ms); if (!this.dueAt || t < this.dueAt) this.dueAt = t; },
+  hint(mv) { if (mv && mv !== this.seenMv) { this.pull = true; this.soon(0); } },
+  wake() { this.pull = true; this.soon(1500); }, // 画面にもどったとき
+  /* 受け持ちが終わった家を、合わせる記録から外す（また受け持ったら、全部を確かめ直す） */
+  forget(keys) {
+    if (!keys.length || !LIVE || !Store.data) return;
+    const st = this.load();
+    let ch = false;
+    keys.forEach(k => {
+      if (st.rows[k]) { delete st.rows[k]; ch = true; }
+      const i = st.checked.indexOf(k);
+      if (i >= 0) { st.checked.splice(i, 1); ch = true; }
+    });
+    if (ch) this.save(st);
+  },
+  /* 1.5秒ごとに呼ばれる。やることがあるときだけ動く */
+  tick() {
+    if (this.busy || !LIVE || !Store.data || Store.inactive || Store.authLost || document.hidden || !me()) return;
+    if (!memoSyncOn()) { // 会衆の設定で止めた：合わせた記録と鍵だけ消す（スマホの中のメモは残す）
+      if (!this.offDone && lsGet(MSYNC_PREFIX + me().id)) this.reset();
+      this.offDone = true;
+      return;
+    }
+    this.offDone = false;
+    const now = Date.now();
+    if (now < this.stopUntil) return;
+    if (!this.lastAt && !this.dueAt) this.wake();                                  // 開いた直後に1回
+    if (this.lastAt && now - this.lastAt > 30 * 60000) { this.pull = true; this.soon(0); } // 合図が届かなくても、30分に1回は確かめる
+    if (!this.dueAt || now < this.dueAt) return;
+    this.dueAt = 0;
+    this.run();
+  },
+  async getKey(force) {
+    const uid = me().id;
+    if (!force && this.key && this.key.uid === uid) return this.key;
+    let o = null;
+    if (!force) { try { o = JSON.parse(lsGet(MKEY_PREFIX + uid) || 'null'); } catch (e) { o = null; } }
+    if (!o || !/^[0-9a-f]{64}$/i.test(String(o.key || ''))) {
+      const j = await api('memo_key', {});
+      o = { key: String(j.key || ''), kid: String(j.kid || '') };
+      if (!/^[0-9a-f]{64}$/i.test(o.key)) throw new Error('memo_key');
+      lsSet(MKEY_PREFIX + uid, JSON.stringify(o));
+    }
+    const raw = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) raw[i] = parseInt(o.key.substr(i * 2, 2), 16);
+    const ck = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+    this.key = { uid, kid: o.kid, ck };
+    return this.key;
+  },
+  async run() {
+    this.busy = true;
+    try {
+      for (let round = 0; round < 3; round++) if (!await this.once()) break;
+      this.fails = 0;
+    } catch (e) {
+      const c = e && (e.code || e.message);
+      if (c === 'memo_off' || c === 'unknown_action') this.stopUntil = Date.now() + 30 * 60000; // 設定で止めている・古いサーバー
+      else if (c !== 'auth') { this.fails = Math.min(6, this.fails + 1); this.soon(30000 * Math.pow(2, this.fails - 1)); }
+    } finally { this.busy = false; }
+  },
+  /* 1回分：送る → 受け取る → 合わせる。もう1回必要なら true */
+  async once() {
+    const uid = me().id;
+    let key = await this.getKey(false);
+    let st = this.load();
+    if (st.kid && key.kid && st.kid !== key.kid) st = { since: 0, rows: {}, checked: [], kid: '' }; // 鍵が作り直された
+    const fs = D().follows || {};
+    const myKeys = Object.keys(fs).filter(k => fs[k] && fs[k].by === uid);
+    const full = myKeys.some(k => st.checked.indexOf(k) < 0) || !st.since;
+    const memos = memoAll(), pins = pinsAll();
+    const all = new Set(Object.keys(memos).concat([...pins], Object.keys(st.rows)));
+    const items = [], sent = {};
+    let size = 0;
+    for (const k of all) {
+      if (size > 400000 || items.length >= 200) { this.soon(500); break; } // 多いときは分けて送る
+      const pl = memoPl(memos, pins, k), h = memoPlHash(pl), r = st.rows[k];
+      const f = fs[k], mine = !!(f && f.by === uid);
+      if (pl) {
+        if (r && !r.del && r.h === h) continue;           // 前回合わせたときから変わっていない
+        if (!mine) continue;                               // 受け持っていない家のメモは送らない
+        const d = await memoEnc(key, k, pl);
+        items.push({ k, base: r ? r.v : 0, d }); sent[k] = h; size += d.length;
+      } else if (r && !r.del) {
+        if (mine) { items.push({ k, base: r.v, del: 1 }); sent[k] = ''; } // この端末で消した
+        else delete st.rows[k];
+      }
+    }
+    if (!items.length && !full && !this.pull) { this.save(st); return false; }
+    this.pull = false;
+    const j = await api('memo_sync', { since: full ? 0 : st.since, items }, { timeout: 60000 });
+    if (j.kid && key.kid && j.kid !== key.kid) { this.reset(); return true; } // 鍵が作り直された：もう一度はじめから
+    if (j.kid && !key.kid) key.kid = j.kid;
+    st.kid = key.kid || j.kid || '';
+    const conf = new Set(j.conflicts || []);
+    (j.gone || []).forEach(k => { delete st.rows[k]; }); // ほかの人の受け持ちになった・もうない家
+    const memos2 = memoAll(), pins2 = pinsAll(); // 返事を待つあいだに書きかえたかもしれないので、読み直す
+    let touched = false, again = conf.size > 0;
+    for (const row of (Array.isArray(j.rows) ? j.rows : [])) {
+      const [k, v, , del, data] = row;
+      if (Object.prototype.hasOwnProperty.call(sent, k) && !conf.has(k)) { // 送った内容が受け付けられた
+        st.rows[k] = { v, h: sent[k], del: del ? 1 : 0 };
+        continue;
+      }
+      let srv = null;
+      if (!del) { try { srv = await memoDec(key, k, data); } catch (e) { continue; } } // 読めない（鍵が合わない）ものはとばす
+      const r = st.rows[k], lp = memoPl(memos2, pins2, k);
+      const same = r ? (r.del ? !lp : r.h === memoPlHash(lp)) : !lp; // この端末は、前回合わせたときから変わっていない
+      if (same) {
+        memoPlApply(memos2, pins2, k, srv); touched = true;
+      } else if (srv && lp) { // 両方で変わった：どちらも消さずに合わせ、次の回に送る
+        memoPlApply(memos2, pins2, k, memoPlMerge(lp, srv)); touched = true; again = true;
+      } else again = true; // 片方で消し、片方で書いた：書いたほうを残して、次の回に送る
+      st.rows[k] = { v, h: memoPlHash(srv), del: del ? 1 : 0 };
+    }
+    if (touched) { memoSaveRaw(memos2); pinsSaveRaw(pins2); }
+    st.since = Number(j.now) || st.since;
+    if (full) st.checked = myKeys;
+    this.save(st);
+    this.seenMv = j.mv || this.seenMv;
+    this.lastAt = Date.now();
+    if (touched) {
+      if (currentView === 'follow') renderFollowList();
+      else if (currentView === 'home') renderHome();
+    }
+    return again;
+  }
+};
+onMemoVer = mv => MemoSync.hint(mv);
 const memoShort = m => { const t = m.text.split('\n')[0]; return t.length > 40 || m.text.includes('\n') ? t.slice(0, 40) + '…' : t; };
 function openMemo(k, back) {
   const [hid, unit] = parseKey(k);
@@ -5352,12 +5335,19 @@ function openMemo(k, back) {
   const f = fol(k);
   if (!f || f.by !== me().id) { toast('メモは、自分が受け持っている再訪問にだけ書けます'); return; }
   const m = memoOf(k), met = sum(k).met, last = sum(k).last;
-  const done = () => { if (back) back(); else { closeSheet(); renderAll(); } };
+  const done = () => { MemoSync.editing = null; if (back) back(); else { closeSheet(); renderAll(); } };
+  let openedText = m ? m.text : ''; // 開いたときのメモ（開いているあいだに、ほかの端末の内容が届いたかを見分ける）
+  MemoSync.editing = k;
   /* 書きかけのメモと「次の約束」を保存する */
   const keepMemo = () => {
     const el = $('#memoText');
     if (!el) return true;
-    const text = el.value.trim(), nx = readNext('memoNext'), o = memoAll();
+    let text = el.value.trim();
+    const nx = readNext('memoNext'), o = memoAll();
+    // 開いているあいだに、ほかの端末で書いた内容が届いていたら、消さずに合わせる
+    const cur = o[k] ? o[k].text : '';
+    if (cur !== openedText && cur !== text) text = text === openedText ? cur : mergeMemoText(text, cur);
+    openedText = text;
     if (text || nx) o[k] = Object.assign({ text, at: new Date().toISOString() }, nx ? { next: nx } : {}); else delete o[k];
     return memoSaveAll(o);
   };
@@ -5367,9 +5357,9 @@ function openMemo(k, back) {
     <p class="hint">押すと訪問の記録になり（区域の地図にも反映）、メモのいちばん上に日時と結果が入ります。入った文字は消せます。</p>
     ${met ? `<p class="metline">前回 会えた日：${fmtDate(met.at)}（${slotShort(slotOf(new Date(met.at)))}）</p>` : '<p class="muted">まだ会えた記録はありません。</p>'}
     ${last ? `<p class="muted">前回の記録：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}</p>` : ''}
-    <label class="field"><span>メモ（このスマホだけ）</span><textarea id="memoText" rows="8" maxlength="1000" placeholder="例：次は土曜の午前に。前回の話の続きから">${esc(m ? m.text : '')}</textarea></label>
+    <label class="field"><span>メモ（${memoScope()}）</span><textarea id="memoText" rows="8" maxlength="1000" placeholder="例：次は土曜の午前に。前回の話の続きから">${esc(m ? m.text : '')}</textarea></label>
     ${nextInputsHtml('memoNext', m && m.next)}
-    <p class="hint">約束の日は、ホームのカレンダーと「今日やること」に出ます（このスマホの中だけ）。</p>
+    <p class="hint">約束の日は、ホームのカレンダーと「今日やること」に出ます（${memoScope()}）。</p>
     ${m && m.next ? `<a class="btn small" href="${gcalUrl('再訪問の約束', m.next.date, m.next.time, '', '', '')}" target="_blank" rel="noopener">約束をGoogleカレンダーに入れる</a>` : ''}
     ${m ? `<p class="muted">最後に保存：${fmtDate(m.at)}</p>` : ''}
     <button class="btn primary block" id="memoSave">メモを保存する</button>
@@ -5379,7 +5369,7 @@ function openMemo(k, back) {
       ${m ? shareButtonsHtml(true) : ''}
       ${m ? '<button class="btn danger block" id="memoDel">メモを消す</button>' : ''}
     </details>
-    <p class="hint">メモはこのスマホの中だけに保存され、係やほかの人には送られません。住んでいる人の名前・電話番号は書かないでください。受け持ちが終わると、メモも自動で消えます。</p>
+    <p class="hint">${memoPrivacyNote()}住んでいる人の名前・電話番号は書かないでください。受け持ちが終わると、メモも自動で消えます。</p>
     <button class="btn block" id="memoBack">もどる</button>`);
   $$('[data-stamp]', $('#sheet')).forEach(b => b.onclick = () => {
     const nx = readNext('memoNext'), o = memoAll();
@@ -5392,7 +5382,7 @@ function openMemo(k, back) {
   $('#memoSave').onclick = () => {
     const text = $('#memoText').value.trim(), nx = readNext('memoNext');
     if (keepMemo() === false) { toast('このスマホに保存できませんでした'); return; }
-    toast(text || nx ? 'メモを保存しました（このスマホだけ）' : 'メモを消しました');
+    toast(text || nx ? `メモを保存しました（${memoScope()}）` : 'メモを消しました');
     if (currentView === 'home') renderHome();
     done();
   };
@@ -5533,7 +5523,7 @@ function openReleaseSheet(k, onlyStop) {
       <button class="choice wide" data-rel="lost">リストから外す<small>もう訪ねない（関心がない・引っ越した など）</small></button>
       ${onlyStop ? '' : '<button class="choice wide" data-rel="handoff">ほかの人に引き継ぐ<small>「引き継ぎを待っている家」として、ほかの人に表示されます</small></button>'}
     </div>
-    ${memoOf(k) ? '<p class="hint">このスマホのメモも消えます（メモは引き継がれません）。</p>' : ''}
+    ${memoOf(k) ? '<p class="hint">メモも消えます（メモは引き継がれません）。</p>' : ''}
     <button class="btn block" data-close>もどる（外さない）</button>`);
   $$('[data-rel]', $('#sheet')).forEach(x => x.onclick = () => {
     const rel = x.dataset.rel;
@@ -5541,7 +5531,7 @@ function openReleaseSheet(k, onlyStop) {
     closeSheet();
     commit(RELEASE_MSG[rel], () => releaseFollow(k, rel), () => {
       if (memoBefore) { const o = memoAll(); o[k] = memoBefore; memoSaveAll(o); }
-      if (pinned) { const p = pinsAll(); p.add(k); lsSet(pinKey(), JSON.stringify([...p])); }
+      if (pinned) { const p = pinsAll(); p.add(k); pinsSave(p); }
     });
   });
 }
@@ -6472,7 +6462,7 @@ function pinOverlay() {
   Object.assign(ovState, {
     w: img.naturalWidth * s, h: img.naturalHeight * s,
     center: map.containerPointToLatLng([sz.x / 2, sz.y / 2]),
-    refZoom: map.getZoom(), pinned: true, pinDeg: mapDeg // 固定したときの地図の向き
+    refZoom: map.getZoom(), pinned: true
   });
   if (!ovState.el) {
     ovState.el = document.createElement('img');
@@ -6489,7 +6479,6 @@ function pinOverlay() {
 function unpinOverlay() {
   if (!ovState || !ovState.pinned) return;
   map.setView(ovState.center, ovState.refZoom, { animate: false });
-  setMapDeg(ovState.pinDeg || 0); // 固定したときの向きにもどしてから、合わせ直す
   ovState.pinned = false;
   if (ovState.el) ovState.el.remove();
   $('#overlayImg').hidden = false;
@@ -6502,7 +6491,7 @@ function placeOverlay() {
   const w = ovState.w * k, h = ovState.h * k, el = ovState.el;
   el.style.width = `${w}px`; el.style.height = `${h}px`;
   el.style.left = `${p.x - w / 2}px`; el.style.top = `${p.y - h / 2}px`;
-  el.style.transform = `rotate(${ovState.rot - (ovState.pinDeg || 0)}deg)`; // 写真は地図と一緒に回るので、固定したときの向きの分をもどす
+  el.style.transform = `rotate(${ovState.rot}deg)`;
 }
 function clearOverlay() {
   if (ovState) {
@@ -6917,16 +6906,20 @@ function renderCards() {
 /* 再訪問のピン留め（このスマホ・本人だけ） */
 const pinKey = () => 'kuiki_pins_' + me().id;
 function pinsAll() { try { return new Set(JSON.parse(lsGet(pinKey()) || '[]')); } catch (e) { return new Set(); } }
+function pinsSaveRaw(p) { if (!p.size) { lsDel(pinKey()); return true; } return lsSet(pinKey(), JSON.stringify([...p])); }
+function pinsSave(p) { const r = pinsSaveRaw(p); MemoSync.soon(); return r; }
 function togglePin(k) {
   const p = pinsAll();
   if (p.has(k)) p.delete(k); else p.add(k);
-  lsSet(pinKey(), JSON.stringify([...p]));
+  pinsSave(p);
   renderFollowList();
 }
 let followQ = '';
 const FSORT = [['idle', 'しばらく訪問していない順'], ['near', '近い順'], ['recent', '最後に訪問した順'], ['metold', '前回会えた日が古い順'], ['terr', '区域番号順']];
 function renderFollowList() {
   const box = $('#myFollows'); if (!box) return;
+  const fw = $('#followWhere');
+  if (fw) fw.textContent = memoSyncOn() ? 'メモは本人の端末（スマホ・iPadなど）だけで見られます。' : 'メモはこのスマホの中だけに残ります。';
   const sortKey = 'kuiki_fsort_' + me().id, sort = lsGet(sortKey) || 'idle', pins = pinsAll();
   let list = Object.entries(D().follows).filter(([k, f]) => f.by === me().id && houseById(parseKey(k)[0]));
   if (!$('#fQ')) { // 道具（リスト/地図・検索・並び順）は一度だけ作る（検索中に文字が消えないように）
@@ -7269,6 +7262,11 @@ function renderInbox() {
       <div class="stepper"><button type="button" data-kset="followSkipDays" data-d="-10" aria-label="期間を短くする">−</button>
         <output class="wide">${st.followSkipDays ? st.followSkipDays + '日' : '使わない'}</output>
         <button type="button" data-kset="followSkipDays" data-d="10" aria-label="期間を長くする">＋</button></div></div>
+    <div class="setrow">
+      <span>再訪問のメモを、同じ人のほかの端末（iPadなど）でも使えるようにする<br><small class="hint">メモは各自の端末の中で暗号化してから保管するので、係の画面やシートでは読めません。「使わない」にすると、保管しているメモをサーバーから消し、これまでどおり各自のスマホの中だけになります（スマホの中のメモは消えません）</small></span>
+      <div class="seg" role="group" aria-label="再訪問のメモをほかの端末でも使う">
+        <button type="button" data-sset="memoSync" data-v="1" aria-pressed="${st.memoSync !== 0}">使う</button>
+        <button type="button" data-sset="memoSync" data-v="0" aria-pressed="${st.memoSync === 0}">使わない</button></div></div>
     <div class="setrow">
       <span>「最近会えた家」を完了の数に入れる<br><small class="hint">入れると、回り終えた割合（％）に数えます</small></span>
       <div class="seg" role="group" aria-label="完了の数に入れる">
@@ -7901,7 +7899,7 @@ function nameZoomSlider(key) {
     <p class="nzends"><span>← 縮めても出す</span><span>拡大したときだけ →</span></p></div>`;
 }
 const ICONS = ['区', '家', '図', '心', '🏠', '🗺️', '📖', '🚪', '✅', '⭐', '🚶', '☀️'];
-const UI_DEFAULT = { fTime: 'off', fFollow: 'off', todayOn: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', mapRot: 'on', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
+const UI_DEFAULT = { fTime: 'off', fFollow: 'off', todayOn: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
 /* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
   standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
@@ -8132,7 +8130,7 @@ function openUiSheet() {
     const S_FEAT = `<h3 class="sub feathead">使う機能</h3>
       <p class="hint">はじめは、区域を回って「会えた・留守」を記録するだけの、かんたんな形です。必要な機能だけ「使う」にしてください。</p>
       <div class="featrow"><p><b>奉仕時間</b><small>時間をはかる・今月の目標・カレンダーに時間を残す</small></p>${seg('fTime', [['off', '使わない'], ['on', '使う']])}</div>
-      <div class="featrow"><p><b>再訪問</b><small>会えたあとに「再訪問する」をえらぶと、メモを残して、下の「再訪問」タブで管理できます（メモはこのスマホの中だけ）</small></p>${seg('fFollow', [['off', '使わない'], ['on', '使う']])}</div>
+      <div class="featrow"><p><b>再訪問</b><small>会えたあとに「再訪問する」をえらぶと、メモを残して、下の「再訪問」タブで管理できます（メモは${memoSyncOn() ? '暗号化して、同じ人のほかの端末とも同じになります' : 'このスマホの中だけ'}）</small></p>${seg('fFollow', [['off', '使わない'], ['on', '使う']])}</div>
       <h3 class="sub">ホームに出すもの</h3>
       <div class="featrow"><p><b>今日やること</b><small>今日の集まり・自分の予定・再訪問の約束・区域カード・今がチャンスの留守宅カードを、ホームのいちばん上にまとめます</small></p>${seg('todayOn', [['off', '出さない'], ['on', '出す']])}</div>
       <h3 class="sub">区域カードに出すもの</h3>
@@ -8157,9 +8155,7 @@ function openUiSheet() {
       <p class="q">区域の線の色</p>
       <div class="linecolors">${Object.entries(TERR_COLORS).map(([k, v]) =>
         `<button type="button" class="lcbtn" data-ui="terrColor" data-v="${k}" aria-pressed="${(UI.terrColor || 'theme') === k}"><i style="background:${k === 'theme' ? accentColor() : v[0]}"></i>${v[1]}</button>`).join('')}</div>
-      <p class="q">区域の線の太さ</p>${seg('terrWidth', [['thin', '細い'], ['normal', 'ふつう'], ['thick', '太い']], UI.terrWidth || 'normal')}
-      ${rotSupported() ? `<p class="q">2本指で地図を回す</p>${seg('mapRot', [['on', '回せる'], ['off', '回さない']], UI.mapRot || 'on')}
-      <p class="hint">2本の指でひねるように動かすと、地図の向きが変わります。右下の「北」のボタンで、北が上にもどります。</p>` : ''}` : '';
+      <p class="q">区域の線の太さ</p>${seg('terrWidth', [['thin', '細い'], ['normal', 'ふつう'], ['thick', '太い']], UI.terrWidth || 'normal')}` : '';
     let S_VIEW = `<h3 class="sub feathead">画面の見え方</h3>
       <div class="choices two">
         <button class="choice${det ? '' : ' on'}" data-ui="mode" data-v="simple" aria-pressed="${!det}">かんたん<small>文字の大きさだけ</small></button>
@@ -8258,14 +8254,13 @@ function openUiSheet() {
       if (k === 'base') setBase(v);
       if (k === 'cProg' || k === 'cReco') renderAll();
       if (k === 'terrColor' || k === 'terrWidth') renderTerrs();
-      if (k === 'mapRot') applyRotSetting();
       if (k === 'aptName' || k === 'fcName' || k === 'pin' || k === 'nameScope') renderHouses();
       if (k === 'calList' || k === 'todayOn') renderHome();
       paint(k !== 'mode');
     });
     $('#uiReset').onclick = async () => {
       if (!await ask('画面の見え方を、最初の状態にもどします（「使う機能」はそのままです）。よろしいですか？')) return;
-      UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fFollow: UI.fFollow, cProg: UI.cProg, cReco: UI.cReco, todayOn: UI.todayOn }); uiSave(); applyUi(); setBase('pale'); applyRotSetting(); // 使う機能・区域カードに出すものはそのまま
+      UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fFollow: UI.fFollow, cProg: UI.cProg, cReco: UI.cReco, todayOn: UI.todayOn }); uiSave(); applyUi(); setBase('pale'); // 使う機能・区域カードに出すものはそのまま
       toast('表示の設定を最初にもどしました');
       paint(false);
     };
@@ -11309,8 +11304,12 @@ function bindStatic() {
     else if ((x = q('[data-set]'))) changeSetting(x.dataset.set, Number(x.dataset.d));
     else if (q('#bkGo')) bulkMove();
     else if ((x = q('[data-sset]'))) {
-      D().settings[x.dataset.sset] = Number(x.dataset.v);
-      Store.save(); renderAll(); toast('設定を変えました');
+      const key = x.dataset.sset, v = Number(x.dataset.v);
+      const go = () => { D().settings[key] = v; Store.save(); renderAll(); toast('設定を変えました'); };
+      if (key === 'memoSync' && v === 0 && D().settings.memoSync !== 0) {
+        ask('再訪問のメモを、ほかの端末で使えないようにします。\nサーバーに保管している全員のメモを消します（各自のスマホの中のメモは残ります）。よろしいですか？')
+          .then(ok => { if (ok) go(); });
+      } else go();
     }
     else if ((x = q('[data-kset]'))) {
       const st = D().settings, key = x.dataset.kset;
@@ -11474,6 +11473,7 @@ async function init() {
       fetchDevices(false); // 区域係のとき、スマホの申し込みを1分ごとに確認
       updateSyncAge();
       if (Store.queue.length) { if (!flushing) flush(); return; }
+      MemoSync.tick(); // 再訪問メモを、同じ人のほかの端末と合わせる（送っていない変更を送り終えてから）
       if (Date.now() >= nextPollAt) {
         schedulePoll(); // 返事を待つ間に、もう一度取りに行かないように先に次の時刻を決める
         refresh(true).then(() => { pollFail = 0; }).catch(() => { pollFail = Math.min(3, pollFail + 1); }).then(schedulePoll);
@@ -11486,7 +11486,7 @@ async function init() {
     document.addEventListener('visibilitychange', () => {
       // ほかのアプリに切りかえるときは、端末への保存と送信をすぐ行う（iPhoneはすぐ止まるため）
       if (document.hidden) { Store.saveCacheNow(); if (Store.queue.length && !flushing) flush(true); return; }
-      lastRefresh = 0; nextPollAt = 0; flushNextAt = 0; again();
+      lastRefresh = 0; nextPollAt = 0; flushNextAt = 0; MemoSync.wake(); again();
     });
     window.addEventListener('pagehide', () => Store.saveCacheNow());
     $('#syncState').onclick = openSyncSheet;
