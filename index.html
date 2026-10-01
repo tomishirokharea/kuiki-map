@@ -1855,6 +1855,7 @@ const TOKEN_KEY = 'kuiki_token', QUEUE_KEY = 'kuiki_queue', OLD_CACHE_KEY = 'kui
 let onMemoVer = null; // 再訪問メモの合図を受け取る（MemoSync が入れる）
 const DATA_VER = 2; // データの種類が増えたら上げる（端末が一度だけ全部を読み直す）
 const CACHE_KEYS = ['c2_meta', 'c2_houses', 'c2_visits']; // 端末の保存：3つに分けて、変わった分だけ書く
+const BIG_SAVE_GAP_MS = 10 * 60000; // 家・記録（大きい部分）を端末に書く間隔の最短（閉じるときは、いつでも書く）
 const FAILED_KEY = 'kuiki_failed'; // 何度送っても受け付けられなかった変更（捨てずに取っておく）
 const metaSigOf = j => JSON.stringify([j.users || null, j.settings || null, j.currentUser || null]);
 const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'schedules', 'users', 's13', 'agedata'];
@@ -2031,7 +2032,13 @@ const Store = {
   metaSig: null,   // 前回受け取った「人・設定」の中身（変わっていなければ、画面の作り直しをしない）
   needMeta: false, // 区域・予定などだけを読み直す（グループが変わったとき）
   inactive: false, // ほかのタブで開かれたので、この画面は止めている
-  markAll() { this.dirty = { meta: true, houses: true, visits: true }; },
+  markAll() { this.dirty = { meta: true, houses: true, visits: true }; this.bigAt = 0; }, // 全部が変わった → 次は家・記録も必ず書く
+  /* 家（約3万件）・訪問記録（数十万件になる）を端末に書いた時刻と、そのときの変更番号。
+     家・記録は大きいので、変わるたびには書かない（書くたびに画面が数秒止まるため）。
+     書かなかったあいだは、端末に残す変更番号を「家・記録を書いたときの番号」にとどめる。
+     次に開いたとき、その番号からの差分を受け取り直すので、記録の取りこぼしは起きない */
+  bigAt: 0,
+  diskSeq: { houses: null, visits: null },
   markCol(c) { this.dirty[c === 'houses' || c === 'visits' ? c : 'meta'] = true; },
   /* 変わったところが何もない返事か（それなら、番号を進めるだけにする） */
   trivial(j) {
@@ -2224,18 +2231,37 @@ const Store = {
     this.cacheTimer = setTimeout(() => this.saveCacheNow(), 2000);
   },
   /* 端末に書く：区域・予定などの「小さい部分」はいつも、家と記録は変わったときだけ */
-  saveCacheNow() {
+  /* final：画面を閉じる・ほかのアプリに切りかえるとき（このときは家・記録もまとめて書く） */
+  saveCacheNow(final) {
     clearTimeout(this.cacheTimer); this.cacheTimer = null;
     if (!LIVE || this.inactive || this.authLost || !this.data) return;
     const dt = this.dirty;
     if (!dt.meta && !dt.houses && !dt.visits) return;
+    const now = Date.now(), cur = Number(this.seq), ds = this.diskSeq || {};
+    const known = x => x !== null && x !== undefined && isFinite(Number(x));
+    // 家・記録を今書くか：閉じるとき／前に書いてから10分たった／まだ一度も書いていない／番号がわからない
+    let big = !!final || !this.bigAt || now - this.bigAt >= BIG_SAVE_GAP_MS || !isFinite(cur);
+    if (!big && ((dt.houses && !known(ds.houses)) || (dt.visits && !known(ds.visits)))) big = true;
+    const wH = dt.houses && big, wV = dt.visits && big;
+    // 書かずに残す部分があるときは、端末に残す番号を、その部分を書いたときの番号にとどめる
+    const held = [];
+    if (dt.houses && !wH) held.push(Number(ds.houses));
+    if (dt.visits && !wV) held.push(Number(ds.visits));
+    const diskSeqNow = held.length ? Math.min(cur, ...held) : this.seq;
     const rest = Object.assign({}, this.data);
     delete rest.houses; delete rest.visits;
-    const put = { c2_meta: { tag: this.token.slice(0, 12), seq: this.seq, state: rest, savedAt: Date.now(), dataVer: DATA_VER } };
-    if (dt.houses) put.c2_houses = this.data.houses;
-    if (dt.visits) put.c2_visits = this.data.visits;
-    this.dirty = { meta: false, houses: false, visits: false };
-    IDB.putMany(put).catch(() => { this.markAll(); /* 書けなかったときは、次にまた全部を書く */ });
+    const put = { c2_meta: { tag: this.token.slice(0, 12), seq: diskSeqNow, state: rest, savedAt: now, dataVer: DATA_VER } };
+    if (wH) put.c2_houses = this.data.houses;
+    if (wV) put.c2_visits = this.data.visits;
+    this.dirty = { meta: false, houses: dt.houses && !wH, visits: dt.visits && !wV };
+    if (wH || wV) this.bigAt = now;
+    const seqWritten = this.seq;
+    IDB.putMany(put).then(() => {
+      const nd = Object.assign({}, this.diskSeq);
+      if (wH) nd.houses = seqWritten;
+      if (wV) nd.visits = seqWritten;
+      this.diskSeq = nd;
+    }).catch(() => { this.markAll(); /* 書けなかったときは、次にまた全部を書く */ });
   },
   async loadLive(tk) {
     this.token = tk.token;
@@ -2272,6 +2298,7 @@ const Store = {
       if (cu && cu.role === 'admin' && !Array.isArray(cache.state.s13)) this.needMeta = true;
       if (!Array.isArray(cache.state.agedata)) this.needMeta = true; // 年齢データを持っていない保存（この版より前）
       this.setServer({ seq: cache.seq, state: cache.state }); // すぐ表示して、あとで差分を取りに行く
+      this.diskSeq = { houses: cache.seq, visits: cache.seq }; this.bigAt = Date.now(); // 開いた直後に大きな書きこみをしない
       if (legacy) { this.markAll(); this.saveCacheSoon(); } // 新しい形で保存し直す
       return 'cache';
     }
@@ -12733,10 +12760,10 @@ async function init() {
     window.addEventListener('offline', () => updateSyncBadge());
     document.addEventListener('visibilitychange', () => {
       // ほかのアプリに切りかえるときは、端末への保存と送信をすぐ行う（iPhoneはすぐ止まるため）
-      if (document.hidden) { Store.saveCacheNow(); if (Store.queue.length && !flushing) flush(true); return; }
+      if (document.hidden) { Store.saveCacheNow(true); if (Store.queue.length && !flushing) flush(true); return; }
       lastRefresh = 0; nextPollAt = 0; flushNextAt = 0; MemoSync.wake(); again();
     });
-    window.addEventListener('pagehide', () => Store.saveCacheNow());
+    window.addEventListener('pagehide', () => Store.saveCacheNow(true));
     $('#syncState').onclick = openSyncSheet;
     $('#syncState').setAttribute('role', 'button');
     $('#syncState').tabIndex = 0;
