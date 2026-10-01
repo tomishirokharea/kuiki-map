@@ -5518,13 +5518,30 @@ function memoSaveRaw(o) {
 }
 function memoSaveAll(o) { const r = memoSaveRaw(o); if (onMemoVer) MemoSync.soon(); return r; }
 const memoOf = k => memoAll()[k] || null;
+/* 受け持ちが外れてから、このスマホのメモを消すまでの猶予（サーバーと同じ10分）。
+   すぐ消すと、「取り消す」で受け持ちを戻しても、メモだけは戻らなかった（このスマホだけに保存しているときは、二度と戻らない）。
+   また、サーバーに受け付けられなかった受け持ちでも、書いたばかりのメモがその場で消えていた */
+const MEMO_GRACE_MS = 10 * 60000;
+const memoLostKey = () => MEMO_PREFIX + 'lost_' + me().id; // 名前が kuiki_memo_ で始まるので、端末の情報を消すときに一緒に消える
 function purgeMemos() {
-  const o = memoAll(), gone = [];
-  Object.keys(o).forEach(k => { const f = fol(k); if (!f || f.by !== me().id) { delete o[k]; gone.push(k); } });
-  if (gone.length) memoSaveRaw(o);
-  const p = pinsAll(); let pc = false;
-  [...p].forEach(k => { const f = fol(k); if (!f || f.by !== me().id) { p.delete(k); pc = true; gone.push(k); } });
+  const o = memoAll(), p = pinsAll(), now = Date.now(), gone = [];
+  let lost = {};
+  try { lost = JSON.parse(lsGet(memoLostKey()) || '{}') || {}; } catch (e) { lost = {}; }
+  let lc = false, oc = false, pc = false;
+  // 消してよいか：受け持ちが外れてから猶予がたった家だけ（受け持ちにもどったら、外れた時刻を忘れる）
+  const expired = k => {
+    const f = fol(k);
+    if (f && f.by === me().id) { if (lost[k]) { delete lost[k]; lc = true; } return false; }
+    if (!lost[k]) { lost[k] = now; lc = true; return false; }
+    return now - lost[k] >= MEMO_GRACE_MS;
+  };
+  Object.keys(o).forEach(k => { if (expired(k)) { delete o[k]; oc = true; gone.push(k); } });
+  [...p].forEach(k => { if (expired(k)) { p.delete(k); pc = true; if (gone.indexOf(k) < 0) gone.push(k); } });
+  // 消し終えた家・メモもピンもない家の「外れた時刻」は、もういらない
+  Object.keys(lost).forEach(k => { if (!(k in o) && !p.has(k)) { delete lost[k]; lc = true; } });
+  if (oc) memoSaveRaw(o);
   if (pc) pinsSaveRaw(p);
+  if (lc) { if (Object.keys(lost).length) lsSet(memoLostKey(), JSON.stringify(lost)); else lsDel(memoLostKey()); }
   // 受け持ちが終わった家は、ほかの端末と合わせる記録からも外す（サーバーのメモは、サーバーが消す）
   if (gone.length) MemoSync.forget(gone);
 }
