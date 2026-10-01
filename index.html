@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.15"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.16"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -3447,6 +3447,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.11.16', items: [
+    ['直', '地図の「?」の中の「おすすめの回り方」の一覧が、奉仕時間の「目標と計画」の画面とまちがって開いていたのを直しました']
+  ] },
   { v: '2026.11.15', items: [
     ['⏲', '「目標と計画」で日にちを押すと、画面の下に時間のダイヤルが出るようになりました。上下にスワイプして、15分ごとに時間をえらべます（止めたところで保存されます）。下までスクロールしなくても入れられます'],
     ['‹›', 'ダイヤルの「‹ ›」で、前の日・次の日に移れます。続けて何日も入れられます'],
@@ -10350,7 +10353,7 @@ function goalHtml(o) {
   }
   return `<div class="today homecard">${body}</div>`;
 }
-/* 目標と計画の画面：月の目標と、カレンダーで日ごとの時間をえらぶ（えらぶとすぐ保存）
+/* 目標と計画の画面（openGoalPlan。区域の「おすすめの回り方」の openPlanSheet とは別）：月の目標と、カレンダーで日ごとの時間をえらぶ（えらぶとすぐ保存）
    ・日にちを押すと、画面の下に「時間のダイヤル」が出る。上下にスワイプして、15分ごとに時間をえらぶ
      （ダイヤルが止まったところで保存。カレンダーはダイヤルの上に見えたまま）
    ・ダイヤルの「‹ ›」で前の日・次の日に移れる（日にちを押し直さなくても、続けて入れられる）
@@ -10375,7 +10378,7 @@ function schedDur(sc) {
   });
   return Math.min(best, WHEEL_MAX);
 }
-function openPlanSheet(ymArg) {
+function openGoalPlan(ymArg) {
   planYm = ymArg || ymOf(new Date());
   planSel = null;
   let wheelBusy = false, wheelVal = 0;
@@ -10623,7 +10626,7 @@ function openReportSheet(ym, opt) {
     setSheet(headHtml(null, opt.auto ? 'おつかれさまでした！' : `${M}月の奉仕報告`, opt.auto ? `${M}月の奉仕報告` : '') + `
       <p class="praise">${esc(praiseLine(done, goal))}</p>
       <div class="rpbox"><p class="muted" style="margin:0">${M}月に記録した時間（${monthDays(o0, ym)}日）</p><p class="big">${fmtMin(done)}</p>
-        ${goal ? (done >= goal ? `<p class="gdiff ahead">目標 ${fmtMin(goal)} を達成（＋${fmtMin(done - goal)}）</p>` : `<p class="gdiff behind">目標 ${fmtMin(goal)} まで、あと ${fmtMin(goal - done)}</p>`) : ''}</div>
+        ${goal ? (done >= goal ? `<p class="gdiff ahead">目標 ${fmtMin(goal)} を達成${done > goal ? `（＋${fmtMin(done - goal)}）` : ''}</p>` : `<p class="gdiff behind">目標 ${fmtMin(goal)} まで、あと ${fmtMin(goal - done)}</p>`) : ''}</div>
       <div class="rpline"><p class="q" style="margin:0">時間</p><div class="stepper"><button type="button" data-rh="-1" aria-label="1時間へらす">−</button><output class="wide">${h}時間</output><button type="button" data-rh="1" aria-label="1時間ふやす">＋</button></div></div>
       ${done % 60 ? `<p class="hint">記録は${fmtMin(done)}です。報告は1時間ごとの数にしています（＋−で直せます）。</p>` : ''}
       <div class="rpline"><p class="q" style="margin:0">レッスン</p><div class="stepper"><button type="button" data-rl="-1" aria-label="1へらす">−</button><output class="wide">${les}</output><button type="button" data-rl="1" aria-label="1ふやす">＋</button></div></div>
@@ -10811,7 +10814,7 @@ function bindHello() {
       return;
     }
     if ((x = q('[data-hchance]'))) { closeHello(true); CHANCE_CACHE = null; takeAwayCard(x.dataset.hchance, x.dataset.slot); return; }
-    if (q('[data-hgoal]')) { closeHello(true); openPlanSheet(); return; }
+    if (q('[data-hgoal]')) { closeHello(true); openGoalPlan(); return; }
     if (q('[data-hclose]')) closeHello();
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !el.hidden) { e.stopPropagation(); closeHello(); } }, true);
@@ -11371,7 +11374,7 @@ function bindHome() {
     else if ((x = q('[data-timer]'))) timerAction(x.dataset.timer);
     else if ((x = q('[data-mt]'))) addToday(Number(x.dataset.mt));
     else if ((x = q('[data-report]'))) openReportSheet(x.dataset.report);
-    else if (q('#goalEdit')) openPlanSheet();
+    else if (q('#goalEdit')) openGoalPlan();
     else if (q('#monthHist')) openMonthHist();
     else if ((x = q('[data-cm]'))) { const b = calMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1); calMonth = new Date(b.getFullYear(), b.getMonth() + Number(x.dataset.cm), 1); renderHome(); }
     else if ((x = q('[data-day]'))) openDay(x.dataset.day);
