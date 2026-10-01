@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.14"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.15"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ（試作版）</title>
 <meta name="theme-color" content="#17324D">
@@ -1209,28 +1209,31 @@ h2,h3,.q{text-wrap:pretty}
 .pquick .chip{min-height:44px;padding:0 14px}
 .pcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:10px}
 .pcal .cw{font-size:13px}
-.pd{position:relative;min-width:0;aspect-ratio:1/1.15;border-radius:10px;border:2px solid var(--line);background:#fff;padding:2px 1px 1px;display:grid;grid-template-rows:auto auto 1fr;justify-items:center;align-items:start;font-weight:700;line-height:1.1;overflow:hidden}
+.pd{position:relative;min-width:0;min-height:66px;border-radius:10px;border:2px solid var(--line);background:#fff;padding:3px 1px 2px;display:grid;grid-template-rows:auto auto 1fr;justify-items:center;align-items:start;font-weight:700;line-height:1.1;overflow:hidden}
 .pd .dn{font-size:15px}
 .pd.sun .dn,.pd.hol .dn{color:#C62828}
 .pd.sat .dn{color:#1565C0}
-.pd .ht{font-size:9px;color:#C62828;max-width:100%;white-space:nowrap;overflow:hidden;letter-spacing:-.3px}
-.pd .sc{font-size:9.5px;color:var(--terr);white-space:nowrap;max-width:100%;overflow:hidden;min-height:10px}
-.pd .ph{align-self:center;font-size:clamp(13px,4vw,17px);color:var(--brand)}
+.pd.hol{background:#FFF5F5}
+.pd .tg{display:flex;flex-direction:column;align-items:center;gap:1px;min-height:12px;max-width:100%;margin-top:1px}
+.pd .tg i{font-style:normal;font-size:9.5px;line-height:1.25;white-space:nowrap;max-width:100%;overflow:hidden;letter-spacing:-.3px}
+.pd .tg .hl{color:#C62828}
+.pd .tg .mt{background:var(--terr);color:#fff;border-radius:5px;padding:0 3px}
+.pd .tg .mt em{font-style:normal;font-size:8.5px;margin-left:1px}
+.pd .ph{align-self:end;margin-bottom:2px;font-size:clamp(14px,4.2vw,18px);color:var(--brand)}
 .pd .ph.zero{color:#B0BEC5}
-.pd .dd{position:absolute;right:2px;bottom:1px;font-size:9px;color:var(--terr)}
+.pd .dd{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:8.5px;color:var(--terr);line-height:1.1}
+.pd:has(.dd) .ph{margin-bottom:9px}
 .pd.past{background:#F3F5F4}
 .pd.past .ph{color:var(--ink2)}
 .pd.hassc{border-color:var(--terr)}
 .pd.today{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand)}
-.pd.sel{background:var(--brand);border-color:var(--brand)}
-.pd.sel *{color:#fff!important}
+.pd.sel{background:var(--brand);border-color:var(--brand);box-shadow:0 0 0 3px #F59E0B}
+.pd.sel .dn,.pd.sel .ph,.pd.sel .dd,.pd.sel .tg .hl{color:#fff!important}
+.pd.sel .tg .mt{background:#fff;color:var(--brand)}
 .pd.empty{border:0;background:transparent}
+.mtkey{font-style:normal;font-size:11px;background:var(--terr);color:#fff;border-radius:5px;padding:0 4px;margin-right:4px;font-weight:700}
 .pwk{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;background:var(--terr-soft);border-radius:8px;padding:2px 10px;font-size:14px;margin:0 0 4px}
 .pwk b{font-size:16px}
-.ppick{border:2px solid var(--brand);border-radius:14px;padding:10px 12px;margin:10px 0;background:#fff}
-.ppick .pdtitle{font-size:19px;font-weight:700}
-.ppick .chips{margin:8px 0 8px;gap:6px}
-.ppick .chip{min-height:46px;padding:0 12px;font-size:16px}
 .holtag{display:inline-block;font-size:14px;color:#C62828;border:1px solid #C62828;border-radius:6px;padding:0 6px}
 .plansum{position:sticky;bottom:calc(-22px - env(safe-area-inset-bottom));z-index:2;margin:12px -16px 0;padding:10px 16px calc(12px + env(safe-area-inset-bottom));background:var(--paper);border-top:2px solid var(--line);box-shadow:0 -4px 12px #0000001a}
 .plansum .big{font-size:20px;font-weight:700}
@@ -1265,6 +1268,35 @@ h2,h3,.q{text-wrap:pretty}
 #hello .hclose{text-align:center;color:var(--ink2);font-size:14px;margin:0}
 body.big #hello .hreco{flex-wrap:wrap}
 body.big #hello .hreco .btn{width:100%}
+/* 時間のダイヤル（目標と計画） */
+.plansum.still{position:static;box-shadow:none}
+.wspacer{height:calc(330px + env(safe-area-inset-bottom))}
+.wpop{position:fixed;left:0;right:0;bottom:0;z-index:2600;background:var(--paper);border-radius:20px 20px 0 0;box-shadow:0 -8px 24px #0004;border-top:3px solid var(--brand);padding:8px 14px calc(10px + env(safe-area-inset-bottom));zoom:var(--z,1);animation:wpIn .2s ease}
+@keyframes wpIn{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
+.wphead{display:flex;align-items:center;gap:8px}
+.wnav{flex:none;width:52px;height:52px;border-radius:14px;border:2px solid var(--ink);background:#fff;font-size:28px;font-weight:700;line-height:1}
+.wptitle{flex:1;min-width:0;text-align:center}
+.wptitle b{display:block;font-size:20px}
+.wptitle small{display:block;font-size:13.5px;color:var(--ink2);line-height:1.45;overflow-wrap:anywhere}
+.mtinfo{color:var(--terr);font-weight:700}
+.wheel2{position:relative;height:168px;margin:6px 0;border-radius:14px;background:#F5F7F6;overflow:hidden;
+  -webkit-mask-image:linear-gradient(to bottom,#0004 0,#000 32%,#000 68%,#0004 100%);mask-image:linear-gradient(to bottom,#0004 0,#000 32%,#000 68%,#0004 100%)}
+.wband{position:absolute;left:8px;right:8px;top:63px;height:42px;border-radius:10px;background:var(--terr-soft);border:2px solid var(--terr);pointer-events:none}
+.wlist{position:relative;height:100%;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;touch-action:pan-y}
+.wlist::-webkit-scrollbar{display:none}
+.wlist:focus-visible{outline:3px solid #F59E0B;outline-offset:-3px}
+.wpad{height:63px}
+.witem{height:42px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:18px;color:var(--ink2);font-weight:700;cursor:pointer;-webkit-user-select:none;user-select:none}
+.witem.on{font-size:23px;color:var(--brand)}
+.wpacts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.wpacts .btn{flex:1 1 0;min-width:0;min-height:48px;white-space:normal;line-height:1.3;padding:4px 8px;font-size:15px}
+.wpfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
+.wpfoot span{font-size:15px;line-height:1.4}
+.wpfoot b{font-size:18px}
+.wpfoot .okc{color:var(--terr);font-weight:700}
+.wpfoot .shortc{color:var(--draw);font-weight:700}
+.wpfoot .btn{min-width:110px}
+body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
 </style>
 </head>
 <body>
@@ -3415,6 +3447,12 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.11.15', items: [
+    ['⏲', '「目標と計画」で日にちを押すと、画面の下に時間のダイヤルが出るようになりました。上下にスワイプして、15分ごとに時間をえらべます（止めたところで保存されます）。下までスクロールしなくても入れられます'],
+    ['‹›', 'ダイヤルの「‹ ›」で、前の日・次の日に移れます。続けて何日も入れられます'],
+    ['集', 'カレンダーのマスに、集まりの時刻を緑の札で出しました。祝日はマスがうすい赤になります。ダイヤルの上には、祝日の名前と、集まりの時間・場所が出ます'],
+    ['合', '終わりの時刻がある集まりの日は「集まりに合わせる」で、その長さをそのまま入れられます']
+  ] },
   { v: '2026.11.14', items: [
     ['目', '奉仕時間に「目標と計画」ができました。月の目標を決めて、祝日と集まりの予定が入ったカレンダーで、日ごとに何時間するかをえらべます。週ごとの合計と、目標に届く計画かどうかが、ひと目で分かります'],
     ['±', 'ホームで、計画より何時間進んでいるか（足りないか）と、目標をこえた時間が分かるようになりました'],
@@ -3852,6 +3890,7 @@ function setSheet(html) {
     if (attrs.length) focusSel = a.tagName.toLowerCase() + attrs.map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join('');
   }
   if (typeof dayCtx !== 'undefined') dayCtx = null;
+  if (html.indexOf('data-pday') < 0) hideWheel(); // 「目標と計画」以外の画面になったら、時間のダイヤルを閉じる
   s.dataset.swipe = ''; // '1'＝設定の画面（閉じたとき「保存しました」と出す）。どの画面も、下にスワイプで閉じる
   if (html.indexOf('class="grab"') < 0) html = '<span class="grab" aria-hidden="true"></span>' + html; // 上のつまみ（下にスワイプで閉じる印）
   s.style.transform = '';
@@ -3866,7 +3905,9 @@ function setSheet(html) {
   s.scrollTop = 0;
   const h = s.querySelector('h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
 }
+function hideWheel() { const w = document.getElementById('wheelPop'); if (w) w.hidden = true; document.body.classList.remove('wheel-open'); }
 function closeSheet() {
+  hideWheel();
   qrWatching = false;
   if (homeUrlDirty) { cleanUrl(); homeUrlDirty = false; } // URLに戻したコードは、画面を閉じたら消す
   $('#sheet').hidden = true; $('#backdrop').hidden = true;
@@ -10271,7 +10312,8 @@ const holidayOf = key => jpHolidays(Number(key.slice(0, 4)))[key] || '';
    ・目標（月の時間）と、日ごとの計画（何時間するか）は、このスマホの中だけに保存
    ・「計画とのちがい」＝ これまでの記録 −（昨日までの計画 ＋ 今日の計画のうち、今日すでに記録した分）
      今日の分は、まだ途中かもしれないので、足りなくても「遅れ」には数えない */
-const fmtH = m => `${m % 60 ? (m / 60).toFixed(1) : m / 60}h`;
+/* マスの中の短い時間：2h・1.5h・1h45・45分 */
+const fmtH = m => { m = Math.round(m); const h = Math.floor(m / 60), r = m % 60; return !r ? `${h}h` : r === 30 ? `${h}.5h` : h ? `${h}h${pad(r)}` : `${r}分`; };
 const planMin = (o, ym, upto) => Object.entries(o.plan).filter(([d]) => d.startsWith(ym) && (!upto || d <= upto)).reduce((a, [, m]) => a + m, 0);
 function planDiff(o, ym) {
   const today = ymd(new Date());
@@ -10308,91 +10350,223 @@ function goalHtml(o) {
   }
   return `<div class="today homecard">${body}</div>`;
 }
-/* 目標と計画の画面：月の目標と、カレンダーで日ごとの時間をえらぶ（押すとすぐ保存） */
+/* 目標と計画の画面：月の目標と、カレンダーで日ごとの時間をえらぶ（えらぶとすぐ保存）
+   ・日にちを押すと、画面の下に「時間のダイヤル」が出る。上下にスワイプして、15分ごとに時間をえらぶ
+     （ダイヤルが止まったところで保存。カレンダーはダイヤルの上に見えたまま）
+   ・ダイヤルの「‹ ›」で前の日・次の日に移れる（日にちを押し直さなくても、続けて入れられる）
+   ・カレンダーのマス：日にち（日曜・祝日は赤）・祝日の短い名前・集まりの時刻（緑の札）・計画の時間（大きく）
+     くわしい祝日の名前と、集まりの時間・場所は、ダイヤルの上に出す
+   ・集まりに終わりの時刻があれば「集まりに合わせる」で、その長さを入れられる */
 let planYm = null, planSel = null;
-const PLAN_OPTS = [0, 30, 60, 90, 120, 150, 180, 240, 300, 360];
+const WHEEL_MAX = 10 * 60, WHEEL_STEP = 15;
+const WHEEL_VALS = Array.from({ length: WHEEL_MAX / WHEEL_STEP + 1 }, (_, i) => i * WHEEL_STEP);
+const HOL_SHORT = { 元日: '元日', 成人の日: '成人', 建国記念の日: '建国', 天皇誕生日: '天皇誕生', 春分の日: '春分', 昭和の日: '昭和', 憲法記念日: '憲法',
+  みどりの日: 'みどり', こどもの日: 'こども', 海の日: '海の日', 山の日: '山の日', 敬老の日: '敬老', 秋分の日: '秋分', スポーツの日: 'スポーツ',
+  文化の日: '文化', 勤労感謝の日: '勤労感謝', 振替休日: '振替休日', 国民の休日: '休日', '慰霊の日（沖縄）': '慰霊の日' };
+const shortTime = t => String(t || '').replace(/^0(\d)/, '$1');
+/* 集まりの長さ（分）。終わりの時刻がない集まりは数えない */
+function schedDur(sc) {
+  let best = 0;
+  sc.forEach(x => {
+    if (!x.time || !x.end) return;
+    const [h1, m1] = x.time.split(':').map(Number), [h2, m2] = x.end.split(':').map(Number);
+    const d = (h2 * 60 + m2) - (h1 * 60 + m1);
+    if (d > 0) best = Math.max(best, Math.round(d / WHEEL_STEP) * WHEEL_STEP);
+  });
+  return Math.min(best, WHEEL_MAX);
+}
 function openPlanSheet(ymArg) {
   planYm = ymArg || ymOf(new Date());
   planSel = null;
-  const paint = () => {
+  let wheelBusy = false, wheelVal = 0;
+  const pop = () => $('#wheelPop');
+  const paint = keep => {
     const o = myData(), ym = planYm, [Y, M] = ym.split('-').map(Number), today = ymd(new Date());
     const goal = o.goals[ym] || 0, first = new Date(Y, M - 1, 1).getDay(), last = new Date(Y, M, 0).getDate();
-    const hol = jpHolidays(Y);
+    const hol = jpHolidays(Y), open = !!(planSel && planSel.startsWith(ym));
     let cells = '', wk = 0, wkP = 0, wkD = 0;
     for (let i = 0; i < first; i++) cells += '<span class="pd empty" aria-hidden="true"></span>';
     for (let d = 1; d <= last; d++) {
       const key = ymd(new Date(Y, M - 1, d)), wd = (first + d - 1) % 7, p = o.plan[key] || 0, dn = o.log[key] || 0;
       const hn = hol[key] || '', sc = schedsOn(key);
       wkP += p; wkD += dn;
-      const lab = `${M}月${d}日${hn ? '　' + hn : ''}${sc.length ? '　集まり ' + sc.map(x => x.time || '').join('、') : ''}　計画 ${p ? fmtMin(p) : 'なし'}${dn ? '　記録 ' + fmtMin(dn) : ''}`;
+      const lab = `${M}月${d}日${hn ? '　' + hn : ''}${sc.length ? '　集まり ' + sc.map(x => x.time || '時間未定').join('、') : ''}　計画 ${p ? fmtMin(p) : 'なし'}${dn ? '　記録 ' + fmtMin(dn) : ''}`;
+      const tags = (hn ? `<i class="hl">${esc(HOL_SHORT[hn] || hn)}</i>` : '') +
+        (sc.length ? `<i class="mt">${esc(shortTime(sc[0].time) || '集まり')}${sc.length > 1 ? '<em>+' + (sc.length - 1) + '</em>' : ''}</i>` : '');
       cells += `<button type="button" class="pd${wd === 0 ? ' sun' : wd === 6 ? ' sat' : ''}${hn ? ' hol' : ''}${sc.length ? ' hassc' : ''}${key === today ? ' today' : ''}${key < today ? ' past' : ''}${key === planSel ? ' sel' : ''}" data-pday="${key}" data-keep aria-label="${esc(lab)}">
-        <span class="dn">${d}</span>${hn ? `<span class="ht">${esc(hn.replace(/（沖縄）|の日$/g, ''))}</span>` : sc.length ? `<span class="sc">${esc((sc[0].time || '集まり').slice(0, 5))}</span>` : '<span class="sc"></span>'}
+        <span class="dn">${d}</span><span class="tg">${tags}</span>
         <span class="ph${p ? '' : ' zero'}">${p ? fmtH(p) : '・'}</span>${dn ? `<span class="dd">✓${fmtH(dn)}</span>` : ''}</button>`;
       if (wd === 6 || d === last) {
         wk++;
-        cells += `<div class="pwk"><span>第${wk}週</span><span>計画 <b>${fmtMin(wkP)}</b>${wkD ? `　記録 ${fmtMin(wkD)}` : ''}</span></div>`;
+        cells += `<div class="pwk"><span>第${wk}週</span><span>計画 <b>${wkP ? fmtMin(wkP) : 'なし'}</b>${wkD ? `　記録 ${fmtMin(wkD)}` : ''}</span></div>`;
         wkP = 0; wkD = 0;
       }
-    }
-    let pick = '<p class="hint-strong">日にちを押すと、その日に奉仕する時間をえらべます。</p>';
-    if (planSel && planSel.startsWith(ym)) {
-      const sd = parseYmd(planSel), hn = hol[planSel] || '', sc = schedsOn(planSel), cur = o.plan[planSel] || 0;
-      pick = `<div class="ppick"><p class="pdtitle">${fmtYmd(planSel)}${hn ? `　<span class="holtag">${esc(hn)}</span>` : ''}</p>
-        ${sc.length ? `<p class="muted">集まり：${sc.map(x => schedLine(x)).join('／')}</p>` : ''}
-        ${o.log[planSel] ? `<p class="muted">記録した時間：${fmtMin(o.log[planSel])}</p>` : ''}
-        <p class="q" style="margin-top:6px">この日に奉仕する時間</p>
-        <div class="chips">${PLAN_OPTS.map(m => `<button type="button" class="chip" data-ph="${m}" data-keep aria-pressed="${cur === m}">${m ? fmtMin(m) : 'なし'}</button>`).join('')}</div>
-        <button type="button" class="btn small wrapbtn" data-pwd data-keep>毎週${WD[sd.getDay()]}曜日に、この時間を入れる${ym === today.slice(0, 7) ? '（今日から月末まで）' : ''}</button></div>`;
     }
     const plan = planMin(o, ym), done = monthMin(o, ym);
     const st = !goal ? '<p class="st">はじめに、上で目標の時間を決めてください。</p>'
       : plan >= goal ? `<p class="st ok">✓ 目標に届く計画です${plan > goal ? `（${fmtMin(plan - goal)} 多め）` : ''}</p>`
         : `<p class="st short">あと ${fmtMin(goal - plan)} 計画に入れると、目標に届きます</p>`;
+    if (keep) sheetKeep = true; // 見ていた位置をそのままにする
     setSheet(headHtml(null, '目標と計画', 'このスマホの中だけに保存されます') + `
       <div class="calhead"><button type="button" class="btn small" data-pm="-1" aria-label="前の月">‹</button><b>${Y}年${M}月</b><button type="button" class="btn small" data-pm="1" aria-label="次の月">›</button></div>
       <div class="pgoal"><p class="q" style="margin:0">${M}月の目標</p>
         <div class="stepper"><button type="button" data-pg="-60" aria-label="1時間へらす">−</button><output class="wide">${goal ? fmtMin(goal) : 'なし'}</output><button type="button" data-pg="60" aria-label="1時間ふやす">＋</button></div></div>
       <div class="pquick">${[15, 30, 50, 70].map(h => `<button type="button" class="chip" data-pgset="${h * 60}" data-keep aria-pressed="${goal === h * 60}">${h}時間</button>`).join('')}</div>
+      <p class="hint-strong">日にちを押すと、下に時間のダイヤルが出ます。上下にスワイプして、時間をえらんでください。</p>
       <div class="pcal">${WD.map((w, i) => `<span class="cw${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</span>`).join('')}${cells}</div>
-      <p class="calkeys"><span><b style="color:#C62828">赤い字</b> 日曜・祝日</span><span><b class="cdsc">9:30</b>集まり</span><span><small>✓1.5h</small> 記録した時間</span></p>
-      ${pick}
-      <div class="plansum"><p class="big">計画 ${fmtMin(plan)} <span class="muted">／ 目標 ${goal ? fmtMin(goal) : 'なし'}</span></p>${st}
+      <p class="calkeys"><span><b style="color:#C62828">赤い字</b> 日曜・祝日</span><span><i class="mtkey">9:30</i>集まり</span><span><small>✓1.5h</small> 記録した時間</span></p>
+      <div class="plansum${open ? ' still' : ''}"><p class="big">計画 ${fmtMin(plan)} <span class="muted">／ 目標 ${goal ? fmtMin(goal) : 'なし'}</span></p>${st}
         ${done ? `<p class="muted">この月の記録 ${fmtMin(done)}${plan ? (pdf => `（${pdf ? `計画との差 ${pdf > 0 ? '＋' : '−'}${fmtMin(Math.abs(pdf))}` : '計画どおり'}）`)(planDiff(o, ym)) : ''}</p>` : ''}</div>
       ${plan ? '<button class="btn block danger" id="pClear">この月の計画をぜんぶ消す</button>' : ''}
-      <button class="btn primary block" data-close>閉じる</button>`);
-    const S = $('#sheet'), save = x => { mySave(x); renderHome(); paint(); };
-    $$('[data-pday]', S).forEach(b => b.onclick = () => { planSel = b.dataset.pday === planSel ? null : b.dataset.pday; paint(); });
-    $$('[data-ph]', S).forEach(b => b.onclick = () => {
-      const x = myData(), m = Number(b.dataset.ph);
-      if (m) x.plan[planSel] = m; else delete x.plan[planSel];
-      save(x);
-    });
-    if ($('[data-pwd]', S)) $('[data-pwd]', S).onclick = () => {
-      const x = myData(), m = x.plan[planSel] || 0, wd = parseYmd(planSel).getDay();
-      let n = 0;
-      for (let d = 1; d <= last; d++) {
-        const dt = new Date(Y, M - 1, d), key = ymd(dt);
-        if (dt.getDay() !== wd || key < today) continue;
-        if (m) x.plan[key] = m; else delete x.plan[key];
-        n++;
-      }
-      save(x); toast(`毎週${WD[wd]}曜日（${n}日）に、${m ? fmtMin(m) : '「なし」'}を入れました`);
-    };
+      <button class="btn primary block" data-close>閉じる</button>
+      ${open ? '<div class="wspacer" aria-hidden="true"></div>' : ''}`);
+    const S = $('#sheet'), save = x => { mySave(x); renderHome(); paint(true); };
+    $$('[data-pday]', S).forEach(b => b.onclick = () => { if (b.dataset.pday === planSel) closeWheel(); else openWheel(b.dataset.pday); });
     $$('[data-pg]', S).forEach(b => b.onclick = () => {
       const x = myData(), g = Math.max(0, Math.min(200 * 60, (x.goals[ym] || 0) + Number(b.dataset.pg)));
       if (g) x.goals[ym] = g; else delete x.goals[ym];
       save(x);
     });
     $$('[data-pgset]', S).forEach(b => b.onclick = () => { const x = myData(); x.goals[ym] = Number(b.dataset.pgset); save(x); });
-    $$('[data-pm]', S).forEach(b => b.onclick = () => { const d = new Date(Y, M - 1 + Number(b.dataset.pm), 1); planYm = ymOf(d); planSel = null; paint(); });
+    $$('[data-pm]', S).forEach(b => b.onclick = () => { const d = new Date(Y, M - 1 + Number(b.dataset.pm), 1); planYm = ymOf(d); closeWheel(true); paint(); });
     if ($('#pClear')) $('#pClear').onclick = async () => {
-      if (!await ask(`${M}月の計画（日ごとの時間）を、ぜんぶ消します。目標と記録は消しません。よろしいですか？`)) { openPlanSheet(ym); return; }
+      closeWheel(true);
+      if (!await ask(`${M}月の計画（日ごとの時間）を、ぜんぶ消します。目標と記録は消しません。よろしいですか？`)) { paint(true); return; }
       const x = myData(); Object.keys(x.plan).filter(d => d.startsWith(ym)).forEach(d => delete x.plan[d]);
-      mySave(x); renderHome(); planYm = ym; planSel = null; paint();
+      mySave(x); renderHome(); paint(true);
     };
+    if (open) paintWheelHead();
+  };
+  /* ---- 時間のダイヤル ---- */
+  const itemH = () => { const it = $$('#wpList .witem'); return it.length > 1 ? (it[1].offsetTop - it[0].offsetTop) : 40; };
+  function ensureWheel() {
+    let el = pop();
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'wheelPop'; el.className = 'wpop'; el.hidden = true;
+    el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'この日に奉仕する時間');
+    el.innerHTML = `<div class="wphead"><button type="button" class="wnav" data-wnav="-1" aria-label="前の日">‹</button>
+        <div class="wptitle"><b id="wpDate"></b><small id="wpInfo"></small></div>
+        <button type="button" class="wnav" data-wnav="1" aria-label="次の日">›</button></div>
+      <div class="wheel2"><div class="wband" aria-hidden="true"></div>
+        <div class="wlist" id="wpList" role="listbox" tabindex="0" aria-label="時間（上下にスワイプ）">
+          <div class="wpad"></div>${WHEEL_VALS.map(v => `<div class="witem" role="option" data-wv="${v}">${v ? fmtMin(v) : 'なし'}</div>`).join('')}<div class="wpad"></div></div></div>
+      <div class="wpacts" id="wpActs"></div>
+      <div class="wpfoot"><span id="wpSum"></span><button type="button" class="btn primary small" id="wpClose">閉じる</button></div>`;
+    document.body.appendChild(el);
+    return el;
+  }
+  function wheelTo(v, smooth) {
+    const list = $('#wpList'), i = Math.max(0, WHEEL_VALS.indexOf(v));
+    wheelBusy = true;
+    list.scrollTo({ top: i * itemH(), behavior: smooth ? 'smooth' : 'auto' });
+    markWheel(i);
+    setTimeout(() => { wheelBusy = false; }, smooth ? 450 : 60);
+  }
+  function markWheel(i) {
+    $$('#wpList .witem').forEach((x, j) => { x.classList.toggle('on', j === i); x.setAttribute('aria-selected', j === i ? 'true' : 'false'); });
+  }
+  /* ダイヤルが止まったら、その時間を保存する */
+  function wheelSettled() {
+    const list = $('#wpList'); if (!list || !planSel) return;
+    const i = Math.max(0, Math.min(WHEEL_VALS.length - 1, Math.round(list.scrollTop / itemH()))), v = WHEEL_VALS[i];
+    markWheel(i);
+    if (v === wheelVal) return;
+    wheelVal = v;
+    const x = myData();
+    if (v) x.plan[planSel] = v; else delete x.plan[planSel];
+    mySave(x); renderHome(); paint(true);
+  }
+  function paintWheelHead() {
+    if (!planSel || !pop()) return;
+    const o = myData(), d = parseYmd(planSel), hn = holidayOf(planSel), sc = schedsOn(planSel);
+    $('#wpDate').textContent = fmtYmd(planSel);
+    const info = [];
+    if (hn) info.push(`<span class="holtag">${esc(hn)}</span>`);
+    if (sc.length) info.push(`<span class="mtinfo">集まり ${sc.map(x => schedLine(x)).join('／')}</span>`);
+    if (o.log[planSel]) info.push(`記録 ${fmtMin(o.log[planSel])}`);
+    $('#wpInfo').innerHTML = info.join(' ') || '&nbsp;';
+    const dur = schedDur(sc), ym = planSel.slice(0, 7);
+    $('#wpActs').innerHTML = (dur ? `<button type="button" class="btn small" data-wset="${dur}">集まりに合わせる（${fmtMin(dur)}）</button>` : '') +
+      `<button type="button" class="btn small" data-wweek>毎週${WD[d.getDay()]}曜日にも入れる</button>`;
+    const goal = o.goals[ym] || 0, plan = planMin(o, ym);
+    $('#wpSum').innerHTML = `計画 <b>${fmtMin(plan)}</b>${goal ? ` ／ 目標 ${fmtMin(goal)}${plan >= goal ? ' <span class="okc">✓</span>' : `<br><span class="shortc">あと ${fmtMin(goal - plan)}</span>`}` : ''}`;
+  }
+  function openWheel(day) {
+    const el = ensureWheel();
+    planSel = day;
+    if (!day.startsWith(planYm)) planYm = day.slice(0, 7);
+    wheelVal = myData().plan[day] || 0;
+    el.hidden = false;
+    document.body.classList.add('wheel-open');
+    paint(true);
+    wheelTo(wheelVal, false);
+    // えらんだ日が、ダイヤルにかくれないように
+    setTimeout(() => {
+      const c = $(`#sheet [data-pday="${day}"]`), sh = $('#sheet'); if (!c || !sh) return;
+      const cr = c.getBoundingClientRect(), pr = el.getBoundingClientRect(), hr = sh.getBoundingClientRect();
+      const z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1;
+      if (cr.bottom > pr.top - 8) sh.scrollTop += (cr.bottom - pr.top + 16) / z;
+      else if (cr.top < hr.top + 8) sh.scrollTop += (cr.top - hr.top - 16) / z;
+    }, 30);
+  }
+  function closeWheel(quiet) {
+    const el = pop(); if (el) el.hidden = true;
+    document.body.classList.remove('wheel-open');
+    const had = planSel; planSel = null;
+    if (had && !quiet) paint(true);
+  }
+  const el = ensureWheel();
+  if (!el.dataset.bound) { // 1回だけ、ダイヤルの動きをつなぐ（同じ画面を何度開いても、二重につながないように）
+    el.dataset.bound = '1';
+    const list = $('#wpList', el);
+    list.addEventListener('scroll', () => {
+      const i = Math.round(list.scrollTop / itemH());
+      if (!wheelBusyRef.v) markWheel(i);
+      clearTimeout(wheelTimerRef.t);
+      wheelTimerRef.t = setTimeout(() => { if (!wheelBusyRef.v) wheelRef.settled(); }, 160);
+    }, { passive: true });
+    list.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      const i = Math.round(list.scrollTop / itemH()) + (e.key === 'ArrowDown' ? 1 : -1);
+      list.scrollTo({ top: Math.max(0, Math.min(WHEEL_VALS.length - 1, i)) * itemH(), behavior: 'smooth' });
+    });
+    el.addEventListener('click', e => {
+      const q = sel => e.target.closest(sel);
+      let x;
+      if ((x = q('[data-wv]'))) { wheelRef.to(Number(x.dataset.wv)); return; }
+      if ((x = q('[data-wnav]'))) { wheelRef.nav(Number(x.dataset.wnav)); return; }
+      if ((x = q('[data-wset]'))) { wheelRef.to(Number(x.dataset.wset)); return; }
+      if (q('[data-wweek]')) { wheelRef.week(); return; }
+      if (q('#wpClose')) wheelRef.close();
+    });
+  }
+  // ダイヤルの動きは、いま開いている「目標と計画」の画面につなぐ
+  wheelBusyRef = { get v() { return wheelBusy; } };
+  wheelRef = {
+    settled: wheelSettled,
+    to: v => { wheelTo(v, true); setTimeout(wheelSettled, 480); },
+    nav: n => { if (!planSel) return; const d = parseYmd(planSel); d.setDate(d.getDate() + n); openWheel(ymd(d)); },
+    week: () => {
+      if (!planSel) return;
+      const x = myData(), m = x.plan[planSel] || 0, sd = parseYmd(planSel), wd = sd.getDay(), today = ymd(new Date());
+      const last = new Date(sd.getFullYear(), sd.getMonth() + 1, 0).getDate();
+      let n = 0;
+      for (let d = 1; d <= last; d++) {
+        const dt = new Date(sd.getFullYear(), sd.getMonth(), d), key = ymd(dt);
+        if (dt.getDay() !== wd || key < today) continue;
+        if (m) x.plan[key] = m; else delete x.plan[key];
+        n++;
+      }
+      mySave(x); renderHome(); paint(true);
+      toast(`毎週${WD[wd]}曜日（${n}日）に、${m ? fmtMin(m) : '「なし」'}を入れました`);
+    },
+    close: () => closeWheel()
   };
   paint();
 }
+let wheelRef = null, wheelBusyRef = { v: false }, wheelTimerRef = { t: 0 };
 /* 月の最終日（と翌月のはじめの1週間）は、自動でまとめを出す */
 function monthEndHtml(o) {
   const now = new Date(), last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
