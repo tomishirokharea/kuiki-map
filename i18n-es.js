@@ -778,7 +778,7 @@ window.KUIKI_I18N.es = {
 "メモ：{0}": "Nota: {0}",
 "再": "R",
 "そのほか": "Otros",
-"オートロックの建物": "Edificio con portero automático",
+"オートロックの建物": "Edificios con portero automático",
 "例：305 A-5（空白で区切ると複数）": "Ej.: 305 A-5 (separe con espacios para varios)",
 "区域{0} {1}部屋 まだ会えていない部屋 {2}": "Territorio {0} · {1} deptos. · aún sin encontrar a nadie: {2}",
 "建物ぜんたいの種別": "Tipo de todo el edificio",
@@ -2535,5 +2535,17 @@ window.KUIKI_I18N.es = {
 "{0}（今のデータを入れかえ）": "{0} — reemplaza los datos actuales",
 "えらんだ市町村の分だけを、このデータに入れかえます。ほかの市町村（e-Stat など）はそのままです。市町村のデータは国勢調査より新しいことが多いので、あれば優先して使えます。": "Solo se reemplazan los datos del municipio elegido; los demás (e-Stat, etc.) no cambian. Los datos del municipio suelen ser más recientes que el censo, así que conviene usarlos si los hay.",
 "年齢データ（{0}・{1}）を保存しました": "Datos de edad guardados ({0} · {1})",
-"どの市町村のデータかをえらんでください": "Elija de qué municipio son los datos"
+"どの市町村のデータかをえらんでください": "Elija de qué municipio son los datos",
+"特別区域 {0} の条件": "Condiciones del territorio especial {0}",
+"条件に合う家だけを集めた区域です。受け取った人の地図には、その家だけが出ます。はじめは全域が対象です。あとから「線を直す」で範囲をしぼれます。": "Es un territorio que reúne solo las casas que cumplen las condiciones. Quien lo reciba verá en el mapa solo esas casas. Al principio abarca toda la zona; luego puede limitarla con «Corregir línea».",
+"例：オートロック・コンビニ": "Ej.: Portero automático · tiendas",
+"条件（いくつでも。えらんだ条件すべてに合う家を集めます）": "Condiciones (varias; se reúnen las casas que cumplen todas)",
+"一度も会えていない家": "Nunca encontrados",
+"留守の記録だけで、会えた記録がない家・部屋": "Casas o deptos. con solo registros «Ausente», sin ningún «En casa»",
+"種別（えらばなければ、すべての種別）": "Tipos (si no elige ninguno, todos)",
+"この家を、ふつうの区域カードから外す（2回訪ねないように）": "Quitar estas casas de las tarjetas normales (para no visitarlas dos veces)",
+"「一度も会えていない家」の区域は、ふつうの区域カードからは外さないのがふつうです（外すと、ふつうの区域で留守宅を回れなくなります）。 回っている人の区域は、受け取った日の時点の家で決まります（とちゅうで会えた家が消えないように）。": "Un territorio de «Nunca encontrados» normalmente no se quita de las tarjetas normales (si se quita, ya no se pueden revisitar esas casas con la tarjeta normal). Mientras alguien lo tiene, las casas se fijan según el día en que lo recibió (para que no desaparezcan al encontrar a alguien).",
+"条件か種別を1つ以上えらんでください": "Elija al menos una condición o un tipo",
+"特別区域 {0} の条件を変えました": "Se cambiaron las condiciones del territorio especial {0}",
+"条件を変える": "Cambiar condiciones"
 };
