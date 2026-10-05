@@ -10016,7 +10016,7 @@ function renderDevices() {
    ========================================================= */
 const AGE_PAGE = 'https://www.e-stat.go.jp/gis/statmap-search?page=1&type=1&toukeiCode=00200521'; // e-Stat 統計GIS：国勢調査の小地域集計
 const AGE_STALE_DAYS = 400; // これより古いデータは「更新してください」と出す
-const ageStale = cur => { const base = cur && (cur.asOf || cur.savedAt); return !!base && daysSince(base) > (cur.estat ? 2000 : AGE_STALE_DAYS); }; // 国勢調査（5年ごと）は約5年半まで
+const ageStale = cur => { if (cur && cur.estat) return !!cur.stale; const base = cur && (cur.asOf || cur.savedAt); return !!base && daysSince(base) > AGE_STALE_DAYS; }; // 国勢調査（5年ごと）は約5年半まで、市町村のデータは約1年
 const PRIOR_K = 3;          // 予想を「記録3件分」として混ぜる
 // 年代ごとの在宅しやすさの目安 [20〜39歳, 40〜64歳, 65歳以上]（実際の記録がたまると影響は小さくなる）
 const HOME_W = {
@@ -10046,7 +10046,9 @@ const estatDocs = () => (D().agedata || []).filter(x => x && /^cur:\d{5}$/.test(
 function ageCur() {
   const ds = estatDocs();
   if (!ds.length) return ageDoc('current');
-  return { estat: true, asOf: ds[0].asOf, savedAt: ds[0].savedAt, by: ds[0].by, file: ds[0].file, cities: ds.map(d => d.city || d.id.slice(4)),
+  const stale = ds.some(d => { const b = d.asOf || d.savedAt; return !!b && daysSince(b) > (d.src === 'city' ? AGE_STALE_DAYS : 2000); });
+  return { estat: true, stale, asOf: ds.map(d => d.asOf).filter(Boolean).sort()[0] || '', savedAt: ds[0].savedAt, by: ds[0].by, file: ds[0].file,
+    cities: ds.map(d => d.city || d.id.slice(4)), docs: ds,
     areas: ds.flatMap(d => d.areas), all: ageAllOf(ds.map(d => d.all || ageAllOf(d.areas))) };
 }
 function ageMap() {
@@ -10190,6 +10192,18 @@ function parseEstat(rows, fname) {
   const all = ageAllOf(codes.map(k => munis[k].all || ageAllOf(munis[k].areas)));
   return { estat: true, munis, areas, all, asOf: ym ? `${ym[1]}-10-01` : '', file: String(fname || '').slice(0, 80) };
 }
+/* 沖縄県の市町村コード（国土地理院の住所検索・e-Stat の地域コードの先頭5けたと同じ） */
+const OKI_MUNI = { '47201': '那覇市', '47205': '宜野湾市', '47207': '石垣市', '47208': '浦添市', '47209': '名護市', '47210': '糸満市', '47211': '沖縄市',
+  '47212': '豊見城市', '47213': 'うるま市', '47214': '宮古島市', '47215': '南城市', '47301': '国頭村', '47302': '大宜味村', '47303': '東村',
+  '47306': '今帰仁村', '47308': '本部町', '47311': '恩納村', '47313': '宜野座村', '47314': '金武町', '47315': '伊江村', '47324': '読谷村',
+  '47325': '嘉手納町', '47326': '北谷町', '47327': '北中城村', '47328': '中城村', '47329': '西原町', '47348': '与那原町', '47350': '南風原町',
+  '47353': '渡嘉敷村', '47354': '座間味村', '47355': '粟国村', '47356': '渡名喜村', '47357': '南大東村', '47358': '北大東村', '47359': '伊平屋村',
+  '47360': '伊是名村', '47361': '久米島町', '47362': '八重瀬町', '47375': '多良間村', '47381': '竹富町', '47382': '与那国町' };
+/* 市町村のCSVが、どの市町村のものかを推しはかる（「市計」の行の名前・ファイル名） */
+function guessMuni(res) {
+  const txt = [(res.all && res.all.n) || '', res.file || '', ...(res.areas || []).slice(0, 3).map(a => a.n)].join(' ');
+  return Object.keys(OKI_MUNI).find(c => txt.indexOf(OKI_MUNI[c]) >= 0) || '';
+}
 /* いくつかの地域を、人口で重みをつけてまとめる */
 function ageAllOf(list) {
   const s = { y: 0, m: 0, o: 0, c: 0, o75: 0, pop: 0 };
@@ -10326,6 +10340,7 @@ function renderAgeAdmin() {
   const done = ts.filter(t => terrAza(t).length).length;
   const old = ageStale(cur);
   box.innerHTML = `<h2 class="sec">年齢データ（字ごとの年齢の割合）</h2>
+    ${cur && cur.docs ? `<details class="more"><summary>市町村ごとのデータ（${cur.docs.length}）</summary><ul>${cur.docs.map(d => `<li>${esc(d.city || d.id.slice(4))}：${d.src === 'city' ? '市町村のデータ' : 'e-Stat 国勢調査'}・${esc(d.asOf || '日付不明')}時点・${d.areas.length}字</li>`).join('')}</ul></details>` : ''}
     ${cur ? `<div class="setrow"><span>今のデータ：<b>${esc(cur.asOf || '日付不明')}</b>時点・${cur.estat ? `${cur.cities.length}市町村・` : ''}${cur.areas.length}字<br>
         <small class="hint">${cur.savedAt ? `${fmtDay(cur.savedAt)}に${esc(uname(cur.by))}さんが保存` : ''}</small></span></div>
       ${old ? '<div class="notice warn">1年以上前のデータです。下の手順で新しくしてください。</div>' : ''}`
@@ -10333,7 +10348,7 @@ function renderAgeAdmin() {
     <ol class="hsteps">
       <li><span class="hnum">1</span><div><p>e-Stat（政府統計の総合窓口）の統計GISで、国勢調査の「小地域（町丁・字等別）」から「男女，年齢（5歳階級）別人口」をえらび、<b>47 沖縄県</b>のファイル（zip）をダウンロードします。沖縄県全体が1つのファイルです。</p>
         <a class="btn small" href="${AGE_PAGE}" target="_blank" rel="noopener">e-Stat を開く</a></div></li>
-      <li><span class="hnum">2</span><div><p>下の「年齢データを更新する」を押して、そのファイルをえらびます。</p></div></li>
+      <li><span class="hnum">2</span><div><p>下の「年齢データを更新する」を押して、そのファイルをえらびます。市町村が出している字ごとの年齢別人口（CSV）も使えます。そのときは、どの市町村のデータかをえらびます（その市町村の分だけ入れかわります）。</p></div></li>
       <li><span class="hnum">3</span><div><p>出てきた内容を確かめて「保存する」を押します。あとは自動です。</p></div></li>
     </ol>
     <div class="row"><label class="btn primary">年齢データを更新する<input type="file" id="ageFile" hidden></label>
@@ -10352,6 +10367,7 @@ async function onAgeFile(file) {
     return;
   }
   if (res.estat) { onEstatFile(res); return; }
+  if (estatDocs().length || AGE_ON) { onCityFile(res); return; }
   const list = res.areas.slice().sort((a, b) => b.o - a.o);
   setSheet(headHtml(null, 'この内容で保存しますか', `${esc(res.asOf || '日付不明')}時点・${res.areas.length}字`) + `
     <p class="hint">ファイル：${esc(res.file)}<br>市全体の高齢化率 ${res.all.o}%。高齢化率の高い順に並べています。</p>
@@ -10384,8 +10400,37 @@ function onEstatFile(res) {
     closeSheet();
     commit(`年齢データ（e-Stat ${res.asOf || ''}・${codes.length}市町村）を保存しました`, () => {
       const now = new Date().toISOString();
-      const rest = (D().agedata || []).filter(x => x && !/^cur:\d{5}$/.test(x.id));
-      codes.forEach(c => { const m = res.munis[c]; rest.push({ id: 'cur:' + c, asOf: res.asOf, city: m.city, areas: m.areas, all: m.all || ageAllOf(m.areas), file: res.file, savedAt: now, by: me().id }); });
+      // 市町村のCSVで入れた市町村は、そのまま残す（e-Stat より新しいため）
+      const keepCity = new Set((D().agedata || []).filter(x => x && /^cur:\d{5}$/.test(x.id) && x.src === 'city').map(x => x.id));
+      const rest = (D().agedata || []).filter(x => x && (!/^cur:\d{5}$/.test(x.id) || keepCity.has(x.id)));
+      codes.forEach(c => { if (keepCity.has('cur:' + c)) return; const m = res.munis[c]; rest.push({ id: 'cur:' + c, src: 'estat', asOf: res.asOf, city: m.city, areas: m.areas, all: m.all || ageAllOf(m.areas), file: res.file, savedAt: now, by: me().id }); });
+      D().agedata = rest;
+    });
+  };
+}
+/* 市町村が出している字ごとの年齢別人口（CSV）：どの市町村のものかをえらび、その市町村の分だけ入れかえる（e-Stat のほかの市町村はそのまま） */
+function onCityFile(res) {
+  const guess = guessMuni(res), have = new Set(estatDocs().map(d => d.id.slice(4)));
+  const list = res.areas.slice().sort((a, b) => b.y - a.y);
+  setSheet(headHtml(null, 'この内容で保存しますか', `${esc(res.asOf || '日付不明')}時点・${res.areas.length}字`) + `
+    <p class="hint">ファイル：${esc(res.file)}</p>
+    <label class="field"><span>どの市町村のデータですか</span><select id="ageMuni" style="width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 12px;font-size:18px;background:#fff">
+      <option value="">えらんでください</option>${Object.keys(OKI_MUNI).map(c => `<option value="${c}"${c === guess ? ' selected' : ''}>${OKI_MUNI[c]}${have.has(c) ? '（今のデータを入れかえ）' : ''}</option>`).join('')}</select></label>
+    <p class="hint">えらんだ市町村の分だけを、このデータに入れかえます。ほかの市町村（e-Stat など）はそのままです。市町村のデータは国勢調査より新しいことが多いので、あれば優先して使えます。</p>
+    <div class="scroll"><table class="slots narrow"><tr><th>字</th><th>20〜39歳</th><th>65歳以上</th><th>0〜14歳</th></tr>
+      ${list.map(a => `<tr><th>${esc(azaShow(a.n))}</th><td>${a.y}%</td><td>${a.o}%</td><td>${a.c}%</td></tr>`).join('')}</table></div>
+    ${res.asOf ? '' : '<div class="notice warn">データの日付がわかりませんでした。保存はできます。</div>'}
+    <button class="btn primary block" id="ageSave">保存する</button>
+    <button class="btn block" data-close>やめる</button>`);
+  $('#ageSave').onclick = () => {
+    const c = $('#ageMuni').value;
+    if (!c) { toast('どの市町村のデータかをえらんでください'); return; }
+    const city = OKI_MUNI[c];
+    closeSheet();
+    commit(`年齢データ（${city}・${res.asOf || '日付不明'}）を保存しました`, () => {
+      const areas = res.areas.map(a => Object.assign({}, a, { k: c + ':' + a.k, n: city + ' ' + a.n }));
+      const rest = (D().agedata || []).filter(x => x && x.id !== 'cur:' + c);
+      rest.push({ id: 'cur:' + c, src: 'city', asOf: res.asOf, city, areas, all: Object.assign({}, res.all, { k: '__all', n: city }), file: res.file, savedAt: new Date().toISOString(), by: me().id });
       D().agedata = rest;
     });
   };
