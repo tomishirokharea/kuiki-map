@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.20"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.22"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -903,11 +903,12 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .kindtag .kb svg{width:14px;height:14px}
 .kb.k-office{background:#1565C0}.kb.k-shop{background:#E65100}.kb.k-biz{background:#00695C}.kb.k-factory{background:#5D4037}
 .kb.k-school{background:#6A1B9A}.kb.k-gov{background:#37474F}.kb.k-police{background:#1A237E}.kb.k-fire{background:#B71C1C}
-.kb.k-hall{background:#2E7D32}.kb.k-hospital{background:#C62828}.kb.k-conv{background:#EF6C00}.kb.k-food{background:#AD1457}
+.kb.k-hall{background:#2E7D32}.kb.k-hospital{background:#C62828}.kb.k-conv{background:#EF6C00}.kb.k-care{background:#00838F}.kb.k-food{background:#AD1457}
 .spbadge{display:inline-block;background:#6A1B9A;color:#fff;border-radius:6px;padding:0 6px;font-size:.8em;margin-left:4px}
 .lendtag{display:inline-block;border-radius:6px;padding:0 6px;font-size:.85em;font-weight:700}
 .lendtag.auto{background:#E3F2FD;color:#0D47A1}.lendtag.open{background:#E8F5E9;color:#1B5E20}.lendtag.stop{background:#FFEBEE;color:#B71C1C}.lendtag.adm{background:#F3F4F6;color:#374151}
 .btn.wrap{white-space:normal;height:auto;line-height:1.4;padding-top:10px;padding-bottom:10px}
+.sortchips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 10px}
 .rng{display:flex;align-items:center;gap:10px}.rng input[type=range]{flex:1;min-width:140px}.rng output{min-width:5.5em;font-weight:700;text-align:right}
 /* 部屋をまとめて削除 */
 .bulkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
@@ -2067,7 +2068,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1 }, d.settings || {});
     d.s13 = d.s13 || [];
     d.agedata = d.agedata || [];
   },
@@ -3982,6 +3983,7 @@ function initMap() {
   dotRenderer = L.canvas({ pane: 'dotPane', padding: 0.3, tolerance: 12 }); // 小さな点は、見た目より広い範囲で押せる
   map.on('click', e => {
     if (moveHid) { moveHouseTo(e.latlng); return; } // 区域係が「この家の場所を直す」を押したあと
+    if (pickPlace) { const f = pickPlace; pickPlace = null; f(e.latlng); return; } // 集まりの場所を地図でえらぶ
     if (mode === 'draw') { if (drawTap === 'line') drawClick(e.latlng); else addAt(e.latlng, true); }
     else if (mode === 'add') addAt(e.latlng, false);
     else if (mode === 'part') partTap(e.latlng);
@@ -4049,6 +4051,7 @@ const KINDS = {
   hall: ['公民館', SVG('<path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M9.5 21v-5h5v5"/><path d="M9 12h6"/>')],
   hospital: ['病院', SVG('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 8v8M8 12h8"/>')],
   conv: ['コンビニ', SVG('<path d="M4 9h16v11H4z"/><path d="M3 9l1.5-4h15L21 9"/><path d="M8 13h3v4H8z"/><path d="M14 13h2"/>')],
+  care: ['介護施設', SVG('<circle cx="12" cy="5" r="2"/><path d="M12 7.5v6l3 6"/><path d="M12 13.5l-3 6"/><path d="M9 10.5h6"/><path d="M17.5 12v8"/>')],
   food: ['飲食店', SVG('<path d="M7 3v8"/><path d="M5 3v4a2 2 0 0 0 4 0V3"/><path d="M7 11v10"/><path d="M16 3c-1.7 1.2-2.5 3.2-2.5 6 0 1.4.8 2.3 2.5 2.5V21"/>')],
 };
 const LOCK_SVG = SVG('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/>');
@@ -4057,7 +4060,7 @@ const unitKind = (h, u) => { const m = h && h.uk; const v = m && m[u]; return KI
 const kindName = k => (KINDS[k] ? KINDS[k][0] : '住居');
 const KIND_PH = { office: '例：〇〇株式会社', shop: '例：〇〇スーパー', biz: '例：〇〇事務所', factory: '例：〇〇工場',
   school: '例：〇〇小学校', gov: '例：〇〇市役所', police: '例：〇〇警察署', fire: '例：〇〇消防署',
-  hall: '例：〇〇公民館', hospital: '例：〇〇病院', conv: '例：〇〇店（コンビニ）', food: '例：食堂〇〇' };
+  hall: '例：〇〇公民館', hospital: '例：〇〇病院', care: '例：〇〇ホーム（介護施設）', conv: '例：〇〇店（コンビニ）', food: '例：食堂〇〇' };
 /* 集合住宅の印：居住の部屋が1つでもあれば住居あつかい。全部お店・会社などのときだけ、そのアイコンを出す */
 function aptKind(h) {
   if (!h.units.length) return kindOf(h);
@@ -7997,8 +8000,8 @@ const canAsk = forGroup => pendingOf(forGroup).length < reqLimit(forGroup);
 const lendMode = t => (t && (t.lend === 'open' || t.lend === 'stop' || t.lend === 'auto') ? t.lend : (t && t.free ? 'open' : 'auto'));
 /* 自動で受け取り可：区域係が「自動受け取り」を使うとき、正式に返却されてから決めた日数がたった区域と、まだ一度も回ったことのない区域 */
 function autoFreeOf(t) {
-  if (!t || Number(D().settings.autoFree) !== 1) return false;
-  const base = t.completedAt || t.returnedAt;
+  if (!t || Number(D().settings.autoFree) !== 1 || t.awayPoolAt) return false;
+  const base = [t.completedAt, t.returnedAt].filter(Boolean).sort().pop();
   if (!base) return true;
   return daysSince(base) >= (Number(D().settings.freeAfterDays) || 0);
 }
@@ -8078,18 +8081,38 @@ function renderRequestArea() {
 }
 
 let reqForGroup = false; // 監督・司会者が「グループ奉仕の区域」として申し込むとき
+let reqSort = 'long';     // 区域をもらう一覧の並べ方：near 近い順・long 長く回っていない順・young 若い世代・many 家が多い順
+/* 区域の「若い世代」の割合：これまでに会えた記録のうち、年代が若い世代だった割合（記録が少ないときは出さない） */
+function youngShare(t) {
+  const am = AGE_ON ? ageMap() : null;
+  if (am) { // 市の年齢データ（字ごとの20〜39歳の割合）を、区域に入っている字の割合で平均する
+    const list = terrAza(t).filter(a => am.has(a.k));
+    if (list.length) {
+      const w = list.reduce((s2, a) => s2 + a.r, 0) || 1;
+      return { city: true, pct: Math.round(list.reduce((s2, a) => s2 + am.get(a.k).y * a.r, 0) / w) };
+    }
+  }
+  let n = 0, y = 0;
+  for (const h of housesOf(t.id)) for (const u of targets(h)) {
+    for (const v of visitsOf(K(h.id, u))) { if (v.result !== 'met' || !v.age) continue; n++; if (YOUNG.has(v.age)) y++; }
+  }
+  return { n, y, pct: n >= 3 ? Math.round(y / n * 100) : null };
+}
 function openRequestSheet(g) {
   if (g !== undefined) reqForGroup = !!g;
   if (!canGroupTerr()) reqForGroup = false;
   const G = reqForGroup, canTake = canTakeFree(G);
   const list = freeTerrs().map(t => {
-    return { t, last: t.completedAt, n: terrStats(t, 0).n, dist: myPos ? distM(myPos, center(t.polygon)) : null };
+    return { t, last: [t.completedAt, t.returnedAt].filter(Boolean).sort().pop() || '', n: terrStats(t, 0).n, dist: myPos ? distM(myPos, center(t.polygon)) : null, yg: reqSort === 'young' ? youngShare(t) : null };
   });
-  list.sort(myPos ? (a, b) => a.dist - b.dist : byLongest);
-  const rows = list.map(({ t, last, n, dist }) => `<article class="pick">
+  if (reqSort === 'near' && !myPos) reqSort = 'long';
+  const SORTS = { near: (a, b) => a.dist - b.dist, long: byLongest, many: (a, b) => b.n - a.n,
+    young: (a, b) => ((b.yg.pct == null ? -1 : b.yg.pct) - (a.yg.pct == null ? -1 : a.yg.pct)) || byLongest(a, b) };
+  list.sort(SORTS[reqSort] || byLongest);
+  const rows = list.map(({ t, last, n, dist, yg }) => `<article class="pick">
       <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
       <div><b>${esc(t.name)}</b>
-        <p class="muted">${n}軒・部屋　${last ? `前回回り終えた日 ${fmtDay(last)}` : '回り終えた記録なし'}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${ageLine(t)}</div>
+        <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null ? `<p class="muted">${yg.city ? `20〜39歳 ${yg.pct}%（市の年齢データ）` : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${ageLine(t)}</div>
       ${isFree(t) && canTake
         ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
         : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
@@ -8100,13 +8123,24 @@ function openRequestSheet(g) {
       <p class="hint">グループの区域は、奉仕の集まりで使います。受け取ったら「今日回る人をえらぶ」で、回る人を決められます。</p>` : ''}
     <p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。</p>
     ${!canTake && list.some(x => isFree(x.t)) ? `<div class="notice warn">この区域は自分では受け取れません（${G ? '' : `自分で受け取れるのは${D().settings.selfTakeMax}枚まで・`}上限に届いています）。係に頼むことはできます。</div>` : ''}
-    <div class="row"><button class="btn small" id="reqNear">${myPos ? '現在地を更新する' : '現在地から近い順にする'}</button>
-      <span class="muted">${myPos ? '近い順' : '長く回っていない順'}に並んでいます</span></div>
+    <p class="q">並べ方</p>
+    <div class="sortchips" role="group" aria-label="並べ方">
+      <button type="button" class="chip" data-rsort="near" aria-pressed="${reqSort === 'near'}">近い順</button>
+      <button type="button" class="chip" data-rsort="long" aria-pressed="${reqSort === 'long'}">返却から長い順</button>
+      <button type="button" class="chip" data-rsort="young" aria-pressed="${reqSort === 'young'}">若い世代が多い順</button>
+      <button type="button" class="chip" data-rsort="many" aria-pressed="${reqSort === 'many'}">家が多い順</button></div>
+    ${reqSort === 'near' ? '<div class="row"><button class="btn small" id="reqNear">現在地を更新する</button></div>' : ''}
+    ${reqSort === 'young' ? `<p class="hint">${AGE_ON && ageMap() ? '市の年齢データ（字ごとの20〜39歳の割合）から出しています。字が決まっていない区域は、「会えた」記録の年代から出します。' : '市の年齢データが入っていないので、これまでに「会えた」と記録したときの年代から出した目安です。'}</p>` : ''}
     ${rows || '<div class="empty">今、空いている区域はありません。</div>'}
     <button class="btn block primary" data-ask="">どこでもよいので係に頼む</button>
     <button class="btn block" data-close>もどる</button>`);
   const S = $('#sheet');
-  $('#reqNear').onclick = () => locate(openRequestSheet);
+  if ($('#reqNear')) $('#reqNear').onclick = () => locate(openRequestSheet);
+  $$('[data-rsort]', S).forEach(x => x.onclick = () => {
+    reqSort = x.dataset.rsort;
+    if (reqSort === 'near' && !myPos) { locate(openRequestSheet); return; }
+    openRequestSheet();
+  });
   if ($('[data-gaway]', S)) $('[data-gaway]', S).onclick = () => openAwayPick(true);
   $$('[data-take]', S).forEach(x => x.onclick = () => takeTerr(x.dataset.take));
   $$('[data-ask]', S).forEach(x => x.onclick = () => askTerr(x.dataset.ask || null));
@@ -8119,7 +8153,7 @@ async function takeTerr(id) {
   closeSheet();
   commit(`区域${t.no}を受け取りました`, () => {
     const now = new Date().toISOString();
-    t.holder = me().id; t.lentAt = now; t.selfTakenAt = now; t.selfSeen = false; t.helpers = [];
+    t.holder = me().id; t.lentAt = now; t.selfTakenAt = now; t.selfSeen = false; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
     t.group = reqForGroup && canGroupTerr() ? myGroup() : null;
     D().requests = D().requests.filter(r => !(r.status === 'pending' && r.by === me().id && r.terrId === id));
   });
@@ -8291,7 +8325,7 @@ function approveReq(id) {
   if (!t || t.holder) { toast('その区域は貸し出せません'); return; }
   commit(`区域${t.no}を${uname(r.by)}さんに貸し出しました`, () => {
     const now = new Date().toISOString();
-    t.holder = r.by; t.lentAt = now; t.helpers = [];
+    t.holder = r.by; t.lentAt = now; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
     t.group = r.forGroup || null; // グループ用の申し込みなら、グループの区域にする
     Object.assign(r, { status: 'approved', terrId: t.id, decidedAt: now, seen: false });
   });
@@ -8318,9 +8352,11 @@ function openReturnSheet(tid) {
       ${ok ? '<p class="hint-strong ok">留守宅を十分に訪ね直しました。返却すると、今日が区域を回り終えた日（S-13 の完了した日付）になります。</p>'
         : `<p class="hint-strong">あと ${Math.max(1, Math.ceil(r.aw.n * awayRetPct() / 100) - r.aw.done)}軒 訪ね直すと返却できます。${adm ? '（区域係は、このまま返却できます）' : '事情があるときは、区域係に相談してください。'}</p>${awayAdvice(r)}`}
       <button class="btn primary block wrap" data-fin="1"${ok || adm ? '' : ' disabled'}>返却する（区域を回り終えました）</button>
+      <button class="btn block wrap" data-pool>残りの留守宅を、留守宅カードにして返す（だれでも受け取れる）</button>
       <button class="btn block wrap" data-fin="0">途中で返却する（回り終えた記録はつけません）</button>
       <button class="btn block" data-close>もどる</button>`);
     $$('[data-fin]', $('#sheet')).forEach(x => x.onclick = () => finishTerr(tid, x.dataset.fin === '1'));
+    $('[data-pool]', $('#sheet')).onclick = () => poolReturn(tid);
     return;
   }
   const total = r.c.todo + r.c.done, reached = r.pct >= th;
@@ -8328,14 +8364,17 @@ function openReturnSheet(tid) {
     <div class="progress big" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${r.pct}%"></i></div>
     <p class="muted">受け取ってから訪ねた家 ${r.c.done} / ${total}（${r.pct}%）${r.c.todo ? `　残り ${r.c.todo}軒` : ''}</p>
     <p class="q">区域を1回目、回り終えましたか？</p>
-    <button class="btn primary block wrap" data-first${reached || adm ? '' : ' disabled'}>1回目を回り終えました（留守宅を回る段階へ）</button>
-    <p class="hint">${reached
-      ? 'カードは返さずに、そのまま持ちます。会えなかった家だけが目立つようになるので、別の日・違う時間帯に訪ね直してください。'
+    <p class="hint">${reached ? '1回目を回り終えたら、留守だった家の回り方をえらびます。'
       : `1回目を終えるには、${th}%以上の家を訪ねてください。${adm ? '（区域係は、このまま進められます）' : ''}`}</p>
+    <button class="btn primary block wrap" data-first${reached || adm ? '' : ' disabled'}>1回目を回り終えた：自分で留守宅を回る（カードを持ったまま）</button>
+    <p class="hint">会えなかった家だけが目立つようになります。別の日・違う時間帯に訪ね直してください。</p>
+    <button class="btn block wrap" data-pool${reached || adm ? '' : ' disabled'}>1回目を回り終えた：留守宅カードにして返す（だれでも受け取れる）</button>
+    <p class="hint">会えなかった家は、時間帯ごとの「留守宅カード」になり、ほかの人が回ります。留守宅カードを返却したときに、決めた割合まで訪ね直されていれば、その日が正式な返却日（S-13 の完了した日付）になります。届いていなければ、残りの家はまた留守宅カードに出ます。</p>
     <button class="btn block wrap" data-fin="0">途中で返却する（回り終えた記録はつけません）</button>
     <p class="hint">残りの家は、次に回る人のおすすめに出ます。</p>
     <button class="btn block" data-close>もどる</button>`);
   if ($('[data-first]', $('#sheet'))) $('[data-first]', $('#sheet')).onclick = () => firstDone(tid);
+  if ($('[data-pool]', $('#sheet'))) $('[data-pool]', $('#sheet')).onclick = () => poolReturn(tid);
   $$('[data-fin]', $('#sheet')).forEach(x => x.onclick = () => finishTerr(tid, false));
 }
 /* 1回目を回り終えた（カードは本人が持ったまま、留守宅を回る段階になる） */
@@ -8362,6 +8401,57 @@ function finishTerr(tid, done) {
   });
 }
 const returnTerr = (tid, completed) => finishTerr(tid, completed); // 以前の呼び方
+/* 1回目のあと、会えなかった家を「留守宅カード」（だれでも受け取れる）にして返す。
+   決めた割合まで訪ね直された日が、正式な返却日（S-13 の完了した日付）になる（区域係のスマホが自動で記録する） */
+function poolReturn(tid) {
+  const t = terrById(tid); if (!t) return;
+  const r = roundInfo(tid, true);
+  closeSheet();
+  if (roundTerr === tid) roundTerr = null;
+  commit(`区域${t.no}を、留守宅カードにして返しました`, () => {
+    const now = new Date().toISOString(), rid = 'x' + uid(), first = t.firstDoneAt || now;
+    D().returns.push({ id: rid, terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: first, at: now, completed: false, pct: r ? r.pct1 : null, pool: 1 });
+    t.lastLentAt = t.lentAt; t.lastFirstAt = first; t.awayPoolAt = now; t.poolRetId = rid;
+    t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null;
+  });
+}
+/* 留守宅カードで回っている区域：1回目に会えなかった家のうち、何軒が訪ね直されたか。決めた割合に届いた日 */
+function poolInfo(t) {
+  if (!t || !t.awayPoolAt || t.holder) return null;
+  const since = t.lastLentAt || '', first = t.lastFirstAt || t.awayPoolAt, sp = isSpecial(t), times = [];
+  let n = 0;
+  for (const h of housesOf(t.id)) {
+    for (const u of (sp ? specialTargets(h, t) : targets(h))) {
+      if (!sp && coveredBySpecial(h, u)) continue;
+      const k = K(h.id, u);
+      if (D().dnc[k] || metBetween(k, since, first)) continue;
+      if (!visitsOf(k).some(v => v.at >= since && v.at <= first) && recentMet(k)) continue;
+      n++;
+      const after = visitsOf(k).filter(v => v.at > first);
+      if (after.length) times.push(after[after.length - 1].at); // いちばん早く訪ね直した日
+    }
+  }
+  times.sort();
+  const need = Math.max(1, Math.ceil(n * awayRetPct() / 100));
+  return { n, done: times.length, pct: n ? Math.round(times.length / n * 100) : 100, doneAt: !n ? first : (times.length >= need ? times[need - 1] : null) };
+}
+/* 区域係のスマホで：決めた割合まで訪ね直された区域を、正式に返却されたものとして記録する */
+let poolBusy = false;
+function finalizePools() {
+  if (!isAdmin() || poolBusy) return;
+  const done = D().territories.map(t => [t, poolInfo(t)]).filter(x => x[1] && x[1].doneAt);
+  if (!done.length) return;
+  poolBusy = true;
+  commit(`留守宅カードで回り終えた区域を記録しました（${done.map(x => x[0].no).join('・')}）`, () => {
+    done.forEach(([t, p]) => {
+      t.completedAt = p.doneAt; t.completedPct = p.pct;
+      const r = D().returns.find(x => x.id === t.poolRetId);
+      if (r) Object.assign(r, { completed: true, at: p.doneAt, pct: p.pct });
+      t.awayPoolAt = null; t.poolRetId = null;
+    });
+  });
+  poolBusy = false;
+}
 
 /* ---------- 留守宅カード ---------- */
 let focusCard = null, roundTerr = null, roundNums = null, barMini = false, curTerr = null;
@@ -8385,7 +8475,7 @@ function nextGroupSlot() {
 const isUnmet = k => { const s = sum(k); return s.n > 0 && s.unmet; };
 const triedSlots = k => sum(k).slots;
 // 担当者のいる区域は担当者だけ。空いている区域は、回り終えた記録があるものだけ。
-const awayEligibleTerr = (t, uid) => (t.holder ? t.holder === uid : (!!t.completedAt || D().settings.awayAllTerr === 1));
+const awayEligibleTerr = (t, uid) => (t.holder ? t.holder === uid : (!!t.awayPoolAt || !!t.completedAt || D().settings.awayAllTerr === 1));
 
 /* 区域ごとの「まだ会えていない家」 */
 function unmetIndex() {
@@ -8439,17 +8529,42 @@ function takeAwayCard(tid, slot, grp) {
   if (!keys.length) { toast('このカードの家は、今はありません'); renderAll(); return; }
   const now = new Date();
   const card = { id: 'c' + uid(), terrId: tid, slot, by: me().id, at: now.toISOString(),
-    expiresAt: new Date(now.getTime() + D().settings.awayDays * DAY).toISOString(), keys };
+    expiresAt: awayExpiry(t, now.getTime()), keys };
   if (G) { card.group = myGroup(); card.helpers = []; }
   commit(`${G ? 'グループの' : ''}留守宅カード（区域${t.no}・${slotShort(slot)}）を受け取りました`, () => { D().awayCards.push(card); });
   if (G) openHelpers(null, card.id); // グループのカードは、続けて「今日回る人」をえらぶ
   else openAwayCard(card.id);
 }
+/* 留守宅カードが自動で終わる日：係の設定で「日数」か「区域の返却の目安まで」（区域を受け取った日から、返却の目安の日数） */
+function awayDueBase(t) { return t ? (t.holder ? t.lentAt : (t.awayPoolAt ? t.lastLentAt : null)) : null; }
+function awayExpiry(t, now) {
+  const base = Number(D().settings.awayExp) === 1 ? awayDueBase(t) : null;
+  const due = base ? Date.parse(base) + lendDays() * DAY : 0;
+  return new Date(due > now + DAY ? due : now + D().settings.awayDays * DAY).toISOString();
+}
+const awayExpText = () => (Number(D().settings.awayExp) === 1
+  ? `受け取ると、その区域の返却の目安（受け取ってから${lendDays()}日）まで使えます（目安がない区域は${D().settings.awayDays}日間）。`
+  : `受け取ると${D().settings.awayDays}日間使えます。`);
 async function endAwayCard(id) {
   const c = D().awayCards.find(x => x.id === id); if (!c) return;
-  if (!await ask('この留守宅カードを終えます。訪ねていない家は、ほかの人のカードに戻ります。よろしいですか？')) return;
+  const t = terrById(c.terrId), pool = t && t.awayPoolAt && !t.holder ? poolInfo(t) : null;
+  const reached = !!pool && pool.pct >= awayRetPct();
+  const msg = !pool ? 'この留守宅カードを返却します。訪ねていない家は、ほかの人のカードに戻ります。よろしいですか？'
+    : reached ? `この留守宅カードを返却します。区域${t.no}の留守宅は${pool.pct}%訪ね直されたので、今日が区域の正式な返却日（S-13 の完了した日付）になります。よろしいですか？`
+    : `この留守宅カードを返却します。区域${t.no}の留守宅は、まだ${pool.pct}%（目安${awayRetPct()}%）なので、残りの家は、また留守宅カードとして出ます。よろしいですか？`;
+  if (!await ask(msg, { ok: '返却する', danger: false })) return;
   if (focusCard === id) focusCard = null;
-  commit('留守宅カードを終えました', () => { c.endedAt = new Date().toISOString(); });
+  commit(reached ? `留守宅カードを返却しました。区域${t.no}を回り終えました` : '留守宅カードを返却しました', () => {
+    const now = new Date().toISOString();
+    c.endedAt = now;
+    if (reached) poolFinish(t, now, pool.pct);
+  });
+}
+/* 留守宅カードで回っていた区域を、正式に返却されたものとして記録する（返却記録の書きかえは、伝道者のときはサーバーが行う） */
+function poolFinish(t, at, pct) {
+  t.completedAt = at; t.completedPct = pct;
+  if (isAdmin()) { const r = D().returns.find(x => x.id === t.poolRetId); if (r) Object.assign(r, { completed: true, at, pct }); }
+  t.awayPoolAt = null; t.poolRetId = null;
 }
 function openAwayCard(id) {
   const c = D().awayCards.find(x => x.id === id); if (!c) return;
@@ -8597,16 +8712,16 @@ function roundHint(t) {
     const head = `<p class="hint-strong">留守宅を回る段階です。1回目に会えなかった家 ${r.aw.n}軒のうち、${r.aw.done}軒を訪ね直しました（${r.aw.pct}%）。</p>`;
     const ok = r.aw.pct >= awayRetPct()
       ? `<p class="hint-strong ok">留守宅を十分に訪ね直しました。${own ? '「返却する」から、区域を返却できます。' : ''}</p>`
-      : `<p class="muted">返却の目安：留守だった家の${awayRetPct()}%を訪ね直す</p>`;
+      : `<p class="muted">返却の目安：留守だった家の${awayRetPct()}%を訪ね直す（回れないときは「返却する」から留守宅カードにして返せます）</p>`;
     if (!r.c.todo) return head + ok;
     const plan = roundPlan(r);
     return head + ok + awayAdvice(r) + (plan.length ? `<p class="hint-strong">今（${slotShort(r.cur)}）のおすすめ ${plan.length}か所。地図をひらくと、番号順に回れます。</p>` : '');
   }
   if (!r.c.todo) return own
-    ? `<p class="hint-strong ok">すべての家に緑のチェックがつきました。「返却する」から「1回目を回り終えました」を選ぶと、留守宅を回る段階になります。</p>`
+    ? `<p class="hint-strong ok">すべての家に緑のチェックがつきました。「返却する」から、留守宅の回り方（自分で回る・留守宅カードにして返す）をえらびます。</p>`
     : `<p class="hint-strong ok">すべての家に緑のチェックがつきました。</p>`;
   const near = r.pct >= D().settings.donePct
-    ? `<p class="hint-strong ok">1回目をほぼ回り終えました（${r.pct}%）。${own ? '「返却する」から「1回目を回り終えました」を選ぶと、留守宅を回る段階になります。' : ''}</p>` : '';
+    ? `<p class="hint-strong ok">1回目をほぼ回り終えました（${r.pct}%）。${own ? '「返却する」から、留守宅の回り方（自分で回る・留守宅カードにして返す）をえらびます。' : ''}</p>` : '';
   const plan = roundPlan(r);
   if (!plan.length) return near;
   const intr = plan.filter(s => s.reasons.some(y => y.includes('★'))).length;
@@ -8698,7 +8813,7 @@ function awayCardHtml(c, kind) {
       <p class="muted">訪ねた家 ${p.done} / ${p.total}　あと${left}日で自動的に終わります</p>
       ${p.total && p.done === p.total ? `<p><b>すべて訪ねました。${kind === 'help' ? '' : '「終える」を押してください。'}</b></p>` : ''}
       ${kind === 'gown' && hs.length ? `<p class="muted"><b>今日回る人（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : ''}</div>
-    ${kind === 'help' ? '' : `<div class="actions">${kind === 'gown' && D().settings.groupOn !== 0 ? `<button class="btn" data-chelpers="${c.id}">今日回る人をえらぶ</button>` : ''}<button class="btn" data-awayend="${c.id}">終える</button></div>`}
+    ${kind === 'help' ? '' : `<div class="actions">${kind === 'gown' && D().settings.groupOn !== 0 ? `<button class="btn" data-chelpers="${c.id}">今日回る人をえらぶ</button>` : ''}<button class="btn" data-awayend="${c.id}">返却する</button></div>`}
   </article>`;
 }
 function renderMyAwayCards() {
@@ -8748,7 +8863,7 @@ function openAwayPick(grp) {
           <p class="muted">まだ会えていない家 ${x.keys.length}軒${x.longDays ? `　いちばん長い家は${x.longDays}日会えていない` : ''}${x.dist != null ? `　ここから約${fmtDist(x.dist)}` : ''}${x.t.holder ? '　あなたの区域' : ''}</p>
         </div><button class="btn small primary" data-awaytake2="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`).join('')
         : `<div class="empty">今、合う留守宅カードはありません。${G ? '<br>集まりの時間帯を変えると、ほかのカードが見つかることがあります。' : reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`}
-      <p class="hint">受け取ると${D().settings.awayDays}日間使えます。返却はいりません。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>
+      <p class="hint">${awayExpText()}回り終えたら「返却する」を押します。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>
       <button class="btn block" data-close>もどる</button>`);
     const S = $('#sheet');
     $$('[data-asort]', S).forEach(b => b.onclick = () => { lsSet(key, b.dataset.asort); paint(); });
@@ -8768,7 +8883,7 @@ function renderAwaySuggest() {
   $('#awayHint').innerHTML = (reg
       ? `あなたの行ける時間（${slots.map(slotShort).join('、')}）に合うカードです。`
       : `今の時間帯（${slotShort(cur)}）に合うカードです。`) +
-    `受け取ると${st.awayDays}日間使えます。返却はいりません。` +
+    awayExpText() + '回り終えたら「返却する」を押します。' +
     (mine ? `<br><b>受け取り中 ${mine}枚</b>（${st.awayMax}枚まで）。「区域カード」画面にあります。` : '');
   const list = awaySuggestions(u.id, slots).slice(0, 10);
   $('#awayList').innerHTML = list.length ? list.map(x => `<article class="ritem k-away"><div>
@@ -8808,7 +8923,10 @@ function renderAwayAdmin() {
   const step = (key, label, unit, d) => `<div class="setrow"><span>${label}</span><div class="stepper">
     <button type="button" data-aset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${st[key]}${unit}</output>
     <button type="button" data-aset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div></div>`;
-  $('#adAwaySet').innerHTML = step('awayDays', '留守宅カードが自動で終わるまで', '日', 1) + step('awayMax', '1人が同時に持てる留守宅カード', '枚まで', 1) +
+  $('#adAwaySet').innerHTML = `<div class="setrow"><span>留守宅カードが自動で終わるとき<br><small class="hint">「区域の返却の目安まで」は、区域を受け取った日から返却の目安（${lendDays()}日）までです。目安がない区域は、下の日数で終わります</small></span>
+      <div class="seg" role="group"><button type="button" data-sset="awayExp" data-v="0" aria-pressed="${Number(st.awayExp) !== 1}">日数で</button>
+      <button type="button" data-sset="awayExp" data-v="1" aria-pressed="${Number(st.awayExp) === 1}">区域の返却の目安まで</button></div></div>` +
+    step('awayDays', '留守宅カードが自動で終わるまで', '日', 1) + step('awayMax', '1人が同時に持てる留守宅カード', '枚まで', 1) +
     step('awayRecentDays', 'この日数以内に訪ねた家は、カードに入れない', '日', 1) +
     `<div class="setrow"><span>1枚のカードに入れる家の数<br><small class="hint">長く会えていない家から入れます</small></span><div class="stepper">
       <button type="button" data-aset="awayCardMax" data-d="-5" aria-label="減らす">−</button><output class="wide">${st.awayCardMax ? st.awayCardMax + '軒まで' : '制限なし'}</output>
@@ -9541,7 +9659,7 @@ async function delDummy() {
   });
 }
 function renderDummy() {
-  if (!AGE_ON && LIVE) { $('#adDummy').innerHTML = ''; return; } // 配布パックの本番では、検証用のダミーは出さない
+  if (LIVE && !(window.KUIKI_CONFIG && window.KUIKI_CONFIG.devTools)) { $('#adDummy').innerHTML = ''; return; } // 配布パックの本番では、検証用のダミーは出さない（config.js の devTools: true で出る）
   const has = dummyTerrs().length || dummyCards().length;
   $('#adDummy').innerHTML = `<div class="setrow"><span>検証用のダミーデータ<br><small class="hint">おすすめ・留守宅カード・地図の印の出かたを、何人かで確かめるためのデータです。えらんだ人ごとに検証用の区域を作り、だれでも使える共通の区域も作ります。${LIVE ? '<b>本番のデータに入ります。</b>確かめ終わったら消してください。' : ''}</small></span>
     <div class="actions">${has
@@ -9896,8 +10014,9 @@ function renderDevices() {
    ・会える見込み：年代ごとの在宅しやすさ（目安の値）× 字の年齢構成 を最初の予想にし、
      その区域・時間帯の実際の記録（直近1年）がたまるほど、実際の割合に近づける
    ========================================================= */
-const AGE_PAGE = 'https://www.city.tomigusuku.lg.jp/soshiki/1/1005/gyomuannai/12/3/3/771.html';
+const AGE_PAGE = 'https://www.e-stat.go.jp/gis/statmap-search?page=1&type=1&toukeiCode=00200521'; // e-Stat 統計GIS：国勢調査の小地域集計
 const AGE_STALE_DAYS = 400; // これより古いデータは「更新してください」と出す
+const ageStale = cur => { const base = cur && (cur.asOf || cur.savedAt); return !!base && daysSince(base) > (cur.estat ? 2000 : AGE_STALE_DAYS); }; // 国勢調査（5年ごと）は約5年半まで
 const PRIOR_K = 3;          // 予想を「記録3件分」として混ぜる
 // 年代ごとの在宅しやすさの目安 [20〜39歳, 40〜64歳, 65歳以上]（実際の記録がたまると影響は小さくなる）
 const HOME_W = {
@@ -9922,9 +10041,17 @@ function azaKey(s) {
 const azaShow = n => String(n || '').replace(/^字/, '');
 const ageDoc = id => (D().agedata || []).find(x => x && x.id === id) || null;
 let AGE_CACHE = null, RATE_CACHE = null;
+/* 今の年齢データ：e-Stat（市町村ごとの cur:コード）があればそれをまとめ、なければ以前の1市のデータ（current） */
+const estatDocs = () => (D().agedata || []).filter(x => x && /^cur:\d{5}$/.test(x.id) && Array.isArray(x.areas));
+function ageCur() {
+  const ds = estatDocs();
+  if (!ds.length) return ageDoc('current');
+  return { estat: true, asOf: ds[0].asOf, savedAt: ds[0].savedAt, by: ds[0].by, file: ds[0].file, cities: ds.map(d => d.city || d.id.slice(4)),
+    areas: ds.flatMap(d => d.areas), all: ageAllOf(ds.map(d => d.all || ageAllOf(d.areas))) };
+}
 function ageMap() {
   if (AGE_CACHE) return AGE_CACHE.map;
-  const cur = ageDoc('current');
+  const cur = ageCur();
   if (!cur || !Array.isArray(cur.areas) || !cur.areas.length) { AGE_CACHE = { map: null }; return null; }
   const map = new Map();
   cur.areas.forEach(a => map.set(a.k, a));
@@ -9997,8 +10124,16 @@ function parseCsvText(text) {
   return rows;
 }
 async function readAgeFile(file) {
-  if (file.size > 5 * 1024 * 1024) throw new Error('ファイルが大きすぎます（5MBまで）');
-  const buf = await file.arrayBuffer();
+  if (file.size > 20 * 1024 * 1024) throw new Error('ファイルが大きすぎます（20MBまで）');
+  let buf = await file.arrayBuffer();
+  if (/\.zip$/i.test(file.name || '') || (new Uint8Array(buf.slice(0, 2))[0] === 0x50 && new Uint8Array(buf.slice(0, 2))[1] === 0x4B)) {
+    // e-Stat のダウンロードは zip（中に .txt か .csv）
+    await loadScript(LIB.zip);
+    const zip = await window.JSZip.loadAsync(buf);
+    const f = Object.values(zip.files).find(x => !x.dir && /\.(txt|csv)$/i.test(x.name));
+    if (!f) throw new Error('zip の中に、データのファイル（.txt・.csv）が見つかりません');
+    buf = await f.async('arraybuffer');
+  }
   let text = new TextDecoder('utf-8').decode(buf);
   if (text.includes('\uFFFD')) { // 文字化け → Shift_JIS（Excelで保存したCSV）として読み直す
     try { text = new TextDecoder('shift_jis').decode(buf); } catch (e) { /* そのまま */ }
@@ -10006,8 +10141,67 @@ async function readAgeFile(file) {
   return parseAgeCsv(text.replace(/^\uFEFF/, ''), file.name || '');
 }
 const AGE_RE = /(\d+)\s*[-‐－～〜~]\s*(\d+)\s*歳|(\d+)\s*歳以上/;
+/* e-Stat 統計GIS（国勢調査 小地域集計）の形：1行目が KEY_CODE・HYOSYO・CITYNAME・NAME…、2行目が「総数０～４歳」などの見出し。
+   地域コードの先頭5けたが市町村コード。HYOSYO 1 は市町村の合計。秘匿（X・-）は 0 として数えない。
+   字の印は「市町村コード:字」（国土地理院の住所検索と同じ市町村コードなので、区域の字と合う） */
+function parseEstat(rows, fname) {
+  const ci = rows.slice(0, 5).findIndex(r => r.includes('KEY_CODE'));
+  if (ci < 0) return null;
+  const code = rows[ci], head = rows.slice(ci, ci + 3).find(r => r.filter(c => AGE_RE.test(c)).length >= 3);
+  if (!head) throw new Error('年齢（「０～４歳」など）の見出しが見つかりません');
+  const hi = rows.indexOf(head);
+  const kc = code.indexOf('KEY_CODE'), hc = code.indexOf('HYOSYO'), cc = code.indexOf('CITYNAME'), nc = code.indexOf('NAME');
+  if (kc < 0 || nc < 0) throw new Error('地域コード・地域名の列が見つかりません');
+  const cols = [];
+  head.forEach((c, i) => {
+    if (!AGE_RE.test(c) || /再掲|平均|人口/.test(c)) return;
+    const m = c.match(AGE_RE), lo = Number(m[1] != null ? m[1] : m[3]);
+    cols.push({ i, lo, sex: /男/.test(c) ? 'm' : /女/.test(c) ? 'f' : 't' });
+  });
+  if (cols.length < 3) throw new Error('年齢（「０～４歳」など）の列が少なすぎます');
+  const use = cols.some(a => a.sex === 't') ? cols.filter(a => a.sex === 't') : cols;
+  const num = v => { const x = Number(String(v || '').replace(/[,\s]/g, '')); return isFinite(x) ? x : 0; };
+  const r1 = x => Math.round(x * 1000) / 10;
+  const munis = {};
+  rows.slice(hi + 1).forEach(r => {
+    const key = String(r[kc] || '').replace(/\D/g, '');
+    if (key.length < 5) return;
+    const mc = key.slice(0, 5), hy = Number(r[hc]) || 0, city = String(cc >= 0 ? r[cc] : '').trim(), name = String(r[nc] || '').trim();
+    let tot = 0, y = 0, mi = 0, o = 0, o75 = 0, ch = 0;
+    use.forEach(a => {
+      const v = num(r[a.i]); tot += v;
+      if (a.lo < 15) ch += v; else if (a.lo >= 20 && a.lo < 40) y += v; else if (a.lo >= 40 && a.lo < 65) mi += v; else if (a.lo >= 65) o += v;
+      if (a.lo >= 75) o75 += v;
+    });
+    if (tot <= 0) return;
+    const m = munis[mc] || (munis[mc] = { city, areas: [], all: null, seen: new Set() });
+    if (!m.city && city) m.city = city;
+    const rec = { k: '', n: '', pop: tot, c: r1(ch / tot), y: r1(y / tot), m: r1(mi / tot), o: r1(o / tot), o75: r1(o75 / tot) };
+    if (hy === 1 || !name) { m.all = Object.assign(rec, { k: '__all', n: m.city || mc }); return; }
+    rec.k = mc + ':' + azaKey(name); rec.n = (m.city ? m.city + ' ' : '') + name;
+    if (m.seen.has(rec.k)) return;
+    m.seen.add(rec.k); m.areas.push(rec);
+  });
+  Object.keys(munis).forEach(k => { delete munis[k].seen; if (!munis[k].areas.length) delete munis[k]; });
+  const codes = Object.keys(munis);
+  if (!codes.length) throw new Error('字のデータが見つかりませんでした');
+  const ym = String(fname || '').match(/(20\d{2})/);
+  const areas = codes.flatMap(k => munis[k].areas);
+  const all = ageAllOf(codes.map(k => munis[k].all || ageAllOf(munis[k].areas)));
+  return { estat: true, munis, areas, all, asOf: ym ? `${ym[1]}-10-01` : '', file: String(fname || '').slice(0, 80) };
+}
+/* いくつかの地域を、人口で重みをつけてまとめる */
+function ageAllOf(list) {
+  const s = { y: 0, m: 0, o: 0, c: 0, o75: 0, pop: 0 };
+  list.filter(Boolean).forEach(a => { ['y', 'm', 'o', 'c', 'o75'].forEach(k => { s[k] += a[k] * a.pop; }); s.pop += a.pop; });
+  const all = { k: '__all', n: '全体', pop: s.pop };
+  ['y', 'm', 'o', 'c', 'o75'].forEach(k => { all[k] = s.pop ? Math.round(s[k] / s.pop * 10) / 10 : 0; });
+  return all;
+}
 function parseAgeCsv(text, fname) {
   const rows = parseCsvText(text).map(r => r.map(c => String(c).normalize('NFKC').trim()));
+  const est = parseEstat(rows, fname);
+  if (est) return est;
   const isAgeHead = c => AGE_RE.test(c) && !/再掲|人口/.test(c);
   const hi = rows.findIndex(r => r.filter(isAgeHead).length >= 3);
   if (hi < 0) throw new Error('年齢（「0-4歳」など）の列が見つかりません');
@@ -10118,33 +10312,33 @@ function ageShowSetHtml() {
 /* ---------- 区域係：年齢データの画面 ---------- */
 function ageNoticeHtml() {
   if (!isAdmin() || !AGE_ON) return '';
-  const cur = ageDoc('current');
+  const cur = ageCur();
   if (!cur) return `<div class="notice info">年齢データがまだありません。「設定・データ」の「年齢データを更新する」から入れると、区域ごとの会いやすい時間帯がわかります。</div>`;
   const base = cur.asOf || cur.savedAt;
-  if (base && daysSince(base) > AGE_STALE_DAYS) return `<div class="notice warn"><b>年齢データが1年以上前のものです（${esc(cur.asOf || '')}）。</b>「設定・データ」の「年齢データを更新する」から新しくしてください。</div>`;
+  if (ageStale(cur)) return `<div class="notice warn"><b>年齢データが1年以上前のものです（${esc(cur.asOf || '')}）。</b>「設定・データ」の「年齢データを更新する」から新しくしてください。</div>`;
   return '';
 }
 function renderAgeAdmin() {
   const box = $('#adAge'); if (!box) return;
   if (!AGE_ON) { box.innerHTML = ''; box.hidden = true; return; }
-  const cur = ageDoc('current'), prev = ageDoc('prev');
-  const ts = D().territories.filter(t => !t.dummy && okPoly(t.polygon));
+  const cur = ageCur(), prev = ageDoc('prev');
+  const ts = D().territories.filter(t => !t.dummy && okPoly(t.polygon) && !isSpecial(t));
   const done = ts.filter(t => terrAza(t).length).length;
-  const old = cur && (cur.asOf || cur.savedAt) && daysSince(cur.asOf || cur.savedAt) > AGE_STALE_DAYS;
+  const old = ageStale(cur);
   box.innerHTML = `<h2 class="sec">年齢データ（字ごとの年齢の割合）</h2>
-    ${cur ? `<div class="setrow"><span>今のデータ：<b>${esc(cur.asOf || '日付不明')}</b>時点・${cur.areas.length}字<br>
+    ${cur ? `<div class="setrow"><span>今のデータ：<b>${esc(cur.asOf || '日付不明')}</b>時点・${cur.estat ? `${cur.cities.length}市町村・` : ''}${cur.areas.length}字<br>
         <small class="hint">${cur.savedAt ? `${fmtDay(cur.savedAt)}に${esc(uname(cur.by))}さんが保存` : ''}</small></span></div>
       ${old ? '<div class="notice warn">1年以上前のデータです。下の手順で新しくしてください。</div>' : ''}`
       : '<div class="notice info">まだ年齢データがありません。下の手順で入れてください。</div>'}
     <ol class="hsteps">
-      <li><span class="hnum">1</span><div><p>市のホームページで「字別年齢（5歳階級）別人口」のCSVをダウンロードします（豊見城市オープンデータ）。</p>
-        <a class="btn small" href="${AGE_PAGE}" target="_blank" rel="noopener">市のページを開く</a></div></li>
+      <li><span class="hnum">1</span><div><p>e-Stat（政府統計の総合窓口）の統計GISで、国勢調査の「小地域（町丁・字等別）」から「男女，年齢（5歳階級）別人口」をえらび、<b>47 沖縄県</b>のファイル（zip）をダウンロードします。沖縄県全体が1つのファイルです。</p>
+        <a class="btn small" href="${AGE_PAGE}" target="_blank" rel="noopener">e-Stat を開く</a></div></li>
       <li><span class="hnum">2</span><div><p>下の「年齢データを更新する」を押して、そのファイルをえらびます。</p></div></li>
       <li><span class="hnum">3</span><div><p>出てきた内容を確かめて「保存する」を押します。あとは自動です。</p></div></li>
     </ol>
     <div class="row"><label class="btn primary">年齢データを更新する<input type="file" id="ageFile" hidden></label>
       ${prev ? `<button type="button" class="btn" data-agerestore>前のデータ（${esc(prev.asOf || '')}）にもどす</button>` : ''}</div>
-    <p class="hint">市が公開している字ごとの集計だけを使います。ファイルそのものは保存せず、計算した割合だけを残します。更新は年1回で十分です。</p>
+    <p class="hint">国が公開している字ごとの集計（人口の割合）だけを使います。ファイルそのものは保存せず、計算した割合だけを残します。国勢調査は5年ごとなので、新しい調査が出たときに入れかえれば十分です。</p>
     ${cur ? ageShowSetHtml() : ''}
     <div class="setrow"><span>区域と字の対応：<b>${done} / ${ts.length}区域</b>で決まっています<br>
       <small class="hint">${LIVE ? '区域の線を引く・直すと、数分でサーバーが自動で調べます（国土地理院の住所検索を使います。送るのは建物の位置だけです）。' : '試作版では自動で調べられません。「区域」の一覧の「字を直す」で手で決められます。'}
@@ -10154,9 +10348,10 @@ async function onAgeFile(file) {
   let res;
   try { res = await readAgeFile(file); }
   catch (e) {
-    infoSheet('このファイルは読めませんでした', `${esc(e.message || '形がちがいます')}<br>市のオープンデータの「字別年齢（5歳階級）別人口」のCSVをえらんでください。今のデータはそのまま使います。`);
+    infoSheet('このファイルは読めませんでした', `${esc(e.message || '形がちがいます')}<br>e-Stat の国勢調査「小地域（町丁・字等別）」の「男女，年齢（5歳階級）別人口」（zip のままでも大丈夫です）をえらんでください。今のデータはそのまま使います。`);
     return;
   }
+  if (res.estat) { onEstatFile(res); return; }
   const list = res.areas.slice().sort((a, b) => b.o - a.o);
   setSheet(headHtml(null, 'この内容で保存しますか', `${esc(res.asOf || '日付不明')}時点・${res.areas.length}字`) + `
     <p class="hint">ファイル：${esc(res.file)}<br>市全体の高齢化率 ${res.all.o}%。高齢化率の高い順に並べています。</p>
@@ -10172,6 +10367,25 @@ async function onAgeFile(file) {
       const rest = (D().agedata || []).filter(x => x && x.id !== 'current' && x.id !== 'prev');
       if (cur) rest.push(Object.assign({}, cur, { id: 'prev' }));
       rest.push({ id: 'current', asOf: res.asOf, areas: res.areas, all: res.all, file: res.file, savedAt: new Date().toISOString(), by: me().id });
+      D().agedata = rest;
+    });
+  };
+}
+/* e-Stat：市町村ごとに分けて保存する（1つの市町村が1つの記録） */
+function onEstatFile(res) {
+  const codes = Object.keys(res.munis).sort();
+  setSheet(headHtml(null, 'この内容で保存しますか', `${esc(res.asOf || '日付不明')}時点・${codes.length}市町村・${res.areas.length}字`) + `
+    <p class="hint">ファイル：${esc(res.file)}<br>e-Stat 国勢調査（小地域集計）。全体の20〜39歳 ${res.all.y}%・65歳以上 ${res.all.o}%</p>
+    <div class="scroll"><table class="slots narrow"><tr><th>市町村</th><th>字</th><th>20〜39歳</th><th>65歳以上</th></tr>
+      ${codes.map(c => { const m = res.munis[c], a = m.all || ageAllOf(m.areas); return `<tr><th>${esc(m.city || c)}</th><td>${m.areas.length}</td><td>${a.y}%</td><td>${a.o}%</td></tr>`; }).join('')}</table></div>
+    <button class="btn primary block" id="ageSave">保存する</button>
+    <button class="btn block" data-close>やめる</button>`);
+  $('#ageSave').onclick = () => {
+    closeSheet();
+    commit(`年齢データ（e-Stat ${res.asOf || ''}・${codes.length}市町村）を保存しました`, () => {
+      const now = new Date().toISOString();
+      const rest = (D().agedata || []).filter(x => x && !/^cur:\d{5}$/.test(x.id));
+      codes.forEach(c => { const m = res.munis[c]; rest.push({ id: 'cur:' + c, asOf: res.asOf, city: m.city, areas: m.areas, all: m.all || ageAllOf(m.areas), file: res.file, savedAt: now, by: me().id }); });
       D().agedata = rest;
     });
   };
@@ -10220,7 +10434,7 @@ function openAzaEdit(tid) {
 /* 区域係「状況」：区域ごとの会いやすい時間帯 */
 function renderMeetAdmin() {
   const box = $('#adMeet'); if (!box) return;
-  const cur = ageDoc('current');
+  const cur = ageCur();
   const ts = D().territories.filter(t => !t.dummy && okPoly(t.polygon));
   const rows = ts.map(t => {
     const ch = {}; let n = 0;
@@ -10357,10 +10571,13 @@ function renderAdmin() {
     D().users.map(u => `<option value="${u.id}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
   $('#adTerrs').innerHTML = ts.map(t => {
     const s = stats.get(t.id), d = t.lentAt ? daysSince(t.lentAt) : 0, due = dueOf(t), over = !!due && Date.parse(due) < Date.now();
-    const lent = t.holder ? t.lentAt : t.lastLentAt, firstAt = t.holder ? t.firstDoneAt : t.lastFirstAt, retAt = t.holder ? '' : (t.completedAt && t.completedAt === t.returnedAt ? t.completedAt : '');
+    const lent = t.holder ? t.lentAt : t.lastLentAt, firstAt = t.holder ? t.firstDoneAt : t.lastFirstAt;
+    const retAt = t.holder || t.awayPoolAt ? '' : (t.completedAt && (!t.returnedAt || t.completedAt >= t.returnedAt) ? t.completedAt : '');
+    const pool = poolInfo(t);
     return `<article class="trow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
       <div><b>${esc(t.name)}</b>${t.group ? ` <span class="gbadge">${esc(t.group)}グループ</span>` : ''}${isSpecial(t) ? `<span class="spbadge">特別区域：${esc(specialKindsText(t))}</span>` : ''} ${lendTag(t)}<div class="meta">
-        <span>貸し出した日 ${lent ? fmtDay(lent) : '—'}</span><span>1回目を回った日 ${firstAt ? fmtDay(firstAt) : '—'}</span><span>正式に返却した日 ${retAt ? fmtDay(retAt) : (t.holder ? '貸出中' : '—')}</span>
+        <span>貸し出した日 ${lent ? fmtDay(lent) : '—'}</span><span>1回目を回った日 ${firstAt ? fmtDay(firstAt) : '—'}</span><span>正式に返却した日 ${retAt ? fmtDay(retAt) : (t.holder ? '貸出中' : pool ? '留守宅カードで回っています' : '—')}</span>
+        ${pool ? `<span>留守宅の訪ね直し ${pool.done} / ${pool.n}（${pool.pct}%・目安 ${awayRetPct()}%）</span><button class="btn small" data-poolfin="${t.id}">正式に返却したことにする</button>` : ''}
         ${t.holder ? `<span class="${over ? 'tag-warn' : ''}">返却の目安 ${fmtDay(due)}${over ? '（過ぎています）' : ''}</span>` : ''}
         <span>家・部屋 ${s.n}</span><span>90日以内に訪問 ${s.visited}</span>
         <span>前回回り終えた日 ${t.completedAt ? fmtDay(t.completedAt) + (t.completedPct != null && t.completedPct < 100 ? `（${t.completedPct}%）` : '') : '記録なし'}</span>
@@ -11239,6 +11456,7 @@ function openSchedActions(s, back) {
     <div class="schedbox"><p class="rt">${schedLine(s)}</p>
       <p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
     <a class="btn primary block" id="scCal" href="${gcalUrl('奉仕の集まり', s.date, s.time, s.end, s.place, s.note)}" target="_blank" rel="noopener">Googleカレンダーに入れる</a>
+    ${placeHref(s) ? `<a class="btn block" href="${esc(placeHref(s))}" target="_blank" rel="noopener">場所をGoogleマップで見る</a>` : ''}
     ${can ? `<button class="btn block" id="scEdit">この予定を直す</button>
       <button class="btn block danger scdel" id="scDel">この予定を消す</button>` : ''}
     <button class="btn block" id="scBack">${back ? '← もどる' : '閉じる'}</button>`);
@@ -11588,7 +11806,7 @@ function todayTodoHtml(todays) {
   todays.forEach(sc => {
     h += `<div class="todo"><span class="tico">${ICO_CAL}</span>
       <div class="tbody2"><small>今日の集まり（${esc(schedGroupName(sc.group))}）</small><b>${esc(sc.time || '時間未定')}${sc.end ? '〜' + esc(sc.end) : ''}</b><span>${esc(sc.place || '場所未定')}</span></div>
-      ${sc.place ? `<a class="btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sc.place)}" target="_blank" rel="noopener">道順</a>` : ''}</div>`;
+      ${placeHref(sc) ? `<a class="btn" href="${esc(placeHref(sc))}" target="_blank" rel="noopener">道順</a>` : ''}</div>`;
   });
   const today = ymd(new Date()), od = myData();
   od.events.filter(e => e.date === today).sort((a, b) => ((a.time || '') < (b.time || '') ? -1 : 1)).forEach(e => {
@@ -11660,7 +11878,7 @@ function renderHome() {
   $('#homeCal').innerHTML = calHtml(o);
   // ②の対応：グループ監督の「グループ」タブをなくしたので、そこにあった月の予定印刷（掲示板用）をホームに置く
   $('#homeSchedTools').innerHTML = (isAdmin() || isOverseer())
-    ? `<button class="btn block" id="homeScPrint">${(new Date().getMonth() + 1) % 12 + 1}月の予定を印刷する（掲示板用）</button>` : '';
+    ? printMonthPicker('homeScPrint') : '';
 }
 /* スワイプの動き（指でもマウスでも）：左に半分以上ずらすと開き、ほかをさわると閉じる */
 const SWIPE_W = 176;
@@ -11752,39 +11970,70 @@ function bindHome() {
     else if ((x = q('[data-cm]'))) { const b = calMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1); calMonth = new Date(b.getFullYear(), b.getMonth() + Number(x.dataset.cm), 1); renderHome(); }
     else if ((x = q('[data-day]'))) openDay(x.dataset.day);
     else if ((x = q('[data-calmode]'))) { calMode = x.dataset.calmode; renderHome(); }
-    else if (q('#homeScPrint')) { const n = new Date(); const d = new Date(n.getFullYear(), n.getMonth() + 1, 1); printMonthSchedule(d.getFullYear(), d.getMonth()); }
+    else if (q('#homeScPrint')) printPickedMonth('homeScPrint');
   });
 }
 
 /* ---- 奉仕の集まりの予定を入れる（グループ監督・区域係） ---- */
-function openSchedForm(s, date, back) {
+/* 集まりの場所の道順：地図でえらんだ場所 → GoogleマップのピンのURL → 名前・住所で検索 */
+function placeHref(sc) {
+  if (sc && Array.isArray(sc.loc) && sc.loc.length === 2) return `https://www.google.com/maps/search/?api=1&query=${Number(sc.loc[0]).toFixed(6)},${Number(sc.loc[1]).toFixed(6)}`;
+  if (sc && sc.mapUrl) return sc.mapUrl;
+  return sc && sc.place ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sc.place)}` : '';
+}
+const GMAP_RE = /^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|(www\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+)\//i;
+/* GoogleマップのURLの中に緯度・経度があれば取り出す（短いURL maps.app.goo.gl には入っていないので、そのまま使う） */
+function coordsFromUrl(u) {
+  const m = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/.exec(u) || /[?&](?:q|query|ll)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/.exec(u) || /@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(u);
+  return m ? [Number(m[1]), Number(m[2])] : null;
+}
+let pickPlace = null; // 区域マップの地図で場所をえらんでいるとき
+function openSchedForm(s, date, back, draft) {
   const admin = isAdmin(), groups = groupsAll();
-  const g0 = s ? s.group : (admin ? (groups[0] || '') : myGroup());
+  const v = (k, def) => (draft && draft[k] != null ? draft[k] : (s && s[k] != null ? s[k] : def));
+  const g0 = v('group', admin ? (groups[0] || '') : myGroup());
+  const loc = v('loc', null);
+  const inp = 'style="width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 12px;font-size:18px;background:#fff"';
   setSheet(headHtml(null, s ? '集まりの予定を直す' : '集まりの予定を入れる', '') + `
-    <label class="field"><span>日にち</span><input type="date" id="scDate" value="${esc(s ? s.date : (date || ymd(new Date())))}" style="width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 12px;font-size:19px"></label>
-    <div class="inline"><label class="field" style="flex:1"><span>はじまり</span><input type="time" id="scTime" value="${esc(s ? s.time : '09:30')}" style="width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 8px;font-size:19px"></label>
-      <label class="field" style="flex:1"><span>おわり（なくてもよい）</span><input type="time" id="scEnd" value="${esc(s ? s.end : '')}" style="width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 8px;font-size:19px"></label></div>
-    <label class="field"><span>場所</span><input type="text" id="scPlace" maxlength="60" value="${esc(s ? s.place : '')}" placeholder="例：〇〇さん宅、会館"></label>
-    <label class="field"><span>ひとこと（なくてもよい）</span><input type="text" id="scNote" maxlength="160" value="${esc(s ? s.note : '')}" placeholder="例：区域12を回ります"></label>
-    ${admin ? `<label class="field"><span>どのグループの予定か</span><select id="scGroup" style="width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 8px;font-size:18px;background:#fff">
+    <label class="field"><span>日にち</span><input type="date" id="scDate" value="${esc(v('date', date || ymd(new Date())))}" ${inp}></label>
+    <div class="inline"><label class="field" style="flex:1"><span>はじまり</span><input type="time" id="scTime" value="${esc(v('time', '09:30'))}" ${inp}></label>
+      <label class="field" style="flex:1"><span>おわり（なくてもよい）</span><input type="time" id="scEnd" value="${esc(v('end', ''))}" ${inp}></label></div>
+    <label class="field"><span>場所</span><input type="text" id="scPlace" maxlength="60" value="${esc(v('place', ''))}" placeholder="例：〇〇さん宅、会館"></label>
+    <p class="hint">施設の名前や住所を入れると、Googleマップで探せます。住所で出てこない場所は、下のどちらかで場所をのこせます。</p>
+    <label class="field"><span>GoogleマップのピンのURL（なくてもよい）</span><input type="url" id="scMap" maxlength="300" value="${esc(v('mapUrl', ''))}" placeholder="https://maps.app.goo.gl/…" ${inp}></label>
+    <div class="inline"><button type="button" class="btn small" id="scPick">区域マップの地図でえらぶ</button>
+      ${loc ? `<span class="muted">地図でえらんだ場所があります</span><button type="button" class="btn small" id="scLocClear">外す</button>` : ''}</div>
+    <label class="field"><span>ひとこと（なくてもよい）</span><input type="text" id="scNote" maxlength="160" value="${esc(v('note', ''))}" placeholder="例：区域12を回ります"></label>
+    ${admin ? `<label class="field"><span>どのグループの予定か</span><select id="scGroup" ${inp}>
       <option value=""${!g0 ? ' selected' : ''}>全体（会衆の全員）</option>${groups.map(g => `<option value="${esc(g)}"${g === g0 ? ' selected' : ''}>${esc(g)}グループ</option>`).join('')}</select></label>`
       : `<p class="muted">${esc(myGroup())}グループの予定として入れます（${groupMembers(myGroup()).length}人に届きます）。</p>`}
-    ${s ? '' : `<label class="check"><input type="checkbox" id="scRepeat">同じ曜日・同じ時間で、4週ぶん入れる</label>`}
+    ${s ? '' : `<label class="check"><input type="checkbox" id="scRepeat"${v('repeat', false) ? ' checked' : ''}>同じ曜日・同じ時間で、4週ぶん入れる</label>`}
     <button class="btn primary block" id="scSave">保存する</button>
     ${s ? '<button class="btn danger block" id="scDel">この予定を消す</button>' : ''}
     <button class="btn block" id="scBack">もどる</button>`);
   const done = () => (back ? back() : closeSheet());
+  const read = () => ({ date: $('#scDate').value, time: $('#scTime').value || '', end: $('#scEnd').value || '', place: $('#scPlace').value.trim(),
+    note: $('#scNote').value.trim(), group: admin ? $('#scGroup').value : myGroup(), mapUrl: $('#scMap').value.trim(), loc,
+    repeat: !!($('#scRepeat') && $('#scRepeat').checked) });
   $('#scBack').onclick = done;
+  $('#scPick').onclick = () => {
+    const d = read();
+    closeSheet(); showView('map');
+    pickPlace = ll => { d.loc = [Math.round(ll.lat * 1e6) / 1e6, Math.round(ll.lng * 1e6) / 1e6]; openSchedForm(s, date, back, d); toast('場所をえらびました'); };
+    toast('集まりの場所をタップしてください（地図を大きくしてから）');
+  };
+  if ($('#scLocClear')) $('#scLocClear').onclick = () => { const d = read(); d.loc = null; openSchedForm(s, date, back, Object.assign(d, { loc: undefined })); };
   $('#scSave').onclick = () => {
-    const date2 = $('#scDate').value, group = admin ? $('#scGroup').value : myGroup();
-    if (!date2) { toast('日にちを入れてください'); return; }
-    const base = { time: $('#scTime').value || '', end: $('#scEnd').value || '', place: $('#scPlace').value.trim(), note: $('#scNote').value.trim(), group };
-    const n = !s && $('#scRepeat') && $('#scRepeat').checked ? 4 : 1;
+    const d = read();
+    if (!d.date) { toast('日にちを入れてください'); return; }
+    if (d.mapUrl && !GMAP_RE.test(d.mapUrl)) { toast('GoogleマップのURL（https://maps.app.goo.gl/… など）を貼ってください'); return; }
+    const base = { time: d.time, end: d.end, place: d.place, note: d.note, group: d.group, mapUrl: d.mapUrl, loc: d.loc || (d.mapUrl ? coordsFromUrl(d.mapUrl) : null) };
+    const n = !s && d.repeat ? 4 : 1;
     commit(s ? '集まりの予定を直しました' : `集まりの予定を${n}件入れました`, () => {
-      if (s) Object.assign(s, base, { date: date2, at: new Date().toISOString() });
+      if (s) Object.assign(s, base, { date: d.date, at: new Date().toISOString() });
       else for (let i = 0; i < n; i++) {
-        const d = parseYmd(date2); d.setDate(d.getDate() + 7 * i);
-        D().schedules.push(Object.assign({ id: 's' + uid() + i, date: ymd(d), by: me().id, at: new Date().toISOString() }, base));
+        const dd = parseYmd(d.date); dd.setDate(dd.getDate() + 7 * i);
+        D().schedules.push(Object.assign({ id: 's' + uid() + i, date: ymd(dd), by: me().id, at: new Date().toISOString() }, base));
       }
     });
     done();
@@ -11804,7 +12053,7 @@ function renderSchedAdmin() {
   box.innerHTML = `<h2 class="sec">奉仕の集まりの予定</h2>
     <p class="hint">${admin ? 'どのグループの予定も入れられます。「全体」は会衆の全員に表示されます。' : `${esc(myGroup())}グループの予定を入れられます。グループの人のホーム画面に表示されます。`}</p>
     <button class="btn primary block" id="scNew">＋ 集まりの予定を入れる</button>
-    <button class="btn block" id="scPrint">${(new Date().getMonth() + 1) % 12 + 1}月の予定を印刷する（掲示板用）</button>
+    ${printMonthPicker('scPrint')}
     <div class="seg" role="group" aria-label="表示の切りかえ">
       <button type="button" data-asm="cal" aria-pressed="${adSchedMode === 'cal'}">カレンダー</button>
       <button type="button" data-asm="list" aria-pressed="${adSchedMode === 'list'}">一覧</button></div>
@@ -11812,7 +12061,7 @@ function renderSchedAdmin() {
       ? calHtml({ events: [], log: {}, admin: true }) + '<p class="hint">日付を押すと、その日の予定を見たり、すぐ入れたりできます。</p>'
       : (list.length ? swipeHint(list) + list.map(s => schedRow(s, true)).join('') : '<div class="empty">これからの予定はありません。</div>')}`;
   $('#scNew').onclick = () => openSchedForm(null, null, null);
-  $('#scPrint').onclick = () => { const n = new Date(); const d = new Date(n.getFullYear(), n.getMonth() + 1, 1); printMonthSchedule(d.getFullYear(), d.getMonth()); };
+  $('#scPrint').onclick = () => printPickedMonth('scPrint');
   $$('[data-asm]', box).forEach(b => b.onclick = () => { adSchedMode = b.dataset.asm; renderSchedAdmin(); });
   $$('[data-cm]', box).forEach(b => b.onclick = () => {
     const base = calMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -12625,6 +12874,17 @@ function openS12() {
 /* =========================================================
    翌月の奉仕の予定を印刷（掲示板に張る用・A4よこ）
    ========================================================= */
+/* 予定の印刷：月をえらぶ（はじめは来月） */
+function printMonthPicker(id) {
+  const n = new Date(), d = new Date(n.getFullYear(), n.getMonth() + 1, 1), val = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+  return `<div class="inline printpick"><input type="month" id="${id}M" value="${val}" aria-label="印刷する月" style="min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:17px;background:#fff">
+    <button class="btn" id="${id}">この月の予定を印刷する（掲示板用）</button></div>`;
+}
+function printPickedMonth(id) {
+  const m = /^(\d{4})-(\d{2})$/.exec(($(`#${id}M`) || {}).value || '');
+  if (!m) { toast('印刷する月をえらんでください'); return; }
+  printMonthSchedule(Number(m[1]), Number(m[2]) - 1);
+}
 async function printMonthSchedule(y, m) {
   const pre = `${y}-${pad2(m + 1)}`, first = new Date(y, m, 1).getDay(), last = new Date(y, m + 1, 0).getDate();
   const list = D().schedules.filter(s => String(s.date).startsWith(pre) && (isAdmin() || !s.group || s.group === myGroup()))
@@ -12900,7 +13160,13 @@ function bindStatic() {
     e.target.value = '';
   };
   $('#adSpecial').onclick = () => openSpecialSheet(null);
-  $('#adTerrs').addEventListener('click', e => { const b = e.target.closest('[data-spedit]'); if (b) openSpecialSheet(b.dataset.spedit); });
+  $('#adTerrs').addEventListener('click', async e => {
+    const b = e.target.closest('[data-spedit]'); if (b) { openSpecialSheet(b.dataset.spedit); return; }
+    const f = e.target.closest('[data-poolfin]'); if (!f) return;
+    const t = terrById(f.dataset.poolfin), p = poolInfo(t); if (!t || !p) return;
+    if (!await ask(`区域${t.no}を、今日、正式に返却されたことにします（留守宅の訪ね直し ${p.pct}%）。よろしいですか？`, { ok: '記録する', danger: false })) return;
+    commit(`区域${t.no}を正式に返却されたことにしました`, () => poolFinish(t, new Date().toISOString(), p.pct));
+  });
   $('#adXlsx').onchange = e => {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
@@ -12994,7 +13260,7 @@ function bindStatic() {
     commit(`区域${t.no}を${uname(val)}さんに貸し出しました`, () => {
       t.holder = val;
       t.lentAt = new Date().toISOString();
-      t.helpers = []; t.group = null;
+      t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
     });
   });
 }
