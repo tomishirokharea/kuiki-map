@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.22"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.23"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -904,11 +904,13 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .kb.k-office{background:#1565C0}.kb.k-shop{background:#E65100}.kb.k-biz{background:#00695C}.kb.k-factory{background:#5D4037}
 .kb.k-school{background:#6A1B9A}.kb.k-gov{background:#37474F}.kb.k-police{background:#1A237E}.kb.k-fire{background:#B71C1C}
 .kb.k-hall{background:#2E7D32}.kb.k-hospital{background:#C62828}.kb.k-conv{background:#EF6C00}.kb.k-care{background:#00838F}.kb.k-food{background:#AD1457}
+.kchip.wide{min-width:46%;text-align:left}.kchip.wide b{display:block}
 .spbadge{display:inline-block;background:#6A1B9A;color:#fff;border-radius:6px;padding:0 6px;font-size:.8em;margin-left:4px}
 .lendtag{display:inline-block;border-radius:6px;padding:0 6px;font-size:.85em;font-weight:700}
 .lendtag.auto{background:#E3F2FD;color:#0D47A1}.lendtag.open{background:#E8F5E9;color:#1B5E20}.lendtag.stop{background:#FFEBEE;color:#B71C1C}.lendtag.adm{background:#F3F4F6;color:#374151}
 .btn.wrap{white-space:normal;height:auto;line-height:1.4;padding-top:10px;padding-bottom:10px}
 .sortchips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 10px}
+.kchip.wide{grid-column:1/-1;flex-direction:row;justify-content:flex-start;gap:10px;padding:10px 12px;text-align:left;font-size:15px}.kchip.wide span{font-weight:400;font-size:13px;color:var(--ink2)}
 .rng{display:flex;align-items:center;gap:10px}.rng input[type=range]{flex:1;min-width:140px}.rng output{min-width:5.5em;font-weight:700;text-align:right}
 /* 部屋をまとめて削除 */
 .bulkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
@@ -3379,7 +3381,7 @@ let SPEC_MEMO = new Map();
 const housesOf = tid => {
   const t = TID.get(tid);
   if (!isSpecial(t)) return HBT.get(tid) || [];
-  const key = D().houses.length + '|' + JSON.stringify(t.special) + '|' + JSON.stringify(t.polygon || []);
+  const key = D().houses.length + '|' + JSON.stringify(t.special) + '|' + JSON.stringify(t.polygon || []) + '|' + (t.lentAt || '') + '|' + (t.special.unmet ? D().visits.length : 0);
   const m = SPEC_MEMO.get(tid);
   if (m && m.key === key) return m.list;
   const list = D().houses.filter(h => inSpecial(h, t));
@@ -3471,21 +3473,51 @@ const okPoly = p => Array.isArray(p) && p.length >= 3 && p.every(v => Array.isAr
 const polyTerrs = () => D().territories.filter(t => okPoly(t.polygon) && !isSpecial(t)); // 家の区域を決めるのは、ふつうの区域だけ
 /* 特別区域：t.special.kinds の種別（コンビニなど）の家だけを集めた区域。家はふつうの区域に入ったまま。
    線があれば、その線の中の家だけ。ふつうの区域カードからは、その家を外す（2回訪ねないように） */
-const isSpecial = t => !!(t && t.special && Array.isArray(t.special.kinds) && t.special.kinds.length);
+/* 特別区域の条件（すべてに合う家・部屋だけを集める）
+   kinds：種別（コンビニなど。えらばなければ、すべての種別）／ lock：オートロックの建物／ unmet：一度も会えていない家（留守の記録だけ）
+   excl：その家を、ふつうの区域カードから外す（はじめは外す。留守宅の区域では外さないのがふつう） */
+const spOf = t => (t && t.special) || {};
+const isSpecial = t => { const sp = spOf(t); return !!(t && t.special && ((Array.isArray(sp.kinds) && sp.kinds.length) || sp.lock || sp.unmet)); };
 const targetKind = (h, u) => (h.type === 'apt' ? unitKind(h, u) : kindOf(h));
+/* 一度も会えていない家：留守の記録はあるが、会えた・拒否の記録がない（at より前の記録だけで決める） */
+function unmetAsOf(k, at) {
+  if (D().dnc[k]) return false;
+  let away = false;
+  for (const v of visitsOf(k)) {
+    if (at && v.at >= at) continue;
+    if (v.result === 'met' || v.result === 'refused') return false;
+    if (v.result === 'away') away = true;
+  }
+  return away;
+}
+function spMatch(h, u, t) {
+  const sp = spOf(t);
+  if (Array.isArray(sp.kinds) && sp.kinds.length && !sp.kinds.includes(targetKind(h, u))) return false;
+  if (sp.lock && !(h.type === 'apt' && h.lock)) return false;
+  // 受け取った人が回っている間は、受け取った日の時点で決める（会えた家が、とちゅうで消えないように）
+  if (sp.unmet && !unmetAsOf(K(h.id, u), t.lentAt || '')) return false;
+  return true;
+}
 function inSpecial(h, t) {
   if (!isSpecial(t)) return false;
   if (okPoly(t.polygon) && !inPoly(h.lat, h.lng, t.polygon)) return false;
-  return targets(h).some(u => t.special.kinds.includes(targetKind(h, u)));
+  return targets(h).some(u => spMatch(h, u, t));
 }
-const specialTargets = (h, t) => targets(h).filter(u => t.special.kinds.includes(targetKind(h, u)));
+const specialTargets = (h, t) => targets(h).filter(u => spMatch(h, u, t));
 function coveredBySpecial(h, u) {
-  const k = targetKind(h, u);
-  if (k === 'home') return false;
-  return D().territories.some(t => isSpecial(t) && lendMode(t) !== 'stop' && t.special.kinds.includes(k) && (!okPoly(t.polygon) || inPoly(h.lat, h.lng, t.polygon)));
+  const ts = D().territories.filter(t => isSpecial(t) && spOf(t).excl !== false && lendMode(t) !== 'stop');
+  if (!ts.length) return false;
+  return ts.some(t => (!okPoly(t.polygon) || inPoly(h.lat, h.lng, t.polygon)) && spMatch(h, u, t));
 }
 const houseInTerr = (h, tid) => { const t = terrById(tid); return isSpecial(t) ? inSpecial(h, t) : h.terrId === tid; };
-const specialKindsText = t => (isSpecial(t) ? t.special.kinds.map(kindName).join('・') : '');
+const specialKindsText = t => {
+  if (!isSpecial(t)) return '';
+  const sp = spOf(t), a = [];
+  if (sp.lock) a.push('オートロック');
+  if (sp.unmet) a.push('一度も会えていない家');
+  (sp.kinds || []).forEach(k => a.push(kindName(k)));
+  return a.join('・');
+};
 function center(poly) {
   if (!okPoly(poly)) return HOME_VIEW.slice(); return [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length]; }
 function distM(a, b) {
@@ -4635,6 +4667,12 @@ function needTerrConfirm(tid, keys) {
   if (!tid || isAdmin()) return false;
   const t = terrById(tid);
   if (!t || myTerr(t) || terrAck.has(tid)) return false;
+  // 自分が受け取っている特別区域（オートロック・一度も会えていない家など）の家は、確認しない
+  const mySp = D().territories.filter(x => isSpecial(x) && myTerr(x));
+  if (keys && keys.length && mySp.length && keys.some(k => {
+    const i = k.indexOf('|'), h = houseById(k.slice(0, i)), u = k.slice(i + 1);
+    return h && mySp.some(x => (!okPoly(x.polygon) || inPoly(h.lat, h.lng, x.polygon)) && spMatch(h, u, x));
+  })) return false;
   if (keys && keys.length) {
     const cardKeys = new Set();
     activeCards().forEach(c => { if (c.by === me().id || isCardHelper(c)) c.keys.forEach(k => cardKeys.add(k)); });
@@ -7781,31 +7819,42 @@ document.addEventListener('change', e => {
 /* ---------- 特別区域（えらんだ種別の家だけを集めた区域） ---------- */
 function openSpecialSheet(tid) {
   const t = tid ? terrById(tid) : null;
-  const kinds = Object.keys(KINDS).filter(k => k !== 'home'), cur = t && isSpecial(t) ? t.special.kinds : [];
+  const kinds = Object.keys(KINDS).filter(k => k !== 'home'), sp = t && isSpecial(t) ? spOf(t) : {}, cur = sp.kinds || [];
   const nextNo = (() => { for (let i = 1; i < 100; i++) { if (!D().territories.some(x => x.no === 'S' + i)) return 'S' + i; } return 'S'; })();
-  setSheet(headHtml(t, t ? `特別区域 ${esc(t.no)} の種別` : '特別区域をつくる', '') + `
-    <p class="hint">えらんだ種別の家（コンビニなど）だけを集めた区域です。受け取った人の地図には、その種別の家だけが出ます。
-      その家は、ふつうの区域カードからは外れます。はじめは全域が対象です。あとから「線を直す」で範囲をしぼれます。</p>
+  const flag = (k, label, sub) => `<button type="button" class="kchip wide" data-spf="${k}" aria-pressed="${!!sp[k]}"><b>${label}</b><span>${sub}</span></button>`;
+  setSheet(headHtml(t, t ? `特別区域 ${esc(t.no)} の条件` : '特別区域をつくる', '') + `
+    <p class="hint">条件に合う家だけを集めた区域です。受け取った人の地図には、その家だけが出ます。はじめは全域が対象です。あとから「線を直す」で範囲をしぼれます。</p>
     ${t ? '' : `<label class="field">区域番号 <input type="text" id="spNo" value="${nextNo}" maxlength="10"></label>
-    <label class="field">名前 <input type="text" id="spName" maxlength="30" placeholder="例：コンビニ"></label>`}
-    <p class="q">種別（いくつでも）</p>
+    <label class="field">名前 <input type="text" id="spName" maxlength="30" placeholder="例：オートロック・コンビニ"></label>`}
+    <p class="q">条件（いくつでも。えらんだ条件すべてに合う家を集めます）</p>
+    <div class="kindpick">${flag('lock', 'オートロック', 'オートロックの建物')}${flag('unmet', '一度も会えていない家', '留守の記録だけで、会えた記録がない家・部屋')}</div>
+    <p class="q">種別（えらばなければ、すべての種別）</p>
     <div class="kindpick">${kinds.map(k => `<button type="button" class="kchip" data-spk="${k}" aria-pressed="${cur.includes(k)}">${KINDS[k][1]}<span>${KINDS[k][0]}</span></button>`).join('')}</div>
+    <label class="check"><input type="checkbox" id="spExcl"${sp.excl === false || (!t && false) ? '' : ' checked'}>この家を、ふつうの区域カードから外す（2回訪ねないように）</label>
+    <p class="hint">「一度も会えていない家」の区域は、ふつうの区域カードからは外さないのがふつうです（外すと、ふつうの区域で留守宅を回れなくなります）。
+      回っている人の区域は、受け取った日の時点の家で決まります（とちゅうで会えた家が消えないように）。</p>
     <button class="btn primary block" id="spSave">${t ? '保存する' : 'つくる'}</button>
     <button class="btn block" data-close>やめる</button>`);
-  $$('[data-spk]', $('#sheet')).forEach(b => b.onclick = () => b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true'));
+  $$('[data-spk],[data-spf]', $('#sheet')).forEach(b => b.onclick = () => {
+    b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true');
+    if (b.dataset.spf === 'unmet' && b.getAttribute('aria-pressed') === 'true' && !t) $('#spExcl').checked = false; // 留守宅の区域は、ふつう外さない
+  });
   $('#spSave').onclick = () => {
     const ks = $$('[data-spk]', $('#sheet')).filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.spk);
-    if (!ks.length) { toast('種別を1つ以上えらんでください'); return; }
-    if (t) { closeSheet(); commit(`特別区域 ${t.no} の種別を変えました`, () => { t.special = { kinds: ks }; }); return; }
-    const no = normNo($('#spNo').value), name = ($('#spName').value.trim() || ks.map(kindName).join('・')).slice(0, 30);
+    const on = k => $(`[data-spf="${k}"]`, $('#sheet')).getAttribute('aria-pressed') === 'true';
+    const special = { kinds: ks, lock: on('lock'), unmet: on('unmet'), excl: $('#spExcl').checked };
+    if (!ks.length && !special.lock && !special.unmet) { toast('条件か種別を1つ以上えらんでください'); return; }
+    const label = specialKindsText({ special });
+    if (t) { closeSheet(); commit(`特別区域 ${t.no} の条件を変えました`, () => { t.special = special; }); return; }
+    const no = normNo($('#spNo').value), name = ($('#spName').value.trim() || label).slice(0, 30);
     if (!NO_RE.test(no)) { toast('区域番号は、英数字で入れてください'); return; }
     if (D().territories.some(x => x.no === no)) { toast('その番号の区域は、もうあります'); return; }
     const pts = polyTerrs().flatMap(x => x.polygon.map(v => [v[0], v[1], 1]));
     const all = pts.length ? pts : D().houses.map(h => [h.lat, h.lng]);
     if (all.length < 1) { toast('先に、ふつうの区域か家をつくってください'); return; }
     closeSheet();
-    commit(`特別区域 ${no}（${ks.map(kindName).join('・')}）をつくりました`, () => {
-      D().territories.push({ id: 't' + uid(), no, name, polygon: xlHull(all, 120), special: { kinds: ks }, holder: null, lentAt: null, lend: 'auto' });
+    commit(`特別区域 ${no}（${label}）をつくりました`, () => {
+      D().territories.push({ id: 't' + uid(), no, name, polygon: xlHull(all, 120), special, holder: null, lentAt: null, lend: 'auto' });
     });
   };
 }
@@ -10642,7 +10691,7 @@ function renderAdmin() {
           <option value="auto"${lendMode(t) === 'auto' ? ' selected' : ''}>きまりのとおり</option>
           <option value="open"${lendMode(t) === 'open' ? ' selected' : ''}>貸出可能にする</option>
           <option value="stop"${lendMode(t) === 'stop' ? ' selected' : ''}>貸出中止にする</option></select></label>
-        ${isSpecial(t) ? `<button class="btn small" data-spedit="${t.id}">種別を変える</button>` : ''}
+        ${isSpecial(t) ? `<button class="btn small" data-spedit="${t.id}">条件を変える</button>` : ''}
         ${t.holder && (userById(t.holder) || {}).group ? `<label class="check"><input type="checkbox" data-grp="${t.id}"${t.group ? ' checked' : ''}>${esc(userById(t.holder).group)}グループの区域にする</label>` : ''}
       </div></article>`;
   }).join('');
