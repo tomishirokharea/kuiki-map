@@ -2,7 +2,7 @@
    区域マップ：圏外でもアプリを開けるようにする仕組み（Service Worker）
    index.html と同じ場所（GitHub Pages の kuiki-map）に置きます。
 
-   ・画面（index.html・config.js）：まずインターネットから新しいものを取りに行き、
+   ・画面（index.html・config.js・schedule.js・言語のファイル）：まずインターネットから新しいものを取りに行き、
      つながらないとき（6秒待っても返事がないとき）だけ、前に保存した画面を使う
      → ふだんはいつも最新の版。圏外でも開ける
    ・地図の部品（Leaflet）と文字（Googleフォント）：一度取ったら、保存したものを使う
@@ -13,6 +13,8 @@ const APP_CACHE = 'kuiki-app-v1';
 const LIB_CACHE = 'kuiki-lib-v1';
 const KEEP = [APP_CACHE, LIB_CACHE];
 const NET_WAIT_MS = 6000;
+// 圏外用に控える、アプリのファイル（新しくファイルを足したら、ここに名前を足す）
+const APP_FILES = /\/(config|schedule|i18n|i18n-es)\.js$/;
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -35,7 +37,7 @@ self.addEventListener('fetch', e => {
 
   if (u.origin === self.location.origin) {
     if (u.searchParams.has('vcheck')) return; // 新しい版があるかの確認は、そのまま通す
-    const isPage = req.mode === 'navigate' || /\/(index\.html)?$/.test(u.pathname) || u.pathname.endsWith('/config.js');
+    const isPage = req.mode === 'navigate' || /\/(index\.html)?$/.test(u.pathname) || APP_FILES.test(u.pathname);
     if (!isPage) return;
     const key = u.origin + u.pathname; // ? から後ろ（招待コードなど）は保存しない
     e.respondWith((async () => {
