@@ -1,5 +1,5 @@
 /* =========================================================
-   schedule.js  区域マップ 追加機能（第1弾〜第4弾）
+   schedule.js  区域マップ 追加機能（第1弾〜第5弾）
    第1弾
    ・係の画面「状況」に「期限の見張り」を出す（1区域は返却の目安まで・全区域は1年）
    ・「区域をもらう」一覧に「おすすめ順」を加え、はじめの並び順にする
@@ -19,6 +19,10 @@
    ・区域カルテ：「区域」タブ・期限の見張り・「今日」タブの「カルテ」ボタンから、1区域の状態・期限・次の一手・時間帯の表・S-13の履歴を1画面で見る
    ・「設定・データ」タブの上に「毎月の点検」（要確認は「今日」タブにも出る）と、設定の変更履歴
      （整理・バックアップ・セルの数はサーバーの ops 問い合わせで読む。Code.gs も新しい版にする）
+   第5弾
+   ・「状況」タブの下に「何度訪ねても会えない家」（住んでいないかもしれない家）を出す（区域係だけ。家のデータには印を付けない）
+   ・地図に係だけの「期限で色分け」（記号・線の形・凡例つき。区域を押すとカルテ）
+   ・この端末の自動ロック（番号・顔認証/指紋。「設定・データ」タブで決める。のぞき見を防ぐためのもの）
    使い方：index.html の </body> の直前に、次の1行を足すだけ
      <script src="schedule.js"></script>
    第2弾の決めを保存するには、サーバー（Code.gs）の設定の部分に youngW・awayTries・nightOn・offDays を足します。
@@ -448,9 +452,11 @@
     _renderAdmin.apply(this, arguments);
     try {
       if (isAdmin()) fixTabLabel();
+      if (lkLocked() && currentView === 'admin') { const ls = document.getElementById('alockScr'); if (!ls || ls.hidden) showLockScreen(); return; }
       if (isAdmin() && adPane === 'terr') paintKarteBtns();
-      if (isAdmin() && adPane === 'set') { paintOps(); loadOps(false); }
+      if (isAdmin() && adPane === 'set') { paintOps(); paintLockBox(); loadOps(false); }
       if (isAdmin() && adPane === 'status') {
+        paintCand(); loadOps(false);
         paintDue();
         paintSlotBox();
         const d = document.querySelector('#adDue details.dueset');
@@ -1125,6 +1131,7 @@
         T('時間帯の表：記録を1周して集計', () => buildSlotAgg(), 2);
         T('時間帯の表：表を作る', () => { MEMO.delete('slotagg'); slotBoxHtml(); }, 3);
         T('「今日」：対応の項目づくり', () => { MEMO.clear(); todayItems(); coverInfo(); }, 3);
+        T('訪ねても会えない家：一覧を作る', () => { MEMO.delete('cand'); candBuild(); }, 2);
         const kt = eligible()[0];
         if (kt) T('区域カルテ：1区域ぶんを作る', () => karteHtml(kt), 3);
         const tb = document.querySelector('#sheet table.slots');
@@ -1212,7 +1219,7 @@
       const q = slotQuery([t], per), n = q.n.reduce((a, b) => a + b, 0), m = q.m.reduce((a, b) => a + b, 0), p = n ? Math.round(m / n * 100) : 0;
       table = `<div class="seg" role="group" aria-label="期間"><button type="button" data-kper="4" aria-pressed="${per === 4}">直近4か月</button><button type="button" data-kper="12" aria-pressed="${per === 12}">1年</button></div>` +
         slotTableHtml({ sc: 'terr', terrs: [t] }, per);
-      nums = `<p>${periodLabel(per)}の記録 <b>${n}件</b>${n ? `：会えた <b>${p}%</b>（拒否を含む）・留守 <b>${100 - p}%</b>` : ''}</p><p>訪問を控える家・部屋（拒否）<b>${karteDnc(t)}</b>軒</p>`;
+      nums = `<p>${periodLabel(per)}の記録 <b>${n}件</b>${n ? `：会えた <b>${p}%</b>（拒否を含む）・留守 <b>${100 - p}%</b>` : ''}</p><p>訪問を控える家・部屋（拒否）<b>${karteDnc(t)}</b>軒</p>${candCountFor(t) ? `<p>何度訪ねても会えない家・部屋 <b>${candCountFor(t)}</b>軒（「状況」タブの下で確かめられます）</p>` : ''}`;
     }
     const hist = karteHist(t);
     const free = !t.holder && lendMode(t) !== 'stop';
@@ -1238,7 +1245,7 @@
   }
   function openKarte(tid) {
     const t = terrById(tid);
-    if (!t || !isAdmin()) return;
+    if (!t || !isAdmin() || lkLocked()) return;
     setSheet(karteHtml(t));
     const S = $('#sheet');
     $$('[data-kper]', S).forEach(b => b.onclick = () => { karteState.period = Number(b.dataset.kper); sheetKeep = true; openKarte(tid); });
@@ -1379,6 +1386,318 @@
   function repaintOps() {
     try { paintOps(); } catch (e) { console.error(e); }
     try { paintToday(); } catch (e) { console.error(e); }
+    try { if (document.getElementById('adCand')) paintCand(); } catch (e) { console.error(e); }
+  }
+
+  /* =========================================================
+     第5弾（1）訪ねても会えない家（住んでいないかもしれない家）を、係が確かめる
+     ・係の画面「状況」タブの下にだけ出す。その場で計算するだけで、家のデータには何も印を付けない
+     ・伝道者のスマホには送らない／印刷・CSV・PDFには出さない
+     ・「人が住んでいた」は、サーバーに「確認ずみ」の印として（家の番号だけ）半年間おぼえる（係の問い合わせ ops でだけ返す）
+     ========================================================= */
+  const CAND = { minAway: 4, minSlots: 3, minSpanDays: 60, keepDays: 180 };
+  const candSeen = new Set();           // 「様子を見る」：この画面を開いているあいだだけ隠す
+  const ckLocal = {};                   // 試作版（サーバーなし）のとき、この画面を開いているあいだだけおぼえる
+  const todayNum = () => Math.floor(Date.now() / 86400000);
+  const ckMap = () => (opsState.data && opsState.data.ck) || ckLocal;
+  const ckOn = k => { const v = ckMap()[k]; return v != null && todayNum() - Number(v) < CAND.keepDays; };
+  const NIGHT_OR_WEEKEND = (1 << 4) | 0x3E0;   // 平日・夜 と 土日の全部（SLOTS の並びは 平日5つ→土日5つ）
+  /* 候補を数える：一度も会えていない／留守を4回以上／3つ以上の違う時間帯／夜か土日をふくむ／最初から最後まで2か月以上 */
+  function candBuild() {
+    return memo('cand', () => {
+      const ok = new Set(eligible().map(t => t.id)), by = new Map(), prov = new Map();
+      for (const h of D().houses) {
+        if (!h.terrId || !ok.has(h.terrId)) continue;
+        for (const u of targets(h)) {
+          const k = K(h.id, u), s = sum(k);
+          if (D().dnc[k]) continue;
+          if (!s.n) { if (h.prov && !u) { if (!prov.has(h.terrId)) prov.set(h.terrId, []); prov.get(h.terrId).push({ k, h, u }); } continue; }
+          if (!s.unmet || s.awayN < CAND.minAway || slotCount(s.awaySlots) < CAND.minSlots || !(s.awaySlots & NIGHT_OR_WEEKEND)) continue;
+          const vs = visitsOf(k), span = (Date.parse(s.last.at) - Date.parse(vs[vs.length - 1].at)) / DAY;
+          if (span < CAND.minSpanDays) continue;
+          if (!by.has(h.terrId)) by.set(h.terrId, []);
+          by.get(h.terrId).push({ k, h, u, s, span: Math.round(span), first: vs[vs.length - 1].at, letter: slotCount(s.slots) >= triesFor(TID.get(h.terrId)) });
+        }
+      }
+      return { by, prov };
+    });
+  }
+  const candCountFor = t => { const c = candBuild(), a = c.by.get(t.id) || []; return a.filter(x => !ckOn(x.k)).length; };
+  const candName = x => (x.h.type === 'apt' ? `${esc(x.h.label || '集合住宅')} ${esc(x.u)}` : esc(x.h.label || '目印なし'));
+  function candRow(x, prov) {
+    const isApt = x.h.type === 'apt';
+    return `<div class="duerow" style="border-left-color:#8A6D00"><div><p><b>${candName(x)}</b></p>
+      <p class="muted">${prov ? 'まだ一度も訪ねていない仮の家です' : `留守 ${x.s.awayN}回（${slotCount(x.s.awaySlots)}つの時間帯）・${showDay(dstr(x.first))}〜${showDay(dstr(x.s.last.at))}`}${x.letter ? '<span class="tag-warn">手紙の候補にも入っています</span>' : ''}</p></div>
+      <div class="duebtns"><button type="button" class="btn small" data-cmap="${x.h.id}">地図で見る</button>
+        ${isApt ? '<span class="muted">部屋は地図で確かめてください</span>' : `<button type="button" class="btn small danger" data-cgone="${x.h.id}">空き家だった</button>`}
+        <button type="button" class="btn small primary" data-clive="${esc(x.k)}">人が住んでいた</button>
+        <button type="button" class="btn small" data-cwait="${esc(x.k)}">様子を見る</button></div></div>`;
+  }
+  function paintCand() {
+    if (!isAdmin() || lkLocked()) return;
+    const pane = document.querySelector('[data-apane="status"]');
+    if (!pane) return;
+    let box = document.getElementById('adCand');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'adCand';
+      pane.appendChild(box);
+      box.addEventListener('click', async e => {
+        const q = s => e.target.closest(s);
+        let x;
+        if ((x = q('[data-cmap]'))) {
+          const h = houseById(x.dataset.cmap);
+          if (h) { openTerr(h.terrId); setTimeout(() => { try { if (h.lat != null) map.setView([h.lat, h.lng], 19); } catch (err) { /* 地図だけ開く */ } }, 500); }
+        } else if ((x = q('[data-cwait]'))) { candSeen.add(x.dataset.cwait); paintCand(); }
+        else if ((x = q('[data-clive]'))) {
+          const k = x.dataset.clive;
+          if (LIVE) { try { const j = await api('ops_ck', { k, on: true }); if (opsState.data) opsState.data.ck = j.ck; } catch (err) { toast('保存できませんでした（サーバーが新しい版か確かめてください）'); return; } }
+          else ckLocal[k] = todayNum();
+          toast('候補から外しました（半年は出しません）'); paintCand();
+        } else if ((x = q('[data-cgone]'))) {
+          const h = houseById(x.dataset.cgone);
+          if (h && await ask(`「${h.label || '目印なし'}」を消します。訪問の記録も一緒に消えます（消したあとの「取り消す」で戻せます）。よろしいですか？`)) deleteHouse(h.id);
+        }
+      });
+    }
+    const c = candBuild();
+    const tids = [...c.by.keys()].filter(id => c.by.get(id).some(x => !ckOn(x.k) && !candSeen.has(x.k)));
+    const total = tids.reduce((a, id) => a + c.by.get(id).filter(x => !ckOn(x.k) && !candSeen.has(x.k)).length, 0);
+    const provN = [...c.prov.values()].reduce((a, l) => a + l.length, 0);
+    const terrs = tids.map(id => TID.get(id)).filter(Boolean).sort(byNo);
+    box.innerHTML = `<h2 class="sec" id="adCandH">何度訪ねても会えない家（${total}軒）</h2>
+      <div class="notice warn"><b>この一覧は、区域係だけが見るものです。</b>住んでいないかもしれない家の情報なので、人に見せたり、写真に撮ったり、書き写したりしないでください。</div>
+      <p class="hint">違う時間帯で${CAND.minAway}回以上留守で、一度も会えていない家です（夜か土日を含み、最初から最後まで${Math.round(CAND.minSpanDays / 30)}か月以上）。現地で様子を確かめて、「空き家だった」か「人が住んでいた」を選びます。</p>
+      ${terrs.length ? terrs.map(t => {
+        const list = c.by.get(t.id).filter(x => !ckOn(x.k) && !candSeen.has(x.k));
+        return `<details class="dueset"><summary>区域${esc(t.no)}　${esc(t.name || '')}（${list.length}軒）</summary>${list.map(x => candRow(x, false)).join('')}</details>`;
+      }).join('') : '<div class="tdnone"><b>確かめる家はありません</b></div>'}
+      ${provN ? `<details class="dueset"><summary>地図から入れた仮の家で、まだ一度も訪ねていない家（${provN}軒）</summary>${[...c.prov.entries()].map(([id, l]) => TID.get(id) ? `<p class="q">区域${esc(TID.get(id).no)}</p>` + l.filter(x => !ckOn(x.k) && !candSeen.has(x.k)).slice(0, 30).map(x => candRow(x, true)).join('') : '').join('')}</details>` : ''}`;
+  }
+
+  /* =========================================================
+     第5弾（2）区域の地図の「期限で色分け」（係だけ・この端末だけ）
+     ・前回回り終えた日からの日数で、区域の塗りを変える。色だけでなく、記号・線の形・凡例でも分かる
+     ・区域の線（約80）だけを塗り替える。家の印は描き直さない
+     ========================================================= */
+  const cssDm = document.createElement('style');
+  cssDm.textContent = `.dm-ctl{background:var(--paper,#fff);border:2px solid var(--ink,#222);border-radius:12px;padding:8px;max-width:250px;margin:70px 8px 0 0;font-size:15px;line-height:1.5}
+.dm-ctl[hidden]{display:none}.dm-ctl .sw{display:inline-block;width:16px;height:16px;border-radius:4px;border:2px solid #333;vertical-align:-3px;margin-right:4px}
+.dm-ctl p{margin:3px 0}body.duemode .terr-label:not(.duelab){display:none}
+.duelab span{background:#fff;border:2px solid #222;border-radius:8px;padding:1px 6px;font-weight:700;font-size:15px;white-space:nowrap;color:#111}`;
+  document.head.appendChild(cssDm);
+  const DMC = {
+    ok: ['#0072B2', '✓', '4か月以内に回った'], mid: ['#F0E442', '！', '4〜8か月前'], long: ['#E69F00', '▲', '8か月〜1年前'],
+    over: ['#D55E00', '✕', '1年をこえた'], none: ['#8C8C8C', '？', '前回の記録なし']
+  };
+  const dmState = { on: lsGet('kuiki_duemode') === '1' };
+  let dueLayer = null, dmCtl = null;
+  function dmClass(t) {
+    const d = dueInfo(t);
+    if (!d.last) return 'none';
+    const days = daysFrom(d.last);
+    return days <= 120 ? 'ok' : days <= 240 ? 'mid' : days <= YEAR ? 'long' : 'over';
+  }
+  function paintDueMap() {
+    if (typeof map === 'undefined' || !map || typeof L === 'undefined') return;
+    if (!dmCtl) {
+      const C = L.Control.extend({ options: { position: 'topright' }, onAdd() { const d = L.DomUtil.create('div', 'dm-ctl'); d.id = 'dmCtl'; L.DomEvent.disableClickPropagation(d); return d; } });
+      dmCtl = new C(); dmCtl.addTo(map);
+      document.getElementById('dmCtl').addEventListener('click', e => {
+        if (!e.target.closest('[data-dmtog]')) return;
+        dmState.on = !dmState.on; lsSet('kuiki_duemode', dmState.on ? '1' : '0');
+        renderTerrs();
+      });
+    }
+    if (!dueLayer) dueLayer = L.layerGroup().addTo(map);
+    dueLayer.clearLayers();
+    const show = isAdmin() && !lkLocked(), on = show && dmState.on;
+    document.body.classList.toggle('duemode', on);
+    const ctl = document.getElementById('dmCtl');
+    ctl.hidden = !show;
+    if (show) ctl.innerHTML = `<button type="button" class="btn small ${on ? 'primary' : ''}" data-dmtog aria-pressed="${on}">期限で色分け：${on ? '入' : '切'}</button>` +
+      (on ? `<div>${Object.keys(DMC).map(k => `<p><span class="sw" style="background:${DMC[k][0]}"></span>${DMC[k][1]} ${DMC[k][2]}</p>`).join('')}<p>線が破線＝貸出中（番号の横に「貸」）<br>点線＝貸出中止（「止」）</p><p class="muted">区域を押すと、カルテが開きます</p></div>` : '');
+    if (!on) return;
+    for (const t of polyTerrs()) {
+      if (t.dummy || isSpecial(t)) continue;
+      const c = DMC[dmClass(t)], held = !!t.holder, stop = lendMode(t) === 'stop';
+      L.polygon(t.polygon, { color: '#222', weight: held || stop ? 4 : 2, dashArray: held ? '10 6' : stop ? '2 8' : null, fillColor: c[0], fillOpacity: 0.4, opacity: 0.9, bubblingMouseEvents: false })
+        .on('click', () => openKarte(t.id)).addTo(dueLayer);
+      L.marker(center(t.polygon), { icon: L.divIcon({ className: 'terr-label duelab', html: `<span>${c[1]} ${esc(t.no)}${held ? ' 貸' : stop ? ' 止' : ''}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(dueLayer);
+    }
+  }
+  const _renderTerrs = window.renderTerrs;
+  window.renderTerrs = function () {
+    _renderTerrs.apply(this, arguments);
+    try { paintDueMap(); } catch (e) { console.error(e); }
+  };
+
+  /* =========================================================
+     第5弾（3）係の画面の自動ロック（この端末だけ）
+     ・これは「のぞき見を防ぐ」ためのものです。端末の中のデータを暗号化するものではありません
+     ・ロックするのは、係の画面と、そこから開いた画面だけ。区域カード・地図・記録の入力は止めない／同期も止めない
+     ・解除は、この端末で決めた番号（4〜6桁・そのままでは保存しない）。顔認証・指紋は、番号とあわせて使える
+     ・時間は、最後に係の画面を触ってから数える（ほかの画面を使っていても、時間がたてばロックされる）
+     ========================================================= */
+  const cssLk = document.createElement('style');
+  cssLk.textContent = `#alockScr{position:fixed;inset:0;z-index:4800;background:var(--bg,#F4F1EA);display:grid;place-items:center;padding:24px;overflow:auto}
+#alockScr[hidden]{display:none}#alockScr .lkbox{max-width:420px;width:100%;text-align:center}
+#alockScr input{font-size:30px;letter-spacing:.4em;text-align:center;width:100%;min-height:62px;border:3px solid var(--ink,#222);border-radius:12px;background:#fff}
+#alockScr .btn{margin-top:10px}.lkmsg{min-height:1.6em;color:#B71C1C;font-weight:700}
+.lkset input[type=password]{font-size:22px;letter-spacing:.3em;min-height:50px;border:2px solid var(--ink,#222);border-radius:10px;padding:0 10px;width:9em;background:#fff}
+.lkset select{min-height:50px;border-radius:10px;border:2px solid var(--ink,#222);padding:0 8px;background:#fff;font-size:17px}`;
+  document.head.appendChild(cssLk);
+  const LK_CFG = 'kuiki_alock', LK_FAIL = 'kuiki_alock_f';
+  const lk = { locked: false, last: Date.now(), cb: null };
+  const lkCfg = () => { try { return JSON.parse(lsGet(LK_CFG) || 'null'); } catch (e) { return null; } };
+  const lkSave = c => (c ? lsSet(LK_CFG, JSON.stringify(c)) : lsDel(LK_CFG));
+  const lkFails = () => { try { return JSON.parse(lsGet(LK_FAIL) || '{"n":0,"until":0}'); } catch (e) { return { n: 0, until: 0 }; } };
+  const lkCan = () => !!(window.crypto && crypto.subtle && window.TextEncoder);
+  const bioCan = () => !!(window.PublicKeyCredential && navigator.credentials && lkCan());
+  const lkActive = () => { try { return isAdmin() && !!lkCfg(); } catch (e) { return false; } };
+  const lkLocked = () => lkActive() && lk.locked;
+  const b64e = u8 => btoa(String.fromCharCode.apply(null, u8));
+  const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  async function pinHash(pin, salt, iter) {
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+    return b64e(new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: b64d(salt), iterations: iter }, key, 256)));
+  }
+  async function lkSetPin(pin) {
+    const salt = b64e(crypto.getRandomValues(new Uint8Array(16))), iter = 150000, old = lkCfg() || {};
+    lkSave({ salt, iter, hash: await pinHash(pin, salt, iter), bio: old.bio || null, min: old.min || 10 });
+    lsDel(LK_FAIL);
+  }
+  async function bioEnroll() {
+    const cred = await navigator.credentials.create({ publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)), rp: { name: '区域マップ' },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'kuiki-admin', displayName: '区域係' },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' }, timeout: 60000, attestation: 'none' } });
+    const c = lkCfg(); c.bio = b64e(new Uint8Array(cred.rawId)); lkSave(c);
+  }
+  async function bioCheck() {
+    const c = lkCfg();
+    await navigator.credentials.get({ publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), allowCredentials: [{ type: 'public-key', id: b64d(c.bio) }], userVerification: 'required', timeout: 60000 } });
+  }
+  function lkUnlocked() {
+    lk.locked = false; lk.last = Date.now(); lsDel(LK_FAIL);
+    const s = document.getElementById('alockScr'); if (s) s.hidden = true;
+    const cb = lk.cb; lk.cb = null;
+    try { paintDueMap(); } catch (e) { /* 地図なし */ }
+    if (cb) cb();
+  }
+  function lockNow() {
+    if (!lkActive() || lk.locked) return;
+    lk.locked = true;
+    if (currentView === 'admin' || !document.getElementById('s13View').hidden) {
+      closeSheet();
+      document.getElementById('s13View').hidden = true;
+      showLockScreen();
+    }
+    try { paintDueMap(); } catch (e) { /* 地図なし */ }
+  }
+  function showLockScreen(cb) {
+    lk.cb = cb || null;
+    let s = document.getElementById('alockScr');
+    if (!s) {
+      s = document.createElement('div'); s.id = 'alockScr'; s.setAttribute('role', 'dialog'); s.setAttribute('aria-modal', 'true');
+      document.body.appendChild(s);
+      s.addEventListener('click', async e => {
+        const msg = s.querySelector('.lkmsg'), inp = s.querySelector('input');
+        const c = lkCfg();
+        if (e.target.closest('[data-lkok]')) {
+          const f = lkFails();
+          if (Date.now() < f.until) { msg.textContent = `あと${Math.ceil((f.until - Date.now()) / 1000)}秒待ってから、もう一度ためしてください`; return; }
+          const pin = inp.value;
+          if (!c || !/^\d{4,6}$/.test(pin)) { msg.textContent = '4〜6桁の数字を入れてください'; return; }
+          const h = await pinHash(pin, c.salt, c.iter);
+          if (h === c.hash) { inp.value = ''; lkUnlocked(); return; }
+          f.n++; f.until = f.n >= 5 ? Date.now() + Math.min(300, 30 * Math.pow(2, f.n - 5)) * 1000 : 0; lsSet(LK_FAIL, JSON.stringify(f));
+          inp.value = ''; msg.textContent = f.until ? `まちがえました。${Math.ceil((f.until - Date.now()) / 1000)}秒待ってください` : `番号がちがいます（あと${5 - f.n}回で待ち時間が入ります）`;
+        } else if (e.target.closest('[data-lkbio]')) {
+          try { await bioCheck(); lkUnlocked(); } catch (err) { msg.textContent = '顔認証・指紋で開けませんでした。番号を入れてください'; }
+        } else if (e.target.closest('[data-lkhome]')) { s.hidden = true; lk.cb = null; showView('home'); }
+        else if (e.target.closest('[data-lkforget]')) {
+          if (!await ask('このスマホの「係」としての登録を外して、登録し直します。\n区域係からもらったリンクを開き直し、ほかの区域係に承認してもらう必要があります。\n（このスマホの区域の情報は消えます。サーバーのデータは消えません）\nよろしいですか？')) return;
+          lkSave(null); lsDel(LK_FAIL);
+          Store.authLost = true; clearTimeout(Store.cacheTimer); IDB.clearCache().catch(() => {}); clearAllMemos();
+          [TOKEN_KEY, QUEUE_KEY, SYNC_KEY, PENDING_KEY, FAILED_KEY].forEach(lsDel); Store.queue = [];
+          s.hidden = true;
+          showBlocking('登録を外しました', 'もう一度使うときは、区域係からもらったリンクを開いてください。ほかの区域係が、このスマホの登録を承認します。');
+        }
+      });
+      s.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { const b = s.querySelector('[data-lkok]'); if (b) b.click(); } });
+    }
+    const c = lkCfg() || {};
+    s.innerHTML = `<div class="lkbox"><h2>係の画面はロックされています</h2>
+      <p class="muted">${c.min || 10}分以上、さわっていなかったためです。番号を入れてください。</p>
+      <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="番号（4〜6桁）">
+      <p class="lkmsg" role="alert"></p>
+      <button type="button" class="btn primary block" data-lkok>開く</button>
+      ${c.bio && bioCan() ? '<button type="button" class="btn block" data-lkbio>顔認証・指紋で開く</button>' : ''}
+      <button type="button" class="btn block" data-lkhome>ほかの画面へ</button>
+      <p><button type="button" class="btn small" data-lkforget>番号を忘れた</button></p></div>`;
+    s.hidden = false;
+    const f = lkFails();
+    if (Date.now() < f.until) s.querySelector('.lkmsg').textContent = `あと${Math.ceil((f.until - Date.now()) / 1000)}秒待ってください`;
+    setTimeout(() => { const i = s.querySelector('input'); if (i) i.focus(); }, 50);
+  }
+  /* 係の画面を触ったら、時間を数え直す。時間がたったら、ロックする */
+  ['pointerdown', 'keydown', 'touchstart', 'scroll'].forEach(ev => document.addEventListener(ev, () => {
+    if (currentView === 'admin' || !document.getElementById('s13View').hidden) { if (!lk.locked) lk.last = Date.now(); }
+  }, true));
+  function lkCheck() {
+    if (!lkActive() || lk.locked) return;
+    const c = lkCfg();
+    if (Date.now() - lk.last >= (c.min || 10) * 60000) lockNow();
+  }
+  setInterval(lkCheck, 15000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) lkCheck(); });
+  window.addEventListener('pageshow', lkCheck);
+  if (lkCfg()) lk.locked = true;   // アプリを開き直したときは、最初からロックしておく
+  const _showView = window.showView;
+  window.showView = function (name) {
+    if (name === 'admin' && lkLocked()) { showLockScreen(() => _showView.call(this, 'admin')); return; }
+    return _showView.apply(this, arguments);
+  };
+  /* 「設定・データ」タブ：この端末の自動ロック */
+  function paintLockBox() {
+    if (!isAdmin() || lkLocked()) return;
+    const pane = document.querySelector('[data-apane="set"]');
+    if (!pane) return;
+    let box = document.getElementById('adLockBox');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'adLockBox'; box.className = 'lkset';
+      const ref = document.getElementById('adOpsBox');
+      pane.insertBefore(box, ref ? ref.nextSibling : pane.firstChild);
+      box.addEventListener('click', async e => {
+        const q = s => e.target.closest(s), c = lkCfg();
+        try {
+          if (q('[data-lkset]')) {
+            const a = $('#lkP1').value, b = $('#lkP2').value;
+            if (!/^\d{4,6}$/.test(a)) { toast('4〜6桁の数字を入れてください'); return; }
+            if (a !== b) { toast('2回の番号が同じではありません'); return; }
+            await lkSetPin(a); lk.locked = false; lk.last = Date.now(); toast('自動ロックを始めました'); paintLockBox();
+          } else if (q('[data-lknow]')) { lockNow(); }
+          else if (q('[data-lkbioon]')) { await bioEnroll(); toast('顔認証・指紋を使えるようにしました'); paintLockBox(); }
+          else if (q('[data-lkbiooff]')) { c.bio = null; lkSave(c); paintLockBox(); }
+          else if (q('[data-lkoff]')) { if (await ask('この端末の自動ロックをやめます。よろしいですか？')) { lkSave(null); lsDel(LK_FAIL); lk.locked = false; paintLockBox(); paintDueMap(); } }
+        } catch (err) { toast('うまくいきませんでした：' + ((err && err.message) || err)); }
+      });
+      box.addEventListener('change', e => { if (e.target.id === 'lkMin') { const c = lkCfg(); if (c) { c.min = Number(e.target.value); lkSave(c); toast('ロックまでの時間を変えました'); } } });
+    }
+    const c = lkCfg(), mins = [5, 10, 15, 20, 30];
+    box.innerHTML = `<h2 class="sec">この端末の自動ロック</h2>
+      <div class="notice info"><b>のぞき見を防ぐためのものです。</b>端末の中のデータを暗号化するものではありません。この端末の画面ロック（パスコードなど）も、必ず設定してください。この設定は、この端末だけに保存されます。</div>
+      <p class="hint">係の画面を触らないまま時間がたつと、係の画面を隠します（区域カード・地図・記録の入力は、そのまま使えます）。</p>
+      ${!lkCan() ? '<p class="muted">この環境では使えません（安全な接続のときだけ使えます）。</p>' : !c ? `
+        <p>番号（4〜6桁）を決めます。<br><input type="password" id="lkP1" inputmode="numeric" maxlength="6" autocomplete="new-password" aria-label="新しい番号"> <input type="password" id="lkP2" inputmode="numeric" maxlength="6" autocomplete="new-password" aria-label="もう一度同じ番号"></p>
+        <button type="button" class="btn primary" data-lkset>この番号で始める</button>` : `
+        <p>状態：<b>✓ 使っています</b>　ロックまでの時間 <select id="lkMin" aria-label="ロックまでの時間">${mins.map(m => `<option value="${m}"${(c.min || 10) === m ? ' selected' : ''}>${m}分</option>`).join('')}</select></p>
+        <div class="kact"><button type="button" class="btn" data-lknow>今すぐロックする</button>
+          ${bioCan() ? (c.bio ? '<button type="button" class="btn" data-lkbiooff>顔認証・指紋をやめる</button>' : '<button type="button" class="btn" data-lkbioon>顔認証・指紋も使う</button>') : ''}
+          <button type="button" class="btn danger" data-lkoff>自動ロックをやめる</button></div>
+        <p class="hint">番号を忘れたときは、ロックの画面の「番号を忘れた」から、このスマホの登録を外して登録し直します（ほかの区域係の承認が必要です）。番号をかえるときは、いったん「自動ロックをやめる」から決め直してください。</p>`}`;
   }
 
   /* 試作版などで、この部品より先に画面ができていたときは描き直す */
