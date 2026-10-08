@@ -1,5 +1,5 @@
 /* =========================================================
-   schedule.js  区域マップ 追加機能（第1弾・第2弾・第3弾）
+   schedule.js  区域マップ 追加機能（第1弾〜第4弾）
    第1弾
    ・係の画面「状況」に「期限の見張り」を出す（1区域は返却の目安まで・全区域は1年）
    ・「区域をもらう」一覧に「おすすめ順」を加え、はじめの並び順にする
@@ -15,6 +15,10 @@
    ・「状況」タブの時間帯の表を、曜日（平日・土曜・日曜）×時間帯の新しい表に置き換える
      （全区域／字／区域・直近4か月／1年。未試行・データ少を分けて出す）
    ・「速さを測る」に、新しい集計の時間を加える
+   第4弾
+   ・区域カルテ：「区域」タブ・期限の見張り・「今日」タブの「カルテ」ボタンから、1区域の状態・期限・次の一手・時間帯の表・S-13の履歴を1画面で見る
+   ・「設定・データ」タブの上に「毎月の点検」（要確認は「今日」タブにも出る）と、設定の変更履歴
+     （整理・バックアップ・セルの数はサーバーの ops 問い合わせで読む。Code.gs も新しい版にする）
    使い方：index.html の </body> の直前に、次の1行を足すだけ
      <script src="schedule.js"></script>
    第2弾の決めを保存するには、サーバー（Code.gs）の設定の部分に youngW・awayTries・nightOn・offDays を足します。
@@ -287,7 +291,7 @@
       <p class="muted">前回回り終えた日 ${showDay(d.last)}・期限 ${d.deadline ? showDay(d.deadline) : '—'}（${leftTxt(d)}）</p>
       <p class="muted">${t.holder ? `貸出中：${esc(uname(t.holder))}さん（返却の目安 ${fmtDay(dueOf(t))}）` : t.awayPoolAt ? '留守宅カードで回っています' : '空いています'}${meetTag(t)}</p>
       ${adjTag(t)}
-    </div><div class="duebtns"><button class="btn small" data-open="${t.id}">地図</button><button class="btn small" data-dueadj="${t.id}">調整</button></div></div>`;
+    </div><div class="duebtns"><button class="btn small" data-open="${t.id}">地図</button><button class="btn small" data-dueadj="${t.id}">調整</button><button class="btn small primary" data-karte="${t.id}">カルテ</button></div></div>`;
   };
   const adjTag = t => {
     const a = [];
@@ -393,6 +397,7 @@
       saveSet(s => { s.offDays = cur.concat(v).sort(); }, '訪問を控える日を登録しました');
     }
     else if ((x = q('[data-dueadj]'))) openAdj(x.dataset.dueadj);
+    else if ((x = q('[data-karte]'))) openKarte(x.dataset.karte);
   }
   /* 区域ごとの調整：若い世代の割合の手直し・留守宅を終える回数 */
   function openAdj(tid) {
@@ -443,6 +448,8 @@
     _renderAdmin.apply(this, arguments);
     try {
       if (isAdmin()) fixTabLabel();
+      if (isAdmin() && adPane === 'terr') paintKarteBtns();
+      if (isAdmin() && adPane === 'set') { paintOps(); loadOps(false); }
       if (isAdmin() && adPane === 'status') {
         paintDue();
         paintSlotBox();
@@ -628,6 +635,7 @@
     $('#profBack').onclick = () => {
       if (back === 'req') window.openRequestSheet();
       else if (back === 'away') window.openAwayPick(awayG);
+      else if (back && back.indexOf('karte:') === 0) openKarte(back.slice(6));
       else closeSheet();
     };
   }
@@ -889,8 +897,8 @@
       ? `${a.getFullYear()}年${a.getMonth() + 1}月〜${now.getMonth() + 1}月`
       : `${a.getFullYear()}年${a.getMonth() + 1}月〜${now.getFullYear()}年${now.getMonth() + 1}月`;
   }
-  function slotTableHtml() {
-    const s = slotScope(), q = slotQuery(s.terrs, slotState.period), emph = s.sc !== 'all';
+  function slotTableHtml(scopeOv, perOv) {
+    const s = scopeOv || slotScope(), per = perOv || slotState.period, q = slotQuery(s.terrs, per), emph = s.sc !== 'all';
     // いちばん会えている欄（10件以上ある欄だけ）
     let best = -1, bp = -1;
     for (let c = 0; c < 15; c++) if (q.n[c] >= SL_BEST && q.m[c] / q.n[c] > bp) { bp = q.m[c] / q.n[c]; best = c; }
@@ -904,7 +912,7 @@
     const rows = SLB.map((b, bi) => `<tr><th>${b}<br><small>${BAND_HINT[b]}</small></th>${[0, 1, 2].map(ci => cell(bi * 3 + ci)).join('')}</tr>`).join('');
     const none = q.n.filter(x => !x).length, few = q.n.filter(x => x > 0 && x < SL_FEW).length;
     return `<table class="slots slotnew" aria-label="曜日と時間帯ごとの会えた割合"><tr><th></th>${SLC.map(x => `<th>${x}</th>`).join('')}</tr>${rows}</table>
-      <p class="hint">期間：<b>${periodLabel(slotState.period)}</b>（今月をふくむ${slotState.period}か月）　記録 ${q.n.reduce((a, b) => a + b, 0)}件</p>
+      <p class="hint">期間：<b>${periodLabel(per)}</b>（今月をふくむ${per}か月）　記録 ${q.n.reduce((a, b) => a + b, 0)}件</p>
       ${emph && none ? `<p class="hint-strong">未試行の枠が${none}つあります。留守宅カードや訪問の計画で、その曜日・時間帯を試してみてください。</p>` : ''}
       ${few ? `<p class="hint">「データ少」は、記録が${SL_FEW}件に満たない枠です。割合は出していません。</p>` : ''}`;
   }
@@ -1015,15 +1023,15 @@
         `<button type="button" class="btn small primary" data-ttaken="${t.id}">確認した</button><button type="button" class="btn small" data-topen="${t.id}">地図</button>`);
     });
     // 5 今月中に出したい区域
-    if (m.need.length) row('#C2410C', `今月中に出したい区域　${m.need.length}区域`, `出さないと1年の期限に間に合いません：区域${listNos(m.need.map(d => d.t))}`, go('status', 'adDue'));
+    if (m.need.length) row('#C2410C', `今月中に出したい区域　${m.need.length}区域`, `出さないと1年の期限に間に合いません：区域${listNos(m.need.map(d => d.t))}`, go('status', 'adDue') + karteBtns(m.need.map(d => d.t), 2));
     // 6 1年の期限
-    if (m.over.length) row('#B71C1C', `1年の期限を過ぎた区域　${m.over.length}区域`, `区域${listNos(m.over.map(d => d.t))}`, go('status', 'adDue'));
+    if (m.over.length) row('#B71C1C', `1年の期限を過ぎた区域　${m.over.length}区域`, `区域${listNos(m.over.map(d => d.t))}`, go('status', 'adDue') + karteBtns(m.over.map(d => d.t), 2));
     if (m.warn.length) row('#C2410C', `1年の期限まで${PIN_DAYS}日以内の区域　${m.warn.length}区域`, `区域${listNos(m.warn.map(d => d.t))}`, go('status', 'adDue'));
     // 7 返却の目安を過ぎた貸出
     const late = ts.filter(t => t.holder && t.lentAt && Date.parse(dueOf(t)) < now);
     if (late.length) row('#C2410C', `返却の目安を過ぎた貸出　${late.length}件`,
       late.slice(0, 4).map(t => `区域${esc(t.no)}（${esc(uname(t.holder))}さん・${daysSince(dueOf(t))}日超過）`).join('、') + (late.length > 4 ? `　ほか${late.length - 4}件` : '') + '。声をかけるかどうかは、係が決めてください。',
-      terrBtns(late, 3));
+      karteBtns(late, 3));
     // 8 留守宅カードで回っているのに、有効なカードを持つ人がいない区域
     const act = activeCards();
     const stuck = ts.filter(t => t.awayPoolAt && !t.holder && !act.some(c => c.terrId === t.id));
@@ -1036,6 +1044,9 @@
       const bad = ts.filter(t => t.azaErr && !(t.azaManual && t.azaManual.length));
       if (bad.length) row('#546E7A', `字を調べられなかった区域　${bad.length}区域`, `区域${listNos(bad)}。「字を直す」で手で決められます`, go('terr', 'adTerrs', '区域の一覧へ'));
     }
+    // 10 毎月の点検で要確認のもの
+    const warns = opsItems().filter(i => i.state === 'warn');
+    if (warns.length) row('#8A6D00', `点検で要確認　${warns.length}件`, warns.map(i => esc(i.title)).join('、'), go('set', 'adOps', '点検を見る'));
     return out;
   }
   function coverHtml() {
@@ -1075,6 +1086,7 @@
           if (t) commit(`区域${t.no}の受け取りを確認しました`, () => { t.selfSeen = true; });
         }
         else if ((x = q('[data-topen]'))) openTerr(x.dataset.topen);
+        else if ((x = q('[data-tkarte]'))) openKarte(x.dataset.tkarte);
       });
     }
     const items = todayItems();
@@ -1088,6 +1100,7 @@
     const cnt = document.getElementById('apCnt');
     if (cnt) { cnt.textContent = items.length; cnt.hidden = !items.length; }
     fixTabLabel();
+    loadOps(false);
   }
   const _renderInbox = window.renderInbox;
   window.renderInbox = function () {
@@ -1112,6 +1125,8 @@
         T('時間帯の表：記録を1周して集計', () => buildSlotAgg(), 2);
         T('時間帯の表：表を作る', () => { MEMO.delete('slotagg'); slotBoxHtml(); }, 3);
         T('「今日」：対応の項目づくり', () => { MEMO.clear(); todayItems(); coverInfo(); }, 3);
+        const kt = eligible()[0];
+        if (kt) T('区域カルテ：1区域ぶんを作る', () => karteHtml(kt), 3);
         const tb = document.querySelector('#sheet table.slots');
         if (!tb) return;
         const mark = ms => (ms < 0 ? '×（エラー）' : ms < 100 ? '◎ 速い' : ms < 300 ? '○ ふつう' : ms < 1000 ? '△ 少し待つ' : '× 重い');
@@ -1125,6 +1140,245 @@
         };
       } catch (e) { console.error(e); }
     };
+  }
+
+  /* =========================================================
+     第4弾（1）区域カルテ：1つの区域の「今」と「次の一手」を1画面に
+     ・入り口：「区域」タブの各行・「状況」タブの期限の見張り・「今日」タブの項目にある「カルテ」ボタン
+     ・区域全体の集計だけ。個々の家の一覧・家ごとの記録は出さない（10軒未満の区域は、割合と時間帯の表も出さない）
+     ・時間帯の表は、第3弾の集計（区域×月）を使い回す（記録を回し直さない）
+     ========================================================= */
+  const css5 = document.createElement('style');
+  css5.textContent = `.kq{font-weight:700;font-size:19px;margin:16px 0 4px}
+.kadv{background:#FFF8E1;border:2px solid #8A6D00;border-radius:12px;padding:10px 12px;margin:8px 0}
+.kadv p{margin:2px 0;font-size:18px}
+.khist{list-style:none;margin:4px 0;padding:0}.khist li{padding:6px 0;border-bottom:1px solid var(--line);font-size:16px}
+.kact{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.kact .btn{flex:1 1 9em}
+.klend{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+.klend select{min-height:50px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;background:#fff;font-size:17px;max-width:100%}
+.opsrow .btn{white-space:normal}.opsh{list-style:none;margin:4px 0;padding:0}.opsh li{padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}`;
+  document.head.appendChild(css5);
+
+  const karteState = { period: 4 };
+  const karteHomes = t => housesOf(t.id).reduce((a, h) => a + targets(h).length, 0);
+  const karteDnc = t => { let n = 0; housesOf(t.id).forEach(h => targets(h).forEach(u => { if (D().dnc[K(h.id, u)]) n++; })); return n; };
+  /* S-13のこの区域の履歴（新しい順に5件）。誰が受け取ったかの記録であって、人ごとの集計ではない */
+  function karteHist(t) {
+    const list = [];
+    D().returns.filter(r => r.terrId === t.id && r.lentAt).forEach(r => list.push({ name: uname(r.by), a: dstr(r.lentAt), c: r.completed ? dstr(r.at) : '', ret: dstr(r.at) }));
+    if (t.holder && t.lentAt) list.push({ name: uname(t.holder), a: dstr(t.lentAt), cur: true });
+    (D().s13 || []).filter(x => x.kind === 'a' && x.terrId === t.id).forEach(x => list.push({ name: x.name, a: x.a, c: x.c || '' }));
+    return list.filter(x => x.a).sort((p, q) => (p.a < q.a ? 1 : p.a > q.a ? -1 : 0)).slice(0, 5);
+  }
+  /* 次の一手（多くても2行）。ルールで選ぶ */
+  function karteAdvice(t, homes) {
+    const out = [], di = dueInfo(t);
+    if (di.left != null && di.left < 0) out.push('1年の期限を過ぎています。早めに回れるようにしてください。');
+    else if (di.left != null && di.left <= PIN_DAYS) out.push(`1年の期限まで、あと${di.left}日です。早めに貸し出してください。`);
+    else if (di.st === 'none') out.push('前回回り終えた日の記録がありません。S-13に転記してください。');
+    if (homes >= SL_AZA_MIN) {
+      const q = slotQuery([t], 4), names = [];
+      for (let bi = 0; bi < 5; bi++) for (let ci = 0; ci < 3; ci++) {
+        if (bi === 4 && !nightOn()) continue;
+        if (!q.n[bi * 3 + ci]) names.push(`${SLC[ci]}の${SLB[bi]}`);
+      }
+      let best = -1, bp = -1;
+      for (let c = 0; c < 15; c++) if (q.n[c] >= SL_BEST && q.m[c] / q.n[c] > bp) { bp = q.m[c] / q.n[c]; best = c; }
+      const ar = awayRate(t);
+      if (ar >= 0.4) out.push(`訪ねた家のうち、まだ会えていない家が${Math.round(ar * 100)}%あります。${best >= 0 ? `いちばん会えているのは${SLC[best % 3]}の${SLB[Math.floor(best / 3)]}（${Math.round(bp * 100)}%）です。` : ''}`);
+      if (names.length) out.push(`まだ試していない枠：${names.slice(0, 4).join('・')}${names.length > 4 ? `など${names.length}枠` : ''}。`);
+    } else out.push(`家・部屋が${SL_AZA_MIN}軒に満たないため、時間帯の提案は出していません。`);
+    if (!out.length) out.push('今のところ、急ぐことはありません。');
+    return out.slice(0, 2);
+  }
+  function karteHtml(t) {
+    const homes = karteHomes(t), few = homes < SL_AZA_MIN, di = dueInfo(t), per = karteState.period;
+    // 1 今の状態
+    let cls = 'cv-none', mark = '○', word = '空いています', sub = '';
+    if (t.holder) {
+      const over = t.lentAt && Date.parse(dueOf(t)) < Date.now();
+      let prog = '';
+      try { const r = roundInfo(t.id, true); if (r) prog = r.phase === 'away' ? `　留守宅を訪ね直す段階：${r.aw.pct}%（目安 ${awayRetPct()}%）` : `　1回目：${r.pct1}%`; } catch (e) { /* 進み具合なしで出す */ }
+      cls = over ? 'cv-bad' : 'cv-ok'; mark = over ? '▲' : '✓'; word = over ? '貸出中（返却の目安を過ぎています）' : '貸出中';
+      sub = `${esc(uname(t.holder))}さん・${t.lentAt ? fmtDay(t.lentAt) + 'に受け取り（' + daysSince(t.lentAt) + '日目）' : ''}　返却の目安 ${t.lentAt ? fmtDay(dueOf(t)) : '—'}${prog}`;
+    } else if (t.awayPoolAt) { cls = 'cv-warn'; mark = '！'; word = '留守宅カードで回っています'; }
+    else if (lendMode(t) === 'stop') { word = '貸出中止にしています'; mark = '－'; }
+    const dueTxt = di.left == null ? '前回の記録がありません' : di.left < 0 ? `1年の期限を${-di.left}日過ぎています` : `1年の期限まで あと${di.left}日`;
+    // 4 時間帯の表 5 数字
+    let table, nums = '';
+    if (few) {
+      table = `<div class="slpriv"><b>この区域は、家・部屋が${SL_AZA_MIN}軒に満たないため、割合と時間帯の表を出しません。</b><br>少ない軒数では、特定の家の様子が推測できてしまうためです。</div>`;
+    } else {
+      const q = slotQuery([t], per), n = q.n.reduce((a, b) => a + b, 0), m = q.m.reduce((a, b) => a + b, 0), p = n ? Math.round(m / n * 100) : 0;
+      table = `<div class="seg" role="group" aria-label="期間"><button type="button" data-kper="4" aria-pressed="${per === 4}">直近4か月</button><button type="button" data-kper="12" aria-pressed="${per === 12}">1年</button></div>` +
+        slotTableHtml({ sc: 'terr', terrs: [t] }, per);
+      nums = `<p>${periodLabel(per)}の記録 <b>${n}件</b>${n ? `：会えた <b>${p}%</b>（拒否を含む）・留守 <b>${100 - p}%</b>` : ''}</p><p>訪問を控える家・部屋（拒否）<b>${karteDnc(t)}</b>軒</p>`;
+    }
+    const hist = karteHist(t);
+    const free = !t.holder && lendMode(t) !== 'stop';
+    const users = free ? D().users.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja')) : [];
+    return headHtml(t, `区域${esc(t.no)}のカルテ`, esc(t.name || '')) + `
+      <div class="cover ${cls}" role="status"><i aria-hidden="true">${mark}</i><div><b>${word}</b>${sub ? `<small>${sub}</small>` : ''}</div></div>
+      <p class="kq">期限</p>
+      <p>前回回り終えた日：<b>${di.last ? showDay(di.last) : '記録なし'}</b>　／　<b>${dueTxt}</b></p>
+      <p class="kq">次の一手</p>
+      <div class="kadv">${karteAdvice(t, homes).map(x => `<p>${esc(x)}</p>`).join('')}</div>
+      <p class="kq">曜日と時間帯ごとの「会えた」割合</p>
+      ${table}
+      <p class="kq">数字</p>
+      <p>家・部屋 <b>${homes}</b>軒</p>${nums}
+      <p class="kq">地域のようす</p>
+      ${profLine(t, 'karte:' + t.id) || '<p class="muted">年齢データがないため、出せません。</p>'}
+      <p class="kq">S-13の履歴（新しい順）</p>
+      ${hist.length ? `<ul class="khist">${hist.map(h => `<li>${showDay(h.a)} 〜 ${h.c ? showDay(h.c) : h.cur ? '貸出中' : h.ret ? '返却 ' + showDay(h.ret) : ''}　${esc(h.name)}さん</li>`).join('')}</ul>` : '<p class="muted">記録がありません。</p>'}
+      ${free ? `<p class="kq">貸し出す</p><div class="klend"><select id="kLendSel" aria-label="貸し出す人をえらぶ"><option value="">人をえらんでください</option>${users.map(u => `<option value="${u.id}">${esc(u.name)}（今 ${heldCount(u.id)}枚）</option>`).join('')}</select>
+        <button type="button" class="btn primary" id="kLend">貸し出す</button></div>` : ''}
+      <div class="kact"><button type="button" class="btn" data-kmap="${t.id}">地図で見る</button><button type="button" class="btn" data-ks12="${t.id}">S-12を印刷</button><button type="button" class="btn" data-kadj="${t.id}">区域の調整</button></div>
+      <button class="btn block" data-close>閉じる</button>`;
+  }
+  function openKarte(tid) {
+    const t = terrById(tid);
+    if (!t || !isAdmin()) return;
+    setSheet(karteHtml(t));
+    const S = $('#sheet');
+    $$('[data-kper]', S).forEach(b => b.onclick = () => { karteState.period = Number(b.dataset.kper); sheetKeep = true; openKarte(tid); });
+    const go = (sel, fn) => { const b = $(sel, S); if (b) b.onclick = fn; };
+    go('[data-kmap]', () => { closeSheet(); openTerr(tid); });
+    go('[data-ks12]', () => printS12([tid], s12Opt.size, s12Opt.back));
+    go('[data-kadj]', () => openAdj(tid));
+    go('#kLend', () => {
+      const v = ($('#kLendSel', S) || {}).value;
+      if (!v) { toast('貸し出す人をえらんでください'); return; }
+      closeSheet();
+      commit(`区域${t.no}を${uname(v)}さんに貸し出しました`, () => {
+        t.holder = v; t.lentAt = new Date().toISOString();
+        t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
+      });
+    });
+  }
+  let karteBound = false;
+  function paintKarteBtns() {
+    const list = document.getElementById('adTerrs');
+    if (!list) return;
+    $$('.trow', list).forEach(row => {
+      const act = row.querySelector('.actions'), o = row.querySelector('[data-open]');
+      if (!act || !o || act.querySelector('[data-karte]')) return;
+      act.insertAdjacentHTML('afterbegin', `<button type="button" class="btn small primary" data-karte="${o.dataset.open}">カルテ</button>`);
+    });
+    if (!karteBound) {
+      karteBound = true;
+      list.addEventListener('click', e => { const b = e.target.closest('[data-karte]'); if (b) openKarte(b.dataset.karte); });
+    }
+  }
+  const karteBtns = (ts, max) => ts.slice(0, max || 2).map(t => `<button type="button" class="btn small" data-tkarte="${t.id}">区域${esc(t.no)}のカルテ</button>`).join('');
+
+  /* =========================================================
+     第4弾（2）毎月の点検（「設定・データ」タブの上）／設定の変更履歴／整理とバックアップの状態
+     ・サーバーの ops 問い合わせで読む（区域係だけ・同期には乗せない）。5分に1回まで
+     ・要確認の項目は「今日」タブにも1行出す
+     ========================================================= */
+  const opsState = { data: null, at: 0, busy: false, fail: '' };
+  const OPS_MANUAL = {
+    devices: ['使わなくなったスマホの登録を外す', '辞めた人や、使わなくなったスマホの登録がないか、「今日」タブの下のスマホの一覧で確かめます'],
+    people: ['区域係とグループの名簿を見直す', '転出・退会した人や、役割が変わった人がいないか確かめます']
+  };
+  async function loadOps(force) {
+    if (!LIVE || !isAdmin() || opsState.busy) return;
+    if (!force && opsState.at && Date.now() - opsState.at < 300000) return;
+    opsState.busy = true;
+    try {
+      const j = await api('ops');
+      if (j && j.ok) { opsState.data = j; opsState.fail = ''; } else opsState.fail = 'old';
+    } catch (e) { opsState.fail = /unknown_action|ops/.test(String((e && e.message) || e)) ? 'old' : 'net'; }
+    finally { opsState.busy = false; opsState.at = Date.now(); }
+    repaintOps();
+  }
+  function opsItems() {
+    const items = [], od = opsState.data;
+    const add = (id, title, state, detail) => items.push({ id, title, state, detail });
+    const wait = !LIVE ? '試作版では見られません' : opsState.fail === 'old' ? 'サーバー（Code.gs）がまだ新しい版になっていません' : opsState.fail === 'net' ? '読み込めませんでした。あとでもう一度ためしてください' : '確かめています…';
+    // 年齢データ
+    if (typeof AGE_ON !== 'undefined' && AGE_ON) {
+      const cur = typeof ageCur === 'function' ? ageCur() : null;
+      if (!cur) add('age', '年齢データが新しいか', 'warn', 'まだ入っていません');
+      else if (ageStale(cur)) add('age', '年齢データが新しいか', 'warn', `${esc(cur.asOf || '')}時点のデータで、古くなっています`);
+      else add('age', '年齢データが新しいか', 'ok', `${esc(cur.asOf || '')}時点`);
+    }
+    // S-13
+    const cv = coverInfo();
+    add('s13', 'S-13の「記録なし」の区域', cv.none ? 'warn' : 'ok', cv.none ? `${cv.none}区域 → S-13に転記してください` : 'ありません');
+    // 保存期間（個人情報の方針は2年まで）
+    const km = Number(D().settings.keepMonths) || 12;
+    add('keep', '訪問記録を残す期間', km > 24 ? 'warn' : 'ok', km > 24 ? `${km}か月です。個人情報の方針（2年）をこえています。24か月以下にしてください` : `${km}か月`);
+    // 自動整理
+    if (!od) add('clean', '毎月の自動整理が動いたか', 'wait', wait);
+    else if (od.cleanOn === false) add('clean', '毎月の自動整理が動いたか', 'warn', '毎月の自動整理が設定されていません（スプレッドシートの「区域マップ」メニューから設定）');
+    else if (!od.clean) add('clean', '毎月の自動整理が動いたか', 'wait', '記録がまだありません。次の毎月1日の整理から表示されます');
+    else {
+      const d = daysSince(od.clean.at), c = od.clean;
+      add('clean', '毎月の自動整理が動いたか', d > 40 ? 'warn' : 'ok',
+        `${d > 40 ? `最後に動いたのは${d}日前です。` : ''}最後：${fmtDay(c.at)}　消した記録：訪問 ${c.visits}件・留守宅カード ${c.cards}件・申し込み ${c.reqs}件`);
+    }
+    // バックアップ
+    if (!od) add('backup', '自動バックアップが動いているか', 'wait', wait);
+    else {
+      const b = od.backup || {};
+      if (b.err) add('backup', '自動バックアップが動いているか', 'warn', `失敗しています：${esc(b.err)}`);
+      else if (b.on === false) add('backup', '自動バックアップが動いているか', 'warn', '止まっています（スプレッドシートの「区域マップ」メニューから始めてください）');
+      else if (!b.last) add('backup', '自動バックアップが動いているか', 'warn', 'まだバックアップがありません');
+      else if (daysSince(b.last) > 10) add('backup', '自動バックアップが動いているか', 'warn', `最後のバックアップが${daysSince(b.last)}日前です（毎週日曜のはずです）`);
+      else add('backup', '自動バックアップが動いているか', 'ok', `最後：${fmtDay(b.last)}`);
+    }
+    // セルの数
+    if (!od) add('cells', 'スプレッドシートの大きさ', 'wait', wait);
+    else if (!od.cells) add('cells', 'スプレッドシートの大きさ', 'wait', '調べられませんでした');
+    else add('cells', 'スプレッドシートの大きさ', od.cells.pct >= 70 ? 'warn' : 'ok',
+      `${od.cells.pct}%を使っています（${od.cells.total.toLocaleString()} / ${od.cells.limit.toLocaleString()}セル）${od.cells.pct >= 70 ? '。「shrinkSheets」を実行してください' : ''}`);
+    // 係が自分でチェックする項目（月が変わると空に戻る）
+    const chk = (od && od.checks && od.checks.items) || {};
+    Object.keys(OPS_MANUAL).forEach(id => {
+      const c = chk[id];
+      if (!od) add(id, OPS_MANUAL[id][0], 'wait', wait);
+      else add(id, OPS_MANUAL[id][0], c ? 'done' : 'todo', c ? `${esc(c.by)}さんが${fmtDay(c.at)}に確認` : OPS_MANUAL[id][1]);
+    });
+    return items;
+  }
+  function paintOps() {
+    if (!isAdmin()) return;
+    const pane = document.querySelector('[data-apane="set"]');
+    if (!pane) return;
+    let box = document.getElementById('adOpsBox');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'adOpsBox';
+      pane.insertBefore(box, pane.firstChild);
+      box.addEventListener('click', async e => {
+        const c = e.target.closest('[data-opschk]'), r = e.target.closest('[data-opsre]');
+        if (c) {
+          try {
+            const j = await api('ops_check', { id: c.dataset.opschk, on: c.dataset.on === '1' });
+            if (j && j.ok && opsState.data) opsState.data.checks = j.checks;
+            repaintOps();
+          } catch (err) { toast('保存できませんでした'); }
+        } else if (r) { toast('確かめています…'); loadOps(true); }
+      });
+    }
+    const items = opsItems(), warn = items.filter(i => i.state === 'warn').length;
+    const MK = { ok: ['#2E7D32', '✓ 済み'], warn: ['#C2410C', '！ 要確認'], wait: ['#546E7A', '・ 確認中'], todo: ['#8A6D00', '□ 未チェック'], done: ['#2E7D32', '✓ チェック済み'] };
+    const hist = (opsState.data && opsState.data.history) || [];
+    box.innerHTML = `<h2 class="sec" id="adOps">毎月の点検</h2>
+      <div class="cover ${warn ? 'cv-warn' : 'cv-ok'}" role="status"><i aria-hidden="true">${warn ? '！' : '✓'}</i><div><b>${warn ? `要確認が${warn}件あります` : 'いまのところ、問題はありません'}</b><small>月が変わると、係のチェックは空に戻ります</small></div></div>
+      ${items.map(i => `<div class="duerow opsrow" style="border-left-color:${MK[i.state][0]}"><div><p><b>${MK[i.state][1]}</b>　${esc(i.title)}</p><p class="muted">${i.detail}</p></div>
+        ${i.state === 'todo' ? `<div class="duebtns"><button type="button" class="btn small primary" data-opschk="${i.id}" data-on="1">確認した</button></div>`
+          : i.state === 'done' ? `<div class="duebtns"><button type="button" class="btn small" data-opschk="${i.id}" data-on="0">取り消す</button></div>` : '<div></div>'}</div>`).join('')}
+      <details class="dueset"><summary>設定の変更履歴（新しい順・${hist.length}件）</summary>
+        ${hist.length ? `<ul class="opsh">${hist.map(h => `<li>${esc(h.at)}　${esc(h.who)}さん：${esc(h.name)}　${esc(h.from)} → ${esc(h.to)}</li>`).join('')}</ul>` : '<p class="muted">履歴はまだありません。これから変えた設定が、ここに残ります。</p>'}
+        <p class="hint">この履歴は区域係だけが見られます。設定の値だけを残し、家や訪問の記録は入れていません。</p></details>
+      <button type="button" class="btn small" data-opsre="1">最新の状態にする</button>`;
+  }
+  function repaintOps() {
+    try { paintOps(); } catch (e) { console.error(e); }
+    try { paintToday(); } catch (e) { console.error(e); }
   }
 
   /* 試作版などで、この部品より先に画面ができていたときは描き直す */
