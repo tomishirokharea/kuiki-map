@@ -1,5 +1,5 @@
 /* =========================================================
-   schedule.js  区域マップ 追加機能（第1弾・第2弾）
+   schedule.js  区域マップ 追加機能（第1弾・第2弾・第3弾）
    第1弾
    ・係の画面「状況」に「期限の見張り」を出す（1区域は返却の目安まで・全区域は1年）
    ・「区域をもらう」一覧に「おすすめ順」を加え、はじめの並び順にする
@@ -9,11 +9,17 @@
    地域のようす
    ・区域・留守宅カードに、地域のタイプ（子育て世代型など）・20〜49歳の割合と市内の順位・区域のおよその人数を出す
    ・押すと、年代の割合・子どもの内訳・会いやすい時間・訪問の準備のヒントを出す（統計からの予想）
+   第3弾（係の画面の見直し）
+   ・係の画面の最初のタブを「今日」にする：年間カバーの状況と、今日対応することだけを並べる
+     （区域の貸し出しと、自分で受け取られた区域の確認は、その場で1タップ・取り消せる）
+   ・「状況」タブの時間帯の表を、曜日（平日・土曜・日曜）×時間帯の新しい表に置き換える
+     （全区域／字／区域・直近4か月／1年。未試行・データ少を分けて出す）
+   ・「速さを測る」に、新しい集計の時間を加える
    使い方：index.html の </body> の直前に、次の1行を足すだけ
      <script src="schedule.js"></script>
    第2弾の決めを保存するには、サーバー（Code.gs）の設定の部分に youngW・awayTries・nightOn・offDays を足します。
    年齢データの自動取り込みは、サーバーの AgeAuto.gs が行います。
-   計算は、スマホに読み込みずみの区域・家・記録・S-13 から行います（通信は増えません）。
+   計算は、スマホに読み込みずみの区域・家・記録・S-13 から行います（通信は増えません・サーバーには何も保存しません）。
    ========================================================= */
 (function () {
   'use strict';
@@ -436,8 +442,10 @@
   window.renderAdmin = function () {
     _renderAdmin.apply(this, arguments);
     try {
+      if (isAdmin()) fixTabLabel();
       if (isAdmin() && adPane === 'status') {
         paintDue();
+        paintSlotBox();
         const d = document.querySelector('#adDue details.dueset');
         if (d) d.addEventListener('toggle', () => { setOpen = d.open; });
       }
@@ -777,6 +785,345 @@
         $$('[data-awaytake2]', S).forEach(b => b.onclick = () => { closeSheet(); takeAwayCard(b.dataset.awaytake2, b.dataset.slot, G); });
       };
       paint();
+    };
+  }
+
+  /* =========================================================
+     第3弾（1）時間帯の表：曜日（平日・土曜・日曜）× 時間帯（朝・昼・午後・夕方・夜）
+     ・「会えた＋拒否」を会えた側、「留守」を会えなかった側として数える
+     ・祝日は日曜に数える（祝日の判定は index.html の holidayOf。この表の中だけで使い、
+       留守宅カード・おすすめ・会える見込みの時間帯の判定 slotOf は変えない）
+     ・全区域／字ごと／区域ごと、直近4か月／1年（月単位）
+     ・集計は係の端末の中で、直近12か月の記録を1周して作る（サーバーには何も保存しない）
+     ========================================================= */
+  const SLB = ['朝', '昼', '午後', '夕方', '夜'], SLC = ['平日', '土曜', '日曜'];
+  const SL_FEW = 5, SL_BEST = 10, SL_AZA_MIN = 10;
+  const slotState = { scope: 'all', sel: '', period: 4 };
+  const css3 = document.createElement('style');
+  css3.textContent = `.slscope{font-size:23px;font-weight:700;margin:10px 0 4px;line-height:1.4}
+.slscope small{display:block;font-size:15px;font-weight:400;color:var(--ink2)}
+.slotnew{min-width:0;width:100%;table-layout:fixed}
+.slotnew th{font-size:15px}
+.slotnew td{height:78px;padding:4px 2px}
+.slotnew td small{color:var(--ink2);font-size:13px}
+.slotnew td.sl-few{background:#F4F4F4;color:#555}
+.slotnew td.sl-none{background:#fff;border:3px dashed #8A6D00;color:#8A6D00}
+.slotnew td.sl-none.sl-emph{background:#FFF4D6;border:4px solid #C2410C;color:#7A2E00;font-size:18px}
+.slotnew td.sl-few b{font-size:14px}
+.slpick{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+.slpick select{min-height:50px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;background:#fff;font-size:17px;max-width:100%}
+.slpriv{background:#F4F4F4;border-radius:12px;padding:14px;margin:8px 0}`;
+  document.head.appendChild(css3);
+
+  /* 記録を1周して、区域×月（今月からの数）×（時間帯・曜日）に足し込む。n は 0〜14、m は 15〜29 の場所 */
+  function buildSlotAgg() {
+    const now = new Date(), base = now.getFullYear() * 12 + now.getMonth();
+    const cut = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString();
+    const ok = new Set(eligible().map(t => t.id));
+    const by = new Map();
+    const vs = D().visits;
+    for (let i = 0; i < vs.length; i++) {
+      const v = vs[i];
+      if (v.at < cut) continue;
+      const h = HID.get(v.houseId);
+      if (!h || !ok.has(h.terrId)) continue;
+      const d = new Date(v.at);
+      if (isNaN(d)) continue;
+      const off = base - (d.getFullYear() * 12 + d.getMonth());
+      if (off < 0 || off > 11) continue;
+      const w = d.getDay();
+      const col = w === 0 ? 2 : w === 6 ? 1 : (holidayOf(ymd(d)) ? 2 : 0); // 祝日は日曜に数える
+      const c = SLB.indexOf(bandOf(d)) * 3 + col;
+      let a = by.get(h.terrId);
+      if (!a) by.set(h.terrId, a = new Int32Array(12 * 30));
+      a[off * 30 + c]++;
+      if (v.result === 'met' || v.result === 'refused') a[off * 30 + 15 + c]++;
+    }
+    return by;
+  }
+  const slotAgg = () => memo('slotagg', buildSlotAgg);
+
+  /* 字ごとの区域のまとまり（その区域でいちばん割合の大きい字に、区域ごと入れる。字が決まっていない区域は「字なし」） */
+  function azaGroups() {
+    return memo('azag', () => {
+      const g = new Map();
+      eligible().forEach(t => {
+        const list = terrAza(t).slice().sort((a, b) => b.r - a.r);
+        const nm = list.length ? (azaShow(String(list[0].n || '').replace(/^.*\s/, '')) || '字なし') : '字なし';
+        if (!g.has(nm)) g.set(nm, { name: nm, terrs: [], homes: 0 });
+        const o = g.get(nm);
+        o.terrs.push(t);
+        o.homes += housesOf(t.id).reduce((a, h) => a + targets(h).length, 0);
+      });
+      return [...g.values()].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    });
+  }
+  /* いま見ている範囲：区域の一覧と、見出し */
+  function slotScope() {
+    const all = eligible().slice().sort(byNo), gs = azaGroups();
+    const hasAza = gs.some(x => x.name !== '字なし');
+    let sc = slotState.scope;
+    if (sc === 'aza' && !hasAza) sc = 'all';
+    if (sc === 'aza') {
+      let g = gs.find(x => x.name === slotState.sel) || gs[0];
+      return { sc, hasAza, terrs: g.terrs, g, title: `字：${g.name}`, sub: `区域 ${g.terrs.map(t => t.no).join('・')}（家・部屋 ${g.homes}軒）`, gs };
+    }
+    if (sc === 'terr') {
+      const t = all.find(x => x.id === slotState.sel) || all[0];
+      return { sc, hasAza, terrs: t ? [t] : [], all, t, title: t ? `区域${t.no}　${t.name || ''}` : '区域がありません', sub: t && prof(t) ? `字：${prof(t).aza}` : '' };
+    }
+    return { sc: 'all', hasAza, terrs: all, title: '全区域', sub: `${all.length}区域のぜんぶ` };
+  }
+  function slotQuery(terrs, p) {
+    const agg = slotAgg(), n = new Array(15).fill(0), m = new Array(15).fill(0);
+    terrs.forEach(t => {
+      const a = agg.get(t.id);
+      if (!a) return;
+      for (let o = 0; o < p; o++) for (let c = 0; c < 15; c++) { n[c] += a[o * 30 + c]; m[c] += a[o * 30 + 15 + c]; }
+    });
+    return { n, m };
+  }
+  function periodLabel(p) {
+    const now = new Date(), a = new Date(now.getFullYear(), now.getMonth() - (p - 1), 1);
+    return a.getFullYear() === now.getFullYear()
+      ? `${a.getFullYear()}年${a.getMonth() + 1}月〜${now.getMonth() + 1}月`
+      : `${a.getFullYear()}年${a.getMonth() + 1}月〜${now.getFullYear()}年${now.getMonth() + 1}月`;
+  }
+  function slotTableHtml() {
+    const s = slotScope(), q = slotQuery(s.terrs, slotState.period), emph = s.sc !== 'all';
+    // いちばん会えている欄（10件以上ある欄だけ）
+    let best = -1, bp = -1;
+    for (let c = 0; c < 15; c++) if (q.n[c] >= SL_BEST && q.m[c] / q.n[c] > bp) { bp = q.m[c] / q.n[c]; best = c; }
+    const cell = c => {
+      const n = q.n[c], m = q.m[c];
+      if (!n) return `<td class="sl-none${emph ? ' sl-emph' : ''}"><b>未試行</b></td>`;
+      if (n < SL_FEW) return `<td class="sl-few"><b>データ少</b><br><small>${n}件</small></td>`;
+      const p = Math.round(m / n * 100);
+      return `<td class="${c === best ? 'best' : ''}" style="background:rgba(21,101,192,${(0.06 + p / 100 * 0.5).toFixed(2)})"><b>${p}%</b><br><small>${n}件</small><div class="bar"><i style="width:${p}%"></i></div></td>`;
+    };
+    const rows = SLB.map((b, bi) => `<tr><th>${b}<br><small>${BAND_HINT[b]}</small></th>${[0, 1, 2].map(ci => cell(bi * 3 + ci)).join('')}</tr>`).join('');
+    const none = q.n.filter(x => !x).length, few = q.n.filter(x => x > 0 && x < SL_FEW).length;
+    return `<table class="slots slotnew" aria-label="曜日と時間帯ごとの会えた割合"><tr><th></th>${SLC.map(x => `<th>${x}</th>`).join('')}</tr>${rows}</table>
+      <p class="hint">期間：<b>${periodLabel(slotState.period)}</b>（今月をふくむ${slotState.period}か月）　記録 ${q.n.reduce((a, b) => a + b, 0)}件</p>
+      ${emph && none ? `<p class="hint-strong">未試行の枠が${none}つあります。留守宅カードや訪問の計画で、その曜日・時間帯を試してみてください。</p>` : ''}
+      ${few ? `<p class="hint">「データ少」は、記録が${SL_FEW}件に満たない枠です。割合は出していません。</p>` : ''}`;
+  }
+  function slotBoxHtml() {
+    const s = slotScope(), st = slotState;
+    const sel = s.sc === 'aza'
+      ? `<select id="slSel" aria-label="字をえらぶ">${s.gs.map(g => `<option value="${esc(g.name)}"${g.name === s.g.name ? ' selected' : ''}>${esc(g.name)}（${g.terrs.length}区域）</option>`).join('')}</select>`
+      : s.sc === 'terr'
+        ? `<select id="slSel" aria-label="区域をえらぶ">${s.all.map(t => `<option value="${t.id}"${s.t && t.id === s.t.id ? ' selected' : ''}>区域${esc(t.no)}　${esc(t.name || '')}</option>`).join('')}</select>` : '';
+    const tiny = s.sc === 'aza' && s.g.homes < SL_AZA_MIN;
+    return `<h2 class="sec">曜日と時間帯ごとの「会えた」割合（拒否を含む）</h2>
+      <p class="hint">「会えた」と「拒否」を会えた側、「留守」を会えなかった側として数えています。</p>
+      <div class="seg" role="group" aria-label="見る範囲">
+        <button type="button" data-ssc="all" aria-pressed="${s.sc === 'all'}">全区域</button>
+        ${s.hasAza ? `<button type="button" data-ssc="aza" aria-pressed="${s.sc === 'aza'}">字ごと</button>` : ''}
+        <button type="button" data-ssc="terr" aria-pressed="${s.sc === 'terr'}">区域ごと</button></div>
+      <div class="slpick">${sel}
+        <div class="seg" role="group" aria-label="期間"><button type="button" data-sper="4" aria-pressed="${st.period === 4}">直近4か月</button><button type="button" data-sper="12" aria-pressed="${st.period === 12}">1年</button></div></div>
+      <p class="slscope">いま見ているのは：${esc(s.title)}${s.sub ? `<small>${esc(s.sub)}</small>` : ''}</p>
+      ${tiny ? `<div class="slpriv"><b>この字は、家・部屋が${SL_AZA_MIN}軒に満たないため、表を出しません。</b><br>少ない軒数では、特定の家の様子が推測できてしまうためです。「区域ごと」か「全区域」で見てください。</div>` : slotTableHtml()}
+      <p class="hint">祝日は日曜に含みます。時間は、記録を入力した時刻で数えています（あとからまとめて入力した記録は、実際の訪問時間とずれます）。留守宅カードの時間帯（平日／土日）とは、土曜と日曜を分けて数える点がちがいます。</p>`;
+  }
+  /* 係の画面「状況」の、古い表（直近180日）を隠して、新しい表を出す */
+  function paintSlotBox() {
+    const tbl = document.getElementById('adSlots');
+    if (!tbl) return;
+    const wrap = tbl.parentNode, hint = wrap.previousElementSibling, h2 = hint && hint.previousElementSibling;
+    [wrap, hint, h2].forEach(x => { if (x) x.hidden = true; });
+    let box = document.getElementById('adSlotBox');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'adSlotBox';
+      (h2 || wrap).parentNode.insertBefore(box, h2 || wrap);
+      box.addEventListener('click', e => {
+        const a = e.target.closest('[data-ssc]'), b = e.target.closest('[data-sper]');
+        if (a) { slotState.scope = a.dataset.ssc; slotState.sel = ''; paintSlotBox(); }
+        else if (b) { slotState.period = Number(b.dataset.sper); paintSlotBox(); }
+      });
+      box.addEventListener('change', e => { if (e.target.id === 'slSel') { slotState.sel = e.target.value; paintSlotBox(); } });
+    }
+    box.innerHTML = slotBoxHtml();
+  }
+
+  /* =========================================================
+     第3弾（2）係の画面の最初のタブ「今日」
+     ・上：年間カバーの状況（言葉・色・記号で示す）
+     ・下：今日対応することだけを並べる（対応がないものは出さない）
+     ・区域の貸し出し（申し込み）と、自分で受け取られた区域の確認は、その場で1タップ（取り消せる）
+     ・くわしい一覧と操作は、これまでどおり下に残している
+     ========================================================= */
+  const css4 = document.createElement('style');
+  css4.textContent = `.cover{display:flex;gap:12px;align-items:center;border:3px solid;border-radius:14px;padding:10px 12px;margin:6px 0 14px}
+.cover i{font-style:normal;font-size:26px;font-weight:700;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:#fff;flex:none}
+.cover b{font-size:21px}.cover small{display:block;font-size:15px;color:var(--ink2);line-height:1.5}
+.cv-ok{border-color:#2E7D32;background:#E8F5E9}.cv-ok i{background:#2E7D32}
+.cv-warn{border-color:#C2410C;background:#FFF1E8}.cv-warn i{background:#C2410C}
+.cv-bad{border-color:#B71C1C;background:#FFEBEE}.cv-bad i{background:#B71C1C}
+.cv-none{border-color:#546E7A;background:#ECEFF1}.cv-none i{background:#546E7A}
+.tdnone{text-align:center;padding:22px 12px;font-size:22px;background:#fff;border:2px dashed var(--line);border-radius:14px}
+.tdnone small{display:block;font-size:15px;color:var(--ink2);margin-top:4px}
+.tdrow .duebtns{min-width:9em}.tdrow .duebtns .btn{white-space:normal}`;
+  document.head.appendChild(css4);
+
+  function coverInfo() {
+    const ds = eligible().map(dueInfo);
+    const known = ds.filter(d => d.last), over = ds.filter(d => d.st === 'over'), warn = ds.filter(d => d.st === 'warn'), none = ds.filter(d => d.st === 'none');
+    let cls = 'cv-ok', mark = '✓', word = '順調';
+    if (!known.length) { cls = 'cv-none'; mark = '？'; word = 'まだ判定できません'; }
+    else if (over.length) { cls = 'cv-bad'; mark = '▲'; word = '遅れ気味'; }
+    else if (warn.length) { cls = 'cv-warn'; mark = '！'; word = '要注意'; }
+    return { cls, mark, word, known: known.length, over: over.length, warn: warn.length, none: none.length };
+  }
+  const listNos = (ts, max) => {
+    const a = ts.slice(0, max || 8).map(t => esc(t.no));
+    return a.join('・') + (ts.length > (max || 8) ? `　ほか${ts.length - (max || 8)}区域` : '');
+  };
+  const terrBtns = (ts, max) => ts.slice(0, max || 3).map(t => `<button type="button" class="btn small" data-topen="${t.id}">区域${esc(t.no)}の地図</button>`).join('');
+
+  /* 今日の対応の項目。対応がないものは作らない */
+  function todayItems() {
+    const out = [], now = Date.now(), ts = eligible(), m = monthStats();
+    const go = (pane, anchor, label) => `<button type="button" class="btn small primary" data-tgo="${pane}" data-anchor="${anchor || ''}">${label || '見る'}</button>`;
+    const row = (tone, title, sub, btns) => out.push({ tone, title, sub, btns });
+    // 1 スマホの登録の申し込み（本人の番号を確かめる必要があるので、ここでは決めない）
+    if (LIVE && typeof devPending === 'function') {
+      const n = devPending().length;
+      if (n) row('#C2410C', `スマホの登録の申し込み　${n}件`, '本人のスマホに出ている番号と同じか、確かめてから登録します', go('inbox', 'adDevices', '確かめる'));
+    }
+    // 2 区域カードの申し込み（その場で貸し出せる）
+    const free = freeTerrs().map(t => ({ t, last: t.completedAt })).sort(byLongest);
+    D().requests.filter(r => !r.type && r.status === 'pending').sort((a, b) => (a.at < b.at ? -1 : 1)).forEach(r => {
+      const selEl = document.querySelector(`[data-reqterr="${r.id}"]`);
+      const want = r.terrId ? terrById(r.terrId) : null;
+      const pick = (selEl && terrById(selEl.value)) || (want && free.some(x => x.t.id === want.id) ? want : (free[0] ? free[0].t : null));
+      const held = D().territories.filter(t => t.holder === r.by);
+      const over = held.filter(t => t.lentAt && daysSince(t.lentAt) > 120).length;
+      row('#1565C0', `${esc(uname(r.by))}さんが、区域カードを申し込んでいます${r.forGroup ? `（${esc(r.forGroup)}グループ用）` : ''}`,
+        `希望：${want ? `区域${esc(want.no)}${want.holder ? '（すでに貸出中）' : ''}` : 'どこでもよい'}　今持っているカード ${held.length}枚${over ? `<span class="tag-warn">4か月超 ${over}枚</span>` : ''}`,
+        (pick ? `<button type="button" class="btn small primary" data-tok="${r.id}">区域${esc(pick.no)}を貸し出す</button>` : '<span class="muted">空いている区域がありません</span>') +
+        `<button type="button" class="btn small" data-tno="${r.id}">見送る</button>`);
+    });
+    // 3 家の削除の申請（記録も消えるので、ここでは決めない）
+    const dn = delReqs().length;
+    if (dn) row('#B3261E', `家の削除の申請　${dn}件`, '申請した人に確認してから、「削除する」か「見送る」を選びます', go('inbox', 'adInbox', '確かめる'));
+    // 4 自分で受け取られた区域（その場で確認できる）
+    D().territories.filter(t => t.holder && t.selfTakenAt && t.selfSeen === false).forEach(t => {
+      row('#00796B', `${esc(uname(t.holder))}さんが、区域${esc(t.no)}を自分で受け取りました`, `${fmtDay(t.selfTakenAt)}に受け取り（今 ${heldCount(t.holder)}枚）`,
+        `<button type="button" class="btn small primary" data-ttaken="${t.id}">確認した</button><button type="button" class="btn small" data-topen="${t.id}">地図</button>`);
+    });
+    // 5 今月中に出したい区域
+    if (m.need.length) row('#C2410C', `今月中に出したい区域　${m.need.length}区域`, `出さないと1年の期限に間に合いません：区域${listNos(m.need.map(d => d.t))}`, go('status', 'adDue'));
+    // 6 1年の期限
+    if (m.over.length) row('#B71C1C', `1年の期限を過ぎた区域　${m.over.length}区域`, `区域${listNos(m.over.map(d => d.t))}`, go('status', 'adDue'));
+    if (m.warn.length) row('#C2410C', `1年の期限まで${PIN_DAYS}日以内の区域　${m.warn.length}区域`, `区域${listNos(m.warn.map(d => d.t))}`, go('status', 'adDue'));
+    // 7 返却の目安を過ぎた貸出
+    const late = ts.filter(t => t.holder && t.lentAt && Date.parse(dueOf(t)) < now);
+    if (late.length) row('#C2410C', `返却の目安を過ぎた貸出　${late.length}件`,
+      late.slice(0, 4).map(t => `区域${esc(t.no)}（${esc(uname(t.holder))}さん・${daysSince(dueOf(t))}日超過）`).join('、') + (late.length > 4 ? `　ほか${late.length - 4}件` : '') + '。声をかけるかどうかは、係が決めてください。',
+      terrBtns(late, 3));
+    // 8 留守宅カードで回っているのに、有効なカードを持つ人がいない区域
+    const act = activeCards();
+    const stuck = ts.filter(t => t.awayPoolAt && !t.holder && !act.some(c => c.terrId === t.id));
+    if (stuck.length) row('#8A6D00', `留守宅カードを持っている人がいない区域　${stuck.length}区域`, `留守宅のまま止まっています：区域${listNos(stuck)}`, go('status', 'adAwaySet', '留守宅の状況'));
+    // 9 年齢データ・字
+    if (typeof AGE_ON !== 'undefined' && AGE_ON) {
+      const cur = typeof ageCur === 'function' ? ageCur() : null;
+      if (!cur) row('#546E7A', '年齢データがまだありません', '入れると、会いやすい時間や地域のようすが出ます', go('set', 'adAge', '設定へ'));
+      else if (ageStale(cur)) row('#546E7A', '年齢データが古くなっています', `${esc(cur.asOf || '')}時点のデータです。新しくしてください`, go('set', 'adAge', '設定へ'));
+      const bad = ts.filter(t => t.azaErr && !(t.azaManual && t.azaManual.length));
+      if (bad.length) row('#546E7A', `字を調べられなかった区域　${bad.length}区域`, `区域${listNos(bad)}。「字を直す」で手で決められます`, go('terr', 'adTerrs', '区域の一覧へ'));
+    }
+    return out;
+  }
+  function coverHtml() {
+    const c = coverInfo();
+    return `<div class="cover ${c.cls}" role="status"><i aria-hidden="true">${c.mark}</i>
+      <div><b>年間カバー：${c.word}</b>
+        <small>1年以内に回っていない区域：<b style="font-size:inherit">${c.over}区域</b>　／　期限まで${PIN_DAYS}日以内：${c.warn}区域</small>
+        <small>1年以内に回った区域：${c.known - c.over} / ${c.known}${c.none ? `</small><small>前回の記録なし ${c.none}区域 → S-13に転記してください` : ''}</small></div></div>`;
+  }
+  function fixTabLabel() {
+    const b = document.querySelector('#adTabs [data-ap="inbox"]');
+    if (b && b.firstChild && b.firstChild.nodeType === 3 && b.firstChild.textContent !== '今日') b.firstChild.textContent = '今日';
+  }
+  function goPane(pane, anchor) {
+    setAdPane(pane);
+    renderAdmin();
+    $('#view-admin').scrollTop = 0;
+    if (anchor) setTimeout(() => { const el = document.getElementById(anchor); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+  }
+  function paintToday() {
+    if (!isAdmin()) return;
+    const pane = document.querySelector('[data-apane="inbox"]');
+    if (!pane) return;
+    let box = document.getElementById('adToday');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'adToday';
+      pane.insertBefore(box, pane.firstChild);
+      box.addEventListener('click', e => {
+        const q = s => e.target.closest(s);
+        let x;
+        if ((x = q('[data-tgo]'))) goPane(x.dataset.tgo, x.dataset.anchor);
+        else if ((x = q('[data-tok]'))) approveReq(x.dataset.tok);
+        else if ((x = q('[data-tno]'))) declineReq(x.dataset.tno);
+        else if ((x = q('[data-ttaken]'))) {
+          const t = terrById(x.dataset.ttaken);
+          if (t) commit(`区域${t.no}の受け取りを確認しました`, () => { t.selfSeen = true; });
+        }
+        else if ((x = q('[data-topen]'))) openTerr(x.dataset.topen);
+      });
+    }
+    const items = todayItems();
+    box.innerHTML = coverHtml() + `<h2 class="sec">今日の対応</h2>` + (items.length
+      ? items.map(i => `<div class="duerow tdrow" style="border-left-color:${i.tone}"><div><p><b>${i.title}</b></p><p class="muted">${i.sub}</p></div><div class="duebtns">${i.btns}</div></div>`).join('') +
+        '<p class="hint">くわしい一覧と、そのほかの操作は、この下にあります。</p>'
+      : '<div class="tdnone"><b>今日対応することはありません</b><small>新しい申し込みや、急ぎの区域はありません</small></div>');
+    // 以前の「待っているものはありません」の表示は、ここに一本化する
+    const em = document.getElementById('adInboxEmpty');
+    if (em) em.innerHTML = '';
+    const cnt = document.getElementById('apCnt');
+    if (cnt) { cnt.textContent = items.length; cnt.hidden = !items.length; }
+    fixTabLabel();
+  }
+  const _renderInbox = window.renderInbox;
+  window.renderInbox = function () {
+    _renderInbox.apply(this, arguments);
+    try { paintToday(); } catch (e) { console.error(e); }
+  };
+
+  /* =========================================================
+     第3弾（3）「速さを測る」に、新しい集計の時間を加える
+     ========================================================= */
+  if (typeof runPerfCheck === 'function') {
+    const _perf = window.runPerfCheck;
+    window.runPerfCheck = function () {
+      _perf.apply(this, arguments);
+      try {
+        const rows = [];
+        const T = (name, fn, k) => {
+          const n = k || 1, t0 = performance.now();
+          try { for (let i = 0; i < n; i++) fn(); } catch (e) { rows.push([name, -1]); return; }
+          rows.push([name, (performance.now() - t0) / n]);
+        };
+        T('時間帯の表：記録を1周して集計', () => buildSlotAgg(), 2);
+        T('時間帯の表：表を作る', () => { MEMO.delete('slotagg'); slotBoxHtml(); }, 3);
+        T('「今日」：対応の項目づくり', () => { MEMO.clear(); todayItems(); coverInfo(); }, 3);
+        const tb = document.querySelector('#sheet table.slots');
+        if (!tb) return;
+        const mark = ms => (ms < 0 ? '×（エラー）' : ms < 100 ? '◎ 速い' : ms < 300 ? '○ ふつう' : ms < 1000 ? '△ 少し待つ' : '× 重い');
+        tb.insertAdjacentHTML('beforeend', rows.map(([n, ms]) =>
+          `<tr><th style="text-align:left">${esc(n)}</th><td>${ms < 0 ? '—' : Math.round(ms) + 'ms'}</td><td>${mark(ms)}</td></tr>`).join(''));
+        const copy = document.getElementById('pfCopy');
+        if (copy) copy.onclick = () => {
+          const text = `区域マップ 動作の速さ（${navigator.userAgent.slice(0, 80)}）\n家${D().houses.length} 記録${D().visits.length}\n` +
+            [...tb.querySelectorAll('tr')].slice(1).map(tr => [...tr.children].map(c => c.textContent.trim()).join(' / ')).join('\n');
+          copyText(text).then(ok => toast(ok ? 'コピーしました' : 'コピーできませんでした'));
+        };
+      } catch (e) { console.error(e); }
     };
   }
 
