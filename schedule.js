@@ -1506,27 +1506,48 @@
      第5弾（2）区域の地図の「期限で色分け」（係だけ・この端末だけ）
      ・前回回り終えた日からの日数で、区域の塗りを変える。色だけでなく、記号・線の形・凡例でも分かる
      ・区域の線（約80）だけを塗り替える。家の印は描き直さない
+     ・番号の札は、縮尺に合わせて出し分ける
+       縮小：色だけ → 中間：小さな番号 → 拡大：くわしい札。重なるときは、期限の近い区域を優先
+     ・係の画面では、「切」のときも同じ出し分けにする（番号が重なって区域が見えなくなるのを防ぐ）
      ========================================================= */
   const cssDm = document.createElement('style');
   cssDm.textContent = `.dm-ctl{background:var(--paper,#fff);border:2px solid var(--ink,#222);border-radius:12px;padding:8px;max-width:250px;margin:70px 8px 0 0;font-size:15px;line-height:1.5}
 .dm-ctl[hidden]{display:none}.dm-ctl .sw{display:inline-block;width:16px;height:16px;border-radius:4px;border:2px solid #333;vertical-align:-3px;margin-right:4px}
-.dm-ctl p{margin:3px 0}.dm-ctl summary{cursor:pointer;min-height:36px;line-height:36px;font-weight:700}body.duemode .terr-label:not(.duelab){display:none}
-.duelab span{pointer-events:auto;cursor:pointer;min-height:34px;display:inline-block;line-height:30px;background:#fff;border:2px solid #222;border-radius:8px;padding:1px 6px;font-weight:700;font-size:15px;white-space:nowrap;color:#111}`;
+.dm-ctl p{margin:3px 0}.dm-ctl summary{cursor:pointer;min-height:36px;line-height:36px;font-weight:700}
+body.duemode .terr-label:not(.duelab){display:none}
+.duelab span{pointer-events:auto;cursor:pointer;display:inline-block;min-height:34px;line-height:30px;background:#fff;border:2px solid #222;border-radius:8px;padding:1px 6px;font-weight:700;font-size:15px;white-space:nowrap;color:#111}
+.duelab.cp span{min-height:0;line-height:18px;font-size:13px;padding:0 4px;border-width:1.5px;border-radius:6px}
+.duelab.ro span{pointer-events:none;cursor:default}
+.duelab.off span{border-color:var(--terr);color:var(--terr)}`;
   document.head.appendChild(cssDm);
   const DMC = {
     ok: ['#0072B2', '✓', '4か月以内に回った'], mid: ['#F0E442', '！', '4〜8か月前'], long: ['#E69F00', '▲', '8か月〜1年前'],
     over: ['#D55E00', '✕', '1年をこえた'], none: ['#8C8C8C', '？', '前回の記録なし']
   };
+  const DM_PRI = { over: 0, long: 1, mid: 2, none: 3, ok: 4 };   // 札が重なったときに残す順（期限が近い区域を先に）
   const cssAt = document.createElement('style');
   cssAt.textContent = '.leaflet-control-attribution{font-size:10px;opacity:.75;padding:0 4px}';
   document.head.appendChild(cssAt);
   const dmState = { on: lsGet('kuiki_duemode') === '1' };
-  let dueLayer = null, dmCtl = null;
+  let dueLayer = null, dmCtl = null, dmRaf = 0, dmHtml = '';
   function dmClass(t) {
     const d = dueInfo(t);
     if (!d.last) return 'none';
     const days = daysFrom(d.last);
     return days <= 120 ? 'ok' : days <= 240 ? 'mid' : days <= YEAR ? 'long' : 'over';
+  }
+  /* 今の縮尺で、番号の札をどう出すか。画面に入っている区域の広さ（真ん中の値）で決める */
+  function dmLabelMode(list, on) {
+    const b = map.getBounds(), areas = [];
+    list.forEach(t => {
+      if (!b.intersects(L.latLngBounds(t.polygon))) return;
+      const a = terrScreenArea(t);
+      if (a > 0) areas.push(a);
+    });
+    if (!areas.length) return 'full';
+    areas.sort((x, y) => x - y);
+    const med = areas[Math.floor(areas.length / 2)];
+    return med < (on ? 1500 : 400) ? 'none' : med < 6000 ? 'cp' : 'full';
   }
   function paintDueMap() {
     if (typeof map === 'undefined' || !map || typeof L === 'undefined') return;
@@ -1540,23 +1561,71 @@
         dmState.on = !dmState.on; lsSet('kuiki_duemode', dmState.on ? '1' : '0');
         renderTerrs();
       });
+      // 拡大・縮小・移動のあと、番号の札を出し直す（続けて動かしているあいだは、描き直しは1コマに1回まで）
+      map.on('zoomend moveend', () => {
+        if (dmRaf) return;
+        dmRaf = requestAnimationFrame(() => { dmRaf = 0; try { paintDueMap(); } catch (e) { console.error(e); } });
+      });
     }
     if (!dueLayer) dueLayer = L.layerGroup().addTo(map);
     dueLayer.clearLayers();
     const show = isAdmin() && !lkLocked(), on = show && dmState.on;
-    document.body.classList.toggle('duemode', on);
+    document.body.classList.toggle('duemode', show);
     const ctl = document.getElementById('dmCtl');
     ctl.hidden = !show;
-    if (show) ctl.innerHTML = `<button type="button" class="btn small ${on ? 'primary' : ''}" data-dmtog aria-pressed="${on}">期限で色分け：${on ? '入' : '切'}</button>` +
+    if (!show) return;
+    const ts = polyTerrs().filter(t => on ? !t.dummy : true);
+    const mode = dmLabelMode(ts, on);
+    // 操作の枠：中身が変わったときだけ作り直す（開いている凡例が、地図を動かすたびに閉じないように）
+    const html = `<button type="button" class="btn small ${on ? 'primary' : ''}" data-dmtog aria-pressed="${on}">期限で色分け：${on ? '入' : '切'}</button>` +
+      (mode === 'none' ? '<p class="muted" style="margin:4px 0 0">拡大すると番号が出ます</p>' : '') +
       (on ? `<details><summary>凡例（色・記号の意味）</summary><div>${Object.keys(DMC).map(k => `<p><span class="sw" style="background:${DMC[k][0]}"></span>${DMC[k][1]} ${DMC[k][2]}</p>`).join('')}<p>線が破線＝貸出中（番号の横に「貸」）<br>点線＝貸出中止（「止」）</p><p class="muted"><b>番号の札</b>か、色のついた場所を押すと、その区域の詳しい情報（カルテ）が開きます</p></div></details>` : '');
-    if (!on) return;
-    for (const t of polyTerrs()) {
-      if (t.dummy || isSpecial(t)) continue;
-      const c = DMC[dmClass(t)], held = !!t.holder, stop = lendMode(t) === 'stop';
-      L.polygon(t.polygon, { color: '#222', weight: held || stop ? 4 : 2, dashArray: held ? '10 6' : stop ? '2 8' : null, fillColor: c[0], fillOpacity: 0.4, opacity: 0.9, bubblingMouseEvents: false })
-        .on('click', () => openKarte(t.id)).addTo(dueLayer);
-      L.marker(center(t.polygon), { icon: L.divIcon({ className: 'terr-label duelab', html: `<span>${c[1]} ${esc(t.no)}${held ? ' 貸' : stop ? ' 止' : ''}</span>`, iconSize: [0, 0] }), interactive: true, bubblingMouseEvents: false, keyboard: false, pane: 'labelPane' })
-        .on('click', () => openKarte(t.id)).addTo(dueLayer);
+    if (html !== dmHtml) {
+      const wasOpen = !!(ctl.querySelector('details') && ctl.querySelector('details').open);
+      ctl.innerHTML = html; dmHtml = html;
+      if (wasOpen && ctl.querySelector('details')) ctl.querySelector('details').open = true;
+    }
+    // 区域の塗り（「入」のときだけ）。縮小しているときは、色を濃く・線を細くして、色が見やすいようにする
+    if (on) {
+      for (const t of ts) {
+        const c = DMC[dmClass(t)], held = !!t.holder, stop = lendMode(t) === 'stop';
+        L.polygon(t.polygon, { color: '#222', weight: held || stop ? (mode === 'none' ? 2.5 : 4) : (mode === 'none' ? 1.2 : 2),
+          dashArray: held ? '10 6' : stop ? '2 8' : null, fillColor: c[0], fillOpacity: mode === 'none' ? 0.6 : 0.4, opacity: 0.9, bubblingMouseEvents: false })
+          .on('click', () => openKarte(t.id)).addTo(dueLayer);
+      }
+    }
+    // 番号の札：縮尺で出し分け、重なるものは優先順で残す
+    if (mode === 'none') return;
+    const sz = map.getSize(), c0 = sz.divideBy(2), sel = on ? null : selTerrId();
+    const scr = ll => { const p = map.latLngToContainerPoint(ll); return map._kmRad ? c0.add(rotPt(p.subtract(c0), map._kmRad)) : p; };
+    const cp = mode === 'cp';
+    const items = [];
+    ts.forEach(t => {
+      const ll = center(t.polygon), p = scr(ll);
+      if (p.x < -20 || p.y < -20 || p.x > sz.x + 20 || p.y > sz.y + 20) return;
+      let text, pri;
+      if (on) {
+        const k = dmClass(t), c = DMC[k], held = !!t.holder, stop = lendMode(t) === 'stop';
+        text = cp ? `${c[1]}${t.no}` : `${c[1]} ${t.no}${held ? ' 貸' : stop ? ' 止' : ''}`;
+        pri = DM_PRI[k];
+      } else {
+        text = `${t.group ? 'G ' : ''}${t.no}`;
+        pri = sel && t.id === sel ? 0 : 1;
+      }
+      items.push({ t, ll, p, text, pri });
+    });
+    items.sort((a, b) => a.pri - b.pri || cmpNo(a.t.no, b.t.no));
+    const placed = [];
+    for (const it of items) {
+      const w = cp ? 10 + 9 * it.text.length : 18 + 11 * it.text.length, h = cp ? 24 : 36;
+      const r = [it.p.x - w / 2 - 2, it.p.y - h / 2 - 2, it.p.x + w / 2 + 2, it.p.y + h / 2 + 2];
+      if (placed.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) continue;   // 先に置いた札と重なるものは出さない
+      placed.push(r);
+      const faint = !on && sel && it.t.id !== sel;
+      const m = L.marker(it.ll, { icon: L.divIcon({ className: `terr-label duelab${cp ? ' cp' : ''}${on ? '' : ' ro off'}${faint ? ' faint' : ''}`, html: `<span>${esc(it.text)}</span>`, iconSize: [0, 0] }),
+        interactive: on, bubblingMouseEvents: false, keyboard: false, pane: 'labelPane' });
+      if (on) m.on('click', () => openKarte(it.t.id));
+      m.addTo(dueLayer);
     }
   }
   const _renderTerrs = window.renderTerrs;
