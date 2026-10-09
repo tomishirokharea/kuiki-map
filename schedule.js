@@ -60,6 +60,7 @@
   /* ---------- 見た目 ---------- */
   const css = document.createElement('style');
   css.textContent = `.duechip{display:inline-block;border-radius:8px;padding:0 8px;font-weight:700;font-size:14px;border:1.5px solid;white-space:nowrap}
+.ptag{display:inline-block;background:#FFF1E8;border:2px solid #C2410C;color:#7A2E00;border-radius:8px;padding:0 8px;font-weight:700;font-size:15px;margin-left:4px}
 .duepin{display:inline-block;background:#B71C1C;color:#fff;border-radius:6px;padding:0 6px;font-size:13px;font-weight:700;margin-right:4px}
 .duemeet{display:inline-block;background:var(--terr-soft);color:var(--terr);border-radius:6px;padding:0 6px;font-size:13px;font-weight:700}
 .duetbl th,.duetbl td{text-align:left;vertical-align:middle}
@@ -465,6 +466,31 @@
     } catch (e) { console.error(e); }
   };
 
+  /* ---------- 途中で返却された区域・まったく回らずに返却された区域：自動受け取りの対象にする ----------
+     ・「自動受け取り」を使っているとき、回り終えた記録のない返却（途中・未着手）は、日数を待たずに、すぐ自由に受け取れる
+       （回り終えて返却した区域は、これまでどおり、決めた日数がたってから）
+     ・受け取る人が分かるように、一覧に「途中で返却（約○%）」「ほとんど回らずに返却」と出す
+     ・係の仕事は増やさない（「今日」タブにも出さない） */
+  const _autoFreeOf = window.autoFreeOf;
+  const isPartial = t => !!t && !t.holder && !t.awayPoolAt && !!t.returnedAt && (!t.completedAt || t.returnedAt > t.completedAt);
+  window.autoFreeOf = function (t) {
+    if (t && Number(D().settings.autoFree) === 1 && isPartial(t)) return true;
+    return _autoFreeOf.apply(this, arguments);
+  };
+  /* 途中返却の説明（受け取る人に見せる）。返却のときの進み具合は、返却の記録（returns）から読む */
+  function partialInfo(t) {
+    if (!isPartial(t)) return null;
+    let r = null;
+    D().returns.forEach(x => { if (x.terrId === t.id && !x.pool && (!r || x.at > r.at)) r = x; });
+    const pct = r && r.pct != null ? Math.round(Number(r.pct)) : null;
+    return { pct, at: t.returnedAt, none: pct == null || pct <= 5 };
+  }
+  const partialTag = t => {
+    const p = partialInfo(t);
+    if (!p) return '';
+    return `<span class="ptag">！ ${p.none ? 'ほとんど回らずに返却' : `途中で返却（回ったのは約${p.pct}%）`}</span>`;
+  };
+
   /* ---------- 「区域をもらう」一覧：おすすめ順を加える ---------- */
   reqSort = 'reco';
   window.openRequestSheet = function (g) {
@@ -483,7 +509,7 @@
         <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
         <div><b>${esc(t.name)}</b>
           ${reqSort === 'reco' ? recoLine(x) : ''}
-          <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}</div>
+          <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}</div>
         ${isFree(t) && canTake
           ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
           : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
@@ -1210,6 +1236,7 @@
       sub = `${esc(uname(t.holder))}さん・${t.lentAt ? fmtDay(t.lentAt) + 'に受け取り（' + daysSince(t.lentAt) + '日目）' : ''}　返却の目安 ${t.lentAt ? fmtDay(dueOf(t)) : '—'}${prog}`;
     } else if (t.awayPoolAt) { cls = 'cv-warn'; mark = '！'; word = '留守宅カードで回っています'; }
     else if (lendMode(t) === 'stop') { word = '貸出中止にしています'; mark = '－'; }
+    { const pi = !t.holder && partialInfo(t); if (pi) { word = '空いています（途中で返却）'; sub = `${fmtDay(pi.at)}に返却・${pi.none ? 'ほとんど回っていません' : '回ったのは約' + pi.pct + '%'}`; } }
     const dueTxt = di.left == null ? '前回の記録がありません' : di.left < 0 ? `1年の期限を${-di.left}日過ぎています` : `1年の期限まで あと${di.left}日`;
     // 4 時間帯の表 5 数字
     let table, nums = '';
