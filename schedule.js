@@ -1733,6 +1733,35 @@
         <p class="hint">番号を忘れたときは、ロックの画面の「番号を忘れた」から、このスマホの登録を外して登録し直します（ほかの区域係の承認が必要です）。番号をかえるときは、いったん「自動ロックをやめる」から決め直してください。</p>`}`;
   }
 
+  /* =========================================================
+     記録のあとの表示（静かにする）
+     ・記録のあとの「次のおすすめ」の枠は出さない
+     ・「取り消す」は、画面の一番下に、小さく目立たない帯で出す（数秒で消える）
+     ========================================================= */
+  const cssQ = document.createElement('style');
+  cssQ.textContent = `#toast.quiet,body.sheet-open #toast.quiet,body.wheel-open #toast.quiet{top:auto;bottom:calc(4px + env(safe-area-inset-bottom));z-index:900;background:#5b6661;color:#e9eeec;border-radius:10px;padding:4px 6px 4px 10px;gap:8px;font-size:13px;box-shadow:none;opacity:.88;max-width:calc(100% - 16px)}
+#toast.quiet button{min-height:32px;border-width:1px;border-radius:8px;font-size:13px;padding:0 10px;font-weight:600}`;
+  document.head.appendChild(cssQ);
+  window.showNextPanel = function () { return false; };
+  const _quickVisit = window.quickVisit;
+  let quietOn = false;
+  window.quickVisit = function () {
+    quietOn = true;
+    try { return _quickVisit.apply(this, arguments); } finally { quietOn = false; }
+  };
+  const _toast = window.toast;
+  let quietTm = 0;
+  window.toast = function () {
+    const r = _toast.apply(this, arguments);
+    try {
+      const el = document.getElementById('toast');
+      clearTimeout(quietTm);
+      el.classList.toggle('quiet', quietOn);
+      if (quietOn) quietTm = setTimeout(() => { el.hidden = true; el.classList.remove('quiet'); }, 8000);
+    } catch (e) { /* 表示だけの話 */ }
+    return r;
+  };
+
   /* 試作版などで、この部品より先に画面ができていたときは描き直す */
   if (Store.data && typeof map !== 'undefined' && map) { try { renderAll(); } catch (e) { console.error(e); } }
 })();
