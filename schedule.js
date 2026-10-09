@@ -1483,8 +1483,8 @@
   const cssDm = document.createElement('style');
   cssDm.textContent = `.dm-ctl{background:var(--paper,#fff);border:2px solid var(--ink,#222);border-radius:12px;padding:8px;max-width:250px;margin:70px 8px 0 0;font-size:15px;line-height:1.5}
 .dm-ctl[hidden]{display:none}.dm-ctl .sw{display:inline-block;width:16px;height:16px;border-radius:4px;border:2px solid #333;vertical-align:-3px;margin-right:4px}
-.dm-ctl p{margin:3px 0}body.duemode .terr-label:not(.duelab){display:none}
-.duelab span{background:#fff;border:2px solid #222;border-radius:8px;padding:1px 6px;font-weight:700;font-size:15px;white-space:nowrap;color:#111}`;
+.dm-ctl p{margin:3px 0}.dm-ctl summary{cursor:pointer;min-height:36px;line-height:36px;font-weight:700}body.duemode .terr-label:not(.duelab){display:none}
+.duelab span{pointer-events:auto;cursor:pointer;min-height:34px;display:inline-block;line-height:30px;background:#fff;border:2px solid #222;border-radius:8px;padding:1px 6px;font-weight:700;font-size:15px;white-space:nowrap;color:#111}`;
   document.head.appendChild(cssDm);
   const DMC = {
     ok: ['#0072B2', '✓', '4か月以内に回った'], mid: ['#F0E442', '！', '4〜8か月前'], long: ['#E69F00', '▲', '8か月〜1年前'],
@@ -1516,14 +1516,15 @@
     const ctl = document.getElementById('dmCtl');
     ctl.hidden = !show;
     if (show) ctl.innerHTML = `<button type="button" class="btn small ${on ? 'primary' : ''}" data-dmtog aria-pressed="${on}">期限で色分け：${on ? '入' : '切'}</button>` +
-      (on ? `<div>${Object.keys(DMC).map(k => `<p><span class="sw" style="background:${DMC[k][0]}"></span>${DMC[k][1]} ${DMC[k][2]}</p>`).join('')}<p>線が破線＝貸出中（番号の横に「貸」）<br>点線＝貸出中止（「止」）</p><p class="muted">区域を押すと、カルテが開きます</p></div>` : '');
+      (on ? `<details><summary>凡例（色・記号の意味）</summary><div>${Object.keys(DMC).map(k => `<p><span class="sw" style="background:${DMC[k][0]}"></span>${DMC[k][1]} ${DMC[k][2]}</p>`).join('')}<p>線が破線＝貸出中（番号の横に「貸」）<br>点線＝貸出中止（「止」）</p><p class="muted"><b>番号の札</b>か、色のついた場所を押すと、その区域の詳しい情報（カルテ）が開きます</p></div></details>` : '');
     if (!on) return;
     for (const t of polyTerrs()) {
       if (t.dummy || isSpecial(t)) continue;
       const c = DMC[dmClass(t)], held = !!t.holder, stop = lendMode(t) === 'stop';
       L.polygon(t.polygon, { color: '#222', weight: held || stop ? 4 : 2, dashArray: held ? '10 6' : stop ? '2 8' : null, fillColor: c[0], fillOpacity: 0.4, opacity: 0.9, bubblingMouseEvents: false })
         .on('click', () => openKarte(t.id)).addTo(dueLayer);
-      L.marker(center(t.polygon), { icon: L.divIcon({ className: 'terr-label duelab', html: `<span>${c[1]} ${esc(t.no)}${held ? ' 貸' : stop ? ' 止' : ''}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(dueLayer);
+      L.marker(center(t.polygon), { icon: L.divIcon({ className: 'terr-label duelab', html: `<span>${c[1]} ${esc(t.no)}${held ? ' 貸' : stop ? ' 止' : ''}</span>`, iconSize: [0, 0] }), interactive: true, bubblingMouseEvents: false, keyboard: false, pane: 'labelPane' })
+        .on('click', () => openKarte(t.id)).addTo(dueLayer);
     }
   }
   const _renderTerrs = window.renderTerrs;
