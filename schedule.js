@@ -1517,6 +1517,9 @@
     ok: ['#0072B2', '✓', '4か月以内に回った'], mid: ['#F0E442', '！', '4〜8か月前'], long: ['#E69F00', '▲', '8か月〜1年前'],
     over: ['#D55E00', '✕', '1年をこえた'], none: ['#8C8C8C', '？', '前回の記録なし']
   };
+  const cssAt = document.createElement('style');
+  cssAt.textContent = '.leaflet-control-attribution{font-size:10px;opacity:.75;padding:0 4px}';
+  document.head.appendChild(cssAt);
   const dmState = { on: lsGet('kuiki_duemode') === '1' };
   let dueLayer = null, dmCtl = null;
   function dmClass(t) {
@@ -1527,6 +1530,8 @@
   }
   function paintDueMap() {
     if (typeof map === 'undefined' || !map || typeof L === 'undefined') return;
+    // 地図の右下の「Leaflet」の文字は消す（国土地理院の出典表示だけ残す）
+    try { if (map.attributionControl) map.attributionControl.setPrefix(false); } catch (e) { /* 表示だけの話なので無視 */ }
     if (!dmCtl) {
       const C = L.Control.extend({ options: { position: 'topright' }, onAdd() { const d = L.DomUtil.create('div', 'dm-ctl'); d.id = 'dmCtl'; L.DomEvent.disableClickPropagation(d); return d; } });
       dmCtl = new C(); dmCtl.addTo(map);
