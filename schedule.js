@@ -94,10 +94,11 @@
 
   /* ---------- 区域ごとの期限 ---------- */
   const eligible = () => D().territories.filter(t => !t.dummy && !isSpecial(t));
-  /* 前回回り終えた日：アプリの記録と、S-13に転記した紙の記録のうち新しいほう */
+  /* 前回回り終えた日：アプリの記録・紙の記録の完了日（t.paperDone）・S-13に転記した紙の記録のうち、いちばん新しいもの */
   function lastDone(t) {
     const c = [];
     if (t.completedAt) c.push(dstr(t.completedAt));
+    if (t.paperDone) c.push(String(t.paperDone)); // 係のスマホが書く、紙の記録の完了日（伝道者のスマホにはS-13がないため）
     (D().s13 || []).forEach(x => { if (x && x.terrId === t.id && x.c) c.push(String(x.c)); });
     return c.filter(Boolean).sort().pop() || '';
   }
@@ -1015,7 +1016,8 @@
     if (!known.length) { cls = 'cv-none'; mark = '？'; word = 'まだ判定できません'; }
     else if (over.length) { cls = 'cv-bad'; mark = '▲'; word = '遅れ気味'; }
     else if (warn.length) { cls = 'cv-warn'; mark = '！'; word = '要注意'; }
-    return { cls, mark, word, known: known.length, over: over.length, warn: warn.length, none: none.length };
+    // total・covered は会衆の目標（kangaeru.js）が使う：前回回り終えて365日以内の区域の数
+    return { cls, mark, word, known: known.length, over: over.length, warn: warn.length, none: none.length, total: ds.length, covered: known.length - over.length };
   }
   const listNos = (ts, max) => {
     const a = ts.slice(0, max || 8).map(t => esc(t.no));
@@ -1830,6 +1832,9 @@ body.duemode .terr-label:not(.duelab){display:none}
     } catch (e) { /* 表示だけの話 */ }
     return r;
   };
+
+  /* ほかの部品（kangaeru.js）が同じ計算を使うための窓口。写さずに、ここの関数をそのまま使ってもらう */
+  window.KM = { coverInfo, lastDone, dueInfo, eligible, slotQuery, slotTableHtml, openKarte, SL_FEW, SL_BEST, memoClear: () => MEMO.clear() };
 
   /* 試作版などで、この部品より先に画面ができていたときは描き直す */
   if (Store.data && typeof map !== 'undefined' && map) { try { renderAll(); } catch (e) { console.error(e); } }
