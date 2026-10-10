@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.28"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.29"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3547,6 +3547,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.11.29', items: [
+    ['並', 'おすすめを、並べかえて選べるようになりました']
+  ] },
   { v: '2026.11.28', items: [
     ['理', 'おすすめに理由が出るようになりました'],
     ['み', 'みんなの目標と、あなたの記録のふり返りが見られるようになりました']
@@ -11739,7 +11742,7 @@ function computeHomeReco() {
   const st = D().settings, bits = Number(st.recoKinds) || 0, on = b => !!(bits & b);
   if (!recoOn() || !bits) return { list: [], needPos: false };
   const nowD = new Date(), now = nowD.getTime(), cur = slotOf(nowD), band = bandOf(nowD);
-  const key = [me().id, cur, myPos ? myPos[0].toFixed(4) + ',' + myPos[1].toFixed(4) : '', [...recoSkip].join(',')].join('|');
+  const key = [me().id, cur, myPos ? myPos[0].toFixed(4) + ',' + myPos[1].toFixed(4) : '', [...recoSkip].join(','), window.KG_RECO_ALL ? 'all' : ''].join('|');
   if (RECO_CACHE && RECO_CACHE.key === key && now - RECO_CACHE.at < 60000) return RECO_CACHE.v;
   const skipMs = (Number(st.recoSkipDays) || 0) * DAY, longMs = (Number(st.recoLongDays) || 180) * DAY;
   const near = Number(st.recoDist) || 500, others = Number(st.recoOthers) !== 0, cardOut = Number(st.recoCardOut) !== 0;
@@ -11783,7 +11786,7 @@ function computeHomeReco() {
       });
     }
   }
-  const N = Math.min(5, Math.max(1, Number(st.recoCount) || 3));
+  const N = window.KG_RECO_ALL ? 1e9 : Math.min(5, Math.max(1, Number(st.recoCount) || 3)); // kangaeru.js が候補を全部ほしいときだけ件数の上限をはずす
   const lists = Object.keys(buckets).map(rk => [...buckets[rk].values()].sort((a, b) => b.sc - a.sc)).filter(l => l.length);
   lists.sort((a, b) => b[0].sc - a[0].sc);
   const out = [], used = new Set();
