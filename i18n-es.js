@@ -2829,5 +2829,18 @@ window.KUIKI_I18N.es = {
 "前回回り終えたのは{0}年{1}月・留守宅カードで回っています": "Última vez que se terminó: {1}/{0} · se recorre con tarjetas de ausentes",
 "前回の記録はありません・留守宅カードで回っています": "Sin registro anterior · se recorre con tarjetas de ausentes",
 "前回回り終えたのは{0}年{1}月・空いています": "Última vez que se terminó: {1}/{0} · está libre",
-"前回の記録はありません・空いています": "Sin registro anterior · está libre"
+"前回の記録はありません・空いています": "Sin registro anterior · está libre",
+/* ---- 電波がないときの地図 / Mapa sin señal ---- */
+"電波がないため、保存した地図を表示しています": "Sin señal: se muestra el mapa guardado",
+"地図の保存": "Mapas guardados",
+"保存した地図": "Mapa guardado",
+"保存した地図：約{0}MB": "Mapa guardado: unos {0} MB",
+"保存した地図：まだありません": "Mapa guardado: todavía no hay",
+"区域を回るとき、電波がなくても地図が見えるように、このスマホに残してある地図の画像です。": "Imágenes del mapa que se guardan en este teléfono para que, al recorrer el territorio, el mapa se vea aunque no haya señal.",
+"保存した地図を消す": "Borrar el mapa guardado",
+"消しても、いま必要な区域の地図は、次にネットにつながったときに自動で取り直します。": "Aunque lo borre, el mapa de los territorios que necesita ahora se vuelve a descargar solo la próxima vez que haya conexión.",
+"保存した地図を消しますか？": "¿Borrar el mapa guardado?",
+"保存した地図を消しました": "Mapa guardado borrado",
+"電波がないところでも、受け取った区域の地図が見られるようになりました": "Ahora puede ver el mapa de los territorios que recibió, incluso donde no hay señal",
+"ホームが左右に動いてしまうことがあったのを直しました": "Se corrigió que la pantalla de inicio a veces se moviera hacia los lados"
 };
