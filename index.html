@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.27"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.28"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3547,6 +3547,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.11.28', items: [
+    ['理', 'おすすめに理由が出るようになりました'],
+    ['み', 'みんなの目標と、あなたの記録のふり返りが見られるようになりました']
+  ] },
   { v: '2026.11.17', items: [
     ['始', '区域マップを使い始めました。歯車の設定から、言語（日本語・スペイン語）をえらべます'],
     ['?', 'わからないことは、区域係にたずねてください']
@@ -13503,8 +13507,9 @@ function afterWelcome() {
 }
 init();
 </script>
-<script src="kantan.js"></script>
 <script src="tsuzuki.js"></script>  
 <script src="schedule.js"></script>
+<script src="kantan.js"></script>
+<script src="kangaeru.js"></script>
 </body>
 </html>
