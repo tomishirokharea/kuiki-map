@@ -14,7 +14,7 @@ const LIB_CACHE = 'kuiki-lib-v1';
 const KEEP = [APP_CACHE, LIB_CACHE];
 const NET_WAIT_MS = 6000;
 // 圏外用に控える、アプリのファイル（新しくファイルを足したら、ここに名前を足す）
-const APP_FILES = /\/(config|schedule|i18n|i18n-es)\.js$/;
+const APP_FILES = /\/(config|schedule|kantan|tsuzuki|kangaeru|i18n|i18n-es)\.js$/;
 
 self.addEventListener('install', () => self.skipWaiting());
 
