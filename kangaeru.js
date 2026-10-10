@@ -959,6 +959,334 @@
     };
   }
 
+  /* =========================================================
+     ネットがないときの地図（国土地理院の淡色地図の画像を、このスマホに残す）
+     ・sw.js が「一度見た地図」を残す（区域のまわりだけ）。ここでは次の4つをする
+       1. 「今必要な範囲」（自分の区域・今日回る区域・回る範囲・自分の留守宅カード）の地図を、ボタンなしで少しずつ取っておく
+       2. 範囲から外れた画像・90日使っていない画像・2,000枚をこえた画像を消す
+       3. ネットにつながっていないとき、地図の上に小さな帯を出す
+       4. 歯車に「保存した地図」の大きさと「保存した地図を消す」を出す（くわしいモードだけ）
+     ・残すのは地図の画像だけ。家や記録は、今のしくみ（IndexedDB）のまま
+     ・国土地理院の負担を小さくするため、1枚ずつ0.2秒あけて、必要な範囲（60枚前後）だけを取る。全区域をまとめて取る機能は作らない
+     ・画像ごとの「どの範囲で必要か」「最後に使った日」は、このスマホの IndexedDB（kuiki-tiles）に覚える
+     ========================================================= */
+  const TM = (function () {
+    const CACHE = 'kuiki-tiles-v1', DBN = 'kuiki-tiles';
+    const ZMIN = 15, ZMAX = 18, PAD_M = 150, REGION_M = 500, RANGE_CAP = 600;
+    const MAX_TILES = 2000, MAX_AGE = 90 * 864e5, GAP = 200, FLUSH_MS = 60000, KB_EST = 22; // KB_EST＝1枚あたりの目安
+    const urlOf = k => { const a = k.split('/'); return TILE_PALE.replace('{z}', a[0]).replace('{x}', a[1]).replace('{y}', a[2]); };
+    const keyOf = u => { const m = /\/xyz\/pale\/(\d+\/\d+\/\d+)\.png/.exec(String(u || '')); return m ? m[1] : null; };
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const canCache = () => typeof caches !== 'undefined' && typeof indexedDB !== 'undefined';
+    let held = false;            // 「保存した地図を消す」のあと、次にネットにつながるまで取り直さない
+    let pumping = false, running = false, again = false, lastSig = '', timer = null, bandDismissed = false;
+    let queue = [];
+    const used = new Map();      // 画面で使った画像 → 時刻（1分に1回まとめて書く）
+    let _db = null;
+
+    /* ---------- IndexedDB ---------- */
+    const idb = () => _db || (_db = new Promise((res, rej) => {
+      const r = indexedDB.open(DBN, 1);
+      r.onupgradeneeded = () => { r.result.createObjectStore('meta', { keyPath: 'k' }); };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => { _db = null; rej(r.error); };
+    }));
+    const reqP = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    const txDone = t => new Promise((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+    async function getAll() { const db = await idb(); return reqP(db.transaction('meta').objectStore('meta').getAll()); }
+    async function writeMany(puts, dels) {
+      if (!puts.length && !dels.length) return;
+      const db = await idb(), t = db.transaction('meta', 'readwrite'), s = t.objectStore('meta');
+      puts.forEach(m => s.put(m)); dels.forEach(k => s.delete(k));
+      return txDone(t);
+    }
+
+    /* ---------- 場所の計算 ---------- */
+    const padBox = (b, m) => { // [南, 西, 北, 東] にまわり m メートルを足す
+      const dLat = m / 111320, dLng = m / (111320 * Math.max(0.2, Math.cos((b[0] + b[2]) / 2 * Math.PI / 180)));
+      return [b[0] - dLat, b[1] - dLng, b[2] + dLat, b[3] + dLng];
+    };
+    const tx = (lng, z) => Math.floor((lng + 180) / 360 * Math.pow(2, z));
+    const ty = (lat, z) => { const r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z)); };
+    function tilesOf(box) { // 1つの範囲の画像の一覧（600枚をこえるときは、いちばん拡大の画像から減らす）
+      for (let zmax = ZMAX; zmax >= ZMIN; zmax--) {
+        const out = [];
+        for (let z = ZMIN; z <= zmax; z++) {
+          const n = Math.pow(2, z) - 1, x0 = Math.max(0, tx(box[1], z)), x1 = Math.min(n, tx(box[3], z)), y0 = Math.max(0, ty(box[2], z)), y1 = Math.min(n, ty(box[0], z));
+          for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) out.push(z + '/' + x + '/' + y);
+        }
+        if (out.length <= RANGE_CAP || zmax === ZMIN) return out;
+      }
+      return [];
+    }
+    const boxOfPts = pts => {
+      let s = Infinity, w = Infinity, n = -Infinity, e = -Infinity;
+      pts.forEach(p => { if (p[0] < s) s = p[0]; if (p[0] > n) n = p[0]; if (p[1] < w) w = p[1]; if (p[1] > e) e = p[1]; });
+      return isFinite(s) && isFinite(w) ? [s, w, n, e] : null;
+    };
+
+    /* 今必要な範囲：id → [南,西,北,東]（まわり150mを足したもの） */
+    function wantedBoxes() {
+      const out = new Map();
+      if (!Store.data) return out;
+      D().territories.forEach(t => {
+        if (t.dummy || !okPoly(t.polygon)) return;
+        let need = false;
+        try { need = myTerr(t) || !!myPart(t); } catch (e) { need = false; }
+        if (!need) return;
+        const b = boxOfPts(t.polygon); if (b) out.set('t:' + t.id, padBox(b, PAD_M));
+      });
+      activeCards().forEach(c => { // 自分の留守宅カード・グループで今日回る人に入っている留守宅カード
+        if (c.dummy || !(c.by === me().id || isCardHelper(c))) return;
+        const pts = (c.keys || []).map(k => houseById(parseKey(k)[0])).filter(Boolean).map(h => [h.lat, h.lng]);
+        const b = boxOfPts(pts); if (b) out.set('c:' + c.id, padBox(b, PAD_M));
+      });
+      return out;
+    }
+    /* 一度見た地図を残してよい場所：全区域を囲む四角＋500m（sw.js に知らせる） */
+    function regionBox() {
+      if (!Store.data) return null;
+      const pts = [];
+      D().territories.forEach(t => { if (!t.dummy && okPoly(t.polygon)) t.polygon.forEach(p => pts.push(p)); });
+      const b = boxOfPts(pts);
+      return b ? padBox(b, REGION_M) : null;
+    }
+    function postArea(box) {
+      try {
+        if (!('serviceWorker' in navigator)) return;
+        const msg = { type: 'kuiki-tile-area', box };
+        if (navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage(msg);
+        navigator.serviceWorker.ready.then(r => { if (r.active) r.active.postMessage(msg); }).catch(() => {});
+      } catch (e) { /* 知らせられなくても、地図は見られる */ }
+    }
+
+    /* ---------- 取ってよいか ---------- */
+    function canFetch() {
+      if (held || navigator.onLine === false) return false;
+      const c = navigator.connection;
+      if (c && (c.type === 'cellular' || c.saveData)) return false; // モバイル通信・データ節約のときは、Wi-Fi になるまで待つ（分からない端末は取る）
+      return true;
+    }
+
+    /* ---------- 使った日の記録（まとめて書く） ---------- */
+    function noteUsed(e) { const k = keyOf(e && e.tile && e.tile.src); if (k) used.set(k, Date.now()); }
+    function attach() {
+      try {
+        if (typeof baseLayers === 'undefined' || !baseLayers) return;
+        ['pale', 'paleLow'].forEach(n => { const l = baseLayers[n]; if (l && !l.__kgTM) { l.__kgTM = 1; l.on('tileload', noteUsed); } });
+      } catch (e) { /* なにもしない */ }
+    }
+    async function flush() {
+      if (!used.size || !canCache()) return;
+      const snap = [...used]; used.clear();
+      try {
+        const db = await idb(), t = db.transaction('meta', 'readwrite'), s = t.objectStore('meta');
+        snap.forEach(([k, u]) => {
+          const g = s.get(k);
+          g.onsuccess = () => { const m = g.result || { k, r: [], u }; m.u = Math.max(m.u || 0, u); s.put(m); };
+        });
+        await txDone(t);
+      } catch (e) { snap.forEach(([k, u]) => { if (!used.has(k)) used.set(k, u); }); }
+    }
+
+    /* ---------- 比べて、取る・消す ---------- */
+    const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+    async function reconcile() {
+      if (running) { again = true; return; }
+      running = true;
+      try {
+        if (!canCache() || !Store.data) return;
+        const want = wantedBoxes(), tid = new Map();
+        want.forEach((box, id) => tilesOf(box).forEach(k => { let a = tid.get(k); if (!a) tid.set(k, a = []); a.push(id); }));
+        tid.forEach(a => a.sort());
+        const cache = await caches.open(CACHE), now = Date.now();
+        const metas = await getAll(), mm = new Map(metas.map(m => [m.k, m]));
+        const puts = [], dels = [];
+        mm.forEach(m => {
+          const nr = tid.get(m.k) || [], old = (m.r || []).slice().sort();
+          if (same(old, nr)) return;
+          if (old.length && !nr.length) { dels.push(m.k); mm.delete(m.k); } // 範囲から外れた（ほかの範囲で使っていない）画像は消す
+          else { m.r = nr; puts.push(m); }
+        });
+        tid.forEach((r, k) => { if (!mm.has(k)) { const m = { k, r, u: now }; mm.set(k, m); puts.push(m); } });
+        await writeMany(puts, dels);
+        for (const k of dels) await cache.delete(urlOf(k), { ignoreVary: true }).catch(() => {});
+        const have = new Set((await cache.keys()).map(r => keyOf(r.url)).filter(Boolean));
+        queue = [...tid.keys()].filter(k => !have.has(k) && !(mm.get(k) || {}).miss)
+          .sort((a, b) => (+a.split('/')[0]) - (+b.split('/')[0]));
+        await sweep(cache);
+        pump();
+      } catch (e) { console.error(e); }
+      finally { running = false; if (again) { again = false; setTimeout(reconcile, 300); } }
+    }
+    /* 消す決まり：90日使っていない画像／2,000枚をこえた分（長く使っていないものから）。今必要な範囲の画像は消さない */
+    async function sweep(cache) {
+      try {
+        cache = cache || await caches.open(CACHE);
+        const now = Date.now(), metas = await getAll(), mm = new Map(metas.map(m => [m.k, m]));
+        const present = new Set((await cache.keys()).map(r => keyOf(r.url)).filter(Boolean));
+        const puts = [], dels = [], gone = [];
+        present.forEach(k => { if (!mm.has(k)) { const m = { k, r: [], u: now }; mm.set(k, m); puts.push(m); } }); // sw.js が残した画像
+        mm.forEach((m, k) => {
+          const need = !!(m.r && m.r.length);
+          if (!present.has(k)) { if (!need && !m.miss) { dels.push(k); mm.delete(k); } return; } // 画像のない記録は片づける
+          if (!need && now - (m.u || 0) > MAX_AGE) { dels.push(k); gone.push(k); present.delete(k); mm.delete(k); }
+        });
+        if (present.size > MAX_TILES) {
+          const cand = [...present].map(k => mm.get(k)).filter(m => m && !(m.r && m.r.length)).sort((a, b) => (a.u || 0) - (b.u || 0));
+          let over = present.size - MAX_TILES;
+          for (const m of cand) { if (over <= 0) break; dels.push(m.k); gone.push(m.k); mm.delete(m.k); over--; }
+        }
+        await writeMany(puts, dels);
+        for (const k of gone) await cache.delete(urlOf(k), { ignoreVary: true }).catch(() => {});
+      } catch (e) { console.error(e); }
+    }
+
+    /* 1枚ずつ、0.2秒あけて取る。つながらなくなったら止める */
+    async function pump() {
+      if (pumping || !queue.length) return;
+      pumping = true;
+      try {
+        const cache = await caches.open(CACHE);
+        while (queue.length) {
+          if (!canFetch()) break;
+          const k = queue.shift(), u = urlOf(k);
+          if (await cache.match(u, { ignoreVary: true })) continue;
+          let res;
+          try { res = await fetch(u, { mode: 'cors', credentials: 'omit' }); }
+          catch (e) { queue.unshift(k); break; } // 電波が切れた。次につながったときに続きから
+          if (res && res.ok && res.type === 'cors') await cache.put(u, res).catch(() => {});
+          else if (res && res.status === 404) markMiss(k); // 地図のない場所（海など）。次からは取りに行かない
+          await sleep(GAP);
+        }
+      } catch (e) { console.error(e); }
+      finally { pumping = false; if (!queue.length) sweep(); }
+    }
+    async function markMiss(k) {
+      try { const db = await idb(), s = db.transaction('meta', 'readwrite').objectStore('meta'), g = await reqP(s.get(k)); if (g) { g.miss = 1; s.put(g); } } catch (e) { /* なにもしない */ }
+    }
+
+    /* ---------- いつ確かめるか ---------- */
+    function check(force) {
+      attach();
+      if (!canCache() || !Store.data) return;
+      try {
+        const want = wantedBoxes(), rb = regionBox();
+        const a = JSON.stringify([...want].map(([id, b]) => [id, b.map(x => Math.round(x * 1e5))])), r = JSON.stringify(rb && rb.map(x => Math.round(x * 1e4)));
+        const sig = a + '|' + r;
+        if (r !== lastSig.split('|')[1]) postArea(rb);
+        if (!force && sig === lastSig && !queue.length) return;
+        lastSig = sig;
+        reconcile();
+      } catch (e) { console.error(e); }
+    }
+    function later(ms, force) { clearTimeout(timer); timer = setTimeout(() => check(force), ms); }
+    window.addEventListener('online', () => { held = false; hideBand(); later(500, true); });
+    window.addEventListener('offline', () => { bandDismissed = false; showBand(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); else { later(800); showBand(); } });
+    window.addEventListener('pagehide', flush);
+    try { if (navigator.connection && navigator.connection.addEventListener) navigator.connection.addEventListener('change', () => later(800, true)); } catch (e) { /* なにもしない */ }
+    setInterval(flush, FLUSH_MS);
+    setInterval(() => check(false), 10 * 60000); // 日付が変わって「今日回る人」から外れた、などを拾う
+    try { if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('controllerchange', () => postArea(regionBox())); } catch (e) { /* なにもしない */ }
+
+    /* ---------- ネットがないときの帯（地図の画面だけ） ---------- */
+    function showBand() {
+      try {
+        const v = document.getElementById('view-map'); if (!v) return;
+        let b = document.getElementById('kgOffBand');
+        if (navigator.onLine !== false || bandDismissed || v.hidden) { if (b) b.hidden = true; return; }
+        if (!b) {
+          b = document.createElement('button'); b.type = 'button'; b.id = 'kgOffBand'; b.setAttribute('role', 'status');
+          b.textContent = '電波がないため、保存した地図を表示しています';
+          b.addEventListener('click', () => { bandDismissed = true; b.hidden = true; });
+          v.appendChild(b);
+        }
+        b.hidden = false;
+      } catch (e) { /* なにもしない */ }
+    }
+    function hideBand() { const b = document.getElementById('kgOffBand'); if (b) b.hidden = true; bandDismissed = false; }
+
+    /* ---------- 歯車：保存した地図 ---------- */
+    async function sizeMB() { // 全部は読まず、最大40枚の平均から目安を出す。保存がなければ null
+      if (!canCache()) return null;
+      const cache = await caches.open(CACHE), keys = await cache.keys();
+      if (!keys.length) return null;
+      let sum = 0, n = 0;
+      const step = Math.max(1, Math.floor(keys.length / 40));
+      for (let i = 0; i < keys.length && n < 40; i += step) {
+        const r = await cache.match(keys[i], { ignoreVary: true });
+        if (r) { try { sum += (await r.blob()).size; n++; } catch (e) { /* なにもしない */ } }
+      }
+      const mb = n ? sum / n * keys.length / 1048576 : keys.length * KB_EST / 1024;
+      return Math.max(1, Math.round(mb));
+    }
+    function gearHtml() {
+      if (!canCache()) return '';
+      return `<h3 class="sub adv">地図の保存</h3><div class="featrow adv" id="kgTileRow"><p><b id="kgTileSize">保存した地図</b><small>区域を回るとき、電波がなくても地図が見えるように、このスマホに残してある地図の画像です。</small></p>
+        <div class="row" style="margin-top:8px"><button type="button" class="btn small" id="kgTileClear">保存した地図を消す</button></div>
+        <small class="kgsm">消しても、いま必要な区域の地図は、次にネットにつながったときに自動で取り直します。</small></div>`;
+    }
+    async function fillSize() {
+      try {
+        const mb = await sizeMB(), el = document.getElementById('kgTileSize'); if (!el) return;
+        el.textContent = mb === null ? '保存した地図：まだありません' : '保存した地図：約' + mb + 'MB';
+      } catch (e) { /* なにもしない */ }
+    }
+    async function clearAll() {
+      held = true; queue = []; used.clear(); lastSig = '';
+      try {
+        if (canCache()) {
+          await caches.delete(CACHE);
+          const db = await idb(), t = db.transaction('meta', 'readwrite'); t.objectStore('meta').clear(); await txDone(t);
+        }
+      } catch (e) { console.error(e); }
+    }
+    document.addEventListener('click', async e => {
+      const b = e.target.closest && e.target.closest('#kgTileClear'); if (!b) return;
+      if (!(await ask('保存した地図を消しますか？消しても、いま必要な区域の地図は、次にネットにつながったときに自動で取り直します。', { danger: true }))) return;
+      await clearAll(); toast('保存した地図を消しました');
+      const el = document.getElementById('kgTileSize'); if (el) el.textContent = '保存した地図：まだありません';
+    });
+
+    return { check, later, attach, showBand, gearHtml, fillSize, _t: { tilesOf, keyOf, urlOf, wantedBoxes, regionBox, reconcile, sweep, flush, getAll, clearAll, padBox, canFetch, hold: v => { held = v; } } };
+  })();
+
+  if (!document.getElementById('kgTileCss')) {
+    const tcss = document.createElement('style'); tcss.id = 'kgTileCss';
+    tcss.textContent = `#kgOffBand{position:absolute;left:10px;right:10px;top:72px;z-index:510;background:#37474F;color:#fff;border:0;border-radius:12px;padding:8px 14px;min-height:44px;font-size:16px;font-weight:700;line-height:1.4;text-align:left;box-shadow:0 2px 8px #0005;overflow-wrap:anywhere}
+#kgOffBand:after{content:'  ×';font-weight:700}
+#kgOffBand[hidden]{display:none}`;
+    document.head.appendChild(tcss);
+  }
+  /* アプリを開いたとき・画面を描き直したとき・区域を受け取ったとき（受け取ると画面が描き直される）に確かめる */
+  (function () {
+    const _ra = window.renderAll;
+    if (typeof _ra === 'function') {
+      window.renderAll = function () { const r = _ra.apply(this, arguments); try { TM.later(1500); } catch (e) { /* なにもしない */ } return r; };
+    }
+    const _sv = window.showView;
+    if (typeof _sv === 'function') {
+      window.showView = function () {
+        const r = _sv.apply(this, arguments);
+        try { TM.attach(); TM.showBand(); } catch (e) { /* なにもしない */ }
+        return r;
+      };
+    }
+    const _ss = window.setSheet;
+    window.setSheet = function (html) {
+      try {
+        if (typeof html === 'string' && html.indexOf('id="uiReset"') >= 0 && UI.mode === 'detail') {
+          html = html.replace('<button class="btn block" id="uiReset">', TM.gearHtml() + '<button class="btn block" id="uiReset">');
+          setTimeout(() => TM.fillSize(), 0);
+        }
+      } catch (e) { console.error(e); }
+      return _ss.call(this, html);
+    };
+    window.KMTile = TM;
+    setTimeout(() => { try { TM.later(100, true); } catch (e) { /* なにもしない */ } }, 1200);
+  })();
+
   /* 更新のお知らせ（CHANGELOG）は index.html に書いてある */
 
   if (Store.data) { try { syncPaperDone(); updateTabs(); if (currentView === 'reco') renderRecoView(); } catch (e) { console.error(e); } }
