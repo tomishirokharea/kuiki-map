@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.11.29"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.11.30"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -560,6 +560,15 @@ body.strong .pin.st-plain{border-width:4px}
 .fsearch input,.fsort select{min-width:0;width:100%}
 .fsort select{text-overflow:ellipsis}
 #view-cards{overflow-x:hidden}
+/* ホーム・おすすめ・再訪問：左右に動かない（たて方向だけ動く）。はみ出しは隠さず、折り返して収める */
+#view-home,#view-reco,#view-follow{overflow-x:hidden;overscroll-behavior-x:none;touch-action:pan-y}
+#view-home .btn{white-space:normal;max-width:100%}
+#view-home .wrap *{overflow-wrap:anywhere}
+#view-home .homeadd p{min-width:0}
+#view-home table{width:100%;table-layout:fixed}
+#view-reco .kgsorts{touch-action:pan-x}
+/* カレンダーの日：文字が大きいと、正方形にこだわって横に広がるので、せまい画面では正方形をやめる */
+@media (max-width:420px){#view-home .cd{aspect-ratio:auto;min-height:56px;overflow:hidden}#view-home .cd .dn{font-size:clamp(13px,4.4vw,16px)}}
 .ftools .seg{display:flex;width:100%;margin:0}
 .ftools .seg button{flex:1}
 .fsearch{display:flex;align-items:center;gap:8px;background:#fff;border:2px solid var(--ink2);border-radius:12px;padding:0 12px;min-height:52px}
@@ -596,11 +605,11 @@ body.strong .pin.st-plain{border-width:4px}
 .timer .tclock{margin:4px 0 10px;font-size:46px;font-weight:700;letter-spacing:.04em;font-variant-numeric:tabular-nums}
 .timer.idle .tclock{opacity:.45}
 .timer .tbtns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-.timer .btn{min-width:130px;border-color:#fff}
+.timer .btn{min-width:0;white-space:normal;border-color:#fff}
 .timer .btn.primary{background:#fff;color:var(--brand)}
 .timer .btn.danger{background:transparent;color:#fff;border-color:#fff}
 .timer .btn:not(.primary):not(.danger){background:transparent;color:#fff}
-.timer .tbig{min-height:64px;font-size:21px;min-width:220px}
+.timer .tbig{min-height:64px;font-size:21px;min-width:0;max-width:100%}
 .timer .muted{color:#ffffffd0;margin:10px 0 0}
 .calhead{display:flex;align-items:center;justify-content:space-between;margin:6px 0}
 .calhead b{font-size:20px}
@@ -717,8 +726,8 @@ body.strong .pin.st-plain{border-width:4px}
 .cd small{font-size:10px;line-height:1.1}
 .calsched{list-style:none;padding:0;margin:10px 0 0;border-top:2px solid var(--line)}
 .calsched li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;padding:8px 2px;border-bottom:1px solid var(--line);font-size:15px}
-.calsched b{color:var(--terr);white-space:nowrap}
-.calsched small{color:var(--ink2);font-size:13px;white-space:nowrap}
+.calsched b{color:var(--terr);overflow-wrap:anywhere}
+.calsched small{color:var(--ink2);font-size:13px;overflow-wrap:anywhere}
 .calnone{margin-top:10px}
 /* 取り込んだ「仮の家」 */
 .pin.prov{border-style:dashed;opacity:.9}
@@ -3547,6 +3556,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.11.30', items: [
+    ['地', '電波がないところでも、受け取った区域の地図が見られるようになりました'],
+    ['左', 'ホームが左右に動いてしまうことがあったのを直しました']
+  ] },
   { v: '2026.11.29', items: [
     ['並', 'おすすめを、並べかえて選べるようになりました']
   ] },
@@ -4010,7 +4023,12 @@ function initMap() {
   map.on('zoom viewreset zoomend', placeOverlay);
   zoomCtl = L.control.zoom({ position: 'bottomright' }); // ＋−は、線を引く・家を追加するときだけ出す
   const opt = { maxZoom: 20, maxNativeZoom: 18, attribution: GSI_ATTR };
-  baseLayers = { pale: L.tileLayer(TILE_PALE, opt), photo: L.tileLayer(TILE_PHOTO, opt) };
+  // 地図の画像は crossOrigin 付きで取る（保存した画像が、ブラウザの容量で「中身の見えない画像」として数MBに数えられないように）。
+  // 圏外でくわしい画像がないときは、透明にして、下に敷いた「ズーム16までの画像を引きのばした地図」を見せる
+  const TILE_BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  baseLayers = { pale: L.tileLayer(TILE_PALE, Object.assign({ crossOrigin: 'anonymous', errorTileUrl: TILE_BLANK }, opt)), photo: L.tileLayer(TILE_PHOTO, opt),
+    paleLow: L.tileLayer(TILE_PALE, { maxZoom: 20, maxNativeZoom: 16, crossOrigin: 'anonymous', errorTileUrl: TILE_BLANK }) };
+  baseLayers.paleLow.addTo(map);
   baseLayers.pale.addTo(map);
   terrLayer = L.layerGroup().addTo(map);
   houseLayer = L.layerGroup().addTo(map);
@@ -9361,6 +9379,9 @@ function setBase(name) {
   map.removeLayer(baseLayers[baseName]);
   baseName = name;
   baseLayers[baseName].addTo(map);
+  if (baseLayers.paleLow) { // 淡色地図のときだけ、下に「ぼやけた代わりの地図」を敷く
+    if (name === 'pale') { baseLayers.paleLow.addTo(map); baseLayers.paleLow.bringToBack(); } else map.removeLayer(baseLayers.paleLow);
+  }
 }
 function openUiSheet() {
   const tab = currentView;
