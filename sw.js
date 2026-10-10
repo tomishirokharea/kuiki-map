@@ -6,17 +6,49 @@
      つながらないとき（6秒待っても返事がないとき）だけ、前に保存した画面を使う
      → ふだんはいつも最新の版。圏外でも開ける
    ・地図の部品（Leaflet）と文字（Googleフォント）：一度取ったら、保存したものを使う
-   ・サーバー（GAS）とのやりとり・地図の画像・版の確認には、手を出さない
+   ・国土地理院の淡色地図の画像：一度見たものは保存し、次からは保存したものを先に使う
+     （保存するのは、会衆の区域のまわり＝全区域を囲む四角＋500m だけ。その四角は画面から知らせてもらう。
+       旅行先など、四角の外の地図は保存しない。写真の地図も保存しない）
+   ・サーバー（GAS）とのやりとり・版の確認には、手を出さない
    ・招待コード（?t=）の入ったURLは保存しない（URLの ? から後ろを消して保存する）
    ========================================================= */
 const APP_CACHE = 'kuiki-app-v1';
 const LIB_CACHE = 'kuiki-lib-v1';
-const KEEP = [APP_CACHE, LIB_CACHE];
+const TILE_CACHE = 'kuiki-tiles-v1';   // 地図の画像（画面側の kangaeru.js も同じ入れ物に入れる。名前を変えるときは両方）
+const AREA_CACHE = 'kuiki-tilearea-v1'; // 保存してよい場所（四角）
+const KEEP = [APP_CACHE, LIB_CACHE, TILE_CACHE, AREA_CACHE];
+const TILE_RE = /^\/xyz\/pale\/(\d+)\/(\d+)\/(\d+)\.png$/;
+const AREA_KEY = 'https://kuiki.invalid/area';
+let AREA = undefined; // [南, 西, 北, 東]。undefined＝まだ読んでいない、null＝区域がない
 const NET_WAIT_MS = 6000;
 // 圏外用に控える、アプリのファイル（新しくファイルを足したら、ここに名前を足す）
 const APP_FILES = /\/(config|schedule|kantan|tsuzuki|kangaeru|i18n|i18n-es)\.js$/;
 
 self.addEventListener('install', () => self.skipWaiting());
+
+/* 画面から「保存してよい場所」を知らせてもらう（アプリを開いたときと、区域が変わったとき） */
+self.addEventListener('message', e => {
+  const d = e.data;
+  if (!d || d.type !== 'kuiki-tile-area') return;
+  const b = Array.isArray(d.box) && d.box.length === 4 && d.box.every(x => typeof x === 'number' && isFinite(x)) ? d.box : null;
+  AREA = b;
+  e.waitUntil(caches.open(AREA_CACHE).then(c => c.put(AREA_KEY, new Response(JSON.stringify(b)))).catch(() => {}));
+});
+async function loadArea() {
+  if (AREA !== undefined) return AREA;
+  try {
+    const c = await caches.open(AREA_CACHE), r = await c.match(AREA_KEY);
+    AREA = r ? await r.json() : null;
+  } catch (err) { AREA = null; }
+  return AREA;
+}
+const tileLat = (y, z) => { const n = Math.PI - 2 * Math.PI * y / Math.pow(2, z); return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))); };
+const tileLng = (x, z) => x / Math.pow(2, z) * 360 - 180;
+function tileInArea(z, x, y, a) { // その画像の範囲が、四角と重なるか
+  if (!a) return false;
+  const n = tileLat(y, z), s = tileLat(y + 1, z), w = tileLng(x, z), ea = tileLng(x + 1, z);
+  return !(s > a[2] || n < a[0] || w > a[3] || ea < a[1]);
+}
 
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
@@ -55,6 +87,23 @@ self.addEventListener('fetch', e => {
         if (hit) return hit;
         return net; // 保存したものがなければ、インターネットの返事を待つ
       }
+    })());
+    return;
+  }
+
+  if (u.hostname === 'cyberjapandata.gsi.go.jp') {
+    const m = TILE_RE.exec(u.pathname);
+    if (!m) return; // 写真の地図などは、そのまま通す
+    e.respondWith((async () => {
+      const cache = await caches.open(TILE_CACHE);
+      const hit = await cache.match(req.url, { ignoreVary: true });
+      if (hit) return hit;
+      const res = await fetch(req); // つながらないときはここで失敗 → 画面側で透明になり、下のぼやけた地図が見える
+      try {
+        // 中身が見える取り方（cors）の画像だけ保存する（opaque は容量の数え方が大きくなるため保存しない）
+        if (res && res.ok && res.type === 'cors' && tileInArea(+m[1], +m[2], +m[3], await loadArea())) cache.put(req.url, res.clone()).catch(() => {});
+      } catch (err) { /* 保存できなくても表示はできる */ }
+      return res;
     })());
     return;
   }
