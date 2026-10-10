@@ -1,12 +1,14 @@
 /* =========================================================
-   kangaeru.js  「自分で考える奉仕」（案1〜案4）
-   指示書：claude/kangaeru-housi-jissou-shijisho.md
-   読み込み：index.html の schedule.js のあとに <script src="kangaeru.js"></script>
-   ・案1 あなたの記録が役に立ちました（スマホの中だけで計算）
-   ・案2 おすすめに理由／区域のようす／予定に入れる／15分で回れる3軒
-   ・案3 会衆の年間カバー（係と同じ数え方・t.paperDone）
-   ・案4 自分だけのふり返り
-   サーバーに新しく送るのは、区域の t.paperDone（係のスマホが書く）と、係の設定 kgGoal だけ
+   kangaeru.js  おすすめタブ（並べかえて選ぶ）＋「自分で考える奉仕」
+   指示書：claude/kangaeru-housi-jissou-shijisho.md ／ claude/osusume-narabekae-jissou-shijisho.md
+   読み込み：index.html の schedule.js → kantan.js のあとに <script src="kangaeru.js"></script>
+   ・ホームには、おすすめを出さない（毎日のひと言・今日やること・ホームの「今日のおすすめ」を消す）
+   ・おすすめは「おすすめタブ」だけ：家のまとまり／留守宅カード／区域カードを1つの一覧にまぜ、
+     5つの欄（近さ・時間・会えていない・若い世代・今の時間）で並べかえて選ぶ
+   ・距離の起点：今いる場所／会館（config.js の hall）／地図でえらんだ場所（このスマホの中だけ）
+   ・役に立った記録・会衆の目標は保留（コードは残し、表示だけ止めてある）
+   ・ふり返りは、おすすめタブのいちばん下（このスマホの中だけ）
+   サーバーに新しく送るのは、区域の t.paperDone（係のスマホが書く）と、係の設定 kgGoal だけ（今回は増やしていない）
    ========================================================= */
 (function () {
   'use strict';
@@ -20,24 +22,51 @@
   const num = (v, d) => (v === undefined || v === null || v === '' || !isFinite(Number(v)) ? d : Number(v));
 
   /* ---------- 見た目 ---------- */
+
+  /* ---------- 見た目 ---------- */
   const css = document.createElement('style');
   css.textContent = `.kgcard{margin:10px 0}
 .kgthanks{background:#E8F5E9;border:2px solid #2E7D32;border-radius:14px;padding:12px 14px}
-.kgthanks b{font-size:19px}
 .kgbig{font-size:34px;font-weight:700;color:var(--brand);line-height:1.2}
 .kgwhy{display:block;width:100%;text-align:left;background:none;border:0;padding:4px 0;color:var(--ink2);font-size:16px;line-height:1.5}
 .kgwhy:after{content:' ›';font-weight:700}
-.kgpick{grid-template-columns:1fr}
 .kgsm{font-size:15px;color:var(--ink2)}
 .kgday{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:6px 0}
 .kgday .choice{min-height:60px;font-size:17px}
 .kgtbl td.kgmine,.kgtblbox td.kgmine{outline:4px solid #C2410C;outline-offset:-4px}
-.kgbody.simple .kgpick .btn{min-height:60px;font-size:20px}
-.kgbody.simple .kgwhy{font-size:18px}
-.kgbody.simple .kgsm{font-size:16px}
-.kgbody.simple .kgbig{font-size:40px}
-.kgbody.simple .kgthanks .btn{min-height:56px;font-size:19px}
-.kgfoot .btn{margin-top:8px}`;
+.kgstat{font-size:17px;font-weight:700;margin:6px 0 4px}
+.kgorg{display:inline-flex;align-items:center;min-height:44px;border:2px solid var(--line);background:#fff;border-radius:22px;padding:0 14px;font-size:16px;color:var(--ink);margin:4px 0}
+.kgorg:after{content:'▾';margin-left:6px;color:var(--brand)}
+.kgsorts{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;-webkit-overflow-scrolling:touch}
+.kgsort{flex:none;min-height:46px;border:2px solid var(--line);background:#fff;border-radius:23px;padding:0 15px;font-size:16px;color:var(--ink);white-space:nowrap}
+.kgsort[aria-pressed=true],.kgcol.on{background:#DCE8F7;border-color:var(--brand);color:var(--brand);font-weight:700}
+.kgc{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0}
+.kgct{font-weight:700;font-size:17px;margin:0 0 6px;line-height:1.4}
+.kgbadge{display:inline-block;font-size:13px;font-weight:400;border-radius:9px;padding:0 8px;background:#E3ECF6;color:var(--brand);margin-left:6px;vertical-align:1px}
+.kgcols{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:6px 0}
+.kgcols.two{grid-template-columns:repeat(2,1fr);gap:8px}
+.kgcol{border:1.5px solid var(--line);border-radius:10px;background:#fff;padding:5px 2px;text-align:center;min-height:62px;color:var(--ink);font-size:15px;line-height:1.25}
+.kgcol svg{width:16px;height:16px;display:block;margin:0 auto 1px;color:var(--ink2)}
+.kgcol small{display:block;font-size:12px;color:var(--ink2);line-height:1.2}
+.kgcol b{display:block;font-size:15px}
+.kgev{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.kgev small{display:block;color:var(--ink2)}
+.uiseg button:disabled{opacity:.45}
+.kgbody.simple .kgstat{font-size:22px}
+.kgbody.simple .kgsm{font-size:18px}
+.kgbody.simple .kgsort{min-height:60px;font-size:20px;padding:0 20px}
+.kgbody.simple .kgsorts{flex-wrap:wrap;overflow:visible}
+.kgbody.simple .kgsort{white-space:normal;flex:1 1 auto;line-height:1.3;padding-top:6px;padding-bottom:6px}
+.kgbody.simple .kgct{font-size:23px}
+.kgbody.simple .kgcol{min-height:84px}
+.kgbody.simple .kgcol small{font-size:17px}
+.kgbody.simple .kgcol b{font-size:28px}
+.kgbody.simple .kgcol svg{width:22px;height:22px}
+.kgbody.simple .kgwhy{font-size:19px}
+.kgbody.simple .kgbig{font-size:34px}
+.kgbody.simple .actions .btn{min-height:62px;font-size:21px}
+.kgbody.simple .kgplan{min-height:48px;font-size:17px}
+.kgbody.simple .kgev{font-size:19px}`;
   document.head.appendChild(css);
 
   /* ---------- 計算の結果を少しのあいだ覚える ---------- */
@@ -221,40 +250,30 @@
     });
   }
   const lookWord = s => (s.best >= 0 ? `あなたは${SLC[s.best % 3]}の${SLB[Math.floor(s.best / 3)]}によく会えています` : '記録が増えると、ここにヒントが出ます');
-  function lookHtml() {
-    if (isSimple() ? false : !uiOn('kgLook')) return '';
-    return '<button type="button" class="btn block" data-kglook>あなたのふり返り（このスマホの中だけ）</button>';
-  }
-  function openLook() {
-    const s = myStats(), simple = isSimple();
-    let body;
-    if (simple) {
-      body = `<p class="kgbig">${esc(lookWord(s))}</p><p class="q">訪ねた家 ${s.homes}軒・会えた ${s.met}軒</p>`;
-    } else {
-      const rows = SLB.map((b, bi) => `<tr><th>${b}<br><small>${BAND_HINT[b]}</small></th>${[0, 1, 2].map(ci => {
-        const c = bi * 3 + ci, n = s.n[c];
-        if (n < FEW) return '<td></td>';
-        const p = Math.round(s.m[c] / n * 100);
-        return `<td style="background:rgba(21,101,192,${(0.06 + p / 100 * 0.5).toFixed(2)})"><b>${p}%</b><br><small>${n}件</small></td>`;
-      }).join('')}</tr>`).join('');
-      body = `<p class="q">直近3か月：訪ねた家 ${s.homes}軒・会えた ${s.met}軒</p>
-        <p><b>${esc(lookWord(s))}</b></p>
-        <table class="slots slotnew kgtbl" aria-label="あなたの曜日と時間帯ごとの会えた割合"><tr><th></th>${SLC.map(x => `<th>${x}</th>`).join('')}</tr>${rows}</table>
-        <p class="hint">会えた割合の濃さです。記録が${FEW}件に満たない欄は空けています。人と比べる数字は出していません。</p>`;
-    }
-    setSheet(headHtml(null, 'あなたのふり返り', 'このスマホの中だけで見られます') +
-      '<div class="notice info">このスマホの中だけで見られます。係やほかの人には送られません。</div>' + body +
-      '<button class="btn block" data-close>閉じる</button>');
-  }
+
 
   /* =========================================================
-     時間帯の集計（区域×月×曜日区分×時間帯）。「区域のようす」と、おすすめの理由に使う
+     ふり返り（おすすめタブのいちばん下。このスマホの中だけ。送らない）
      ========================================================= */
-  const slotQ = (tid, per) => { const t = terrById(tid); return t ? KM.slotQuery([t], per) : { n: new Array(15).fill(0), m: new Array(15).fill(0) }; };
-  const homesOf = t => memo('kgh' + t.id + '|' + D().houses.length, () => housesOf(t.id).reduce((a, h) => a + targets(h).length, 0));
+  function lookSection(simple) {
+    const s = myStats();
+    if (simple) return `<h2 class="sec">ふり返り</h2><div class="kgc"><p class="kgbig">${esc(lookWord(s))}</p><p class="kgsm">訪ねた家 ${s.homes}軒・会えた ${s.met}軒</p></div>`;
+    const rows = SLB.map((b, bi) => `<tr><th>${b}<br><small>${BAND_HINT[b]}</small></th>${[0, 1, 2].map(ci => {
+      const c = bi * 3 + ci, n = s.n[c];
+      if (n < FEW) return '<td></td>';
+      const p = Math.round(s.m[c] / n * 100);
+      return `<td style="background:rgba(21,101,192,${(0.06 + p / 100 * 0.5).toFixed(2)})"><b>${p}%</b><br><small>${n}件</small></td>`;
+    }).join('')}</tr>`).join('');
+    return `<h2 class="sec">ふり返り</h2><div class="kgc">
+      <div class="notice info">このスマホの中だけで見られます。係やほかの人には送られません。</div>
+      <p class="q">直近3か月：訪ねた家 ${s.homes}軒・会えた ${s.met}軒</p>
+      <p><b>${esc(lookWord(s))}</b></p>
+      <table class="slots slotnew kgtbl" aria-label="あなたの曜日と時間帯ごとの会えた割合"><tr><th></th>${SLC.map(x => `<th>${x}</th>`).join('')}</tr>${rows}</table>
+      <p class="hint">会えた割合の濃さです。記録が${FEW}件に満たない欄は空けています。人と比べる数字は出していません。</p></div>`;
+  }
 
   /* =========================================================
-     案2 おすすめに理由（今日のおすすめ）
+     理由（1行）。選び方は前回の決まり（指示書4.3）のまま
      ========================================================= */
   const dayText = (col, bi) => `${SLC[col]}の${SLB[bi]}`;
   function reasonFor(it) {
@@ -265,64 +284,19 @@
       const tn = q.n.reduce((a, b) => a + b, 0), tm = q.m.reduce((a, b) => a + b, 0);
       if (tn && m / n > tm / tn) return `${dayText(col, bi)}は、この区域で会えた割合が高い時間です（${Math.round(m / n * 100)}%）`;
     }
-    if (myPos && okPoly(t.polygon)) {
-      const d = distM(myPos, center(t.polygon));
-      if (d <= (num(D().settings.recoDist, 500))) return `ここから約${fmtDist(d)}。歩いて約${Math.max(1, Math.round(d / 67))}分です`;
+    if (it.dist != null && it.dist <= num(D().settings.recoDist, 500)) {
+      const w = orgWord(), mn = Math.max(1, Math.round(it.dist / 67));
+      return `${w}から約${fmtDist(it.dist)}。歩いて約${mn}分です`;
     }
     if (it.kind === 'round' && it.left) return `あと${it.left}軒で、区域を回り終えます`;
     return it.why ? String(it.why) : '今の時間に訪ねられる家があります';
   }
-  function buildPicks() {
-    const simple = isSimple(), now = new Date(), col0 = colOf(now), bi0 = SLB.indexOf(bandOf(now)), out = [], used = new Set();
-    const push = it => { if (!it.t || used.has(it.t.id)) return; used.add(it.t.id); out.push(it); };
-    const max = simple ? 1 : 3;
-    // 1 今の時間帯の留守宅カード（「今日やること」に同じカードが出ているときは出さない）
-    try {
-      if (uiEff().todayOn !== 'on') {
-        const ch = chanceCard();
-        if (ch) push({ kind: 'card', t: ch.t, slot: ch.slot, col: slotCol(ch.slot), bi: slotBand(ch.slot), title: `区域${ch.t.no}の留守宅カード（${slotShort(ch.slot)}）` });
-      }
-    } catch (e) { console.error(e); }
-    // 2 自分の区域カードの続き
-    const rounds = [];
-    D().territories.filter(t => t.holder === me().id).forEach(t => {
-      try { const r = roundInfo(t.id); if (r && r.c.todo > 0) rounds.push({ kind: 'round', t, col: col0, bi: bi0, left: r.c.todo, title: `区域${t.no}の続き` }); } catch (e) { /* とばす */ }
-    });
-    rounds.sort((a, b) => a.left - b.left);
-    // 3 今あるおすすめ（簡単モードと、係が「出さない」のときは使わない）
-    const recos = [];
-    if (!simple && recoOn()) {
-      try {
-        computeHomeReco().list.forEach(x => recos.push({ kind: 'reco', t: x.t, h: x.h, u: x.u, rk: x.rk, col: col0, bi: bi0, why: x.why,
-          title: `区域${x.t.no}　${targetName(x.h, x.u).replace(/<[^>]*>/g, '')}` }));
-      } catch (e) { console.error(e); }
-    }
-    const seq = [rounds[0], recos[0], recos[1], rounds[1], recos[2], recos[3]];
-    seq.forEach(it => { if (it) push(it); });
-    const res = out.slice(0, max);
-    res.forEach(it => { it.reason = reasonFor(it); });
-    return res;
-  }
-  let picks = [];
-  function picksHtml(simple) {
-    if (!uiOn('kgReco')) return '';
-    if (offToday()) return '<div class="notice warn kgcard">今日は、区域係が「訪問を控える日」にしています。おすすめはお休みです。</div>';
-    picks = buildPicks();
-    const body = picks.length ? picks.map((it, i) => `<article class="ritem kgpick"><div>
-        <p class="rt">${esc(it.title)}</p>
-        <button type="button" class="kgwhy" data-kginfo="${i}">${esc(it.reason)}</button></div>
-        <div class="actions"><button type="button" class="btn small primary" data-kggo="${i}">今行く</button>
-          ${simple ? '' : `<button type="button" class="btn small" data-kgplan="${i}">予定に入れる</button>`}</div></article>`).join('')
-      : '<p class="muted">今の時間帯のおすすめは、ありません。区域カードから回れます。</p>';
-    return `<h2 class="sec">今日のおすすめ</h2>${body}` + (simple ? '' :
-      `<div class="row">${recoOn() ? '<button type="button" class="btn small" data-kgmore>ほかのおすすめ</button>' : ''}<button type="button" class="btn small" data-kgquick>15分で回れる3軒</button></div>`);
-  }
-  function goPick(it) {
-    CHANCE_CACHE = null;
-    if (it.kind === 'card') takeAwayCard(it.t.id, it.slot);
-    else if (it.kind === 'round') openTerr(it.t.id);
-    else { recoMark(it.h.id, it.u, it.rk); goTo(it.h.id, it.u, false, it.rk); }
-  }
+
+  /* =========================================================
+     時間帯の集計（区域×月×曜日区分×時間帯）。「区域のようす」と、おすすめの理由に使う
+     ========================================================= */
+  const slotQ = (tid, per) => { const t = terrById(tid); return t ? KM.slotQuery([t], per) : { n: new Array(15).fill(0), m: new Array(15).fill(0) }; };
+  const homesOf = t => memo('kgh' + t.id + '|' + D().houses.length, () => housesOf(t.id).reduce((a, h) => a + targets(h).length, 0));
 
   /* =========================================================
      案2 理由を押すと「区域のようす」（伝道者向け。名前・S-13・拒否の数・何度訪ねても会えない家は出さない）
@@ -374,10 +348,12 @@
       ? '<div class="slpriv"><b>家が少ない区域なので、くわしい数は出していません。</b></div>'
       : simple ? '' : `<div class="seg" role="group" aria-label="期間"><button type="button" data-kgper="4" aria-pressed="${ST_PER.v === 4}">直近4か月</button><button type="button" data-kgper="12" aria-pressed="${ST_PER.v === 12}">1年</button></div>
           ${infoTable(tid, ST_PER.v)}<p class="hint">枠で囲んだ欄が、今のおすすめの曜日・時間帯です。人と比べる数字は出していません。</p>`;
+    const yg = youngOf(t);
+    const youngLine = !simple && yg ? `<p class="muted">若い世代：${yg === 2 ? '多い' : 'ふつう'}（区域の統計からの目安です）</p>` : '';
     const hasKarte = isAdmin() && typeof KM.openKarte === 'function';
     setSheet(headHtml(t, `区域${esc(t.no)}のようす`, esc(t.name || '')) + `
       <p><b>${esc(state)}</b></p>${line}${simple ? '' : tableBox}${top}${simple && few ? tableBox : ''}
-      ${simple ? '' : `${age}<p class="muted">家・部屋 ${homes}軒・会えていない家 ${unmet}軒</p>`}
+      ${simple ? '' : `${age}<p class="muted">家・部屋 ${homes}軒・会えていない家 ${unmet}軒</p>${youngLine}`}
       <div class="actions"><button type="button" class="btn primary" id="kgiMap">地図で見る</button>
         ${simple ? '' : '<button type="button" class="btn" id="kgiPlan">予定に入れる</button>'}
         ${from ? '<button type="button" class="btn primary" id="kgiGo">今行く</button>' : ''}
@@ -426,11 +402,13 @@
       $('#kgSave').onclick = () => {
         if (st.date < ymd(new Date())) { toast('今日より前の日は入れられません'); return; }
         const dl = SLC[colOf(parseYmd(st.date))], band = SLB[st.bi];
-        const title = it.kind === 'card' ? `区域${it.t.no}の留守宅（${dl}・${band}）` : it.kind === 'round' ? `区域${it.t.no}の続き（${dl}・${band}）` : `区域${it.t.no}のおすすめの家（${dl}・${band}）`;
+        const title = it.kind === 'card' ? `区域${it.t.no}の留守宅（${dl}・${band}）` : it.kind === 'round' ? `区域${it.t.no}の続き（${dl}・${band}）`
+          : it.kind === 'terr' ? `区域${it.t.no}を受け取る（${dl}・${band}）` : `区域${it.t.no}のおすすめの家（${dl}・${band}）`;
         const o = myData();
-        o.events.push({ id: uid(), date: st.date, time: BT[st.bi], title, tid: it.t.id, rk: it.kind === 'reco' ? (it.rk || 'reco') : it.kind, band });
+        o.events.push({ id: uid(), date: st.date, time: BT[st.bi], title, tid: it.t.id, rk: it.kind === 'group' ? ((it.sel && it.sel[0] && it.sel[0].rk) || 'reco') : it.kind, band });
         mySave(o);
         renderHome();
+        if (currentView === 'reco') renderRecoView();
         setSheet(headHtml(null, '予定に入れました', esc(title)) + `
           <p class="okmsg"><b>${fmtYmd(st.date)}　${BT[st.bi]}ごろ</b>の予定に入りました。ホームの「これからの予定」に出ます。</p>
           <a class="btn block" href="${gcalUrl(title, st.date, BT[st.bi], '', '', '')}" target="_blank" rel="noopener">Googleカレンダーに入れる</a>
@@ -473,134 +451,461 @@
     };
   }
 
+
   /* =========================================================
-     案2 「15分で回れる3軒」（詳しいモードだけ）
+     おすすめタブ：このスマホだけの設定（歯車）と、距離の起点
      ========================================================= */
-  function nearChain() {
-    const st = D().settings, near = 1200, dLat = near / 110540, dLng = near / 100000;
-    const skipMs = num(st.recoSkipDays, 14) * DAY, longMs = num(st.recoLongDays, 180) * DAY, others = num(st.recoOthers, 1) !== 0, now = Date.now();
-    const cardKeys = new Set();
-    activeCards().forEach(c => { if (c.by !== me().id) c.keys.forEach(k => cardKeys.add(k)); });
-    const cand = [];
-    for (const h of D().houses) {
-      if (!h.terrId || Math.abs(h.lat - myPos[0]) > dLat || Math.abs(h.lng - myPos[1]) > dLng) continue;
-      const t = terrById(h.terrId);
-      if (!t || (!others && t.holder && !myTerr(t))) continue;
-      for (const u of targets(h)) {
-        const k = K(h.id, u);
-        if (D().dnc[k] || D().follows[k] || relOf(k) || recentMet(k) || cardKeys.has(k)) continue;
-        const s = sum(k);
-        if (!s.n || (s.last && skipMs && now - Date.parse(s.last.at) < skipMs)) continue;
-        if (s.met && now - Date.parse(s.met.at) <= longMs) continue;
-        cand.push({ h, u });
-        break;
+  let tmpSimple = null;                                  // kantan.js をくぐるあいだだけ使う目印
+  const isS = () => (tmpSimple === null ? isSimple() : tmpSimple);
+  const pk = (n) => 'kuiki_kg' + n + '_' + me().id;
+  const tabPref = () => { const v = lsGet(pk('tab')); return v === 'on' || v === 'off' ? v : ''; };
+  const recoTabOn = () => !!Store.data && recoOn() && (tabPref() ? tabPref() === 'on' : !isSimple());   // はじめ：くわしい＝出す／かんたん＝出さない
+  const revOn = () => lsGet(pk('rev')) !== 'off';                                                    // はじめ：出す
+  const sortKeyOf = () => 'kuiki_osort_' + me().id;
+  const hallPos = () => { const h = window.KUIKI_CONFIG && window.KUIKI_CONFIG.hall; return Array.isArray(h) && h.length === 2 && isFinite(h[0]) && isFinite(h[1]) && (Number(h[0]) || Number(h[1])) ? [Number(h[0]), Number(h[1])] : null; };
+
+  const ORG = { type: 'here', pick: null, who: '' };
+  function orgLoad() {
+    if (ORG.who === me().id) return;
+    ORG.who = me().id; ORG.type = 'here'; ORG.pick = null;
+    try {
+      const o = JSON.parse(lsGet(pk('org')) || 'null');
+      if (o) {
+        if (o.type === 'hall' || o.type === 'pick') ORG.type = o.type;
+        if (Array.isArray(o.pick) && o.pick.length === 2 && isFinite(o.pick[0]) && isFinite(o.pick[1])) ORG.pick = [Number(o.pick[0]), Number(o.pick[1])];
       }
-    }
-    const out = [];
-    let at = myPos, total = 0;
-    while (out.length < 3 && cand.length) {
-      let bi = 0, bd = Infinity;
-      cand.forEach((c, i) => { const d = distM(at, [c.h.lat, c.h.lng]); if (d < bd) { bd = d; bi = i; } });
-      const c = cand.splice(bi, 1)[0];
-      c.d = bd; total += bd; out.push(c); at = [c.h.lat, c.h.lng];
-    }
-    return { out, mins: Math.ceil(total / 67 + 4 * out.length) };
+    } catch (e) { /* はじめにもどす */ }
+    if (ORG.type === 'hall' && !hallPos()) ORG.type = 'here';
+    if (ORG.type === 'pick' && !ORG.pick) ORG.type = 'here';
   }
-  function openQuick() {
-    if (!myPos) {
-      setSheet(headHtml(null, '15分で回れる3軒', '') + `<p class="hint">現在地がわかると、近くの家をえらべます。</p>
-        <button class="btn primary block" id="kgLoc">現在地を使う</button><button class="btn block" data-close>閉じる</button>`);
-      $('#kgLoc').onclick = () => locate(openQuick);
-      return;
+  const orgSave = () => lsSet(pk('org'), JSON.stringify({ type: ORG.type, pick: ORG.pick }));   // 地図でえらんだ場所も、このスマホの中だけ
+  function orgPos() {
+    orgLoad();
+    if (isS() || ORG.type === 'here') return myPos || null;
+    return ORG.type === 'hall' ? hallPos() : ORG.pick;
+  }
+  const orgSig = () => { const p = orgPos(); return (isS() ? 's' : ORG.type) + '|' + (p ? p[0].toFixed(5) + ',' + p[1].toFixed(5) : ''); };
+  function orgWord() { return isS() || ORG.type === 'here' ? 'ここ' : ORG.type === 'hall' ? '会館' : 'えらんだ場所'; }
+  const orgLabel = () => (ORG.type === 'hall' ? '会館から' : ORG.type === 'pick' ? '地図でえらんだ場所から' : '今いる場所から');
+
+  /* =========================================================
+     候補をつくる（家のまとまり／留守宅カード／区域カード）
+     ・同じ家を2つの候補に入れない：区域カードの続き → 留守宅カード → （新しくもらえる区域）→ 家のまとまり の順に優先
+     ・家のまとまりは computeHomeReco と同じ家（係の設定もそのまま）。「一度に出す件数」は使わない
+     ========================================================= */
+  const hasUnmet = k => !D().dnc[k] && !D().follows[k] && !relOf(k) && isUnmet(k);
+  const unmetCount = t => memo('kgum' + t.id + '|' + vl(), () => {
+    let n = 0;
+    housesOf(t.id).forEach(h => targets(h).forEach(u => { if (hasUnmet(K(h.id, u))) n++; }));
+    return n;
+  });
+  const cenOf = t => memo('kgcen' + t.id, () => (okPoly(t.polygon) ? center(t.polygon) : null));
+  const ptsOfTerr = t => memo('kgpt' + t.id + '|' + D().houses.length, () => housesOf(t.id).filter(h => isFinite(h.lat) && isFinite(h.lng)).map(h => [h.lat, h.lng]));
+  const ceil5 = m => Math.max(5, Math.ceil(m / 5) * 5);
+  const minDist = (pos, pts) => { let b = Infinity; for (let i = 0; i < pts.length; i++) { const d = distM(pos, pts[i]); if (d < b) b = d; } return b === Infinity ? null : b; };
+
+  /* 家のまとまり：起点にいちばん近い家から、近い順に3軒 */
+  function pickSel(c, pos) {
+    const arr = c.pool;
+    let sel;
+    if (pos) { arr.forEach(x => { x._d = distM(pos, [x.h.lat, x.h.lng]); }); sel = arr.slice().sort((a, b) => a._d - b._d).slice(0, 3); }
+    else sel = arr.slice().sort((a, b) => b.sc - a.sc).slice(0, 3);
+    // 近い順につなぐ（1軒目は起点にいちばん近い家）
+    const out = [sel.shift()];
+    while (sel.length) {
+      const last = out[out.length - 1];
+      let bi = 0, bd = Infinity;
+      sel.forEach((x, i) => { const d = distM([last.h.lat, last.h.lng], [x.h.lat, x.h.lng]); if (d < bd) { bd = d; bi = i; } });
+      const x = sel.splice(bi, 1)[0]; x.leg = bd; out.push(x);
     }
-    const r = nearChain();
-    setSheet(headHtml(null, '15分で回れる3軒', r.out.length && r.mins <= 20 ? `約${r.mins}分` : '') + (r.out.length
-      ? r.out.map((c, i) => `<article class="ritem"><div><p class="rt"><span class="numbadge">${i + 1}</span> ${targetName(c.h, c.u)}</p>
-          <p class="muted">${i === 0 ? 'ここから' : '前の家から'}約${fmtDist(c.d)}</p></div>
-          <button type="button" class="btn small primary" data-kgq="${i}">地図で見る</button></article>`).join('')
-        + '<p class="hint">最近会えた家・拒否の家・ほかの人の留守宅カードの家は入れていません。</p>'
-      : '<div class="empty">近くに、今おすすめできる家はありません。</div>') + '<button class="btn block" data-close>閉じる</button>');
-    $$('[data-kgq]', $('#sheet')).forEach(b => b.onclick = () => {
-      const c = r.out[Number(b.dataset.kgq)];
-      closeSheet(); recoMark(c.h.id, c.u, 'near'); goTo(c.h.id, c.u, false, 'near');
+    out[0].leg = pos ? out[0]._d : null;
+    let walk = 0; out.forEach(x => { if (x.leg != null) walk += x.leg; });
+    c.sel = out; c.dist = pos ? out[0]._d : null;
+    c.mins = ceil5(walk / 67 + 4 * out.length);
+    c.unmet = out.filter(x => hasUnmet(x.k)).length;
+    c.why = out[0].why;
+    c.title = `区域${c.t.no}の家 ${out.length}軒`;
+  }
+  /* 起点が変わったとき：距離だけを計算し直す（家を全部回し直さない） */
+  function setDists(list) {
+    const pos = orgPos(), sig = orgSig();
+    if (list.sig === sig) return;
+    list.sig = sig;
+    list.forEach(c => {
+      c.reason = null;
+      if (c.kind === 'group') pickSel(c, pos);
+      else c.dist = pos && c.pts && c.pts.length ? minDist(pos, c.pts) : null;
     });
   }
 
-  /* =========================================================
-     ホームへの組み込み（先に画面を出し、計算はそのあとで）
-     ========================================================= */
-  let fillTok = 0;
-  function ensureBox(id, where) {
-    const wrap = $('#view-home .wrap');
-    if (!wrap) return null;
-    let el = document.getElementById(id);
-    if (!el) {
-      el = document.createElement('div'); el.id = id;
-      if (where === 'top') { const hello = $('#homeHello'); if (hello && hello.parentNode === wrap) hello.insertAdjacentElement('afterend', el); else wrap.insertBefore(el, wrap.firstChild); }
-      else wrap.appendChild(el);
+  function buildCands() {
+    const now = new Date(), cur = slotOf(now), my = me().id, col0 = colOf(now), bi0 = Math.max(0, SLB.indexOf(bandOf(now)));
+    const out = [], mineT = new Set(), roundT = new Set(), cardHouse = new Set();
+    D().territories.forEach(t => { if (t.holder && myTerr(t) && !t.dummy) mineT.add(t.id); });
+    // 1 自分の区域カードの続き
+    mineT.forEach(tid => {
+      const t = terrById(tid);
+      try {
+        const r = roundInfo(tid);
+        if (r && r.c.todo > 0) {
+          roundT.add(tid);
+          out.push({ kind: 'round', t, left: r.c.todo, unmet: unmetCount(t), col: col0, bi: bi0, now: true, mine: true, title: `区域${t.no}の続き`,
+            pts: r.items.filter(x => isFinite(x.h.lat)).map(x => [x.h.lat, x.h.lng]) });
+        }
+      } catch (e) { /* この区域はとばす */ }
+    });
+    // 2 留守宅カード：区域ごとに、今の時間帯のカード1枚と、ほかの時間帯でいちばん会える見込みが高いカード1枚まで
+    if (myAwayCount(false) < D().settings.awayMax) {
+      const byT = new Map();
+      awaySuggestions(my, SLOTS).forEach(x => {
+        if (roundT.has(x.t.id) || x.t.dummy) return;
+        const p = meetChance(x.t, x.slot).p;
+        x.exp = x.keys.length * p;
+        if (!byT.has(x.t.id)) byT.set(x.t.id, []);
+        byT.get(x.t.id).push(x);
+      });
+      byT.forEach(list => {
+        const curC = list.find(x => x.slot === cur) || null, curKeys = new Set(curC ? curC.keys : []);
+        const rest = list.filter(x => x.slot !== cur && !x.keys.some(k => curKeys.has(k))).sort((a, b) => b.exp - a.exp);
+        [curC, rest[0]].forEach(x => {
+          if (!x) return;
+          const hs = x.keys.map(k => houseById(parseKey(k)[0])).filter(h => h && isFinite(h.lat));
+          x.keys.forEach(k => cardHouse.add(parseKey(k)[0]));
+          out.push({ kind: 'card', t: x.t, slot: x.slot, keys: x.keys, unmet: x.keys.length, col: slotCol(x.slot), bi: slotBand(x.slot), now: x.slot === cur, mine: false,
+            title: `区域${x.t.no}の留守宅カード（${slotShort(x.slot)}のカード）`, why: `${x.keys.length}軒のうち、約${Math.max(1, Math.round(x.exp))}軒で会えそう`,
+            pts: hs.map(h => [h.lat, h.lng]) });
+        });
+      });
     }
-    return el;
+    // 3 新しくもらえる区域（「区域をもらう」のおすすめ順＝返却から長い順の上位3つ）
+    if (hasRoom(false)) {
+      const taken = new Set(out.map(c => c.t.id));
+      freeTerrs().filter(t => !taken.has(t.id)).map(t => ({ t, last: [t.completedAt, t.returnedAt].filter(Boolean).sort().pop() || '' }))
+        .sort(byLongest).slice(0, 3).forEach(({ t }) => {
+          const take = isFree(t) && canTakeFree(false);
+          out.push({ kind: 'terr', t, take, unmet: unmetCount(t), col: col0, bi: bi0, now: true, mine: false, title: `区域${t.no}をもらう`,
+            why: take ? '空いている区域です。すぐ受け取れます' : '空いている区域です。係に頼むと受け取れます', pts: ptsOfTerr(t) });
+        });
+    }
+    // 4 家のまとまり（computeHomeReco と同じ家。自分の区域・カードの家・もらえる区域の家は入れない）
+    const ex = new Set(mineT);
+    out.forEach(c => { if (c.kind === 'terr') ex.add(c.t.id); });
+    let reco = [];
+    try { window.KG_RECO_ALL = true; reco = computeHomeReco().list; } catch (e) { console.error(e); } finally { window.KG_RECO_ALL = false; }
+    const pools = new Map();
+    reco.forEach(x => {
+      if (ex.has(x.t.id) || cardHouse.has(x.h.id) || x.t.dummy || !isFinite(x.h.lat) || !isFinite(x.h.lng)) return;
+      if (!pools.has(x.t.id)) pools.set(x.t.id, []);
+      pools.get(x.t.id).push(x);
+    });
+    pools.forEach(pool => out.push({ kind: 'group', t: pool[0].t, pool, col: col0, bi: bi0, now: true, mine: false }));
+    out.forEach((c, i) => { c.i = i; });
+    out.sig = null;
+    return out;
   }
-  function fillHome(tok) {
-    if (tok !== fillTok) return;
-    const view = $('#view-home'); if (!view || view.hidden) return;
-    const simple = isSimple();
-    const top = ensureBox('kgTop', 'top'), foot = ensureBox('kgFoot', 'foot');
-    if (!top || !foot) return;
-    top.className = 'kgbody' + (simple ? ' simple' : '');
-    // 簡単モード：案3は大きな数字1つ、案1は1行
-    top.innerHTML = '<p class="muted">さがしています…</p>';
-    setTimeout(() => {
-      if (tok !== fillTok) return;
-      let html = '';
-      // 詳しいモード：知らせ → おすすめ → 目標（6.1）／簡単モード：おすすめ → 知らせ(1行) → 目標(1行)（6.2）
-      const parts = [() => thanksHtml(simple), () => picksHtml(simple), () => goalHtml(simple)];
-      if (simple) parts.unshift(parts.splice(1, 1)[0]);
-      parts.forEach(f => { try { html += f(); } catch (e) { console.error(e); } });
-      top.innerHTML = html;
-      try { foot.innerHTML = `<div class="kgfoot">${thanksFoot()}${lookHtml()}</div>`; } catch (e) { console.error(e); }
-    }, 0);
+  function getCands() {
+    const cur = slotOf(new Date()), key = ['kgc', me().id, cur, vl(), D().awayCards.length, D().houses.length, D().territories.filter(t => t.holder === me().id).length,
+      myPos ? myPos[0].toFixed(4) + ',' + myPos[1].toFixed(4) : '', D().settings.recoKinds, D().settings.recoDist, D().settings.recoOthers].join('|');
+    return memo(key, buildCands);
   }
-  const _renderHome = window.renderHome;
-  window.renderHome = function () {
-    const r = _renderHome.apply(this, arguments);
-    try { const tok = ++fillTok; setTimeout(() => fillHome(tok), 0); } catch (e) { console.error(e); }
-    return r;
+
+  /* ---------- 5つの欄と、並べかえ ---------- */
+  const youngInfo = () => memo('kgyg|' + D().territories.length + '|' + vl(), () => {
+    if (!(typeof AGE_ON !== 'undefined' && AGE_ON && typeof ageMap === 'function' && ageMap())) return null;
+    const m = new Map(), arr = [];
+    eligible().forEach(t => { try { const y = youngShare(t); if (y && y.pct != null) { m.set(t.id, y.pct); arr.push(y.pct); } } catch (e) { /* とばす */ } });
+    arr.sort((a, b) => b - a);
+    return { m, thr: arr.length ? arr[Math.max(0, Math.ceil(arr.length / 3) - 1)] : null };   // 市内で上から3分の1が「多い」
+  });
+  const youngOf = t => { const y = youngInfo(); if (!y || !y.m.has(t.id)) return 0; return y.thr > 0 && y.m.get(t.id) >= y.thr ? 2 : 1; };   // 2 多い・1 ふつう・0 ―
+  const TRANK = { group: 0, card: 1, round: 2, terr: 2 };                                                                                  // 15分 → 1時間 → 半日
+  const COLS = [
+    ['near', '近さ', SVG('<path d="M12 21s-6-5.4-6-10a6 6 0 0 1 12 0c0 4.6-6 10-6 10z"/><circle cx="12" cy="11" r="2"/>')],
+    ['time', '時間', SVG('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>')],
+    ['unmet', '会えていない', SVG('<path d="M4 11l8-6.5 8 6.5"/><path d="M6 10v9h12v-9"/>')],
+    ['young', '若い世代', SVG('<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c0-3.2 2.5-5 5.5-5s5.5 1.8 5.5 5"/><circle cx="17" cy="9.5" r="2.2"/><path d="M16.5 14.2c2.4 0 4 1.5 4 4.3"/>')],
+    ['now', '今の時間', SVG('<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>')]
+  ];
+  const SORTS = [['near', '近い順'], ['time', '時間が短い順'], ['unmet', '会えていない家が多い順'], ['young', '若い世代が多い順'], ['now', '今の時間に合う順']];
+  const SORT_NOTE = {
+    near: '起点から、いちばん近い家までの距離で並べています',
+    time: '回るのにかかる時間の目安で並べています（15分 → 1時間 → 半日）',
+    unmet: '留守の記録だけの、会えていない家の数で並べています',
+    young: '若い世代は、区域の統計からの目安です（家ごとの数字ではありません）',
+    now: '今の時間に回るのに合うものを、先に並べています'
+  };
+  const simpleSorts = () => SORTS.filter(s => s[0] === 'near' || s[0] === 'unmet');
+  function sortKey() {
+    const simple = isS(), ok = (simple ? simpleSorts() : SORTS).map(s => s[0]), v = lsGet(sortKeyOf());
+    if (ok.includes(v)) return v;
+    return simple ? (myPos ? 'near' : 'unmet') : 'now';
+  }
+  const cmpN = (a, b) => (a === b ? 0 : a - b);
+  const dOf = c => (c.dist == null ? Infinity : c.dist);
+  function sortList(list, key) {
+    const near = (a, b) => cmpN(dOf(a), dOf(b));
+    const f = {
+      near,
+      time: (a, b) => cmpN(TRANK[a.kind], TRANK[b.kind]) || near(a, b),
+      unmet: (a, b) => cmpN(b.unmet, a.unmet) || near(a, b),
+      young: (a, b) => cmpN(youngOf(b.t), youngOf(a.t)) || cmpN(b.unmet, a.unmet) || near(a, b),
+      now: (a, b) => cmpN(b.now ? 1 : 0, a.now ? 1 : 0) || near(a, b)
+    }[key] || near;
+    return list.slice().sort((a, b) => f(a, b) || (a.i - b.i));
+  }
+  function cellVals(c) {
+    return {
+      near: c.dist == null ? '―' : fmtDist(c.dist),
+      time: c.kind === 'group' ? `約${c.mins}分` : c.kind === 'card' ? '1時間' : '半日',
+      unmet: `${c.unmet}軒`,
+      young: ['―', 'ふつう', '多'][youngOf(c.t)],
+      now: c.now ? '○' : '―'
+    };
+  }
+
+  /* ---------- 画面 ---------- */
+  const VIEW = { shown: 10, list: null, order: [] };
+  let TOK = 0;
+  const DOW = ['日曜', '月曜', '火曜', '水曜', '木曜', '金曜', '土曜'];
+  const plansOf = (future) => {
+    const today = ymd(new Date());
+    return myData().events.filter(e => e.tid && (future ? e.date > today : e.date === today)).sort((a, b) => ((a.date + (a.time || '')) < (b.date + (b.time || '')) ? -1 : 1));
+  };
+  const evRow = (e, withDate) => `<div class="kgev"><div><b>${e.time ? `<span>${esc(e.time)}</span>　` : ''}${esc(e.title)}</b>${withDate ? `<small>${fmtYmd(e.date)}</small>` : ''}</div>${evBtn(e.id)}</div>`;
+
+  function cardHtml(c, i, simple, sk) {
+    const v = cellVals(c);
+    const cols = (simple ? COLS.filter(x => x[0] === 'near' || x[0] === 'unmet') : COLS).map(([k, lab, ic]) =>
+      `<button type="button" class="kgcol${sk === k ? ' on' : ''}" data-kgs="${k}" aria-pressed="${sk === k}">${ic}<small>${lab}</small><b>${esc(v[k])}</b></button>`).join('');
+    if (c.reason == null) c.reason = reasonFor(c);
+    const goLabel = c.kind === 'terr' ? (c.take ? '受け取る' : '係に頼む') : '今行く';
+    let acts;
+    if (simple) {
+      acts = (c.now ? `<button type="button" class="btn primary block" data-kggo="${i}">${goLabel}</button>` : `<button type="button" class="btn primary block" data-kgplan="${i}">予定に入れる</button>`) +
+        (c.now ? `<button type="button" class="btn small kgplan" data-kgplan="${i}">予定に入れる</button>` : '');
+    } else {
+      acts = (c.now ? `<button type="button" class="btn small primary" data-kggo="${i}">${goLabel}</button><button type="button" class="btn small" data-kgplan="${i}">予定に入れる</button>`
+        : `<button type="button" class="btn small primary" data-kgplan="${i}">予定に入れる</button>`) +
+        (c.kind === 'group' ? `<button type="button" class="btn small" data-kgchain="${i}">回る順番</button>` : '');
+    }
+    return `<article class="kgc"><p class="kgct">${esc(c.title)}${c.mine ? '<span class="kgbadge">あなたの区域カード</span>' : ''}</p>
+      <div class="kgcols${simple ? ' two' : ''}" role="group" aria-label="並べかえる欄">${cols}</div>
+      <button type="button" class="kgwhy" data-kginfo="${i}">${esc(c.reason)}</button>
+      <div class="actions">${acts}</div></article>`;
+  }
+  function paintSorts() {
+    const el = $('#kgSorts'); if (!el) return;
+    const simple = isS(), sk = sortKey();
+    el.innerHTML = `<div class="kgsorts" role="group" aria-label="並べかえ">${(simple ? simpleSorts() : SORTS).map(([k, l]) =>
+      `<button type="button" class="kgsort" data-kgs="${k}" aria-pressed="${sk === k}">${l}</button>`).join('')}</div>` +
+      (simple ? '' : `<p class="kgsm">${SORT_NOTE[sk]}</p>`);
+  }
+  function paintOrg() {
+    const el = $('#kgOrg'); if (!el) return;
+    orgLoad();
+    const loc = !orgPos() && (isS() || ORG.type === 'here') ? '<div class="row"><button type="button" class="btn small" data-kgloc>現在地を使う</button></div>' : '';
+    el.innerHTML = (isS() ? '' : `<button type="button" class="kgorg" data-kgorg>距離は：${orgLabel()}</button>`) + loc;
+  }
+  function paintList() {
+    const el = $('#kgList'); if (!el) return;
+    const simple = isS(), sk = sortKey();
+    if (offToday()) { el.innerHTML = '<div class="notice warn">今日は、区域係が訪問を控える日にしています</div>'; return; }
+    const list = VIEW.list;
+    if (!list) return;
+    setDists(list);
+    VIEW.order = sortList(list, sk);
+    const show = VIEW.order.slice(0, VIEW.shown);
+    let h = show.map((c, i) => cardHtml(c, i, simple, sk)).join('');
+    if (!h) h = '<div class="empty">今出せるおすすめはありません。</div>';
+    if (VIEW.order.length > show.length) h += `<button type="button" class="btn block" data-kgmore>もっと見る</button>`;
+    el.innerHTML = h;
+  }
+  function fill(tok) {
+    if (tok !== TOK || !recoTabOn()) return;
+    const simple = isS();
+    try { VIEW.list = offToday() ? [] : getCands(); } catch (e) { console.error(e); VIEW.list = []; }
+    paintOrg(); paintSorts(); paintList();
+    const fut = $('#kgPlans'); if (fut && !simple) { const p = plansOf(true).slice(0, 6); fut.innerHTML = p.length ? `<h2 class="sec">あなたの予定</h2>${p.map(e => evRow(e, true)).join('')}` : ''; }
+    const rv = $('#kgRev');
+    if (rv && revOn()) setTimeout(() => { if (tok !== TOK) return; try { rv.innerHTML = lookSection(simple); } catch (e) { console.error(e); } }, 0);
+  }
+  window.renderRecoView = function () {
+    const box = $('#recoPane'); if (!box || $('#view-reco').hidden) return;
+    if (!recoTabOn()) { box.innerHTML = '<div class="empty">今は、おすすめを出さない設定です。</div>'; return; }
+    orgLoad();
+    const simple = isS(), now = new Date(), tok = ++TOK, today = plansOf(false);
+    VIEW.shown = simple ? 3 : 10;
+    box.innerHTML = `<div class="kgbody${simple ? ' simple' : ''}">
+      ${today.length ? `<h2 class="sec">今日の予定</h2>${today.map(e => evRow(e, false)).join('')}` : ''}
+      <h2 class="sec">おすすめ</h2>
+      <p class="kgstat">今は${DOW[now.getDay()]}の${bandOf(now)}です</p>
+      ${simple ? '<p class="kgsm">今いる場所から探します</p>' : ''}<div id="kgOrg"></div>
+      <div id="kgSorts"></div>
+      <div id="kgList"><p class="muted">さがしています…</p></div>
+      <div id="kgPlans"></div><div id="kgRev"></div></div>`;
+    paintSorts();
+    setTimeout(() => fill(tok), 0);                                   // 枠を先に出し、一覧はそのあとで作る
+    try { maybeAutoLocate(); } catch (e) { /* 現在地の自動取得だけの話 */ }
   };
 
+  function setSort(k) {
+    lsSet(sortKeyOf(), k);
+    VIEW.shown = isS() ? 3 : 10;
+    paintSorts(); paintList();                                        // 作った一覧を並べ直すだけ
+    const b = document.querySelector('#kgSorts [data-kgs="' + k + '"]'); if (b) b.focus({ preventScroll: true });
+  }
+
+  /* 距離の起点の切りかえ */
+  let kgPicking = false;
+  function openOrigin() {
+    orgLoad();
+    const hall = hallPos(), cur = ORG.type;
+    const opt = (k, label, sub) => `<button type="button" class="choice${cur === k ? ' on' : ''}" data-kgo="${k}" aria-pressed="${cur === k}">${label}${sub ? `<small>${sub}</small>` : ''}</button>`;
+    setSheet(headHtml(null, '距離の起点', 'どこからの近さで、並べるかを決めます') +
+      `<div class="kgday" style="grid-template-columns:1fr">${opt('here', '今いる場所', '')}${hall ? opt('hall', '会館', '') : ''}${opt('pick', '地図でえらんだ場所', '何かのついでに回るときに')}</div>
+      ${ORG.pick ? '<button type="button" class="btn block" data-kgrepick>地図で場所をえらび直す</button>' : ''}
+      <p class="hint">えらんだ場所は、このスマホの中だけに置きます。</p>
+      <button class="btn block" data-close>閉じる</button>`);
+    const S = $('#sheet');
+    $$('[data-kgo]', S).forEach(b => b.onclick = () => {
+      const k = b.dataset.kgo;
+      if (k === 'pick' && !ORG.pick) { startPick(); return; }
+      ORG.type = k; orgSave(); closeSheet();
+      if (k === 'here' && !myPos) locate(() => { renderRecoView(); }); else renderRecoView();
+    });
+    const rp = $('[data-kgrepick]', S); if (rp) rp.onclick = startPick;
+  }
+  function startPick() {
+    closeSheet(); kgPicking = true; showView('map');
+    pickPlace = ll => {
+      kgPicking = false;
+      ORG.type = 'pick'; ORG.pick = [Math.round(ll.lat * 1e6) / 1e6, Math.round(ll.lng * 1e6) / 1e6]; orgSave();
+      showView('reco'); toast('場所をえらびました');
+    };
+    toast('距離の起点にする場所を、地図でタップしてください');
+  }
+
+  /* 今行く／予定に入れる／回る順番 */
+  function goPick(it) {
+    CHANCE_CACHE = null;
+    if (it.kind === 'card') takeAwayCard(it.t.id, it.slot);
+    else if (it.kind === 'round') openTerr(it.t.id);
+    else if (it.kind === 'terr') { reqForGroup = false; if (it.take) takeTerr(it.t.id); else askTerr(it.t.id); }
+    else { const s = it.sel[0]; recoMark(s.h.id, s.u, s.rk); goTo(s.h.id, s.u, false, s.rk); }
+  }
+  function openChain(c) {
+    setSheet(headHtml(null, '回る順番', `約${c.mins}分`) + c.sel.map((x, i) => `<article class="ritem"><div><p class="rt"><span class="numbadge">${i + 1}</span> ${targetName(x.h, x.u)}</p>
+        ${x.leg != null ? `<p class="muted">${i === 0 ? (isS() || ORG.type === 'here' ? 'ここから' : ORG.type === 'hall' ? '会館から' : 'えらんだ場所から') : '前の家から'}約${fmtDist(x.leg)}</p>` : ''}</div>
+        <button type="button" class="btn small primary" data-kgq="${i}">地図で見る</button></article>`).join('') +
+      '<p class="hint">最近会えた家・拒否の家・ほかの人の留守宅カードの家は入れていません。</p><button class="btn block" data-close>閉じる</button>');
+    $$('[data-kgq]', $('#sheet')).forEach(b => b.onclick = () => {
+      const x = c.sel[Number(b.dataset.kgq)];
+      closeSheet(); recoMark(x.h.id, x.u, x.rk); goTo(x.h.id, x.u, false, x.rk);
+    });
+  }
+
   /* ---------- 押したときの動き ---------- */
+  function setPref(what, v, btn) {
+    lsSet(pk(what), v);
+    if (btn && btn.parentNode) btn.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+    if (what === 'tab') {
+      updateTabs();
+      if (!recoTabOn() && currentView === 'reco') showView('home');
+      toast(v === 'on' ? 'おすすめのタブを出すようにしました' : 'おすすめのタブを出さないようにしました');
+    } else {
+      if (currentView === 'reco') renderRecoView();
+      toast(v === 'on' ? 'おすすめにふり返りを出すようにしました' : 'おすすめにふり返りを出さないようにしました');
+    }
+  }
   document.addEventListener('click', e => {
     const q = s => e.target.closest && e.target.closest(s);
     let x;
     if ((x = q('[data-kgopen]'))) { e.preventDefault(); e.stopPropagation(); openEvent(x.dataset.kgopen); return; }
-    if (q('[data-ui^="kg"]')) { setTimeout(() => { try { renderHome(); } catch (err) { /* 表示だけの話 */ } }, 60); return; }
-    if (!q('#view-home')) return;
-    if (q('[data-kgthok]')) { thanksDone(); }
-    else if (q('[data-kgthsee]')) openThanks();
-    else if (q('[data-kglook]')) openLook();
-    else if (q('[data-kgquick]')) openQuick();
-    else if (q('[data-kgmore]')) showView('reco');
-    else if ((x = q('[data-kggo]'))) { const it = picks[Number(x.dataset.kggo)]; if (it) goPick(it); }
-    else if ((x = q('[data-kgplan]'))) { const it = picks[Number(x.dataset.kgplan)]; if (it) openPlan(it); }
-    else if ((x = q('[data-kginfo]'))) { const it = picks[Number(x.dataset.kginfo)]; if (it) window.openTerrInfo(it.t.id, it.col, it.bi, it); }
+    if ((x = q('[data-kgui]'))) { e.preventDefault(); e.stopPropagation(); if (!x.disabled) setPref(x.dataset.kgui, x.dataset.v, x); return; }
+    if (!q('#view-reco')) return;
+    const it = (el, k) => VIEW.order[Number(el.dataset[k])];
+    if ((x = q('[data-kgs]'))) { e.stopPropagation(); setSort(x.dataset.kgs); }
+    else if (q('[data-kgorg]')) openOrigin();
+    else if (q('[data-kgmore]')) { VIEW.shown += isS() ? 3 : 10; paintList(); }
+    else if (q('[data-kgloc]')) { locate(() => { RECO_CACHE = null; renderRecoView(); }); }
+    else if ((x = q('[data-kggo]'))) { const c = it(x, 'kggo'); if (c) goPick(c); }
+    else if ((x = q('[data-kgplan]'))) { const c = it(x, 'kgplan'); if (c) openPlan(c); }
+    else if ((x = q('[data-kgchain]'))) { const c = it(x, 'kgchain'); if (c) openChain(c); }
+    else if ((x = q('[data-kginfo]'))) { const c = it(x, 'kginfo'); if (c) window.openTerrInfo(c.t.id, c.col, c.bi, c); }
   }, true);
 
-  /* ---------- 歯車の設定（詳しいモードの「ホームに出すもの」）と、日の画面の「地図をひらく」 ---------- */
-  function uiRows() {
-    const seg = (key, cur) => `<div class="seg uiseg" role="group">${[['on', '出す'], ['off', '出さない']].map(([v, l]) =>
-      `<button type="button" data-ui="${key}" data-v="${v}" aria-pressed="${cur === v}">${l}</button>`).join('')}</div>`;
-    const row = (key, name, sub) => `<div class="featrow"><p><b>${name}</b><small>${sub}</small></p>${seg(key, uiOn(key) ? 'on' : 'off')}</div>`;
-    return row('kgReco', '今日のおすすめ', '空いた時間におすすめの家や区域を、理由つきで出します') +
-      row('kgThanks', '役に立った記録', 'あなたの留守の記録で、ほかの人が会えた家の数を知らせます') +
-      (goalOn() ? row('kgGoal', '会衆の目標', '今年、会衆で回った区域の割合を出します')
-        : '<div class="featrow"><p><b>会衆の目標</b><small>区域係が「出さない」にしているため、選べません</small></p></div>') +
-      row('kgLook', 'ふり返り', 'あなたの記録のふり返りを、このスマホの中だけで見られます');
+  /* =========================================================
+     ほかの画面のおすすめを消す／タブの出しかた（kantan.js の関数も「包む」形）
+     ========================================================= */
+  // ホーム：毎日のひと言の「今のおすすめ」の欄
+  const _showHello = window.showHello;
+  window.showHello = function () {
+    const r = _showHello.apply(this, arguments);
+    try { const el = document.getElementById('hello'); if (el) { const a = el.querySelector('.hsec'), b = el.querySelector('#helloReco'); if (a) a.remove(); if (b) b.remove(); } } catch (e) { console.error(e); }
+    return r;
+  };
+  // ホーム：「今日やること」の「今がチャンス・留守宅カード」。おすすめは、おすすめタブだけに出す
+  window.chanceCard = function () { return null; };
+  // 下のタブ
+  const _updateTabs = window.updateTabs;
+  window.updateTabs = function () {
+    const r = _updateTabs.apply(this, arguments);
+    try {
+      const rec = document.getElementById('tabReco');
+      if (rec && Store.data) {
+        rec.hidden = !recoTabOn();
+        const tabs = document.getElementById('tabs');
+        if (tabs) {
+          const n = [...tabs.children].filter(b => b.tagName === 'BUTTON' && !b.hidden).length;
+          tabs.style.setProperty('--tabs', n); tabs.classList.toggle('many', n >= 6);
+        }
+      }
+    } catch (e) { console.error(e); }
+    return r;
+  };
+  const _showView = window.showView;
+  window.showView = function (name) {
+    if (kgPicking && name !== 'map' && name !== 'reco') { kgPicking = false; pickPlace = null; }
+    if (name === 'reco') {
+      if (!recoTabOn()) name = 'home';
+      else if (isSimple()) {                                          // kantan.js は簡単モードで 'reco' をホームへ戻すので、このあいだだけ詳しいモードに見せる
+        tmpSimple = true; const m = UI.mode; UI.mode = 'detail';
+        try { return _showView.call(this, name); } finally { UI.mode = m; tmpSimple = null; }
+      }
+    }
+    return _showView.call(this, name);
+  };
+  const _applyUi = window.applyUi;
+  window.applyUi = function () {
+    const was = !!Store.data && currentView === 'reco';
+    const r = _applyUi.apply(this, arguments);
+    try { if (was && currentView !== 'reco' && recoTabOn()) showView('reco'); } catch (e) { console.error(e); }
+    return r;
+  };
+
+  /* =========================================================
+     歯車の設定（各自）と、日の画面の「地図をひらく」
+     ・「おすすめのタブを出す」「おすすめにふり返りを出す」を「使う機能」の中に足す（かんたんモードでも選べる）
+     ・係が recoOn=0 のときは押せない
+     ========================================================= */
+  function prefRows() {
+    const seg = (k, cur, dis) => `<div class="seg uiseg" role="group">${[['on', '出す'], ['off', '出さない']].map(([v, l]) =>
+      `<button type="button" data-kgui="${k}" data-v="${v}" aria-pressed="${cur === v}"${dis ? ' disabled' : ''}>${l}</button>`).join('')}</div>`;
+    if (!recoOn()) {
+      return `<div class="featrow"><p><b>おすすめのタブを出す</b><small>区域係が、おすすめを使わない設定にしています</small></p>${seg('tab', 'off', true)}</div>`;
+    }
+    return `<div class="featrow"><p><b>おすすめのタブを出す</b><small>下のタブに「おすすめ」を出します。近くの会えていない家や留守宅カードを、並べかえて選べます</small></p>${seg('tab', recoTabOn() ? 'on' : 'off')}</div>
+      <div class="featrow"><p><b>おすすめにふり返りを出す</b><small>あなたの記録のふり返りを、おすすめのいちばん下に出します（このスマホの中だけ）</small></p>${seg('rev', revOn() ? 'on' : 'off')}</div>`;
   }
   const _setSheet = window.setSheet;
   window.setSheet = function (html) {
     try {
       if (typeof html === 'string') {
-        if (html.indexOf('id="uiReset"') >= 0 && !isSimple()) html = html.replace('<h3 class="sub">区域カードに出すもの</h3>', uiRows() + '<h3 class="sub">区域カードに出すもの</h3>');
+        if (html.indexOf('id="uiReset"') >= 0 && html.indexOf('<h3 class="sub">ホームに出すもの</h3>') >= 0 && Store.data) {
+          html = html.replace('<h3 class="sub">ホームに出すもの</h3>', prefRows() + '<h3 class="sub">ホームに出すもの</h3>')
+            .replace('その日はじめて開いたときに、ひと言・今日の目標・今の時間帯におすすめの家を出します（まわりをさわると閉じます）', 'その日はじめて開いたときに、ひと言・今日の目標を出します（まわりをさわると閉じます）')
+            .replace('今日の集まり・自分の予定・再訪問の約束・区域カード・今がチャンスの留守宅カードを、ホームのいちばん上にまとめます', '今日の集まり・自分の予定・再訪問の約束・区域カードを、ホームのいちばん上にまとめます');
+        }
         if (html.indexOf('data-evdel') >= 0) {
           myData().events.filter(e => e.tid).forEach(e => {
             html = html.replace(`<button class="btn small danger" data-evdel="${e.id}">`, `${evBtn(e.id)}<button class="btn small danger" data-evdel="${e.id}">`);
@@ -611,21 +916,28 @@
     return _setSheet.call(this, html);
   };
 
-  /* ---------- 係の設定：伝道者のホームに会衆の目標を出すか ---------- */
-  const _renderAdmin = window.renderAdmin;
-  window.renderAdmin = function () {
-    _renderAdmin.apply(this, arguments);
-    try {
-      const box = document.getElementById('adDataSet');
-      if (isAdmin() && adPane === 'set' && box && !box.querySelector('[data-kgadm]')) {
-        const on = goalOn();
-        box.insertAdjacentHTML('beforeend', `<div class="setrow" data-kgadm><span>伝道者のホームに、会衆の目標を出す<br><small class="hint">今年、会衆で回った区域の割合を、みんなのホームに出します（個人の件数や順位は出しません）</small></span>
-          <div class="seg" role="group" aria-label="会衆の目標"><button type="button" data-sset="kgGoal" data-v="1" aria-pressed="${on}">出す</button><button type="button" data-sset="kgGoal" data-v="0" aria-pressed="${!on}">出さない</button></div></div>`);
-      }
-    } catch (e) { console.error(e); }
-  };
+  /* ---------- 係の画面：おすすめの設定から「一度に出す件数」を消す（この件数はもう使わない） ---------- */
+  const _renderRecoAdmin = window.renderRecoAdmin;
+  if (typeof _renderRecoAdmin === 'function') {
+    window.renderRecoAdmin = function () {
+      const r = _renderRecoAdmin.apply(this, arguments);
+      try {
+        const box = document.getElementById('adReco');
+        if (box) {
+          const b = box.querySelector('[data-kset="recoCount"]'), row = b && b.closest('.setrow');
+          if (row) row.remove();
+          const h = box.querySelector('h2.sec'); if (h && h.textContent.indexOf('ホームの') === 0) h.textContent = 'おすすめのタブ';
+          box.querySelectorAll('p.hint').forEach(p => {
+            p.innerHTML = p.innerHTML.replace('<br>えらんだ種類から、順番に1件ずつ出します。', '')
+              .replace('カードを受け取らなくても、空いた時間に2〜3件回れる家を、全員の画面の下のタブ「おすすめ」に出します。', 'カードを受け取らなくても回れる家や、留守宅カード・区域カードを、全員の画面の下のタブ「おすすめ」に、並べかえて選べる形で出します。');
+          });
+        }
+      } catch (e) { console.error(e); }
+      return r;
+    };
+  }
 
-  /* ---------- 「速さを測る」に4行（いちばん古いスマホで0.3秒未満が目安） ---------- */
+  /* ---------- 「速さを測る」に行を足す（いちばん古いスマホで0.3秒未満が目安） ---------- */
   if (typeof runPerfCheck === 'function') {
     const _perf = window.runPerfCheck;
     window.runPerfCheck = function () {
@@ -634,12 +946,10 @@
         const rows = [];
         const T = (name, fn) => {
           const t0 = performance.now();
-          try { MEMO.clear(); fn(); } catch (e) { rows.push([name, -1]); return; }
+          try { MEMO.clear(); fn(); } catch (e) { console.error(e); rows.push([name, -1]); return; }
           rows.push([name, performance.now() - t0]);
         };
-        T('役に立った記録', () => { thanksInfo(); thanksFresh(); });
-        T('今日のおすすめ（理由つき）', () => { RECO_CACHE = null; CHANCE_CACHE = null; buildPicks(); });
-        T('会衆の目標', () => { coverStats(); monthMet(); });
+        T('おすすめの一覧づくり', () => { RECO_CACHE = null; CHANCE_CACHE = null; const l = buildCands(); setDists(l); sortList(l, sortKey()); });
         T('ふり返り', () => { myStats(); });
         const tb = document.querySelector('#sheet table.slots');
         if (!tb) return;
@@ -651,5 +961,5 @@
 
   /* 更新のお知らせ（CHANGELOG）は index.html に書いてある */
 
-  if (Store.data) { try { syncPaperDone(); renderHome(); } catch (e) { console.error(e); } }
+  if (Store.data) { try { syncPaperDone(); updateTabs(); if (currentView === 'reco') renderRecoView(); } catch (e) { console.error(e); } }
 })();
