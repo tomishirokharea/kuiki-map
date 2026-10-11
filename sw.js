@@ -6,23 +6,23 @@
      つながらないとき（6秒待っても返事がないとき）だけ、前に保存した画面を使う
      → ふだんはいつも最新の版。圏外でも開ける
    ・地図の部品（Leaflet）と文字（Googleフォント）：一度取ったら、保存したものを使う
-   ・国土地理院の淡色地図の画像：一度見たものは保存し、次からは保存したものを先に使う
+   ・国土地理院の地図の画像（淡色地図 pale・標準地図 std）：一度見たものは保存し、次からは保存したものを先に使う
      （保存するのは、会衆の区域のまわり＝全区域を囲む四角＋500m だけ。その四角は画面から知らせてもらう。
-       旅行先など、四角の外の地図は保存しない。写真の地図も保存しない）
+       旅行先など、四角の外の地図は保存しない。写真の地図も保存しない。画像のURLのタイル番号 z/x/y を緯度経度に直して、四角と比べる）
    ・サーバー（GAS）とのやりとり・版の確認には、手を出さない
    ・招待コード（?t=）の入ったURLは保存しない（URLの ? から後ろを消して保存する）
    ========================================================= */
 const APP_CACHE = 'kuiki-app-v1';
 const LIB_CACHE = 'kuiki-lib-v1';
-const TILE_CACHE = 'kuiki-tiles-v1';   // 地図の画像（画面側の kangaeru.js も同じ入れ物に入れる。名前を変えるときは両方）
+const TILE_CACHE = 'kuiki-tiles-v1';   // 地図の画像（画面側の kangaeru.js・chizu.js も同じ入れ物に入れる。名前を変えるときは両方）
 const AREA_CACHE = 'kuiki-tilearea-v1'; // 保存してよい場所（四角）
 const KEEP = [APP_CACHE, LIB_CACHE, TILE_CACHE, AREA_CACHE];
-const TILE_RE = /^\/xyz\/pale\/(\d+)\/(\d+)\/(\d+)\.png$/;
+const TILE_RE = /^\/xyz\/(pale|std)\/(\d+)\/(\d+)\/(\d+)\.png$/;   // 見やすい地図（pale）と、地名の多い地図（std）
 const AREA_KEY = 'https://kuiki.invalid/area';
 let AREA = undefined; // [南, 西, 北, 東]。undefined＝まだ読んでいない、null＝区域がない
 const NET_WAIT_MS = 6000;
 // 圏外用に控える、アプリのファイル（新しくファイルを足したら、ここに名前を足す）
-const APP_FILES = /\/(config|schedule|kantan|tsuzuki|kangaeru|i18n|i18n-es)\.js$/;
+const APP_FILES = /\/(config|schedule|kantan|tsuzuki|kangaeru|chizu|i18n|i18n-es|i18n-es-chizu)\.js$/;
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -101,7 +101,7 @@ self.addEventListener('fetch', e => {
       const res = await fetch(req); // つながらないときはここで失敗 → 画面側で透明になり、下のぼやけた地図が見える
       try {
         // 中身が見える取り方（cors）の画像だけ保存する（opaque は容量の数え方が大きくなるため保存しない）
-        if (res && res.ok && res.type === 'cors' && tileInArea(+m[1], +m[2], +m[3], await loadArea())) cache.put(req.url, res.clone()).catch(() => {});
+        if (res && res.ok && res.type === 'cors' && tileInArea(+m[2], +m[3], +m[4], await loadArea())) cache.put(req.url, res.clone()).catch(() => {});
       } catch (err) { /* 保存できなくても表示はできる */ }
       return res;
     })());
