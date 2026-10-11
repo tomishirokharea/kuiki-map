@@ -762,7 +762,7 @@
     const hall = hallPos(), cur = ORG.type;
     const opt = (k, label, sub) => `<button type="button" class="choice${cur === k ? ' on' : ''}" data-kgo="${k}" aria-pressed="${cur === k}">${label}${sub ? `<small>${sub}</small>` : ''}</button>`;
     setSheet(headHtml(null, '距離の起点', 'どこからの近さで、並べるかを決めます') +
-      `<div class="kgday" style="grid-template-columns:1fr">${opt('here', '今いる場所', '')}${hall ? opt('hall', '会館', '') : ''}${opt('pick', '地図でえらんだ場所', '何かのついでに回るときに')}</div>
+      `<div class="kgday" style="grid-template-columns:1fr">${opt('here', '今いる場所', '')}${hall ? opt('hall', '会館', '') : ''}${opt('pick', '地図でえらんだ場所', '何かのついでに回るときに')}${lmOk() ? '<button type="button" class="btn block" data-kglm>目印からえらぶ</button>' : ''}</div>
       ${ORG.pick ? '<button type="button" class="btn block" data-kgrepick>地図で場所をえらび直す</button>' : ''}
       <p class="hint">えらんだ場所は、このスマホの中だけに置きます。</p>
       <button class="btn block" data-close>閉じる</button>`);
@@ -774,7 +774,13 @@
       if (k === 'here' && !myPos) locate(() => { renderRecoView(); }); else renderRecoView();
     });
     const rp = $('[data-kgrepick]', S); if (rp) rp.onclick = startPick;
+    const lb = $('[data-kglm]', S);   // 会館・学校などの目印を起点にする（chizu.js。えらんだ場所は「地図でえらんだ場所」と同じく、このスマホの中だけ）
+    if (lb) lb.onclick = () => window.KZ.pickLandmark(it => {
+      ORG.type = 'pick'; ORG.pick = [it.lat, it.lng]; orgSave();
+      renderRecoView(); toast('「' + it.name + '」を起点にしました');
+    });
   }
+  const lmOk = () => !isS() && !!(window.KZ && window.KZ.pickLandmark && window.KZ.landmarks && window.KZ.landmarks().length);
   function startPick() {
     closeSheet(); kgPicking = true; showView('map');
     pickPlace = ll => {
