@@ -506,15 +506,21 @@
       young: (a, b) => ((b.yg.pct == null ? -1 : b.yg.pct) - (a.yg.pct == null ? -1 : a.yg.pct)) || byLongest(a, b) };
     list.sort(SORTS[reqSort] || SORTS.reco);
     const recoLine = x => `<p class="muted">${x.sx.pin ? '<span class="duepin">急ぎ</span>' : ''}${chip(x.sx.d.st)} ${leftTxt(x.sx.d)}${meetTag(x.t)}</p>`;
-    const rows = list.map(x => { const { t, last, n, dist, yg } = x; return `<article class="pick">
+    // 今すぐ受け取れる区域と、係に頼む区域を分ける（並びは、それぞれの中で選んだ並べ方のまま）
+    const canGet = x => isFree(x.t) && canTake;
+    const askWhy = x => canGet(x) ? '' : `<p class="muted">${isFree(x.t) ? '持てる枚数に届いています' : '係が貸し出す区域です'}</p>`;
+    const rowHtml = x => { const { t, last, n, dist, yg } = x; return `<article class="pick">
         <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
         <div><b>${esc(t.name)}</b>
           ${reqSort === 'reco' ? recoLine(x) : ''}
-          <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}</div>
-        ${isFree(t) && canTake
+          <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}${askWhy(x)}</div>
+        ${canGet(x)
           ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
           : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
-      </article>`; }).join('');
+      </article>`; };
+    const rowsCan = list.filter(canGet).map(rowHtml).join(''), rowsAsk = list.filter(x => !canGet(x)).map(rowHtml).join('');
+    const both = !!rowsCan && !!rowsAsk;   // 両方あるときだけ、見出しで分ける
+    const rows = (both ? '<p class="q">今すぐ受け取れる区域</p>' : '') + rowsCan + (both ? '<p class="q">係に頼む区域（係が決めて届けます）</p>' : '') + rowsAsk;
     setSheet(headHtml(null, G ? `${esc(myGroup())}グループの区域をもらう` : (canGroupTerr() ? '個人の区域をもらう' : '区域カードをもう1枚'),
         `持てるのは${holdMax(G)}枚まで（今 ${heldOf(G)}枚・申し込み中 ${pendingOf(G).length}件）`) + `
       ${G ? `<div class="seg" role="group" aria-label="もらうカード"><button type="button" aria-pressed="true">区域カード</button><button type="button" data-gaway aria-pressed="false">留守宅カード</button></div>
