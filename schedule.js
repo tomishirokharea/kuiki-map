@@ -1513,11 +1513,18 @@
      ・係の画面では、「切」のときも同じ出し分けにする（番号が重なって区域が見えなくなるのを防ぐ）
      ========================================================= */
   const cssDm = document.createElement('style');
-  cssDm.textContent = `.dm-ctl{background:var(--paper,#fff);border:2px solid var(--ink,#222);border-radius:12px;padding:8px;max-width:250px;margin:0 0 0 auto;align-self:flex-start;box-sizing:border-box;font-size:15px;line-height:1.5}
-.dm-ctl[hidden]{display:none}.dm-ctl .sw{display:inline-block;width:16px;height:16px;border-radius:4px;border:2px solid #333;vertical-align:-3px;margin-right:4px}
+  cssDm.textContent = `.maptools{align-items:flex-start}
+.dm-ctl{position:relative;margin:0 0 0 auto;align-self:flex-start;font-size:15px;line-height:1.5}
+.dm-ctl[hidden]{display:none}
+.maptools>.dm-ctl{box-shadow:none}
+.dm-ctl>.btn.small{min-height:52px;border-radius:12px;padding-left:14px;padding-right:14px;white-space:nowrap;box-shadow:0 2px 6px #0003}
+.dm-drop{position:absolute;top:calc(100% + 6px);right:0;width:max-content;max-width:min(250px,calc(100vw - 20px));display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.dm-drop>*{background:var(--paper,#fff);border:2px solid var(--ink,#222);border-radius:12px;box-shadow:0 2px 6px #0003;box-sizing:border-box}
+.dm-drop .dm-hint{margin:0;padding:2px 10px;white-space:nowrap}
+.dm-drop details{padding:0 8px;width:100%}
+.dm-ctl .sw{display:inline-block;width:16px;height:16px;border-radius:4px;border:2px solid #333;vertical-align:-3px;margin-right:4px}
 .dm-ctl p{margin:3px 0}.dm-ctl summary{cursor:pointer;min-height:36px;line-height:36px;font-weight:700}
 body.duemode .terr-label:not(.duelab){display:none}
-body.duemode .zoomhint{top:calc(176px * var(--z,1))}
 .duelab span{pointer-events:auto;cursor:pointer;display:inline-block;min-height:34px;line-height:30px;background:#fff;border:2px solid #222;border-radius:8px;padding:1px 6px;font-weight:700;font-size:15px;white-space:nowrap;color:#111}
 .duelab.cp span{min-height:0;line-height:18px;font-size:13px;padding:0 4px;border-width:1.5px;border-radius:6px}
 .duelab.ro span{pointer-events:none;cursor:default}
@@ -1584,9 +1591,12 @@ body.duemode .zoomhint{top:calc(176px * var(--z,1))}
     const ts = polyTerrs().filter(t => on ? !t.dummy : true);
     const mode = dmLabelMode(ts, on);
     // 操作の枠：中身が変わったときだけ作り直す（開いている凡例が、地図を動かすたびに閉じないように）
-    const html = `<button type="button" class="btn small ${on ? 'primary' : ''}" data-dmtog aria-pressed="${on}">期限で色分け：${on ? '入' : '切'}</button>` +
-      (mode === 'none' ? '<p class="muted" style="margin:4px 0 0">拡大すると番号が出ます</p>' : '') +
-      (on ? `<details><summary>凡例（色・記号の意味）</summary><div>${Object.keys(DMC).map(k => `<p><span class="sw" style="background:${DMC[k][0]}"></span>${DMC[k][1]} ${DMC[k][2]}</p>`).join('')}<p>線が破線＝貸出中（番号の横に「貸」）<br>点線＝貸出中止（「止」）</p><p class="muted"><b>番号の札</b>か、色のついた場所を押すと、その区域の詳しい情報（カルテ）が開きます</p></div></details>` : '');
+    // ボタンは1つだけを同じ行に置く。説明と凡例は、ボタンの下に重ねて出す（行の高さを変えないため）
+    const html = `<button type="button" class="btn small ${on ? 'primary' : ''}" data-dmtog aria-pressed="${on}" aria-label="期限で色分け：${on ? '入' : '切'}">期限：${on ? '入' : '切'}</button>` +
+      (mode === 'none' || on ? '<div class="dm-drop">' +
+        (mode === 'none' ? '<p class="dm-hint">拡大すると番号が出ます</p>' : '') +
+        (on ? `<details><summary>凡例（色・記号の意味）</summary><div>${Object.keys(DMC).map(k => `<p><span class="sw" style="background:${DMC[k][0]}"></span>${DMC[k][1]} ${DMC[k][2]}</p>`).join('')}<p>線が破線＝貸出中（番号の横に「貸」）<br>点線＝貸出中止（「止」）</p><p class="muted"><b>番号の札</b>か、色のついた場所を押すと、その区域の詳しい情報（カルテ）が開きます</p></div></details>` : '') +
+        '</div>' : '');
     if (html !== dmHtml) {
       const wasOpen = !!(ctl.querySelector('details') && ctl.querySelector('details').open);
       ctl.innerHTML = html; dmHtml = html;

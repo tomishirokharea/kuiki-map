@@ -1383,7 +1383,7 @@ body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
       <div id="map"></div>
       <div class="maptools" id="mapTools">
         <select id="terrJump" aria-label="区域をえらぶ"></select>
-        <button class="btn primary adv" id="btnAdd">＋ 家を追加</button>
+        <button class="btn primary adv" id="btnAdd" aria-label="家を追加" title="家を追加">＋ 家</button>
       </div>
       <button type="button" class="zoomhint" id="zoomHint" hidden>地図を拡大すると家の印が出ます<span aria-hidden="true">×</span></button>
       <div class="cardbar" id="cardBar" hidden></div>
@@ -7747,7 +7747,7 @@ async function xlLocate(sheets, fileName) {
       <div class="tile"><b>${nApprox}</b><span>だいたいの場所の家</span></div>
       <div class="tile"><b>${nMiss}</b><span>場所が分からない住所</span></div></div>
     <p class="hint">「だいたいの場所」の家は、町や丁目のまん中に置きます。取り込んだあと、一覧から1軒ずつ地図で確かめて、家を押して「この家の場所を直す」で直してください。</p>
-    ${nMiss ? `<details class="more"><summary>場所が分からない住所（${nMiss}件）</summary><p class="hint">これらは取り込みません。地図で「＋ 家を追加」から入れてください。</p><ul>${missList.map(x => `<li>区域${esc(x[0])}　<span data-notr>${esc(x[1])}</span></li>`).join('')}</ul></details>` : ''}
+    ${nMiss ? `<details class="more"><summary>場所が分からない住所（${nMiss}件）</summary><p class="hint">これらは取り込みません。地図で「＋ 家」から入れてください。</p><ul>${missList.map(x => `<li>区域${esc(x[0])}　<span data-notr>${esc(x[1])}</span></li>`).join('')}</ul></details>` : ''}
     <p class="hint">区域の線は、家から約${XL_PAD_M}m外側を囲む形で作ります。あとから「区域」の一覧で線を引き直せます。</p>
     <button class="btn primary block" id="xlCommit">区域 ${plan.length}つ・家 ${nGood + nApprox}軒を取り込む</button>
     <button class="btn block" data-close>やめる</button>`);
