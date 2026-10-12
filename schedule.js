@@ -1513,10 +1513,11 @@
      ・係の画面では、「切」のときも同じ出し分けにする（番号が重なって区域が見えなくなるのを防ぐ）
      ========================================================= */
   const cssDm = document.createElement('style');
-  cssDm.textContent = `.dm-ctl{background:var(--paper,#fff);border:2px solid var(--ink,#222);border-radius:12px;padding:8px;max-width:250px;margin:70px 8px 0 0;font-size:15px;line-height:1.5}
+  cssDm.textContent = `.dm-ctl{background:var(--paper,#fff);border:2px solid var(--ink,#222);border-radius:12px;padding:8px;max-width:250px;margin:0 0 0 auto;align-self:flex-start;box-sizing:border-box;font-size:15px;line-height:1.5}
 .dm-ctl[hidden]{display:none}.dm-ctl .sw{display:inline-block;width:16px;height:16px;border-radius:4px;border:2px solid #333;vertical-align:-3px;margin-right:4px}
 .dm-ctl p{margin:3px 0}.dm-ctl summary{cursor:pointer;min-height:36px;line-height:36px;font-weight:700}
 body.duemode .terr-label:not(.duelab){display:none}
+body.duemode .zoomhint{top:calc(176px * var(--z,1))}
 .duelab span{pointer-events:auto;cursor:pointer;display:inline-block;min-height:34px;line-height:30px;background:#fff;border:2px solid #222;border-radius:8px;padding:1px 6px;font-weight:700;font-size:15px;white-space:nowrap;color:#111}
 .duelab.cp span{min-height:0;line-height:18px;font-size:13px;padding:0 4px;border-width:1.5px;border-radius:6px}
 .duelab.ro span{pointer-events:none;cursor:default}
@@ -1556,9 +1557,13 @@ body.duemode .terr-label:not(.duelab){display:none}
     // 地図の右下の「Leaflet」の文字は消す（国土地理院の出典表示だけ残す）
     try { if (map.attributionControl) map.attributionControl.setPrefix(false); } catch (e) { /* 表示だけの話なので無視 */ }
     if (!dmCtl) {
-      const C = L.Control.extend({ options: { position: 'topright' }, onAdd() { const d = L.DomUtil.create('div', 'dm-ctl'); d.id = 'dmCtl'; L.DomEvent.disableClickPropagation(d); return d; } });
-      dmCtl = new C(); dmCtl.addTo(map);
-      document.getElementById('dmCtl').addEventListener('click', e => {
+      // 操作の枠は、地図の上の「区域をえらぶ・家を追加」と同じ入れ物に入れる。
+      // 同じ行に入りきらないときは自然に次の行へ回るので、どんな画面の幅・文字の大きさでも重ならない
+      const host = document.getElementById('mapTools');
+      if (!host) return;
+      const d = document.createElement('div'); d.className = 'dm-ctl'; d.id = 'dmCtl'; d.hidden = true;
+      host.appendChild(d); dmCtl = d;
+      d.addEventListener('click', e => {
         if (!e.target.closest('[data-dmtog]')) return;
         dmState.on = !dmState.on; lsSet('kuiki_duemode', dmState.on ? '1' : '0');
         renderTerrs();
