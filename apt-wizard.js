@@ -50,6 +50,7 @@
 .aw-add{display:flex;gap:8px;margin:8px 0}
 .aw-bar{position:sticky;bottom:-1px;background:#fff;border-top:1px solid var(--line);padding:10px 0 6px;margin-top:14px;z-index:2}
 .aw-bar p{margin:0 0 6px;font-size:15px;color:var(--ink2);text-align:center}
+.aw-sep{margin-top:18px;border-top:1px solid var(--line);padding-top:12px}
 .aw-prefix{width:110px;min-height:48px;border-radius:10px;border:2px solid var(--ink2);padding:0 10px;font:inherit;font-size:18px;text-align:center}
 `;
   document.head.appendChild(css);
@@ -323,6 +324,8 @@
     return `<button class="btn ${frames ? 'primary ' : ''}block" data-aptedit="${esc(h.id)}">${frames || !h.units.length ? '部屋番号を入れる（階ごとにまとめて）' : '部屋を足す・直す・まとめて作る'}</button>`;
   };
   window.aptCandCount = candCount;
+  window.aptNearby = nearby;
+  window.aptCandHtml = x => `<button class="aw-cand" data-ci="${esc(x.c.i)}"><b>${esc(x.c.n || '（名前なし）')}</b><span>${dTxt(x.d)}</span>${tags(x.c)}</button>`;
   document.addEventListener('click', e => {
     const a = e.target.closest && e.target.closest('[data-aptwiz]');
     if (a) { e.preventDefault(); openWizard(a.dataset.aptwiz); return; }

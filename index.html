@@ -5009,7 +5009,6 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (fromBuilding) b += `<button class="btn small" id="backBld">← 部屋の一覧にもどる</button>`;
     if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
     if (h.ban) b += banNotice(h);
-    if (!unit && h.type === 'house' && st.step === 'result' && window.aptQuickHtml) b += window.aptQuickHtml(h);
     if (!dnc && other) b += `<div class="notice warn"><b>ほかの人が再訪問している${unit ? '部屋' : '家'}です。</b>${recentMet(k) ? '最近会えているので、訪問は控えてください。' : 'しばらく会えていないので、訪ねてもかまいません。'}${blocked ? '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
 
 
@@ -5062,15 +5061,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     }
     if (!unit) {
       const hk = kindOf(h);
-      b += `<details class="more"${st.editOpen ? ' open' : ''}><summary>この家の編集</summary>
-        <p class="q">種別</p>${kindChips(hk)}
-        ${hk !== 'home' ? `<label class="field"><span>${esc(kindName(hk))}の名前（なくてもよい）</span><span class="inline">
-          <input type="text" id="fHName" maxlength="30" value="${esc(h.label || '')}" placeholder="${esc(KIND_PH[hk] || '例：〇〇')}"><button class="btn small" id="fHNameSave">保存</button></span>
-          <small class="hint">設定で「学校・役所・お店などの名前」を出すにすると、地図に出ます。</small></label>` : ''}
-        ${h.type === 'house' ? '<p class="q">建物</p><button class="btn block" id="fToApt">アパート・マンションに変える</button>' : ''}
-        ${isAdmin() ? '<button class="btn block" id="fMove">この家の場所を直す</button>' : ''}
-        ${delReqOf(h.id) ? '<p class="tag-warn">この家は削除を申請中です（区域係の確認待ち）</p>'
-          : `<button class="btn small danger" id="fDel">${isAdmin() ? 'この家を削除する' : 'この家の削除を申請する'}</button>`}</details>`;
+      b += `<button class="btn block" id="fEditHouse">この家を編集</button>`;
     }
     setSheet(b);
 
@@ -5116,7 +5107,7 @@ function openTarget(hid, unit, fromBuilding, review) {
       paint();
     };
     on('provDrop', () => dropProvHouse(hid));
-    on('fToApt', () => openConvertApt(hid));
+    on('fEditHouse', () => openAddForm(null, null, hid));
     on('fMove', () => startMoveHouse(hid));
     on('fHNameSave', () => {
       const v = $('#fHName').value.trim();
@@ -6535,7 +6526,7 @@ function bindNaming(f, repaint) {
     else if (f.rooms.length > 1) f.rooms.pop();
     again();
   });
-  $$('[data-room]', S).forEach(x => x.onclick = () => { const i = Number(x.dataset.room); f.rooms[i] = Math.min(40, Math.max(1, f.rooms[i] + Number(x.dataset.d))); again(); });
+  $$('[data-room]', S).forEach(x => x.onclick = () => { const i = Number(x.dataset.room); f.rooms[i] = Math.min(40, Math.max(i === 0 ? 0 : 1, f.rooms[i] + Number(x.dataset.d))); again(); });
   $$('[data-nb]', S).forEach(x => x.onclick = () => {
     if (Number(x.dataset.d) > 0) { if (f.bldgs.length < 12) f.bldgs.push({ name: nextBldgName(f), n: (f.bldgs[f.bldgs.length - 1] || { n: 4 }).n }); }
     else if (f.bldgs.length > 1) f.bldgs.pop();
@@ -6709,18 +6700,47 @@ function floorUnits(rooms) {
   rooms.forEach((n, i) => { for (let r = 1; r <= n; r++) out.push(`${i + 1}${pad(r)}`); });
   return out;
 }
-function openAddForm(ll, tid) {
+function openAddForm(ll, tid, editId) {
+  const eh = editId ? houseById(editId) : null; // 家の画面の「この家を編集」から開いたとき
+  if (editId && !eh) return;
+  if (eh) { ll = { lat: eh.lat, lng: eh.lng }; tid = eh.terrId; }
   const t = tid ? terrById(tid) : null;
-  const f = { type: 'apt', label: '', n: Object.assign(newNaming(), { rooms: [2, 4] }), kind: 'home', lock: false };
+  const f = { type: 'apt', label: '', n: Object.assign(newNaming(), { rooms: [2, 4] }), kind: 'home', lock: false, cand: null, ban: '' };
   if (mode === 'draw' && drawTap === 'house') f.type = 'house';
+  if (eh) { f.type = eh.type; f.label = eh.label || ''; f.kind = kindOf(eh); f.lock = !!eh.lock; }
+  const recN = eh ? visitsOf(K(eh.id, '')).length : 0;
+  const nrm = x => String(x || '').replace(/[\s　]/g, '').toLowerCase();
   const keep = () => {
     const l = $('#fLabel'); if (l) f.label = l.value;
     const lk2 = $('#fLock'); if (lk2) f.lock = lk2.checked;
     namingKeep(f.n);
   };
+  // 建物名の欄：付近の候補（エクセルの建物）を出す。えらんでも、そのまま入力してもよい
+  const pickCand = c => {
+    keep();
+    f.cand = c; f.label = c.n || f.label; f.lock = !!c.k; f.ban = c.b || '';
+    if (f.n.nm === 'floor' && c.f) f.n.rooms = Array.from({ length: Math.min(40, c.f) }, (_, i) => i === 0 && c.g === 0 ? 0 : (f.n.rooms[i] != null && f.n.rooms[i] > 0 ? f.n.rooms[i] : (f.n.rooms[f.n.rooms.length - 1] || 2)));
+    paint();
+  };
+  const bindCands = () => {
+    const lab = $('#fLabel'), box = $('#fCandBox');
+    if (!lab || !box || f.type !== 'apt' || !window.aptNearby) return;
+    const show = () => {
+      const q = nrm(lab.value);
+      let list = window.aptNearby(ll, tid).list;
+      if (q) list = list.filter(x => nrm(x.c.n).includes(q));
+      list = list.slice(0, 5);
+      box.innerHTML = list.length
+        ? `<p class="hint">付近の候補（タップでえらべます）</p>` + list.map(x => window.aptCandHtml(x)).join('')
+        : (q ? '' : '<p class="hint">この付近に、使える候補はありません。そのまま入力できます。</p>');
+      $$('[data-ci]', box).forEach(bt => bt.onclick = () => { const x = list.find(y => y.c.i === bt.dataset.ci); if (x) pickCand(x.c); });
+    };
+    lab.onfocus = show;
+    lab.oninput = () => { f.label = lab.value; show(); };
+  };
   const paint = () => {
     const apt = f.type === 'apt';
-    setSheet(headHtml(t, 'ここに追加します', t ? `区域${esc(t.no)}　${esc(t.name)}` : '区域は、線を完成したときに決まります') + `
+    setSheet(headHtml(t, eh ? 'この家を編集' : 'ここに追加します', t ? `区域${esc(t.no)}　${esc(t.name)}` : '区域は、線を完成したときに決まります') + `
       <p class="q">建物の種類</p>
       <div class="choices two">
         <button class="choice${!apt ? ' on' : ''}" data-type="house" aria-pressed="${!apt}"><i class="pin st-new">家</i>一戸建て</button>
@@ -6728,32 +6748,62 @@ function openAddForm(ll, tid) {
       </div>
       ${apt ? `<label class="check locrow"><input type="checkbox" id="fLock"${f.lock ? ' checked' : ''}>オートロックの建物</label>
       <p class="hint">あとからでも、建物の編集で変えられます。</p>` : ''}
+      ${apt && f.cand ? `<div class="aw-from"><b>候補：${esc(f.cand.n || '（名前なし）')}</b><button id="fCandOff">はずす</button></div>
+        ${f.ban ? `<div class="notice refnote"><b>${f.ban === 'no' ? '立入禁止の建物です。' : '手紙のみの建物です。'}</b></div>` : ''}` : ''}
       <label class="field"><span>${apt ? '建物名' : f.kind !== 'home' ? `${esc(kindName(f.kind))}の名前（なくてもよい）` : '目印（見た目など）'}</span>
-        <input type="text" id="fLabel" maxlength="30" value="${esc(f.label)}" placeholder="${apt ? '例：〇〇ハイツ' : f.kind !== 'home' ? esc(KIND_PH[f.kind] || '例：〇〇') : '例：青い門・2階建て'}">
+        <input type="text" id="fLabel" maxlength="30" value="${esc(f.label)}" placeholder="${apt ? '例：〇〇ハイツ（タップで付近の候補）' : f.kind !== 'home' ? esc(KIND_PH[f.kind] || '例：〇〇') : '例：青い門・2階建て'}">
         <small class="hint">住んでいる人の名前は書かないでください。</small></label>
+      ${apt ? '<div id="fCandBox"></div>' : ''}
       <p class="q">${apt ? '建物ぜんたいの種別' : '種別'}</p>${kindChips(f.kind)}
       ${apt ? '<p class="hint">部屋ごとの種別は、あとから部屋の画面で変えられます。</p>' : ''}
-      ${apt && window.openAptWizard ? '<button class="btn block" id="fCand">付近の候補から えらぶ</button>' : ''}
       ${apt ? namingHtml(f.n) : ''}
-      <button class="btn primary block" id="fSave">この場所に追加する</button>
-      <button class="btn block" data-close>やめる</button>`);
+      ${eh && apt && recN ? `<div class="notice warn">この家の記録 ${recN}件は、建物ぜんたいの記録として残り、部屋ごとの記録には入りません。</div>` : ''}
+      <button class="btn primary block" id="fSave">${eh ? '保存する' : 'この場所に追加する'}</button>
+      <button class="btn block" data-close>やめる</button>
+      ${eh ? `<div class="aw-sep">${isAdmin() ? '<button class="btn block" id="fMove">この家の場所を直す</button>' : ''}
+        ${delReqOf(eh.id) ? '<p class="tag-warn">この家は削除を申請中です（区域係の確認待ち）</p>'
+          : `<button class="btn small danger" id="fDel">${isAdmin() ? 'この家を削除する' : 'この家の削除を申請する'}</button>`}</div>` : ''}`);
     const S = $('#sheet');
     $$('[data-type]', S).forEach(x => x.onclick = () => { keep(); f.type = x.dataset.type; paint(); });
     $$('[data-kind]', S).forEach(x => x.onclick = () => { keep(); f.kind = x.dataset.kind; paint(); });
     if ($('#fLock')) $('#fLock').onchange = e => { f.lock = e.target.checked; };
     if (f.type === 'apt') { const l = $('#fLabel'), lk = $('#fLock'); bindNaming(f.n, () => { if (l) f.label = l.value; if (lk) f.lock = lk.checked; namingKeep(f.n); paint(); }); }
-    if ($('#fCand')) $('#fCand').onclick = () => { closeSheet(); window.openAptWizard(null, { ll, tid }); };
+    bindCands();
+    if ($('#fCandOff')) $('#fCandOff').onclick = () => { keep(); f.cand = null; f.ban = ''; paint(); };
+    if ($('#fMove')) $('#fMove').onclick = () => startMoveHouse(editId);
+    if ($('#fDel')) $('#fDel').onclick = async () => {
+      if (!isAdmin()) { closeSheet(); openDelRequest(eh); return; }
+      if (!await ask('この家と、その記録をすべて削除します。よろしいですか？')) return;
+      closeSheet(); deleteHouse(editId);
+    };
     $('#fSave').onclick = () => {
       keep();
       const label = f.label.trim();
       const us = f.type === 'apt' ? genUnits(f.n) : [];
       if (f.type === 'apt' && !us.length) { toast('部屋の名前を入れてください'); return; }
       closeSheet();
+      const setCand = h => { if (f.type === 'apt' && f.cand) { h.cid = f.cand.i; if (f.ban) h.ban = f.ban; } }; // 選んだ候補は、次から出ない
+      if (eh) {
+        commit(f.type === 'apt' ? `${label || '建物'}をアパート・マンションにしました（${us.length}部屋）` : '保存しました', () => {
+          const h = houseById(editId); if (!h) return;
+          h.label = label;
+          if (f.kind !== 'home') h.kind = f.kind; else delete h.kind;
+          if (f.type === 'apt') {
+            h.type = 'apt'; h.units = us;
+            if (f.lock) h.lock = true; else delete h.lock;
+            delete h.prov; delete h.uk; delete h.ul; // 確かめた建物なので「仮の家」ではなくなる
+            setCand(h);
+          }
+        });
+        if (f.type === 'apt') setTimeout(() => openAptSeq(editId), 300); else setTimeout(() => openTarget(editId, '', false), 200);
+        return;
+      }
       addCount++; updateAddBar();
       commit(f.type === 'apt' ? `集合住宅を追加しました（${us.length}部屋）` : '一戸建てを追加しました', () => {
         const nh = { id: 'h' + uid(), terrId: tid, type: f.type, lat: ll.lat, lng: ll.lng, label, units: us, createdAt: new Date().toISOString(), createdBy: me().id };
         if (f.kind !== 'home') nh.kind = f.kind;
         if (f.type === 'apt' && f.lock) nh.lock = true;
+        setCand(nh);
         D().houses.push(nh);
       });
     };
