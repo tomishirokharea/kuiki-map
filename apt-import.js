@@ -11,6 +11,10 @@
         ・場所が分からない建物は作らず、一覧にして出す（地図で「＋ 家」から入れる）
         ・部屋は「1階・2階…」の階ごとの枠（1階に部屋がない建物は2階から）
    CSVの列：建物ID,区域,建物名,住所,階数,1F有,オートロック,立入,確認事項
+   取り込みのしかたは2通り
+     A) CSV：住所を国土地理院の住所検索で位置にする
+     B) マイマップのKML/KMZ：CSVをGoogleマイマップに読ませて、ピンを地図で確かめ・直してから書き出したもの
+        （位置はマイマップのピンの位置をそのまま使う。ピンの「建物名・区域・階数・1F有・オートロック・立入」の列だけを読む）
    index.html の xlParseJa / xlGeocode / xlPick（エクセル取り込みと同じ仕組み）を使います。
    ========================================================= */
 (function () {
@@ -70,22 +74,31 @@
   }
 
   /* ---------- リセット ---------- */
+  // 前回までの取り込みで「新しく置いた」家：目印(imp)があるもの。目印をつける前の取り込みの家は、
+  // 「アパートの印があり、仮の家でなく、係が最近(7日以内)つくった家」を候補にする（係が件数を見て、消すかどうかえらぶ）
+  const isNewImp = h => h.type === 'apt' && !!h.imp;
+  const isLegacyNew = h => h.type === 'apt' && !h.imp && !h.prov && h.createdBy === me().id && Date.now() - Date.parse(h.createdAt) < 7 * 86400000;
   function counts() {
     const d = D();
     const apt = d.houses.filter(h => h.type === 'apt');
     return {
       visits: d.visits.length, dnc: Object.keys(d.dnc || {}).length, follows: Object.keys(d.follows || {}).length,
-      cards: (d.awayCards || []).length, apt: apt.length, houses: d.houses.length, prov: d.houses.filter(h => h.prov).length
+      cards: (d.awayCards || []).length, apt: apt.length, houses: d.houses.length, prov: d.houses.filter(h => h.prov).length,
+      imp: apt.filter(isNewImp).length, legacy: apt.filter(isLegacyNew).length
     };
   }
-  function resetData() {
+  function resetData(opt) {
     const d = D();
+    opt = opt || {};
     d.visits = []; d.dnc = {}; d.follows = {}; d.awayCards = [];
+    // 取り込みで新しく置いた家は、家ごと消す（元からあった家は残して、ふつうの家にもどす）
+    d.houses = d.houses.filter(h => !(isNewImp(h) || (opt.legacy && isLegacyNew(h))));
     d.houses.forEach(h => {
       if (h.type === 'apt') {
         h.type = 'house'; h.units = []; h.label = '';
         delete h.lock; delete h.uk; delete h.ul; delete h.kind; delete h.ban;
       } else delete h.ban;
+      delete h.imp;
     });
     Store.save();
     renderAll();
@@ -114,14 +127,15 @@
         <b>残すもの：</b>仮の家の印と場所（${c.prov}軒）・家の場所・区域の線と担当・予定・利用者</p>
       <button class="btn block danger" id="aiReset">リセットする…</button>
       <h3 class="sub">③ アパートを取り込む</h3>
-      <p class="hint">個人情報を除いた一覧（CSV）を選びます。住所は位置を調べるためだけに使い、アプリには保存しません。</p>
-      <label class="btn primary block">取り込み用のCSVを選ぶ<input type="file" id="aiFile" accept=".csv,text/csv,text/plain" hidden></label>
+      <p class="hint"><b>おすすめ：</b>取り込み用のCSVをGoogleマイマップに読ませ、ピンの位置を地図で確かめて直してから、KML（またはKMZ）で書き出して選びます。位置はピンの場所をそのまま使います。<br>
+        CSVをそのまま選ぶこともできます（住所を国土地理院の住所検索で調べます。精度は住所しだいです）。どちらも住所はアプリに保存しません。</p>
+      <label class="btn primary block">KML・KMZ・CSVを選ぶ<input type="file" id="aiFile" accept=".kml,.kmz,.csv,text/csv,text/plain,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden></label>
       <button class="btn block" data-close>閉じる</button>`);
     $('#aiReset').onclick = openReset;
     $('#aiFile').onchange = e => {
       const f = e.target.files && e.target.files[0];
       e.target.value = '';
-      if (f) readCsvFile(f);
+      if (f) readFile(f);
     };
   }
 
@@ -129,7 +143,10 @@
     const c = counts();
     setSheet(headHtml(null, 'リセットの確認', '元にもどせません') + `
       <div class="notice warn"><b>次のものを消します。</b><br>訪問の記録 ${c.visits}件／拒否 ${c.dnc}件／再訪問 ${c.follows}件／留守宅カード ${c.cards}件<br>
-        アパート ${c.apt}棟の「アパート」の印と部屋の名前（ふつうの家にもどります）</div>
+        アパート ${c.apt}棟の「アパート」の印と部屋の名前（ふつうの家にもどります）<br>
+        取り込みで新しく置いた家 ${c.imp}軒（家ごと消えます）</div>
+      ${c.legacy ? `<label class="check"><input type="checkbox" id="aiLegacy">前回までの取り込みで新しく置いたと思われる家も、家ごと消す（${c.legacy}軒）</label>
+        <p class="hint">「アパートの印がある・仮の家ではない・7日以内に係がつくった」家です。前回の確認画面の「新しく置く」の数と近ければ、チェックを入れてください。</p>` : ''}
       <p class="hint">仮の家の印・家の場所・区域の線と担当は、そのまま残ります。各自のスマホに残っている再訪問のメモは、このリセットでは消えません。</p>
       <button class="btn block" id="aiBk">リセット前の控えをファイルに保存する</button>
       <label class="check"><input type="checkbox" id="aiSure">スプレッドシートのバックアップを取りました</label>
@@ -142,14 +159,71 @@
     $('#aiBack').onclick = openMain;
     $('#aiGo').onclick = () => {
       if (!isAdmin()) return;
-      resetData();
+      resetData({ legacy: !!($('#aiLegacy') && $('#aiLegacy').checked) });
       toast('リセットしました。次は「アパートを取り込む」です');
       openMain();
     };
   }
 
-  async function readCsvFile(file) {
+  /* マイマップのKML：ピン（Point）だけを読む。読む列は決めたものだけ（それ以外の列・説明欄は読まない） */
+  function parseMyMap(text) {
+    const doc = new DOMParser().parseFromString(text, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('xml');
+    const out = { list: [], network: doc.getElementsByTagNameNS('*', 'NetworkLink').length > 0, noCols: 0 };
+    for (const pm of doc.getElementsByTagNameNS('*', 'Placemark')) {
+      const pt = pm.getElementsByTagNameNS('*', 'Point')[0];
+      if (!pt) continue; // 線・図形（区域）は、ここでは読まない
+      const c = kmlCoords(pt)[0];
+      if (!c) continue;
+      const data = {};
+      for (const d of pm.getElementsByTagNameNS('*', 'Data')) {
+        const v = d.getElementsByTagNameNS('*', 'value')[0];
+        data[String(d.getAttribute('name') || '').trim()] = v ? v.textContent.trim() : '';
+      }
+      if (!('区域' in data) && !('階数' in data)) { out.noCols++; continue; }
+      const nameEl = [...pm.children].find(x => x.localName === 'name');
+      const g = k => String(data[k] == null ? '' : data[k]).trim();
+      const ban = g('立入');
+      out.list.push({
+        ref: g('建物ID'), terr: g('区域'), name: (g('建物名') || (nameEl ? nameEl.textContent.trim() : '')).slice(0, 40), addr: g('住所'),
+        floors: Math.max(0, Math.min(MAX_FLOORS, Math.floor(num(g('階数'))))), floor1: g('1F有') === '0' ? '0' : '1',
+        lock: g('オートロック') === '1', ban: ban === 'no' || ban === 'letter' ? ban : '', memo: '',
+        pos: { lat: c[0], lng: c[1], good: true }, fromMap: true
+      });
+    }
+    return out;
+  }
+  async function readKmlText(file) {
+    const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+    if (head[0] === 0x50 && head[1] === 0x4B) { // KMZ（圧縮されたKML）
+      toast('KMZファイルを開いています…');
+      await loadScript(LIB.zip);
+      const zip = await window.JSZip.loadAsync(file);
+      const f = zip.file('doc.kml') || zip.file(/\.kml$/i)[0];
+      if (!f) throw new Error('nokml');
+      return f.async('string');
+    }
+    return file.text();
+  }
+
+  async function readFile(file) {
     let list;
+    const isMap = /\.(kml|kmz)$/i.test(file.name || '');
+    if (isMap) {
+      let r;
+      try { r = parseMyMap(await readKmlText(file)); } catch (e) { r = null; }
+      if (!r) { infoSheet('ファイルを読み込めませんでした', 'Googleマイマップの「KML/KMZにエクスポート」で書き出したファイルを選んでください。KMZのときは、インターネットにつながっている必要があります。'); return; }
+      if (!r.list.length) {
+        infoSheet('建物のピンが見つかりませんでした', r.network
+          ? 'このファイルには地図の中身が入っていません。書き出すときに「ネットワーク リンク」のチェックを外して、もう一度書き出してください。'
+          : '取り込み用のCSV（見出しに「区域」「階数」などがあるもの）をマイマップに読ませた地図を、書き出してください。');
+        return;
+      }
+      list = r.list;
+      list.forEach(b => { b.units = unitsOf(b); });
+      showPlan(makePlan(list, new Map()), file.name || '', r.noCols);
+      return;
+    }
     try {
       const rows = parseCsv(await readText(file));
       list = rows.length > 1 ? buildings(rows) : null;
@@ -184,14 +258,14 @@
 
   function makePlan(list, geo) {
     const cnt = new Map();
-    list.forEach(b => { if (b.entry && b.entry.nums.length) cnt.set(b.entry.q, (cnt.get(b.entry.q) || 0) + 1); });
+    list.forEach(b => { if (!b.fromMap && b.entry && b.entry.nums.length) cnt.set(b.entry.q, (cnt.get(b.entry.q) || 0) + 1); });
     const plan = { convert: [], create: [], miss: [], already: 0, noTerr: new Set() };
     // すでに登録した建物（同じ名前で近くにある）は、二度つくらない
     const apts = D().houses.filter(h => h.type === 'apt' && h.label);
     const ex = list.map(b => {
       const t = terrByNo(b.terr); if (!t) plan.noTerr.add(b.terr);
       b.t = t || null;
-      b.pos = b.entry ? xlPick(b.entry, geo.get(b.entry.q)) : null;
+      if (!b.fromMap) b.pos = b.entry ? xlPick(b.entry, geo.get(b.entry.q)) : null;
       return b;
     });
     const placeable = [];
@@ -199,10 +273,16 @@
       if (!b.pos) { plan.miss.push(b); return; }
       if (apts.some(h => h.label === b.name && xlDist([h.lat, h.lng], [b.pos.lat, b.pos.lng]) <= MATCH_M * 2)) { plan.already++; return; }
       b.why = [];
-      if (!b.entry.nums.length) b.why.push('番地が分からないため、だいたいの場所');
-      else if (!b.pos.good) b.why.push('番地まで合わず、だいたいの場所');
-      if (cnt.get(b.entry.q) > 1 && b.entry.nums.length) b.why.push('同じ住所に建物が複数あります');
+      if (!b.fromMap) {
+        if (!b.entry.nums.length) b.why.push('番地が分からないため、だいたいの場所');
+        else if (!b.pos.good) b.why.push('番地まで合わず、だいたいの場所');
+        if (cnt.get(b.entry.q) > 1 && b.entry.nums.length) b.why.push('同じ住所に建物が複数あります');
+      }
       placeable.push(b);
+    });
+    // マイマップのピン：同じ場所（4m以内）に別の建物のピンが重なっているものだけ、確かめる建物にする
+    placeable.forEach(b => {
+      if (b.fromMap && placeable.some(o => o !== b && o.fromMap && xlDist([o.pos.lat, o.pos.lng], [b.pos.lat, b.pos.lng]) < 4)) b.why.push('同じ場所に別の建物のピンが重なっています');
     });
     // 確実な建物（番地が合う・住所がひとつだけ）は、近くの家に重ねる
     const sure = placeable.filter(b => !b.why.length);
@@ -244,7 +324,7 @@
 
   const lineOf = b => `${esc(b.name || '（名前なし）')}　<span class="muted" data-notr>${esc(b.addr || '住所なし')}</span>`;
 
-  function showPlan(plan, fileName) {
+  function showPlan(plan, fileName, noCols) {
     const nCv = plan.convert.length, nCr = plan.create.length, nMiss = plan.miss.length;
     const noT = Array.from(plan.noTerr);
     setSheet(headHtml(null, '取り込む内容の確認', esc(fileName)) + `
@@ -252,8 +332,9 @@
         <div class="tile"><b>${nCr}</b><span>新しく置く（要確認）</span></div>
         <div class="tile"><b>${nMiss}</b><span>場所が分からない</span></div></div>
       ${plan.already ? `<p class="hint">すでに登録してある ${plan.already}棟は、入れません。</p>` : ''}
+      ${noCols ? `<p class="hint">取り込み用の列がないピン ${noCols}個は、読まずにとばしました。</p>` : ''}
       <p class="hint"><b>家に重ねる</b>：住所の場所のすぐ近くにある家（仮の家を優先）を、アパートに変えます。<br>
-        <b>新しく置く</b>：同じ住所に建物が複数ある・番地まで分からない・近くに家がない建物です。取り込んだあとの一覧で、1棟ずつ地図で確かめてください。</p>
+        <b>新しく置く</b>：近くに家がない・場所があいまい・ピンが重なっている建物です。取り込んだあとの一覧で、1棟ずつ地図で確かめてください。</p>
       ${noT.length ? `<div class="notice warn">一覧の区域 ${esc(noT.join('・'))} は、アプリに区域がありません。場所の線の中にある区域に入ります。</div>` : ''}
       ${nMiss ? `<details class="more"><summary>場所が分からない建物（${nMiss}棟）：作りません</summary>
         <p class="hint">地図で「＋ 家」から入れてください。</p><ul>${plan.miss.map(b => `<li>区域${esc(b.terr)}　${lineOf(b)}</li>`).join('')}</ul>
@@ -284,7 +365,7 @@
       if (w) check.push({ id: h.id, b, note: w.trim() });
     });
     plan.create.forEach(b => {
-      const h = { id: 'h' + uid(), terrId: terrOf(b.lat, b.lng), type: 'apt', lat: round6(b.lat), lng: round6(b.lng), label: '', units: [], createdAt: now, createdBy: me().id };
+      const h = { id: 'h' + uid(), terrId: terrOf(b.lat, b.lng), type: 'apt', lat: round6(b.lat), lng: round6(b.lng), label: '', units: [], createdAt: now, createdBy: me().id, imp: true };
       apply(b, h);
       D().houses.push(h);
       check.push({ id: h.id, b, note: (b.why.join('。') + diffTerr(b, h)).trim() });
@@ -318,5 +399,5 @@
     if (!isAdmin()) { toast('区域係だけが使えます'); return; }
     openMain();
   });
-  window.AptImport = { parseCsv, buildings, unitsOf, makePlan, resetData, counts };
+  window.AptImport = { parseCsv, buildings, unitsOf, makePlan, parseMyMap, resetData, counts };
 })();

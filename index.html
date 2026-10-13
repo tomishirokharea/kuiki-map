@@ -2741,7 +2741,7 @@ function expandHouse(a) {
     lat: a[3], lng: a[4], label: a[5] || '',
     units: a[6] ? String(a[6]).split('|') : [],
     createdAt: new Date((a[8] || 0) * 1000).toISOString(), createdBy: a[7] || '',
-    kind: a[9] || undefined, lock: a[10] ? true : undefined, prov: a[12] ? true : undefined, ban: a[14] === 'n' ? 'no' : a[14] === 'l' ? 'letter' : undefined,
+    kind: a[9] || undefined, lock: a[10] ? true : undefined, prov: a[12] ? true : undefined, ban: a[14] === 'n' ? 'no' : a[14] === 'l' ? 'letter' : undefined, imp: a[15] ? true : undefined,
     uk: a[11] ? (() => { try { return JSON.parse(a[11]); } catch (e) { return undefined; } })() : undefined,
     ul: a[13] ? (() => { try { return JSON.parse(a[13]); } catch (e) { return undefined; } })() : undefined
   };
