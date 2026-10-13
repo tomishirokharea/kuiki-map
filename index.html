@@ -2741,7 +2741,7 @@ function expandHouse(a) {
     lat: a[3], lng: a[4], label: a[5] || '',
     units: a[6] ? String(a[6]).split('|') : [],
     createdAt: new Date((a[8] || 0) * 1000).toISOString(), createdBy: a[7] || '',
-    kind: a[9] || undefined, lock: a[10] ? true : undefined, prov: a[12] ? true : undefined, ban: a[14] === 'n' ? 'no' : a[14] === 'l' ? 'letter' : undefined, imp: a[15] ? true : undefined,
+    kind: a[9] || undefined, lock: a[10] ? true : undefined, prov: a[12] ? true : undefined, ban: a[14] === 'n' ? 'no' : a[14] === 'l' ? 'letter' : undefined, imp: a[15] ? true : undefined, cid: a[16] || undefined,
     uk: a[11] ? (() => { try { return JSON.parse(a[11]); } catch (e) { return undefined; } })() : undefined,
     ul: a[13] ? (() => { try { return JSON.parse(a[13]); } catch (e) { return undefined; } })() : undefined
   };
@@ -5009,6 +5009,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (fromBuilding) b += `<button class="btn small" id="backBld">← 部屋の一覧にもどる</button>`;
     if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
     if (h.ban) b += banNotice(h);
+    if (!unit && h.type === 'house' && st.step === 'result' && window.aptQuickHtml) b += window.aptQuickHtml(h);
     if (!dnc && other) b += `<div class="notice warn"><b>ほかの人が再訪問している${unit ? '部屋' : '家'}です。</b>${recentMet(k) ? '最近会えているので、訪問は控えてください。' : 'しばらく会えていないので、訪ねてもかまいません。'}${blocked ? '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
 
 
@@ -6215,6 +6216,7 @@ function openBuilding(hid) {
     : (h.units.length ? `<div class="units">${h.units.map(cell).join('')}</div>` : '');
   setSheet(headHtml(t, esc(h.label || '集合住宅'), `区域${t ? t.no : '-'}　${h.units.length}部屋　まだ会えていない部屋 ${aptLeft(h)}`) + `
     ${banNotice(h)}
+    ${window.aptRoomsHtml ? window.aptRoomsHtml(h) : ''}
     ${h.units.length ? `<button class="btn primary block" id="seqStart">続けて入力にもどる</button>` : ''}
     <p class="q">部屋の一覧</p>
     <p class="hint">部屋をタップすると、その部屋の記録をくわしく見られます。</p>
@@ -6731,6 +6733,7 @@ function openAddForm(ll, tid) {
         <small class="hint">住んでいる人の名前は書かないでください。</small></label>
       <p class="q">${apt ? '建物ぜんたいの種別' : '種別'}</p>${kindChips(f.kind)}
       ${apt ? '<p class="hint">部屋ごとの種別は、あとから部屋の画面で変えられます。</p>' : ''}
+      ${apt && window.openAptWizard ? '<button class="btn block" id="fCand">付近の候補から えらぶ</button>' : ''}
       ${apt ? namingHtml(f.n) : ''}
       <button class="btn primary block" id="fSave">この場所に追加する</button>
       <button class="btn block" data-close>やめる</button>`);
@@ -6739,6 +6742,7 @@ function openAddForm(ll, tid) {
     $$('[data-kind]', S).forEach(x => x.onclick = () => { keep(); f.kind = x.dataset.kind; paint(); });
     if ($('#fLock')) $('#fLock').onchange = e => { f.lock = e.target.checked; };
     if (f.type === 'apt') { const l = $('#fLabel'), lk = $('#fLock'); bindNaming(f.n, () => { if (l) f.label = l.value; if (lk) f.lock = lk.checked; namingKeep(f.n); paint(); }); }
+    if ($('#fCand')) $('#fCand').onclick = () => { closeSheet(); window.openAptWizard(null, { ll, tid }); };
     $('#fSave').onclick = () => {
       keep();
       const label = f.label.trim();
@@ -13561,5 +13565,6 @@ init();
 <script src="kangaeru.js"></script>
 <script src="chizu.js"></script>
 <script src="apt-import.js"></script>
+<script src="apt-wizard.js"></script>
 </body>
 </html>

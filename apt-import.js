@@ -98,10 +98,145 @@
         h.type = 'house'; h.units = []; h.label = '';
         delete h.lock; delete h.uk; delete h.ul; delete h.kind; delete h.ban;
       } else delete h.ban;
-      delete h.imp;
+      delete h.imp; delete h.cid;
     });
     Store.save();
     renderAll();
+  }
+
+  /* アパートだけ消す：部屋ごとの記録は消し、家ぜんたいの記録（部屋なしの記録）は残す。取り込みで置いた家は家ごと消す */
+  function aptCounts() {
+    const d = D();
+    const apt = d.houses.filter(h => h.type === 'apt'), ids = new Set(apt.map(h => h.id));
+    const roomV = d.visits.filter(v => v.unit && ids.has(v.houseId)).length;
+    const inApt = k => { const i = k.lastIndexOf('|'); return i > 0 && ids.has(k.slice(0, i)) && k.slice(i + 1) !== ''; };
+    return {
+      apt: apt.length, imp: apt.filter(isNewImp).length, legacy: apt.filter(isLegacyNew).length, roomV,
+      roomD: Object.keys(d.dnc || {}).filter(inApt).length, roomF: Object.keys(d.follows || {}).filter(inApt).length
+    };
+  }
+  function resetApts(opt) {
+    const d = D();
+    opt = opt || {};
+    const gone = new Set(d.houses.filter(h => isNewImp(h) || (opt.legacy && isLegacyNew(h))).map(h => h.id));
+    const apt = new Set(d.houses.filter(h => h.type === 'apt').map(h => h.id));
+    const inApt = k => { const i = k.lastIndexOf('|'); if (i <= 0) return false; const id = k.slice(0, i); return gone.has(id) || (apt.has(id) && k.slice(i + 1) !== ''); };
+    d.visits = d.visits.filter(v => !(gone.has(v.houseId) || (apt.has(v.houseId) && v.unit)));
+    Object.keys(d.dnc || {}).forEach(k => { if (inApt(k)) delete d.dnc[k]; });
+    Object.keys(d.follows || {}).forEach(k => { if (inApt(k)) delete d.follows[k]; });
+    d.houses = d.houses.filter(h => !gone.has(h.id));
+    d.houses.forEach(h => {
+      if (h.type === 'apt') { h.type = 'house'; h.units = []; h.label = ''; delete h.lock; delete h.uk; delete h.ul; delete h.kind; delete h.ban; }
+      delete h.imp; delete h.cid;
+    });
+    Store.save();
+    renderAll();
+  }
+  function openResetApt() {
+    const c = aptCounts();
+    setSheet(headHtml(null, 'アパートを全部消す', '元にもどせません') + `
+      <div class="notice warn"><b>次のものを消します。</b><br>アパート ${c.apt}棟の「アパート」の印と部屋（ふつうの家にもどります）<br>
+        部屋ごとの記録：訪問 ${c.roomV}件／拒否 ${c.roomD}件／再訪問 ${c.roomF}件<br>
+        取り込みで新しく置いた家 ${c.imp}軒（家ごと消えます）</div>
+      ${c.legacy ? `<label class="check"><input type="checkbox" id="aiLegacy2">前回までの取り込みで新しく置いたと思われる家も、家ごと消す（${c.legacy}軒）</label>` : ''}
+      <p class="hint"><b>残すもの：</b>一戸建ての訪問の記録・家の場所・仮の家の印・区域の線と担当・予定・利用者。<br>登録ずみの「候補」（エクセルの建物）にも、手をふれません。</p>
+      <button class="btn block" id="aiBk">消す前の控えをファイルに保存する</button>
+      <label class="check"><input type="checkbox" id="aiSure">スプレッドシートのバックアップを取りました</label>
+      <label class="field"><span>確認のため「アパート消去」と入力してください</span><input type="text" id="aiWord" autocomplete="off"></label>
+      <button class="btn block danger" id="aiGo" disabled>アパートを全部消す</button>
+      <button class="btn block" id="aiBack">もどる</button>`);
+    const upd = () => { $('#aiGo').disabled = !($('#aiSure').checked && $('#aiWord').value.trim() === 'アパート消去'); };
+    $('#aiSure').onchange = upd; $('#aiWord').oninput = upd;
+    $('#aiBk').onclick = () => { try { downloadBackup(); toast('控えを保存しました'); } catch (e) { toast('控えを保存できませんでした'); } };
+    $('#aiBack').onclick = openMain;
+    $('#aiGo').onclick = () => {
+      if (!isAdmin()) return;
+      resetApts({ legacy: !!($('#aiLegacy2') && $('#aiLegacy2').checked) });
+      toast('アパートを消しました。次は「候補を登録」です');
+      openMain();
+    };
+  }
+
+  /* ---------- 候補の登録（エクセルの建物を、区域ごとの「候補」にする） ----------
+     家は作りません。区域ごとに「建物名・階数・1階の有無・オートロック・立入禁止・だいたいの位置」を持たせ、
+     現場で付近の候補をえらんだときに、階数などが自動で入ります。区域は一覧の「区域」欄が正です。 */
+  const hash36 = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+  function candStats() {
+    const used = new Set(); D().houses.forEach(h => { if (h.cid) used.add(h.cid); });
+    let all = 0, left = 0;
+    D().territories.forEach(t => (t.cands || []).forEach(c => { all++; if (!used.has(c.i)) left++; }));
+    return { all, left, used: all - left };
+  }
+  async function readForCand(file) {
+    const isMap = /\.(kml|kmz)$/i.test(file.name || '');
+    if (isMap) {
+      let r;
+      try { r = parseMyMap(await readKmlText(file)); } catch (e) { r = null; }
+      if (!r || !r.list.length) { infoSheet('建物のピンが見つかりませんでした', 'マイマップから書き出したKML/KMZ（「ネットワーク リンク」はチェックを外す）を選んでください。'); return; }
+      showCandPlan(makeCandPlan(r.list), file.name || '');
+      return;
+    }
+    let list;
+    try { const rows = parseCsv(await readText(file)); list = rows.length > 1 ? buildings(rows) : null; } catch (e) { list = null; }
+    if (!list || !list.length) { infoSheet('一覧を読み込めませんでした', '「建物ID,区域,建物名,住所,階数,1F有,オートロック,立入,確認事項」の見出しがあるCSVを選んでください。'); return; }
+    list.forEach(b => {
+      const p = b.addr ? xlParseJa('沖縄県' + b.addr) : null;
+      if (p) b.entry = { q: '沖縄県' + p.muni + p.town + p.nums.join('-'), nums: p.nums, muni: p.muni, town: p.town };
+    });
+    const qs = Array.from(new Set(list.filter(b => b.entry).map(b => b.entry.q)));
+    setSheet(headHtml(null, '住所から場所を調べています', esc(file.name || '')) + `<p class="hint">住所 ${qs.length}件。しばらくお待ちください（この画面を閉じないでください）。</p>
+      <div class="bar"><i id="aiBar" style="width:0%"></i></div><p class="muted" id="aiCnt">0 / ${qs.length}</p>`);
+    let geo;
+    try {
+      geo = await xlGeocode(qs, n => { const b = $('#aiBar'), c = $('#aiCnt'); if (b) b.style.width = Math.round(n / Math.max(1, qs.length) * 100) + '%'; if (c) c.textContent = `${n} / ${qs.length}`; });
+    } catch (e) { infoSheet('場所を調べられませんでした', 'インターネットの接続を確かめて、もう一度ためしてください。'); return; }
+    list.forEach(b => { b.pos = b.entry ? xlPick(b.entry, geo.get(b.entry.q)) : null; });
+    showCandPlan(makeCandPlan(list), file.name || '');
+  }
+  function makeCandPlan(list) {
+    const plan = { by: new Map(), miss: [], noTerr: new Set(), n: 0 };
+    const seen = new Set();
+    list.forEach((b, idx) => {
+      const t = terrByNo(b.terr);
+      if (!t) { plan.noTerr.add(b.terr || '（区域なし）'); return; }
+      if (!b.pos) { plan.miss.push(b); return; }
+      let id = String(b.ref || '').replace(/[^\w.\-]/g, '').slice(0, 40) || ('x' + hash36(`${tkey(b.terr)}|${b.name}|${b.addr}`));
+      if (seen.has(id)) id = (id + '-' + idx).slice(0, 40);
+      seen.add(id);
+      const c = { i: id, n: b.name.slice(0, 40), la: round6(b.pos.lat), ln: round6(b.pos.lng) };
+      if (b.floors) c.f = b.floors;
+      if (b.floor1 === '0') c.g = 0;
+      if (b.lock) c.k = 1;
+      if (b.ban) c.b = b.ban;
+      if (!plan.by.has(t.id)) plan.by.set(t.id, []);
+      plan.by.get(t.id).push(c);
+      plan.n++;
+    });
+    return plan;
+  }
+  function showCandPlan(plan, fileName) {
+    const noT = Array.from(plan.noTerr), nMiss = plan.miss.length;
+    setSheet(headHtml(null, '候補として登録する内容', esc(fileName)) + `
+      <div class="tiles"><div class="tile"><b>${plan.n}</b><span>候補にする建物</span></div>
+        <div class="tile"><b>${plan.by.size}</b><span>区域</span></div>
+        <div class="tile"><b>${nMiss}</b><span>場所が分からない</span></div></div>
+      <p class="hint">家は作りません。区域ごとに「候補」として持たせます。現場で家の画面から「アパート・マンションだった」を押すと、付近の候補が近い順に出て、えらぶと階数などが自動で入ります。使った候補は、次から出ません。<br>
+        同じ区域の候補は、このファイルの内容に置きかわります（登録ずみの建物はそのままです）。</p>
+      ${noT.length ? `<div class="notice warn">一覧の区域 ${esc(noT.join('・'))} は、アプリに区域がありません。その建物は候補にしません。</div>` : ''}
+      ${nMiss ? `<details class="more"><summary>場所が分からない建物（${nMiss}棟）：候補にしません</summary>
+        <p class="hint">場所がないと「付近の候補」に出せません。マイマップのKMLで場所を直して、もう一度取り込めます。</p><ul>${plan.miss.map(b => `<li>区域${esc(b.terr)}　${lineOf(b)}</li>`).join('')}</ul></details>` : ''}
+      <button class="btn primary block" id="aiCandGo"${plan.n ? '' : ' disabled'}>${plan.n}棟を候補にする</button>
+      <button class="btn block" data-close>やめる</button>`);
+    $('#aiCandGo').onclick = () => {
+      if (!isAdmin()) return;
+      plan.by.forEach((list, tid) => {
+        const t = terrById(tid); if (!t) return;
+        t.cands = list.sort((a, b) => String(a.n).localeCompare(String(b.n), 'ja'));
+      });
+      Store.save(); renderAll();
+      toast(`${plan.n}棟を候補にしました`);
+      openMain();
+    };
   }
   function downloadBackup() {
     const d = D();
@@ -116,26 +251,39 @@
 
   /* ---------- 画面 ---------- */
   function openMain() {
-    const c = counts();
-    setSheet(headHtml(null, 'アパートの登録', 'リセット → 取り込み の順に進めます') + `
+    const c = counts(), cs = candStats();
+    setSheet(headHtml(null, 'アパートの登録', 'けす → 候補をいれる の順に進めます') + `
       <div class="notice info">使いはじめの前に、実際のアパートの一覧に合わせるための画面です。<b>区域係だけ</b>が使えます。</div>
       <h3 class="sub">① 先にバックアップをとる</h3>
-      <p class="hint">スプレッドシートのメニューから「今すぐバックアップ」を押してください。リセットは元にもどせないため、これが本当の控えになります。</p>
-      <h3 class="sub">② リセット</h3>
-      <p class="hint">消すもの：訪問の記録 ${c.visits}件・拒否 ${c.dnc}件・再訪問 ${c.follows}件・留守宅カード ${c.cards}件<br>
-        アパートの印と部屋（${c.apt}棟）は、ふつうの家にもどします。<br>
-        <b>残すもの：</b>仮の家の印と場所（${c.prov}軒）・家の場所・区域の線と担当・予定・利用者</p>
-      <button class="btn block danger" id="aiReset">リセットする…</button>
-      <h3 class="sub">③ アパートを取り込む</h3>
-      <p class="hint"><b>おすすめ：</b>取り込み用のCSVをGoogleマイマップに読ませ、ピンの位置を地図で確かめて直してから、KML（またはKMZ）で書き出して選びます。位置はピンの場所をそのまま使います。<br>
-        CSVをそのまま選ぶこともできます（住所を国土地理院の住所検索で調べます。精度は住所しだいです）。どちらも住所はアプリに保存しません。</p>
-      <label class="btn primary block">KML・KMZ・CSVを選ぶ<input type="file" id="aiFile" accept=".kml,.kmz,.csv,text/csv,text/plain,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden></label>
+      <p class="hint">スプレッドシートのメニューから「今すぐバックアップ」を押してください。消すのは元にもどせません。</p>
+      <h3 class="sub">② 入っているアパートを全部消す</h3>
+      <p class="hint">アパート ${c.apt}棟を、ふつうの家にもどします（取り込みで置いた家 ${c.imp}軒は家ごと消えます）。一戸建ての記録・家の場所・区域の線は残ります。</p>
+      <button class="btn block danger" id="aiResetApt">アパートだけ全部消す…</button>
+      <h3 class="sub">③ エクセルの建物を「候補」にする（おすすめ）</h3>
+      <p class="hint">家は作らず、区域ごとに候補として持たせます。現場で付近の候補をえらぶだけで、名前・階数・オートロックが入ります。<br>
+        いまの候補：<b>${cs.all}棟</b>（使った ${cs.used}／残り ${cs.left}）</p>
+      <label class="btn primary block">KML・KMZ・CSVを選んで、候補にする<input type="file" id="aiCandFile" accept=".kml,.kmz,.csv,text/csv,text/plain,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden></label>
+      <p class="hint">場所は、マイマップで直したKML／KMZのピンの場所を使います（CSVのときは住所から調べます）。住所はアプリに保存しません。</p>
+      <details class="more"><summary>くわしい方法（全部の記録のリセット・家に直接取り込む）</summary>
+        <h3 class="sub">全部の記録をリセット</h3>
+        <p class="hint">訪問の記録 ${c.visits}件・拒否 ${c.dnc}件・再訪問 ${c.follows}件・留守宅カード ${c.cards}件も、すべて消します。</p>
+        <button class="btn block danger" id="aiReset">すべてリセットする…</button>
+        <h3 class="sub">家に直接取り込む</h3>
+        <p class="hint">住所の場所のすぐ近くの家を、そのままアパートに変えます。位置がずれると、まちがいやすい方法です。</p>
+        <label class="btn block">KML・KMZ・CSVを選ぶ<input type="file" id="aiFile" accept=".kml,.kmz,.csv,text/csv,text/plain,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden></label>
+      </details>
       <button class="btn block" data-close>閉じる</button>`);
     $('#aiReset').onclick = openReset;
+    $('#aiResetApt').onclick = openResetApt;
     $('#aiFile').onchange = e => {
       const f = e.target.files && e.target.files[0];
       e.target.value = '';
       if (f) readFile(f);
+    };
+    $('#aiCandFile').onchange = e => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (f) readForCand(f);
     };
   }
 
@@ -399,5 +547,5 @@
     if (!isAdmin()) { toast('区域係だけが使えます'); return; }
     openMain();
   });
-  window.AptImport = { parseCsv, buildings, unitsOf, makePlan, parseMyMap, resetData, counts };
+  window.AptImport = { parseCsv, buildings, unitsOf, makePlan, parseMyMap, resetData, counts, makeCandPlan, resetApts, aptCounts };
 })();

@@ -22,7 +22,7 @@ const AREA_KEY = 'https://kuiki.invalid/area';
 let AREA = undefined; // [南, 西, 北, 東]。undefined＝まだ読んでいない、null＝区域がない
 const NET_WAIT_MS = 6000;
 // 圏外用に控える、アプリのファイル（新しくファイルを足したら、ここに名前を足す）
-const APP_FILES = /\/(config|schedule|kantan|tsuzuki|kangaeru|chizu|apt-import|i18n|i18n-es|i18n-es-chizu)\.js$/;
+const APP_FILES = /\/(config|schedule|kantan|tsuzuki|kangaeru|chizu|apt-import|apt-wizard|i18n|i18n-es|i18n-es-chizu)\.js$/;
 
 self.addEventListener('install', () => self.skipWaiting());
 
