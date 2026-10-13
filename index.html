@@ -756,6 +756,8 @@ body.strong .pin.st-plain{border-width:4px}
 .hname span.fc{border-color:#6A1B9A;color:#4A148C}
 .pin .lk{background:#5B2E8C}
 .pin .kb ~ .lk{bottom:14px}
+.pin b.ban{position:absolute;left:-11px;top:-10px;min-width:23px;height:23px;padding:0 2px;border-radius:7px;display:grid;place-items:center;border:2px solid #fff;background:#B3261E;color:#fff;font-size:12px;font-style:normal;font-weight:800;box-shadow:0 1px 3px #0006}
+.pin b.ban.letter{background:#8A5A00}
 .pin .kb svg,.pin .lk svg{width:15px;height:15px;stroke-width:2.4}
 .pin .aptname{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:4px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#ffffffe6;border:1px solid var(--ink2);border-radius:6px;padding:0 4px;font-size:12px;font-weight:700;color:var(--ink);font-style:normal}
 .kindpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:6px}
@@ -1515,6 +1517,7 @@ body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
           <!-- iPhoneでは accept に .kml を書くとファイルを選べないことがあるため、あえて指定しない（中身で判定する） -->
           <label class="btn">マイマップから区域を取り込む<input type="file" id="adKml" hidden></label>
           <button class="btn" id="adSpecial">＋ 特別区域（コンビニなど）をつくる</button>
+          <button class="btn" id="adAptImp">アパートの登録（やり直し・取り込み）</button>
           <label class="btn">エクセルから区域と家を取り込む<input type="file" id="adXlsx" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label></div>
         <p class="hint">Googleマイマップで「KML/KMZにエクスポート」したファイルを選びます。区域の線だけを取り込み、ピン（家の印）は取り込みません。</p>
         <div id="adTakeSet"></div>
@@ -2738,7 +2741,7 @@ function expandHouse(a) {
     lat: a[3], lng: a[4], label: a[5] || '',
     units: a[6] ? String(a[6]).split('|') : [],
     createdAt: new Date((a[8] || 0) * 1000).toISOString(), createdBy: a[7] || '',
-    kind: a[9] || undefined, lock: a[10] ? true : undefined, prov: a[12] ? true : undefined,
+    kind: a[9] || undefined, lock: a[10] ? true : undefined, prov: a[12] ? true : undefined, ban: a[14] === 'n' ? 'no' : a[14] === 'l' ? 'letter' : undefined,
     uk: a[11] ? (() => { try { return JSON.parse(a[11]); } catch (e) { return undefined; } })() : undefined,
     ul: a[13] ? (() => { try { return JSON.parse(a[13]); } catch (e) { return undefined; } })() : undefined
   };
@@ -4133,6 +4136,10 @@ function aptKind(h) {
 }
 const kindBadge = k => (k && k !== 'home' ? `<b class="kb k-${k}" title="${KINDS[k][0]}">${KINDS[k][1]}</b>` : '');
 const lockBadge = h => (h.lock ? `<b class="lk" title="オートロック">${LOCK_SVG}</b>` : '');
+const BAN_TEXT = { no: ['禁', '立入禁止'], letter: ['手', '手紙のみ'] };
+const banBadge = h => (h.type === 'apt' && BAN_TEXT[h.ban] ? `<b class="ban${h.ban === 'letter' ? ' letter' : ''}" title="${BAN_TEXT[h.ban][1]}">${BAN_TEXT[h.ban][0]}</b>` : '');
+const banNotice = h => (h && h.type === 'apt' && h.ban === 'no' ? '<div class="notice warn"><b>立入禁止の建物です。</b>中には入らないでください。</div>'
+  : h && h.type === 'apt' && h.ban === 'letter' ? '<div class="notice warn"><b>手紙のみの建物です。</b>訪問はせず、手紙を入れてください。</div>' : '');
 function periodStart(h) {
   const t = h.terrId ? terrById(h.terrId) : null;
   return t ? (t.lentAt || t.returnedAt || t.completedAt || '') : ''; // 担当者のいない区域は、返却・回り終えた日から
@@ -4196,6 +4203,13 @@ function setHouseLock(hid, on, after) {
   });
   if (after) after();
 }
+function setHouseBan(hid, v, after) {
+  const h = houseById(hid); if (!h || !isAdmin()) return;
+  commit(v === 'no' ? '立入禁止の建物にしました' : v === 'letter' ? '手紙のみの建物にしました' : '立ち入りの印を外しました', () => {
+    if (v === 'no' || v === 'letter') h.ban = v; else delete h.ban;
+  });
+  if (after) after();
+}
 function houseIcon(h, ff, locked) {
   const since = periodStart(h), lk = locked ? ' locked' : '';
   const nb = !locked && roundNums && roundNums.has(h.id) ? `<s>${roundNums.get(h.id)}</s>` : '';
@@ -4214,7 +4228,7 @@ function houseIcon(h, ff, locked) {
     const rj = targets(h).some(u => D().dnc[K(h.id, u)]) ? '<b class="rj">拒</b>' : '';
     const ak = aptKind(h);
     const nameTag = ''; // 名前は、renderHouses で別の札として出す（小さな点のときも出せるように）
-    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${locked ? '' : kindBadge(ak) + lockBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
+    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${locked ? '' : kindBadge(ak) + lockBadge(h) + banBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
   }
   const k = K(h.id, ''), s = pinState(k, since), fo = '';
   // 選んでいないときも、今回訪ねた家（会えた・留守）は薄く＋緑のチェックにする
@@ -4994,7 +5008,8 @@ function openTarget(hid, unit, fromBuilding, review) {
     let b = headHtml(t, title, sub);
     if (fromBuilding) b += `<button class="btn small" id="backBld">← 部屋の一覧にもどる</button>`;
     if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
-    else if (other) b += `<div class="notice warn"><b>ほかの人が再訪問している${unit ? '部屋' : '家'}です。</b>${recentMet(k) ? '最近会えているので、訪問は控えてください。' : 'しばらく会えていないので、訪ねてもかまいません。'}${blocked ? '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
+    if (h.ban) b += banNotice(h);
+    if (!dnc && other) b += `<div class="notice warn"><b>ほかの人が再訪問している${unit ? '部屋' : '家'}です。</b>${recentMet(k) ? '最近会えているので、訪問は控えてください。' : 'しばらく会えていないので、訪ねてもかまいません。'}${blocked ? '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
 
 
     if (!blocked) {
@@ -6199,6 +6214,7 @@ function openBuilding(hid) {
     ? groups.map(([g, us]) => `<p class="ugrp">${esc(g || 'そのほか')}</p><div class="units">${us.map(cell).join('')}</div>`).join('')
     : (h.units.length ? `<div class="units">${h.units.map(cell).join('')}</div>` : '');
   setSheet(headHtml(t, esc(h.label || '集合住宅'), `区域${t ? t.no : '-'}　${h.units.length}部屋　まだ会えていない部屋 ${aptLeft(h)}`) + `
+    ${banNotice(h)}
     ${h.units.length ? `<button class="btn primary block" id="seqStart">続けて入力にもどる</button>` : ''}
     <p class="q">部屋の一覧</p>
     <p class="hint">部屋をタップすると、その部屋の記録をくわしく見られます。</p>
@@ -6212,6 +6228,8 @@ function openBuilding(hid) {
         ${h.units.length ? '<button class="btn block danger" id="fUnitBulk">部屋をえらんで、まとめて削除する</button>' : ''}` : ''}
       <label class="field"><span>建物名を変える</span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="${esc(h.label)}"><button class="btn small" id="fLabelSave">保存</button></span></label>
       <label class="check locrow"><input type="checkbox" id="fLock"${h.lock ? ' checked' : ''}>オートロックの建物</label>
+      ${isAdmin() ? `<label class="field"><span>立ち入りについて</span><select id="fBan" aria-label="立ち入りについて">
+        <option value=""${!h.ban ? ' selected' : ''}>ふつう</option><option value="no"${h.ban === 'no' ? ' selected' : ''}>立入禁止</option><option value="letter"${h.ban === 'letter' ? ' selected' : ''}>手紙のみ</option></select></label>` : ''}
       ${isAdmin() ? '<button class="btn block" id="fMoveB">この建物の場所を直す</button>' : ''}
       <p class="q">建物ぜんたいの種別</p>${kindChips(kindOf(h))}
       <p class="hint">部屋ごとの種別は、部屋をタップして「この部屋の編集」で変えられます。地図では、住居の部屋が1つでもあれば、ふつうの集合住宅として出ます。</p>
@@ -6221,6 +6239,7 @@ function openBuilding(hid) {
   $$('[data-unit]', $('#sheet')).forEach(x => x.onclick = () => openTarget(hid, x.dataset.unit, true));
   $$('[data-kind]', $('#sheet')).forEach(x => x.onclick = () => setHouseKind(hid, x.dataset.kind, () => openBuilding(hid)));
   if ($('#fLock')) $('#fLock').onchange = e => setHouseLock(hid, e.target.checked);
+  if ($('#fBan')) $('#fBan').onchange = e => setHouseBan(hid, e.target.value, () => openBuilding(hid));
   if ($('#fMoveB')) $('#fMoveB').onclick = () => startMoveHouse(hid);
   if ($('#seqStart')) $('#seqStart').onclick = () => openAptSeq(hid);
   if ($('#fRename')) $('#fRename').onclick = () => openUnitNames(hid, () => openBuilding(hid));
@@ -6351,6 +6370,7 @@ function openAptSeq(hid, startUnit) {
       const uk = unitKind(h, u);
       return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}へ">${kindBadge(uk)}${esc(uName(h, u))}</button>`;
     }).join('')}</div>`;
+    b += banNotice(h);
     if (st.finished) {
       b += `<div class="okmsg"><b>${cnt === need ? 'すべての部屋に緑のチェックがつきました。' : '最後の部屋まで進みました。'}</b>部屋番号をタップすると、その部屋を入力できます。</div>
         <button class="btn primary block" data-close>閉じる</button>
@@ -13540,5 +13560,6 @@ init();
 <script src="kantan.js"></script>
 <script src="kangaeru.js"></script>
 <script src="chizu.js"></script>
+<script src="apt-import.js"></script>
 </body>
 </html>
