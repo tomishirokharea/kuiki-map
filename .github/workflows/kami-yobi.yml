@@ -42,7 +42,7 @@ jobs:
 
       - name: PDF を作ってドライブへ送る
         env:
-          KUIKI_PAGE: ${{ vars.KUIKI_PAGE || 'https://tomishirokharea.github.io/kuiki-map/kuiki-map-test/' }}
+          KUIKI_PAGE: ${{ vars.KUIKI_PAGE || 'https://tomishirokharea.github.io/kuiki-map/' }}
           KUIKI_TOKEN: ${{ secrets.KUIKI_ROBOT_TOKEN }}
           FORCE: ${{ inputs.force || 'false' }}
         run: node tools/kami-yobi.mjs
