@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.12.1"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.12.2"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3559,6 +3559,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.12.2', items: [
+    ['安', '安全のため、区域係が招待リンクを渡すときは、新しく作り直す形になりました']
+  ] },
   { v: '2026.12.1', items: [
     ['標', '地図に、地名の多い『標準地図』を選べるようになりました'],
     ['目', '地図に、会館や学校などの目印が出るようになりました']
@@ -8608,7 +8611,7 @@ function finalizePools() {
 /* ---------- 留守宅カード ---------- */
 let focusCard = null, roundTerr = null, roundNums = null, barMini = false, curTerr = null;
 let barHidden = false; // 下の案内を、押して隠したか（「?」を押すと、また出る）
-const slotText = s => { const [dt, b] = s.split('・'); return `${dt}の${b}（${BAND_HINT[b]}）`; };
+const slotText = s => { const [dt, b] = String(s || '').split('・'); return esc(`${dt}の${b}（${BAND_HINT[b] || ''}）`); }; // 時間帯の文字は画面にそのまま入るので、必ず esc する
 const slotShort = s => s.replace('・', 'の');
 const activeCards = () => { const now = Date.now(); return D().awayCards.filter(c => !c.endedAt && Date.parse(c.expiresAt) > now); };
 /* グループで回る留守宅カード：c.group（グループ名）と c.helpers（今日回る人。区域の helpers と同じ形）を持つ */
@@ -12353,10 +12356,18 @@ function openAddUser() {
 /* その人の招待リンクとQRを見せる */
 async function openUserLink(u, reissue) {
   if (!LIVE) { toast('招待リンクは、本番のときだけ作れます'); return; }
-  if (reissue && !await ask(`${u.name}さんの今の招待リンクは使えなくなります。よろしいですか？`)) return;
+  if (reissue && reissue !== 'confirmed' && !await ask(`${u.name}さんの今の招待リンクは使えなくなります。よろしいですか？`)) return;
   toast('リンクを用意しています…');
   let j;
   try { j = await api('user_link', { id: u.id, reissue: !!reissue }); } catch (e) { toast('リンクを作れませんでした。通信を確認してください'); return; }
+  // 安全のため、招待リンクはサーバーに残していない。今のリンクは出せないので、作り直すかを聞く
+  if (j && j.need === 'reissue') {
+    if (!await ask(`${u.name}さんの招待リンクを作り直します。`, {
+      title: '新しい招待リンクを作りますか？',
+      body: '安全のため、招待リンクは保存していません。作り直すと、今のリンクは使えなくなります。登録済みのスマホは、そのまま使えます。',
+      ok: '作り直す', danger: false })) return;
+    return openUserLink(u, 'confirmed');
+  }
   if (!j.url) { toast('先に、スプレッドシートの「② 公開ページのURLを設定」を行ってください'); return; }
   openQrSheet(`${u.name}さんの招待リンク`, 'このQRを本人のスマホで読み取ってもらいます', j.url, {
     note: '本人のスマホのカメラでQRを読み取ると、その場で使えるようになります。ほかの人には渡さないでください。',
