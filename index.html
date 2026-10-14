@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.12.3"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.12.4"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -631,10 +631,12 @@ body.strong .pin.st-plain{border-width:4px}
 .terr-label.grp span{border-color:#9C6BD1;color:#5B2E8C;background:#F7F2FCee}
 .tcard.grp{border-color:#C9B2E6}
 /* 係の画面の中のタブ */
-.atabs{display:grid!important;grid-template-columns:repeat(3,1fr);gap:0}
-.atabs button{min-height:50px;font-size:15px;border-left:0!important;border-top:2px solid var(--ink)}
-.atabs button:nth-child(-n+3){border-top:0}
-.atabs button:not(:nth-child(3n+1)){border-left:2px solid var(--ink)!important}
+.atabs{display:grid!important;grid-template-columns:repeat(5,1fr);gap:0}
+.atabs button{min-height:54px;font-size:17px;border-left:0!important;border-top:0;padding:0 4px!important;white-space:nowrap}
+.atabs button:not([hidden]) ~ button{border-left:2px solid var(--ink)!important}
+.adsub{display:flex;flex-wrap:wrap;margin:-4px 0 12px}
+.adsub button{flex:1 1 6em;min-height:50px;font-size:16px}
+.adsub [data-admap]{flex:0 1 auto}
 .atabs .cnt{position:static;display:inline-grid;margin-left:4px;vertical-align:middle}
 
 /* ===== 左にスワイプして編集・削除 ===== */
@@ -1064,7 +1066,7 @@ img,canvas,video{max-width:100%}
   .swatches{grid-template-columns:repeat(2,1fr)}
   .iconpick{grid-template-columns:repeat(4,1fr)}
   nav.tabs button{font-size:13px}
-  .atabs button{font-size:14px}
+  .atabs button{font-size:15px}
   .cd{min-height:52px}
 }
 
@@ -1125,9 +1127,7 @@ img,canvas,video{max-width:100%}
   .homegrid .homemain>.sec:first-child{margin-top:0}
   /* 係の「状況」のタイルを多めに並べる */
   .tiles{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
-  .atabs{grid-template-columns:repeat(6,1fr)}
-  .atabs button{border-top:0}
-  .atabs button:not(:first-child){border-left:2px solid var(--ink)!important}
+  .atabs{grid-template-columns:repeat(5,1fr)}
 }
 
 /* =========================================================
@@ -1485,13 +1485,20 @@ body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
     <section class="view" id="view-admin" hidden>
       <div class="wrap">
         <div class="seg subtabs atabs" id="adTabs" role="group" aria-label="係の画面の切りかえ">
-          <button type="button" data-ap="inbox" aria-pressed="true">申請・承認<b class="cnt" id="apCnt" hidden>0</b></button>
+          <button type="button" data-ap="inbox" aria-pressed="true">今日<b class="cnt" id="apCnt" hidden>0</b></button>
           <button type="button" data-ap="terr" aria-pressed="false">区域</button>
           <button type="button" data-ap="sched" aria-pressed="false">予定</button>
-          <button type="button" data-ap="status" aria-pressed="false">状況</button>
-          <button type="button" data-ap="people" aria-pressed="false">人・グループ</button>
-          <button type="button" data-ap="set" aria-pressed="false">設定・データ</button>
+          <button type="button" data-ap="status" aria-pressed="false" hidden>状況</button>
+          <button type="button" data-ap="people" aria-pressed="false" aria-label="人とグループ">人</button>
+          <button type="button" data-ap="set" aria-pressed="false" aria-label="設定とデータ">設定</button>
         </div>
+        <!-- 「区域」タブの中の切りかえ（一覧／状況）。状況は「区域」タブの中に入れた -->
+        <div class="seg adsub" id="adTerrSub" role="group" aria-label="区域の見かた" hidden>
+          <button type="button" data-ap="terr" aria-pressed="true">一覧</button>
+          <button type="button" data-ap="status" aria-pressed="false">状況</button>
+          <button type="button" data-admap>期限の地図</button>
+        </div>
+        <div id="adTopBar"></div>
         <div class="apane" data-apane="inbox">
           <div id="adDevices"></div>
           <div id="adInbox"></div>
@@ -1513,13 +1520,16 @@ body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
         </div>
         <div class="apane" data-apane="terr" hidden>
         <h2 class="sec">区域の一覧</h2>
-        <div class="row"><button class="btn primary" id="adNewTerr">＋ 新しい区域の線を引く</button>
+        <div class="row"><button class="btn primary" id="adNewTerr">＋ 新しい区域の線を引く</button></div>
+        <details class="dueset"><summary>区域の取り込み・特別区域・アパートの登録</summary>
+        <div class="row">
           <!-- iPhoneでは accept に .kml を書くとファイルを選べないことがあるため、あえて指定しない（中身で判定する） -->
           <label class="btn">マイマップから区域を取り込む<input type="file" id="adKml" hidden></label>
           <button class="btn" id="adSpecial">＋ 特別区域（コンビニなど）をつくる</button>
           <button class="btn" id="adAptImp">アパートの登録（やり直し・取り込み）</button>
           <label class="btn">エクセルから区域と家を取り込む<input type="file" id="adXlsx" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label></div>
         <p class="hint">Googleマイマップで「KML/KMZにエクスポート」したファイルを選びます。区域の線だけを取り込み、ピン（家の印）は取り込みません。</p>
+        </details>
         <div id="adTakeSet"></div>
         <div id="adTerrs"></div>
         </div>
@@ -3242,7 +3252,9 @@ let HID = new Map(), TID = new Map();
 const terrById = id => TID.get(id) || D().territories.find(t => t.id === id);
 const houseById = id => HID.get(id) || D().houses.find(h => h.id === id);
 const userById = id => D().users.find(u => u.id === id);
-const uname = id => (userById(id) || { name: '不明' }).name;
+/* 名前を隠す（係の画面の「名前をかくす」）：schedule.js が unameMask を入れる。入っていないときは、ふつうの名前 */
+let unameMask = null;
+const uname = id => (unameMask && unameMask(id)) || (userById(id) || { name: '不明' }).name;
 function userOptions(sel, noneLabel) {
   return (noneLabel ? `<option value="">${noneLabel}</option>` : '') +
     D().users.map(u => `<option value="${u.id}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
@@ -8630,7 +8642,12 @@ function nextGroupSlot() {
 const isUnmet = k => { const s = sum(k); return s.n > 0 && s.unmet; };
 const triedSlots = k => sum(k).slots;
 // 担当者のいる区域は担当者だけ。空いている区域は、回り終えた記録があるものだけ。
-const awayEligibleTerr = (t, uid) => (t.holder ? t.holder === uid : (!!t.awayPoolAt || !!t.completedAt || D().settings.awayAllTerr === 1));
+const awayEligibleBase = (t, uid) => (t.holder ? t.holder === uid : (!!t.awayPoolAt || !!t.completedAt || D().settings.awayAllTerr === 1));
+/* 区域係が「この時間帯を重点にする」と決めた時間帯（係の画面の時間帯の表から）。期限を過ぎたものは使わない
+   ・空いている区域は、ふだん留守宅カードを出さない区域でも、その時間帯のカードだけは出す
+   ・一覧では「区域係のおすすめ」として上に出す */
+const focusSlots = t => { const today = ymd(new Date()); return (Array.isArray(t && t.focus) ? t.focus : []).filter(f => f && SLOTS.includes(f.s) && String(f.until || '') >= today).map(f => f.s); };
+const awayEligibleTerr = (t, uid) => awayEligibleBase(t, uid) || (!t.holder && focusSlots(t).length > 0);
 
 /* 区域ごとの「まだ会えていない家」 */
 function unmetIndex() {
@@ -8661,13 +8678,16 @@ function awaySuggestions(uid, slots) {
   const idx = unmetIndex(), locked = lockedKeys(), res = [];
   for (const t of D().territories) {
     if (!awayEligibleTerr(t, uid) || !idx.has(t.id)) continue;
+    const base = awayEligibleBase(t, uid), fs = focusSlots(t);
     for (const slot of slots) {
+      const focus = fs.includes(slot);
+      if (!base && !focus) continue; // 重点の時間帯だけで出している区域は、その時間帯だけ
       const keys = cardKeys(idx.get(t.id), slot, locked);
-      if (keys.length) res.push({ t, slot, keys, dist: myPos ? distM(myPos, center(t.polygon)) : null });
+      if (keys.length) res.push({ t, slot, keys, focus, dist: myPos ? distM(myPos, center(t.polygon)) : null });
     }
   }
   res.sort(myPos ? (a, b) => a.dist - b.dist || b.keys.length - a.keys.length : (a, b) => b.keys.length - a.keys.length);
-  return res;
+  return res.filter(x => x.focus).concat(res.filter(x => !x.focus)); // 区域係のおすすめ（重点の時間帯）を先に
 }
 function cardProgress(c) {
   const keys = c.keys.filter(k => houseById(parseKey(k)[0]));
@@ -8679,7 +8699,7 @@ function takeAwayCard(tid, slot, grp) {
     toast(`${G ? 'グループの' : ''}留守宅カードは${max}枚まで持てます。終えてから受け取ってください`); return;
   }
   const t = terrById(tid);
-  if (!t || !awayEligibleTerr(t, me().id)) { toast('このカードは受け取れません'); return; }
+  if (!t || !awayEligibleTerr(t, me().id) || (!awayEligibleBase(t, me().id) && !focusSlots(t).includes(slot))) { toast('このカードは受け取れません'); return; }
   const keys = cardKeys(unmetIndex().get(tid) || [], slot, lockedKeys());
   if (!keys.length) { toast('このカードの家は、今はありません'); renderAll(); return; }
   const now = new Date();
@@ -13154,7 +13174,11 @@ let adPane = 'inbox';
 function setAdPane(v) {
   const allowed = isAdmin() ? ['inbox', 'terr', 'sched', 'status', 'people', 'set'] : ['sched', 'people'];
   adPane = allowed.includes(v) ? v : allowed[0];
-  $$('#adTabs [data-ap]').forEach(b => { b.hidden = !allowed.includes(b.dataset.ap); b.setAttribute('aria-pressed', String(b.dataset.ap === adPane)); });
+  // 「状況」は「区域」タブの中の切りかえ（上のタブは「区域」が選ばれたまま）
+  const tabOf = p => (p === 'status' ? 'terr' : p);
+  $$('#adTabs [data-ap]').forEach(b => { b.hidden = b.dataset.ap === 'status' || !allowed.includes(b.dataset.ap); b.setAttribute('aria-pressed', String(b.dataset.ap === tabOf(adPane))); });
+  const sub = $('#adTerrSub');
+  if (sub) { sub.hidden = tabOf(adPane) !== 'terr'; $$('[data-ap]', sub).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ap === adPane))); }
   $('#adTabs').style.gridTemplateColumns = allowed.length === 2 ? 'repeat(2,1fr)' : '';
   $$('#view-admin .apane').forEach(p => { const k = p.dataset.apane; p.hidden = !(k === adPane || (adPane === 'status' && k === 'status2')); });
 }
@@ -13210,12 +13234,14 @@ function openTerr(id) {
 /* ---------- ボタンの動き ---------- */
 function bindStatic() {
   $$('#tabs button').forEach(b => b.onclick = () => showView(b.dataset.view));
-  $('#adTabs').addEventListener('click', e => {
+  const adTabClick = e => {
     const b = e.target.closest('[data-ap]'); if (!b) return;
     setAdPane(b.dataset.ap);
     if (isAdmin()) renderAdmin(); else if (isOverseer()) renderOverseer(); // えらんだタブの中身を、そのとき作る
     $('#view-admin').scrollTop = 0;
-  });
+  };
+  $('#adTabs').addEventListener('click', adTabClick);
+  $('#adTerrSub').addEventListener('click', adTabClick);
   bindHome();
   bindReco();
   bindSwipe();
@@ -13437,7 +13463,7 @@ function bindStatic() {
     else if ((x = q('[data-delok]'))) approveDel(x.dataset.delok);
     else if ((x = q('[data-delno]'))) { const r = D().requests.find(y => y.id === x.dataset.delno); if (r && !houseById(r.houseId)) approveDel(r.id); else declineDel(x.dataset.delno); }
     else if ((x = q('[data-reqno]'))) declineReq(x.dataset.reqno);
-    else if ((x = q('[data-takenseen]'))) { const t = terrById(x.dataset.takenseen); if (t) { t.selfSeen = true; Store.save(); renderAll(); } }
+    else if ((x = q('[data-takenseen]'))) { const t = terrById(x.dataset.takenseen); if (t) commit(`区域${t.no}の受け取りを確認しました`, () => { t.selfSeen = true; t.selfSeenBy = me().id; t.selfSeenAt = new Date().toISOString(); }); }
     else if ((x = q('[data-takemax]'))) {
       const st = D().settings;
       st.selfTakeMax = Math.min(5, Math.max(1, st.selfTakeMax + Number(x.dataset.takemax)));
