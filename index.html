@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.12.4"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.12.5"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -2751,7 +2751,7 @@ function expandHouse(a) {
     lat: a[3], lng: a[4], label: a[5] || '',
     units: a[6] ? String(a[6]).split('|') : [],
     createdAt: new Date((a[8] || 0) * 1000).toISOString(), createdBy: a[7] || '',
-    kind: a[9] || undefined, lock: a[10] ? true : undefined, prov: a[12] ? true : undefined, ban: a[14] === 'n' ? 'no' : a[14] === 'l' ? 'letter' : undefined, imp: a[15] ? true : undefined, cid: a[16] || undefined,
+    kind: a[9] || undefined, lock: a[10] ? true : undefined, prov: a[12] ? true : undefined, ban: a[14] === 'n' ? 'no' : a[14] === 'l' ? 'letter' : undefined, imp: a[15] ? true : undefined, cid: a[16] || undefined, mu: a[17] || undefined,
     uk: a[11] ? (() => { try { return JSON.parse(a[11]); } catch (e) { return undefined; } })() : undefined,
     ul: a[13] ? (() => { try { return JSON.parse(a[13]); } catch (e) { return undefined; } })() : undefined
   };
@@ -5057,7 +5057,7 @@ function openTarget(hid, unit, fromBuilding, review) {
           const extra = !sv ? '' : st.detail
             ? (v.result === 'met' ? `（${esc(ageName(v.age))}・${esc(intName(v.interest))}）` : (v.result === 'refused' && v.age ? `（${esc(ageName(v.age))}）` : ''))
             : (featFollow() && v.result === 'met' && INTERESTED.has(v.interest) ? ' ★' : '');
-          const mine2 = v.by === me().id || isAdmin();
+          const mine2 = window.canFixVisit ? window.canFixVisit(v) : (v.by === me().id || isAdmin()); // 直せる記録だけスワイプで取り消せる（naoshi.js）
           const row = `<li class="vrow${mine2 ? ' swipe-body' : ''}"><i class="pin st-${v.result}">${ST_CHAR[v.result]}</i><span>${fmtDate(v.at)}　${slotOf(d)}<br>${RESULT_LABEL[v.result]}${extra}</span></li>`;
           // 自分でつけた記録は、左にスワイプすると取り消せる
           return mine2
@@ -5065,7 +5065,7 @@ function openTarget(hid, unit, fromBuilding, review) {
             : row;
         }).join('')}</ul>${vs.length > (st.step === 'review' ? 10 : 5) ? `<p class="muted">ほか ${vs.length - (st.step === 'review' ? 10 : 5)}件</p>` : ''}`
       : '<p class="muted">まだ記録はありません。</p>';
-    if (vs.some(v => v.by === me().id || isAdmin())) b += '<p class="hint">記録を<b>左にスワイプ</b>すると、取り消せます。</p>';
+    if (vs.some(v => (window.canFixVisit ? window.canFixVisit(v) : (v.by === me().id || isAdmin())))) b += '<p class="hint">記録を<b>左にスワイプ</b>すると、取り消せます（その日のうち）。</p>';
     if (st.step === 'review' && !blocked) b += `<button class="btn primary block review-rec" id="shRecord">訪問の結果を記録する</button>`;
 
     b += navLink(h);
@@ -13653,5 +13653,6 @@ init();
 <script src="chizu.js"></script>
 <script src="apt-import.js"></script>
 <script src="apt-wizard.js"></script>
+<script src="naoshi.js"></script><!-- まちがえた記録の直し方・二世帯住宅 -->
 </body>
 </html>
