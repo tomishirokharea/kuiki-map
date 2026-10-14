@@ -2850,7 +2850,7 @@ window.KUIKI_I18N.es = {
 "電波がないところでも、受け取った区域の地図が見られるようになりました": "Ahora puede ver el mapa de los territorios que recibió, incluso donde no hay señal",
 "ホームが左右に動いてしまうことがあったのを直しました": "Se corrigió que la pantalla de inicio a veces se moviera hacia los lados",
 "新しい招待リンクを作りますか？": "¿Crear un enlace de invitación nuevo?",
-"安全のため、招待リンクは保存していません。作り直すと、今のリンクは使えなくなります。登録済みのスマホは、そのまま使えます。": "Por seguridad, los enlaces de invitación no se guardan. Si crea uno nuevo, el enlace actual dejará de funcionar. Los teléfonos ya registrados siguen funcionando.",
+"安全のため、招待リンクは保存していません。作り直すと、今のリンクと、そのリンクで開いた端末は使えなくなります（新しいリンクを開き直します）。共通リンクやホーム画面のアイコンから登録した端末は、そのまま使えます。": "Por seguridad, los enlaces de invitación no se guardan. Si crea uno nuevo, el enlace actual y los dispositivos que lo usaron dejarán de funcionar (hay que abrir el enlace nuevo). Los dispositivos registrados con el enlace común o con el icono de la pantalla de inicio siguen funcionando.",
 "{0}さんの招待リンクを作り直します。": "Se creará de nuevo el enlace de invitación de {0}.",
 "安全のため、区域係が招待リンクを渡すときは、新しく作り直す形になりました": "Por seguridad, cuando el encargado entrega un enlace de invitación, ahora se crea uno nuevo"
 };

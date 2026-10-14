@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.12.2"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.12.3"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -12364,7 +12364,7 @@ async function openUserLink(u, reissue) {
   if (j && j.need === 'reissue') {
     if (!await ask(`${u.name}さんの招待リンクを作り直します。`, {
       title: '新しい招待リンクを作りますか？',
-      body: '安全のため、招待リンクは保存していません。作り直すと、今のリンクは使えなくなります。登録済みのスマホは、そのまま使えます。',
+      body: '安全のため、招待リンクは保存していません。作り直すと、今のリンクと、そのリンクで開いた端末は使えなくなります（新しいリンクを開き直します）。共通リンクやホーム画面のアイコンから登録した端末は、そのまま使えます。',
       ok: '作り直す', danger: false })) return;
     return openUserLink(u, 'confirmed');
   }
