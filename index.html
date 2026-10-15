@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.12.5"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.12.6"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3039,6 +3039,9 @@ function mergeChanges(list) {
 /* 送信に失敗したときは、2秒→4秒→8秒…（最大1分）と間をあけて送り直す。
    同じ変更が何度送っても受け付けられないときは、それを脇に置いて、ほかの記録の送受信を止めない */
 let flushFail = 0, flushNextAt = 0, headFail = 0;
+// 送り直しの印：前の送信の返事が届かなかったとき（と、アプリを開いて最初の送信）は、サーバーに「すでに届いているかもしれない」と伝える。
+// サーバーは、その記録がシートにすでにあるか確かめてから入れる（同じ記録が2行にならないように・監査D3）
+let sendRetry = true;
 const failedList = () => { try { return JSON.parse(lsGet(FAILED_KEY) || '[]') || []; } catch (e) { return []; } };
 function parkHead(e) {
   const ch = Store.queue.shift();
@@ -3064,8 +3067,11 @@ async function flush(force) {
         while (take < Store.queue.length && n + changeCount(Store.queue[take]) <= SEND_BATCH) n += changeCount(Store.queue[take++]);
       }
       const body = { changes: take === 1 ? Store.queue[0] : mergeChanges(Store.queue.slice(0, take)), since: Store.seq };
+      if (sendRetry) body.re = 1;
       const keepalive = document.hidden && JSON.stringify(body).length < 50000; // 閉じる直前の送信
+      sendRetry = true; // 返事が届くまでは「届いたかどうか分からない」
       const j = await api('sync', body, { keepalive });
+      sendRetry = false;
       flushFail = 0; headFail = 0; flushNextAt = 0;
       const rj = j.rejected || [];
       if (rj.length) {

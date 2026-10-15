@@ -25,6 +25,9 @@
   'use strict';
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof openTarget !== 'function') return;
 
+  if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.12.6')) {
+    CHANGELOG.unshift({ v: '2026.12.6', items: [['直', '電波が悪いときに送り直しても、記録が二重にならないようにしました']] });
+  }
   if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.12.5')) {
     CHANGELOG.unshift({ v: '2026.12.5', items: [
       ['直', 'まちがえた記録を、その日のうちなら自分で直せるようになりました'],

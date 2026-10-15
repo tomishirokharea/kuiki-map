@@ -2932,5 +2932,6 @@ window.KUIKI_I18N.es = {
 "左の世帯": "Hogar de la izquierda",
 "右の世帯": "Hogar de la derecha",
 "奥の世帯": "Hogar del fondo",
-"表の世帯": "Hogar del frente"
+"表の世帯": "Hogar del frente",
+"電波が悪いときに送り直しても、記録が二重にならないようにしました": "Si se reenvía con mala señal, los registros ya no se duplican"
 };
