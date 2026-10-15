@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.12.8"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.12.9"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -8661,7 +8661,7 @@ function unmetIndex(onlyTid) {
    「どこまで工夫したか」を見せる参考の数字で、区域の完了の条件ではない（完了の条件は poolInfo・roundInfo）。
    会えていない家がなければ null（出さない）。items は unmetIndex() の区域の項目（呼び出し側で1回だけ作ったものを使い回す） */
 const triedUnion = items => { let m = 0; for (const x of (items || [])) m |= x.tried; return m; };
-const triedOf = items => (items && items.length ? slotCount(triedUnion(items)) : null);
+const triedOf = items => { const xs = (items || []).filter(x => !x.hard); return xs.length ? slotCount(triedUnion(xs)) : null; }; // 10通りすべて留守の家（hard）は、カード・um と同じく除く（入れると必ず 10/10 になる）
 function lockedKeys() { const s = new Set(); activeCards().forEach(c => c.keys.forEach(k => s.add(k))); return s; }
 /* カードに入れる家：長く会えていない家から、上限の数まで */
 function cardKeys(items, slot, locked) {
@@ -9143,11 +9143,11 @@ function renderAwayAdmin() {
     if (!items.length) return '';
     const avg = (items.reduce((s, x) => s + slotCount(x.tried), 0) / items.length).toFixed(1);
     const using = act.filter(c => c.terrId === t.id).length;
-    return `<tr><th>区域${t.no}</th><td>${items.length}軒</td><td>${avg} / ${SLOTS.length}</td><td>${triedOf(items)} / ${SLOTS.length}</td><td>${using ? `${using}枚` : '—'}</td>
+    return `<tr><th>区域${t.no}</th><td>${items.length}軒</td><td>${avg} / ${SLOTS.length}</td><td>${triedOf(items) == null ? '—' : triedOf(items) + ' / ' + SLOTS.length}</td><td>${using ? `${using}枚` : '—'}</td>
       <td>${t.holder ? `${esc(uname(t.holder))}さん` : (t.completedAt ? 'だれでも' : '<span class="muted">回り終えた記録なし</span>')}</td></tr>`;
   }).join('');
   $('#adAwayTerrs').innerHTML = rows
-    ? `<div class="scroll"><table class="slots narrow"><tr><th>区域</th><th>会えていない家</th><th>試した時間帯（平均）</th><th>試した時間帯</th><th>使用中のカード</th><th>留守宅カードを使える人</th></tr>${rows}</table></div>`
+    ? `<div class="scroll"><table class="slots narrow"><tr><th>区域</th><th>会えていない家</th><th>1軒あたり試した時間帯（平均）</th><th>区域で試した時間帯（合わせて）</th><th>使用中のカード</th><th>留守宅カードを使える人</th></tr>${rows}</table></div>`
     : '<p class="muted">会えていない家はありません。</p>';
 
   const hard = all.filter(x => x.hard);
