@@ -5,7 +5,8 @@
    ・画面（index.html・config.js・schedule.js・言語のファイル）：まずインターネットから新しいものを取りに行き、
      つながらないとき（6秒待っても返事がないとき）だけ、前に保存した画面を使う
      → ふだんはいつも最新の版。圏外でも開ける
-   ・地図の部品（Leaflet）と文字（Googleフォント）：一度取ったら、保存したものを使う
+   ・地図の部品など（vendor に置いた Leaflet・pdf.js など）と文字（Googleフォント）：一度取ったら、保存したものを使う
+     （vendor のファイル名には版の番号が入っているので、中身が変わるときは名前ごと変わる）
    ・国土地理院の地図の画像（淡色地図 pale・標準地図 std）：一度見たものは保存し、次からは保存したものを先に使う
      （保存するのは、会衆の区域のまわり＝全区域を囲む四角＋500m だけ。その四角は画面から知らせてもらう。
        旅行先など、四角の外の地図は保存しない。写真の地図も保存しない。画像のURLのタイル番号 z/x/y を緯度経度に直して、四角と比べる）
@@ -13,7 +14,7 @@
    ・招待コード（?t=）の入ったURLは保存しない（URLの ? から後ろを消して保存する）
    ========================================================= */
 const APP_CACHE = 'kuiki-app-v1';
-const LIB_CACHE = 'kuiki-lib-v1';
+const LIB_CACHE = 'kuiki-lib-v2'; // v2：地図の部品を CDN から vendor に移した（古い CDN の控えは消える）
 const TILE_CACHE = 'kuiki-tiles-v1';   // 地図の画像（画面側の kangaeru.js・chizu.js も同じ入れ物に入れる。名前を変えるときは両方）
 const AREA_CACHE = 'kuiki-tilearea-v1'; // 保存してよい場所（四角）
 const KEEP = [APP_CACHE, LIB_CACHE, TILE_CACHE, AREA_CACHE];
@@ -58,9 +59,7 @@ self.addEventListener('activate', e => {
   })());
 });
 
-const isLib = u =>
-  (u.hostname === 'cdnjs.cloudflare.com' && u.pathname.includes('/leaflet/')) ||
-  u.hostname === 'fonts.googleapis.com' || u.hostname === 'fonts.gstatic.com';
+const isLib = u => u.hostname === 'fonts.googleapis.com' || u.hostname === 'fonts.gstatic.com';
 
 self.addEventListener('fetch', e => {
   const req = e.request;
@@ -69,6 +68,17 @@ self.addEventListener('fetch', e => {
 
   if (u.origin === self.location.origin) {
     if (u.searchParams.has('vcheck')) return; // 新しい版があるかの確認は、そのまま通す
+    if (u.pathname.includes('/vendor/')) { // 地図の部品など：一度取ったら保存したものを使う（圏外でも地図が出る）
+      e.respondWith((async () => {
+        const cache = await caches.open(LIB_CACHE);
+        const hit = await cache.match(u.origin + u.pathname);
+        if (hit) return hit;
+        const res = await fetch(req);
+        if (res && res.ok && res.type === 'basic') cache.put(u.origin + u.pathname, res.clone()).catch(() => {});
+        return res;
+      })());
+      return;
+    }
     const isPage = req.mode === 'navigate' || /\/(index\.html)?$/.test(u.pathname) || APP_FILES.test(u.pathname);
     if (!isPage) return;
     const key = u.origin + u.pathname; // ? から後ろ（招待コードなど）は保存しない

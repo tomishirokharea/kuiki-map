@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.12.6"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.12.7"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -14,8 +14,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- 地図の部品（Leaflet）は、外の配布サイトではなく、このアプリと同じ場所（vendor）に置いたものを読む（改ざん対策・監査S14） -->
+<link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
+<script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="config.js"></script><!-- GASのURLと、会衆ごとの設定はこのファイルに書きます（無ければ試作モード） -->
 <script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><!-- スペイン語の辞書 / Diccionario español -->
 <script src="i18n.js"></script><!-- 言語の切りかえ / Cambio de idioma -->
@@ -1715,11 +1716,12 @@ const TILE_PALE = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png';
 const TILE_PHOTO = 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg';
 const GSI_ATTR = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>';
 
-/* 必要になったときだけ読み込む部品（ふだんの起動は軽いまま） */
+/* 必要になったときだけ読み込む部品（ふだんの起動は軽いまま）
+   どれも npm の公式の配布物を vendor に置いたもの。外の配布サイト（CDN）からは読まない（改ざん対策・監査S14） */
 const LIB = {
-  pdf: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-  pdfWorker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
-  zip: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+  pdf: 'vendor/pdfjs-3.11.174/pdf.min.js',
+  pdfWorker: 'vendor/pdfjs-3.11.174/pdf.worker.min.js',
+  zip: 'vendor/jszip-3.10.1/jszip.min.js'
 };
 const libLoading = {};
 function loadScript(url) {
@@ -2443,10 +2445,14 @@ async function claimHome() {
   const code = lsGet(HOME_KEY);
   lsDel(HOME_KEY);
   if (!code) return '';
-  try {
-    const j = await apiRaw({ action: 'home_claim', code, device: deviceLabel() });
-    if (j.ok && j.token) { lsSet(TOKEN_KEY, j.token); lsSet(HOME_WELCOME, '1'); return j.token; }
-  } catch (e) { /* つながらないときは、下の案内を出す */ }
+  for (let i = 0; i < 3; i++) { // 混んでいる・回数制限（slow）のときは、少し待って3回までためす
+    try {
+      const j = await apiRaw({ action: 'home_claim', code, device: deviceLabel() });
+      if (j.ok && j.token) { lsSet(TOKEN_KEY, j.token); lsSet(HOME_WELCOME, '1'); return j.token; }
+      if (j.error !== 'slow' && j.error !== 'busy') break;
+    } catch (e) { break; /* つながらないときは、下の案内を出す */ }
+    await new Promise(r => setTimeout(r, 4000));
+  }
   return '';
 }
 /* ホーム画面のアイコンから開いたのに、コードが引き継がれていないとき */
@@ -2501,65 +2507,17 @@ async function openJoin() {
   try { j = await apiRaw({ action: 'join_scan', join: lsGet(JOIN_KEY), device: deviceLabel() }); }
   catch (e) { joinError('つながりませんでした', 'インターネットにつながっているか確認してください。', openJoin); return; }
   if (!j.ok) {
-    if (j.error === 'auth' || j.error === 'unknown_action') { openJoinList(); return; } // サーバーが古いとき：名前をえらぶ方式
     if (j.error === 'join') { lsDel(JOIN_KEY); joinError('このリンクは使えなくなりました', '区域係から、新しいリンク（QR）をもらってください。'); return; }
-    joinError('申し込めませんでした', j.error === 'busy' ? '申し込みが多すぎるため、今は受け付けられません。区域係に相談してください。' : 'しばらくしてから、もう一度ためしてください。', j.error === 'busy' ? null : openJoin);
+    // busy＝申し込みが多すぎる（係が承認すれば空く）／slow＝短いあいだに何度も押された（少し待てば通る）
+    joinError('申し込めませんでした', j.error === 'busy' ? '申し込みが多すぎるため、今は受け付けられません。区域係に相談してください。'
+      : j.error === 'slow' ? '短いあいだに何度も申し込まれました。1分ほど待ってから、もう一度ためしてください。'
+      : 'しばらくしてから、もう一度ためしてください。', j.error === 'busy' ? null : openJoin);
     return;
   }
   lsDel(QUEUE_KEY);
   lsSet(TOKEN_KEY, j.token);
   lsSet(PENDING_KEY, JSON.stringify({ code: j.code || '', at: new Date().toISOString() }));
   openWaiting();
-}
-/* 以前の方式（名前をえらんで申し込む）。サーバーが古いときだけ使う */
-async function openJoinList() {
-  hideBlocking();
-  joinPaint('<h2>読み込んでいます…</h2>');
-  let j;
-  try { j = await apiRaw({ action: 'join_list', join: lsGet(JOIN_KEY) }); }
-  catch (e) { joinError('読み込めませんでした', 'インターネットにつながっているか確認してください。', openJoin); return; }
-  if (!j.ok) {
-    if (j.error === 'join') { lsDel(JOIN_KEY); joinError('このリンクは使えなくなりました', '区域係から、新しいリンクをもらってください。'); }
-    else joinError('読み込めませんでした', 'しばらくしてから、もう一度ためしてください。', openJoin);
-    return;
-  }
-  const users = j.users || [];
-  joinPaint(`<h2>はじめに、あなたの名前をえらんでください</h2>
-    <p class="muted">えらんだあと、区域係が確認してから使えるようになります。</p>
-    <label class="field"><span>名前でさがす</span><input type="text" id="jQ" placeholder="名前の一部を入れる" autocomplete="off"></label>
-    <div id="jList">${users.map(u => `<button class="namebtn" data-uid="${esc(u.id)}" data-name="${esc(u.name)}">${esc(u.name)}</button>`).join('')
-      || '<p class="muted">名前が登録されていません。区域係に相談してください。</p>'}</div>
-    <p class="hint">自分の名前がないときは、区域係に相談してください。</p>`);
-  $('#jQ').oninput = e => {
-    const q = e.target.value.trim();
-    $$('#jList [data-name]').forEach(b => { b.hidden = !!q && !b.dataset.name.includes(q); });
-  };
-  $$('#jList [data-uid]').forEach(b => b.onclick = () => joinConfirm(b.dataset.uid, b.dataset.name));
-}
-function joinConfirm(uid, name) {
-  joinPaint(`<h2>この名前で登録します</h2>
-    <p class="bigname">${esc(name)}さん</p>
-    <div class="notice warn"><b>登録したあとは、このスマホでは名前を変えられません。</b><br>まちがえたときは、区域係に相談してください。</div>
-    <button class="btn primary block" id="jGo">${esc(name)}さんとして申し込む</button>
-    <button class="btn block" id="jBack">← 名前をえらびなおす</button>`);
-  $('#jBack').onclick = openJoinList;
-  $('#jGo').onclick = async () => {
-    const b = $('#jGo'); b.disabled = true; b.textContent = '申し込んでいます…';
-    let j;
-    try { j = await apiRaw({ action: 'join_request', join: lsGet(JOIN_KEY), uid, device: deviceLabel() }); }
-    catch (e) { joinError('申し込めませんでした', 'インターネットにつながっているか確認してください。', () => joinConfirm(uid, name)); return; }
-    if (!j.ok || !j.token) {
-      const why = j.error === 'busy' ? '申し込みが多すぎるため、今は受け付けられません。区域係に相談してください。'
-        : j.error === 'join' ? 'このリンクは使えなくなりました。区域係から、新しいリンクをもらってください。'
-        : 'しばらくしてから、もう一度ためしてください。';
-      joinError('申し込めませんでした', why, j.error === 'join' ? null : openJoin);
-      return;
-    }
-    lsDel(QUEUE_KEY);
-    lsSet(TOKEN_KEY, j.token);
-    lsSet(PENDING_KEY, JSON.stringify({ name: j.name || name, at: new Date().toISOString() }));
-    openWaiting();
-  };
 }
 let waitTimer = null;
 function paintWaiting(p) {
@@ -2595,6 +2553,11 @@ function openWaiting() {
       waitTimer = setTimeout(check, 3000); // 係が登録したら、すぐ分かるように
       return;
     }
+    if (!j.ok && j.error !== 'auth') { // 混んでいる・回数制限（slow）・サーバーのエラー：申し込みは消さずに、少し待って確かめ直す
+      if ($('#wState')) $('#wState').textContent = '混み合っています。少し待ってから、自動で確認します。';
+      waitTimer = setTimeout(check, 15000);
+      return;
+    }
     clearTimeout(waitTimer);
     lsDel(TOKEN_KEY); lsDel(PENDING_KEY);
     joinError('登録は見送りになりました', '区域係に相談してください。', lsGet(JOIN_KEY) ? openJoin : null);
@@ -2604,6 +2567,7 @@ function openWaiting() {
     if (!name) { toast('名前を入れてください'); return; }
     try {
       const j = await apiRaw({ action: 'join_hint', token: lsGet(TOKEN_KEY), name });
+      if (!j.ok && j.error === 'slow') { toast('混み合っています。1分ほど待ってから、もう一度送ってください'); return; }
       if (!j.ok) throw new Error(j.error);
       p.hint = name; lsSet(PENDING_KEY, JSON.stringify(p));
       toast('係に名前を知らせました');
@@ -7543,7 +7507,7 @@ function doImport(rows, snap) {
    ・区域の線は、その区域の家をぜんぶ囲む形で自動で作る（家から XL_PAD_M m 外側）
    ・引っ越した・亡くなった家（Se mudó・Se mudaron・falleció）は入れない。「No Visitar」は拒否の家として入れる
    ・住所が丁目までしか分からなかった家は「場所を確かめる家」として最後に一覧で出す（係が「この家の場所を直す」で直せる） */
-LIB.xlsx = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+LIB.xlsx = 'vendor/xlsx-0.18.5/xlsx.full.min.js';
 const XL_PAD_M = 250;   // 区域の線を、家からどれだけ外側に引くか（m）
 const XL_DUP_M = 6;     // すでにある家とこれより近ければ、同じ家とみなして入れない（m）
 const XL_GSI = 'https://msearch.gsi.go.jp/address-search/AddressSearch?q=';
