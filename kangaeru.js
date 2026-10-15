@@ -319,6 +319,7 @@
     S.querySelectorAll('.kgtblbox .hint-strong').forEach(e => e.remove());
   }
   const ST_PER = { v: 4 };
+  const on2 = (S, sel, fn) => { const b = S.querySelector(sel); if (b) b.onclick = fn; };
   window.openTerrInfo = function (tid, col, bi, from) {
     const t = terrById(tid); if (!t) return;
     const simple = isSimple(), homes = homesOf(t), few = homes < MIN_HOMES;
@@ -342,6 +343,13 @@
         : '<p class="muted">記録が増えると、ここに出ます。</p>');
     }
     housesOf(tid).forEach(h => targets(h).forEach(u => { const k = K(h.id, u); if (!D().dnc[k] && isUnmet(k)) unmet++; }));
+    // この区域の留守宅で試した時間帯（参考。完了の条件ではない）。この区域の家だけ調べる（3万件を1周しない）。くわしい表示だけ、会えていない家があるときだけ
+    let triedBox = '';
+    if (!few && !simple) {
+      const tc = triedOf(unmetIndex(tid).get(tid));
+      if (tc != null) triedBox = `<button type="button" class="kgwhy" data-kgtried>この区域の留守宅で試した時間帯：${tc} / ${SLOTS.length}</button>
+        <p class="hint">${SLOTS.length}通りすべてを試す必要はありません。会えなかった家の${awayRetPct()}%を訪ね直すと、区域が完了します</p>`;
+    }
     const age = (!simple && typeof AGE_ON !== 'undefined' && AGE_ON && typeof ageMap === 'function' && ageMap())
       ? `<p><button type="button" class="agetype at-mix" data-prof="${tid}" data-back="">この地域のようす ›</button></p>` : '';
     const tableBox = few
@@ -352,7 +360,7 @@
     const youngLine = !simple && yg ? `<p class="muted">若い世代：${yg === 2 ? '多い' : 'ふつう'}（区域の統計からの目安です）</p>` : '';
     const hasKarte = isAdmin() && typeof KM.openKarte === 'function';
     setSheet(headHtml(t, `区域${esc(t.no)}のようす`, esc(t.name || '')) + `
-      <p><b>${esc(state)}</b></p>${line}${simple ? '' : tableBox}${top}${simple && few ? tableBox : ''}
+      <p><b>${esc(state)}</b></p>${line}${triedBox}${simple ? '' : tableBox}${top}${simple && few ? tableBox : ''}
       ${simple ? '' : `${age}<p class="muted">家・部屋 ${homes}軒・会えていない家 ${unmet}軒</p>${youngLine}`}
       <div class="actions"><button type="button" class="btn primary" id="kgiMap">地図で見る</button>
         ${simple ? '' : '<button type="button" class="btn" id="kgiPlan">予定に入れる</button>'}
@@ -361,6 +369,7 @@
       <button class="btn block" data-close>閉じる</button>`);
     const S = $('#sheet'), on = (id, fn) => { const b = $('#' + id, S); if (b) b.onclick = fn; };
     markSlot(S, hl);
+    on2(S, '[data-kgtried]', () => { const b = S.querySelector('.kgtblbox'); if (b) b.scrollIntoView({ behavior: 'smooth', block: 'start' }); }); // すぐ下の曜日×時間帯の表へ
     $$('[data-kgper]', S).forEach(b => b.onclick = () => { ST_PER.v = Number(b.dataset.kgper); sheetKeep = true; window.openTerrInfo(tid, col, bi, from); });
     on('kgiMap', () => { closeSheet(); openTerr(tid); });
     on('kgiPlan', () => openPlan(from || { kind: 'round', t, col, bi, title: `区域${t.no}` }));

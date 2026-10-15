@@ -767,11 +767,13 @@
       ${profLine(x.t, 'away')}
       <p class="muted">会えていない家 ${x.um}軒のうち、<b>${slotShort(x.slot)}にまだ訪ねていない ${x.keys.length}軒</b>がこのカードに入ります${x.longDays ? `。いちばん長い家は${x.longDays}日会えていません` : ''}</p>
       ${x.dist != null || x.t.holder ? `<p class="muted">${[x.dist != null ? `ここから約${fmtDist(x.dist)}` : '', x.t.holder ? 'あなたの区域' : ''].filter(Boolean).join('　')}</p>` : ''}
+      ${x.tc != null && !isSimple() ? `<p class="muted">試した時間帯 ${x.tc}/${SLOTS.length}</p>` : ''}
     </div><button class="btn small primary" ${attr}="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`;
   const withAway = (list, idx) => list.map(x => {
     const items = idx.get(x.t.id) || [], ks = new Set(x.keys);
     const oldest = items.reduce((a, i) => (ks.has(i.k) && (!a || i.first < a) ? i.first : a), '');
-    return Object.assign(x, { um: items.filter(i => !i.hard).length, longDays: oldest ? daysSince(oldest) : 0 });
+    // tc：この区域の「試した時間帯」（会えていない家の分をすべて合わせた数。参考の数字）。索引は呼び出し側で1回だけ作ったものを使う
+    return Object.assign(x, { um: items.filter(i => !i.hard).length, longDays: oldest ? daysSince(oldest) : 0, tc: triedOf(items) });
   });
   if (typeof renderAwaySuggest === 'function') {
     window.renderAwaySuggest = function () {

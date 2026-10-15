@@ -2933,5 +2933,15 @@ window.KUIKI_I18N.es = {
 "右の世帯": "Hogar de la derecha",
 "奥の世帯": "Hogar del fondo",
 "表の世帯": "Hogar del frente",
-"電波が悪いときに送り直しても、記録が二重にならないようにしました": "Si se reenvía con mala señal, los registros ya no se duplican"
+"電波が悪いときに送り直しても、記録が二重にならないようにしました": "Si se reenvía con mala señal, los registros ya no se duplican",
+"区域全体の留守宅：訪ね直し {0} / {1}軒（目安{2}%）　あと{3}軒で区域が完了します": "Casas sin respuesta de todo el territorio: revisitadas {0} / {1} (meta {2} %). Faltan {3} casa(s) para completar el territorio",
+"区域全体の留守宅：目安に届きました。このカードを返却すると、区域が完了します": "Casas sin respuesta de todo el territorio: meta alcanzada. Al devolver esta tarjeta, el territorio queda completo",
+"区域全体の留守宅：目安に届きました。区域カードを返却すると、区域が完了します": "Casas sin respuesta de todo el territorio: meta alcanzada. Al devolver la tarjeta del territorio, queda completo",
+"試した時間帯 {0}/{1}": "Franjas intentadas {0}/{1}",
+"試した時間帯": "Franjas intentadas",
+"この区域の留守宅で試した時間帯：{0} / {1}": "Franjas intentadas en las casas sin respuesta de este territorio: {0} / {1}",
+"{0}通りすべてを試す必要はありません。会えなかった家の{1}%を訪ね直すと、区域が完了します": "No hace falta probar las {0} combinaciones. Al revisitar el {1} % de las casas donde no hubo respuesta, el territorio queda completo",
+"同じ家に、続けて何人も行かないように。": "Para que no vayan varias personas seguidas a la misma casa.",
+"留守宅カードに入れる家は、『区域 ＞ 状況』の『この日数以内に訪ねた家は、カードに入れない』で決めます。": "Las casas que entran en la tarjeta de ausentes se definen en «Territorio > Situación», en «No incluir casas visitadas dentro de estos días».",
+"留守宅カードに、区域全体の進み具合と、試した時間帯が出るようになりました": "La tarjeta de ausentes ahora muestra el avance de todo el territorio y las franjas intentadas"
 };
