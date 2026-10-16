@@ -2958,5 +2958,13 @@ window.KUIKI_I18N.es = {
 "巡回：その区域の直近の正式返却日の翌日から、次の正式返却まで。": "Vuelta: desde el día siguiente a la última devolución oficial del territorio hasta la siguiente devolución oficial.",
 "留守宅カードの出し方": "Cómo se entregan las tarjetas de ausentes",
 "違う時間帯でこの回数留守だった家を「手紙の候補」の一覧に出します（留守宅の画面に出ます）。留守宅カードに入れるかどうかは、「留守宅訪問のルール」で決めます。": "Las casas sin nadie en esta cantidad de franjas distintas aparecen en la lista de «candidatas a carta». Si entran en la tarjeta de ausentes se define en «Reglas de visita a ausentes».",
-"違う時間帯でこの回数留守だった家を「手紙の候補」の一覧に出します。単身向けのアパートが多い区域などは、回数を増やします。": "Las casas sin nadie en esta cantidad de franjas distintas aparecen en la lista de «candidatas a carta». En territorios con muchos apartamentos para personas solas, suba la cantidad."
+"違う時間帯でこの回数留守だった家を「手紙の候補」の一覧に出します。単身向けのアパートが多い区域などは、回数を増やします。": "Las casas sin nadie en esta cantidad de franjas distintas aparecen en la lista de «candidatas a carta». En territorios con muchos apartamentos para personas solas, suba la cantidad.",
+"まだの時間帯だけ": "Solo franjas pendientes",
+"地図の表示（まだの時間帯だけ・すべて）": "Vista del mapa (solo franjas pendientes / todas)",
+"今（{0}）まだの家 {1}": "Pendientes ahora ({0}): {1}",
+"{0}は試し済みの家 {1}軒は、薄く出しています": "Las {1} casas ya probadas en {0} se muestran atenuadas",
+"{0}は試し済みの家 {1}軒は、かくしています": "Las {1} casas ya probadas en {0} están ocultas",
+"地図に、試し済みの家も薄く出します（みんなの画面も）": "El mapa mostrará atenuadas también las casas ya probadas (en la pantalla de todos)",
+"地図に、まだの時間帯の家だけ出します（みんなの画面も）": "El mapa mostrará solo las casas con franja pendiente (en la pantalla de todos)",
+"留守宅カードの地図に、「まだの時間帯だけ」「すべて」の切りかえがつきました": "El mapa de la tarjeta de ausentes ahora permite cambiar entre «Solo franjas pendientes» y «Todas»"
 };

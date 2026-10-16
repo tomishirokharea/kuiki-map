@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.0"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.1"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -109,6 +109,8 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 #map.penmode{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ctext y='20' font-size='20'%3E%E2%9C%8F%EF%B8%8F%3C/text%3E%3C/svg%3E") 2 22,crosshair}
 .maptools{position:absolute;top:10px;left:10px;right:10px;z-index:500;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
 .maptools>*{pointer-events:auto;box-shadow:0 2px 6px #0003}
+.cardview{position:absolute;top:72px;left:10px;z-index:500;box-shadow:0 2px 6px #0003;border-radius:12px;background:#fff}
+.cardview .seg button{min-height:44px;padding:0 12px;font-size:15px}
 .maptools select{min-height:52px;border-radius:12px;border:2px solid var(--ink);background:#fff;padding:0 8px;font-weight:700;max-width:44vw}
 .zoomhint{position:absolute;top:130px;left:50%;transform:translateX(-50%);z-index:500;background:var(--brand);color:#fff;border:0;border-radius:99px;padding:6px 16px;font-size:16px;font-weight:700;min-height:48px;max-width:calc(100% - 20px);display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px #0005}
 .zoomhint span{font-size:22px;line-height:1}
@@ -226,6 +228,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .stamp.away{border-color:var(--draw);color:var(--draw)}
 .pin.hl{box-shadow:0 0 0 4px var(--draw),0 1px 3px #0006}
 .pin.dim{opacity:.3}
+.pin.fade,.unit.fade{opacity:.45} /* 薄く：今の時間帯は試し済みの家・ほかの人が記録した家（緑のチェックはそのまま） */
 .pin.done,.unit.done,.uchip.donec,.pin.prev,.unit.prev{background-image:linear-gradient(rgba(255,255,255,.68),rgba(255,255,255,.68));color:#5E6E77;border-color:#E3E8E6;box-shadow:none}
 /* 訪ねた家は、印そのものを薄くして「終わった」ことがひと目でわかるように（チェックだけは濃いまま） */
 .pin.done,.pin.prev{font-weight:400}
@@ -1388,6 +1391,7 @@ body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
         <select id="terrJump" aria-label="区域をえらぶ"></select>
         <button class="btn primary adv" id="btnAdd" aria-label="家を追加" title="家を追加">＋ 家</button>
       </div>
+      <div class="cardview" id="cardView" hidden></div>
       <button type="button" class="zoomhint" id="zoomHint" hidden>地図を拡大すると家の印が出ます<span aria-hidden="true">×</span></button>
       <div class="cardbar" id="cardBar" hidden></div>
       <div class="nextpanel" id="nextPanel" hidden role="region" aria-label="記録のあと"></div>
@@ -3541,6 +3545,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.1', items: [
+    ['時', '留守宅カードの地図に、「まだの時間帯だけ」「すべて」の切りかえがつきました']
+  ] },
   { v: '2026.12.8', items: [
     ['進', '留守宅カードに、区域全体の進み具合と、試した時間帯が出るようになりました']
   ] },
@@ -4630,7 +4637,7 @@ function dotStyle(h, ff, locked) {
   if (!ks.length) return { s: Object.assign({ radius: r }, DOT.plain), o: 1 };
   const one = k => {
     if (D().dnc[k]) return 'dnc';
-    const f = ff ? ff(k) : null;
+    const f = ff ? String(ff(k) || '').split(' ')[0] : null; // 'hl fade' のように、あとに「薄く」の印が付くことがある
     if (f === 'dim') return 'dim';
     if (f === 'done') return 'done';
     if (f === 'prev') return 'prev';
@@ -4643,7 +4650,8 @@ function dotStyle(h, ff, locked) {
   const st = sts.includes('plain') ? 'plain' : sts.every(x => x === 'dnc') ? 'dnc'
     : sts.every(x => x === 'dim') ? 'dim' : sts.includes('done') ? 'done' : sts.includes('prev') ? 'prev' : 'plain';
   if (st === 'dim') return { s: Object.assign({ radius: r }, DOT.plain), o: 0.3 };
-  return { s: Object.assign({ radius: r }, DOT[st]), o: 1 };
+  const faded = !!ff && ks.filter(k => !D().dnc[k]).every(k => String(ff(k) || '').indexOf(' fade') > 0); // 全部の部屋が「薄く」のとき
+  return { s: Object.assign({ radius: r }, DOT[st]), o: faded ? 0.45 : 1 };
 }
 function fillTerrJump() {
   const sel = $('#terrJump');
@@ -8673,10 +8681,11 @@ function awayOk(x, slot, rl, now) {
    tried：試した時間帯（留守の記録がある時間帯。10ビットの整数。数える範囲は awayScope）／awayN：今回の巡回で留守だった日の数
    triedAll・first：これまでの全記録（「手紙の候補」「いつから会えていないか」の材料として残す） */
 let UM_MEMO = null; // 全体を調べた結果は、同じ画面の描きかえの間（同じ処理の中）だけ使い回す（3万件を何度も1周しない）
-function unmetIndex(onlyTid) {
+function unmetIndex(onlyTid, rlOv) {
   // onlyTid：1つの区域だけ調べるとき（区域のようすなど）。3万件を1周せず、その区域の家だけ見る。結果は全体を調べたときと同じ
-  const rl = awayRule(), memoKey = D().visits.length + '|' + JSON.stringify(rl) + '|' + D().houses.length + '|' + (D().returns || []).length;
-  if (!onlyTid && UM_MEMO && UM_MEMO.src === D().visits && UM_MEMO.key === memoKey) return UM_MEMO.m;
+  // rlOv：留守宅カードに控えたルール（そのカードの数え方で調べる）。なければ今の設定
+  const rl = rlOv || awayRule(), memoKey = D().visits.length + '|' + JSON.stringify(rl) + '|' + D().houses.length + '|' + (D().returns || []).length;
+  if (!onlyTid && !rlOv && UM_MEMO && UM_MEMO.src === D().visits && UM_MEMO.key === memoKey) return UM_MEMO.m;
   const m = new Map(), now = Date.now(), bm = new Map(), gapMs = rl.gap * DAY;
   for (const h of (onlyTid ? (HBT.get(onlyTid) || []) : D().houses)) {
     if (!h.terrId) continue;
@@ -8706,7 +8715,7 @@ function unmetIndex(onlyTid) {
         recent: now - Date.parse(s.last.at) < gapMs, hard: slotCount(s.slots) >= SLOTS.length });
     }
   }
-  if (!onlyTid) { UM_MEMO = { src: D().visits, key: memoKey, m }; Promise.resolve().then(() => { if (UM_MEMO && UM_MEMO.m === m) UM_MEMO = null; }); }
+  if (!onlyTid && !rlOv) { UM_MEMO = { src: D().visits, key: memoKey, m }; Promise.resolve().then(() => { if (UM_MEMO && UM_MEMO.m === m) UM_MEMO = null; }); }
   return m;
 }
 /* 区域の「試した時間帯」：まだ会えていない家で試した時間帯を、すべて合わせた数（分母は SLOTS.length）。
@@ -8805,7 +8814,7 @@ function openAwayCard(id) {
 }
 /* 地図の目立たせ方（留守宅カード／自分の区域カードを回るとき） */
 const visitedSince = (k, iso) => { const s = sum(k); return !!s.last && s.last.at >= iso; };
-const FOCUS_RANK = ['hl', '', 'later', 'prev', 'done', 'dim', 'refuse'];
+const FOCUS_RANK = ['hl', 'hl fade', '', 'later', 'prev', 'done', 'done fade', 'dim', 'refuse']; // 'fade'＝薄く（試し済みの時間帯・ほかの人が記録した家）
 const todayIso = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); };
 /* 緑のチェックの基準：自分の区域なら受け取ってから、それ以外は今日 */
 function unitDoneSince(h) {
@@ -8813,7 +8822,7 @@ function unitDoneSince(h) {
   return myTerr(t) && t.lentAt ? t.lentAt : todayIso();
 }
 const focusCls = st => (st ? ' ' + st : '');
-const doneMark = st => (st === 'done' ? '<u>✓</u>' : st === 'prev' ? '<u class="b">✓</u>' : ''); // 青いチェック＝今回より前に最近会えた家・カードを持っていない人が会えた家
+const doneMark = st => (st === 'done' || st === 'done fade' ? '<u>✓</u>' : st === 'prev' ? '<u class="b">✓</u>' : ''); // 青いチェック＝今回より前に最近会えた家・カードを持っていない人が会えた家
 const PLAN_SIZE = 10;
 // 一緒に回る人は、同じおすすめ順で重ならないよう、はじめは「進み具合」で表示する
 const roundMode = () => {
@@ -8952,14 +8961,63 @@ function roundHint(t) {
   const intr = plan.filter(s => s.reasons.some(y => y.includes('★'))).length;
   return near + `<p class="hint-strong">今（${slotShort(r.cur)}）のおすすめ ${plan.length}か所${intr && featFollow() ? `（★ ${intr}か所）` : ''}。地図をひらくと、番号順に回れます。</p>`;
 }
+/* ---------- 留守宅カードの地図の表示 ----------
+   ・端末の今の時刻から、今の時間帯（10通り）を決める。その時間帯をまだ試していない家だけが「いま訪ねる家」
+   ・上限回数・最短間隔に当たった家と、拒否の家は、切りかえに関係なく、いつも地図から外す（住民への配慮）。受け取ったときのルール（c.rl）で決める
+   ・「まだの時間帯だけ」（はじめ）：今の時間帯を試し済みの家は、かくす ／ 「すべて」：試し済みの家も、薄く出す
+   ・10通りすべて試し済みの家は、いちばん前に試した時間帯のときに、候補に戻る（awayOk と同じ）
+   ・簡単モードは「まだの時間帯だけ」に固定（切りかえは出さない）
+   ・グループのカードは、カードを持つ人（司会者）の設定（c.view）に、全員を合わせる */
+const CARDVIEW_KEY = 'kuiki_cardview';
+const simpleNow = () => typeof isSimple === 'function' && isSimple();
+function cardView(c) {
+  if (simpleNow()) return 'new';
+  if (c.group) return c.view === 'all' ? 'all' : 'new';
+  return lsGet(CARDVIEW_KEY) === 'all' ? 'all' : 'new';
+}
+const cardViewMine = c => !simpleNow() && (!c.group || c.by === me().id); // 切りかえを出すのは、自分で決められる人だけ
+function setCardView(c, v) {
+  v = v === 'all' ? 'all' : 'new';
+  if (c.group && c.by === me().id) commit(v === 'all' ? '地図に、試し済みの家も薄く出します（みんなの画面も）' : '地図に、まだの時間帯の家だけ出します（みんなの画面も）', () => { c.view = v; });
+  else { lsSet(CARDVIEW_KEY, v); renderHouses(); }
+}
+let CST_MEMO = null;
+function cardStates(c) {
+  const cur = slotOf(new Date()), view = cardView(c), mid = me().id;
+  const key = [c.id, D().visits.length, cur, view, mid, c.mode || '', JSON.stringify(c.parts || '')].join('|');
+  if (CST_MEMO && CST_MEMO.key === key && CST_MEMO.src === D().visits) return CST_MEMO.r;
+  // 控えのない古いカードは、これまでどおり（上限・間隔では外さない）。今の時間帯の判定だけ使う
+  const rl = c.rl || { cap: 15, gap: 0, nr: 1, sc: 0 }, now = Date.now();
+  const items = new Map();
+  (unmetIndex(c.terrId, rl).get(c.terrId) || []).forEach(x => items.set(x.k, x));
+  const share = !!c.group && c.mode !== 'split';
+  const map = new Map(), r = { map, cur, view, hl: 0, tried: 0, done: 0 };
+  for (const k of c.keys) {
+    if (D().dnc[k]) { map.set(k, 'refuse'); continue; }
+    if (!cardKeyMine(c, k)) { map.set(k, 'dim'); continue; } // 分けたとき：自分の範囲の外
+    if (visitedSince(k, c.at)) { // 緑のチェックは残す。シェアでは、ほかの人が記録した家を薄くする
+      r.done++;
+      map.set(k, share && visitsOf(k).some(v => v.at >= c.at && v.by !== mid) ? 'done fade' : 'done');
+      continue;
+    }
+    const x = items.get(k);
+    if (!x || x.awayN >= rl.cap || (rl.gap && now - Date.parse(x.lastAt) < rl.gap * DAY)) { map.set(k, 'dim'); continue; } // いつも外す家
+    const triedNow = rl.nr && hasSlot(x.tried, cur) && !(x.tried === FULL_SLOTS && x.oldSlot === cur);
+    if (triedNow) { r.tried++; map.set(k, view === 'all' ? 'hl fade' : 'dim'); } else { r.hl++; map.set(k, 'hl'); }
+  }
+  CST_MEMO = { key, src: D().visits, r };
+  return r;
+}
+const cardKeyMine = () => true; // グループで「分ける」を選んだカードは、機能Cで自分の範囲だけにする
+
 /* 家ごとの表示を返す関数（目立たせていないときは null） */
 function focusFn() {
   roundNums = null;
   const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
   if (focusCard && !c) focusCard = null;
   if (c) {
-    const set = new Set(c.keys);
-    return k => (set.has(k) ? (visitedSince(k, c.at) ? 'done' : 'hl') : (D().dnc[k] ? 'refuse' : 'dim'));
+    const r = cardStates(c);
+    return k => r.map.get(k) || (D().dnc[k] ? 'refuse' : 'dim');
   }
   const r = roundTerr ? roundInfo(roundTerr) : null;
   if (roundTerr && !r) roundTerr = null;
@@ -9010,13 +9068,25 @@ function renderCardBar() {
   const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
   if (focusCard && !c) focusCard = null;
   $('#legendBtn').classList.toggle('hasbar', !!(c && barHidden));
+  const cvEl = $('#cardView');
+  if (cvEl) { // 地図の上の、小さな切りかえ（まだの時間帯だけ ⇄ すべて）。簡単モードと、グループの参加者には出さない
+    const show = !!c && cardViewMine(c);
+    cvEl.hidden = !show;
+    if (show) {
+      const cv = cardView(c);
+      cvEl.innerHTML = `<div class="seg uiseg" role="group" aria-label="地図の表示（まだの時間帯だけ・すべて）"><button type="button" data-cview="new" aria-pressed="${cv === 'new'}">まだの時間帯だけ</button><button type="button" data-cview="all" aria-pressed="${cv === 'all'}">すべて</button></div>`;
+      $$('[data-cview]', cvEl).forEach(b => { b.onclick = () => setCardView(c, b.dataset.cview); });
+    }
+  }
   if (!c || barHidden) { bar.hidden = true; }
   else {
     const t = terrById(c.terrId), p = cardProgress(c);
     const key = (cls, mark, label) => `<span><i class="pin mini st-plain${cls}">${mark}</i>${label}</span>`;
+    const r = cardStates(c), cv = cardView(c);
     bar.hidden = false; bar.classList.remove('mini');
     bar.innerHTML = `<p><b>留守宅カード　区域${t ? esc(t.no) : '-'}</b>　${slotText(c.slot)}に訪ねてください</p>
-      <p class="keys">${key(' hl', '', `まだ訪ねていない家 ${p.total - p.done}`)}${key(' done', '<u>✓</u>', `訪ねた家 ${p.done}`)}</p>
+      <p class="keys">${key(' hl', '', `今（${slotShort(r.cur)}）まだの家 ${r.hl}`)}${key(' done', '<u>✓</u>', `訪ねた家 ${p.done}`)}</p>
+      ${r.tried ? `<p class="muted">${slotShort(r.cur)}は試し済みの家 ${r.tried}軒は、${cv === 'all' ? '薄く出しています' : 'かくしています'}</p>` : ''}
       ${p.total && p.done === p.total ? '<p class="okmsg"><b>すべて訪ねました。</b>「区域カード」画面で「終える」を押してください。</p>' : ''}
       <div class="row"><button class="btn small" id="cardBarClose">表示を戻す</button></div>`;
     $('#cardBarClose').onclick = () => { focusCard = null; roundTerr = null; renderTerrs(); renderHouses(); };
