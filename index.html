@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.1"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.2"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3545,6 +3545,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.2', items: [
+    ['分', 'グループの留守宅カードで、「分ける」「シェア」を選べるようになりました']
+  ] },
   { v: '2026.13.1', items: [
     ['時', '留守宅カードの地図に、「まだの時間帯だけ」「すべて」の切りかえがつきました']
   ] },
@@ -4262,8 +4265,12 @@ function recentOtherHtml(k) {
   const v = sum(k).last;
   if (!v || v.by === me().id) return '';
   const min = Math.floor((Date.now() - Date.parse(v.at)) / 60000);
-  if (min < 0 || min >= 60) return '';
-  return `<div class="notice warn"><b>${min < 1 ? 'たった今' : `${min}分前に`}、ほかの人が記録しています（${RESULT_LABEL[v.result]}）。</b><br>同じ家を続けて訪ねていないか確認してください。</div>`;
+  // グループの留守宅カードの家は、同じ日に同じ家を2回訪ねないよう、今日の記録なら時間がたっていても知らせる
+  const grp = activeCards().some(c => c.group && c.keys.includes(k) && (c.by === me().id || isCardHelper(c)));
+  const lim = grp ? Math.max(60, Math.floor((Date.now() - Date.parse(todayIso())) / 60000)) : 60;
+  if (min < 0 || min >= lim) return '';
+  const ago = min < 1 ? 'たった今' : min < 60 ? `${min}分前に` : `${Math.floor(min / 60)}時間前に`;
+  return `<div class="notice warn"><b>${ago}、ほかの人が記録しています（${RESULT_LABEL[v.result]}）。</b><br>${grp ? '同じ日に、同じ家を2回訪ねないようにしてください。' : '同じ家を続けて訪ねていないか確認してください。'}</div>`;
 }
 function openHelpers(tid, cid) {
   // cid があるときは、グループで回る留守宅カード（c.helpers）の「今日回る人」
@@ -4462,6 +4469,18 @@ function renderTerrs() {
     partsOf(t).forEach(p => {
       if (!hold && (!mp || p.id !== mp.id)) return;
       if (!okPoly(p.poly)) return;
+      const own = mp && p.id === mp.id;
+      L.polygon(p.poly, { color: own ? '#00796B' : '#C2410C', weight: 4, dashArray: own ? null : '8 6',
+        fillColor: own ? '#00796B' : '#C2410C', fillOpacity: own ? 0.08 : 0.05, interactive: false }).addTo(terrLayer);
+      L.marker(center(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
+    });
+  }
+  // グループの留守宅カードで分けた範囲（カードを持つ人には全部、わたされた人には自分の範囲だけ）
+  const fc = focusCard ? activeCards().find(x => x.id === focusCard) : null;
+  if (fc && fc.group && fc.mode === 'split') {
+    const mp = myPart(fc), hold = fc.by === me().id;
+    partsOf(fc).forEach(p => {
+      if ((!hold && (!mp || p.id !== mp.id)) || !okPoly(p.poly)) return;
       const own = mp && p.id === mp.id;
       L.polygon(p.poly, { color: own ? '#00796B' : '#C2410C', weight: 4, dashArray: own ? null : '8 6',
         fillColor: own ? '#00796B' : '#C2410C', fillOpacity: own ? 0.08 : 0.05, interactive: false }).addTo(terrLayer);
@@ -4819,6 +4838,19 @@ function startPartSplit(tid) {
   renderPartDraw();
   toast('地図をタップして、わたす範囲を囲んでください');
 }
+/* グループの留守宅カードで、地図に線を引いて範囲を分ける（カードを持つ人だけ。分けた範囲は今日の終わりまで） */
+function startCardSplit(cid) {
+  const c = D().awayCards.find(x => x.id === cid);
+  if (!c || !c.group || c.by !== me().id || c.endedAt) { toast('このカードを持つ人だけが分けられます'); return; }
+  if (c.mode !== 'split') { toast('「分ける」を選ぶと、範囲を分けられます'); return; }
+  openAwayCard(cid);
+  partDraw = { tid: c.terrId, cid, pts: [], tool: lsGet('kuiki_parttool') === 'pen' ? 'pen' : 'tap' };
+  setMode('part');
+  setPartTool(partDraw.tool);
+  renderPartDraw();
+  toast('地図をタップして、わたす範囲を囲んでください');
+}
+const partObj = pd => (pd.cid ? D().awayCards.find(x => x.id === pd.cid) : terrById(pd.tid)); // 分ける相手：区域、またはグループの留守宅カード
 function endPartSplit() {
   penOff();
   partDraw = null;
@@ -4917,27 +4949,28 @@ function updatePartBar() {
   } else el.textContent = n === 0 ? '地図をタップして、範囲を囲みます'
     : n < 3 ? `あと${3 - n}か所タップすると、範囲になります（今 ${n}か所）`
       : `${n}か所で囲んでいます。「この範囲をわたす」を押してください`;
-  const t = partDraw ? terrById(partDraw.tid) : null;
-  const ps = t ? partsOf(t) : [];
+  const po = partDraw ? partObj(partDraw) : null;
+  const ps = po ? partsOf(po) : [];
   $('#partList').textContent = ps.length ? `今日わたした範囲：${ps.map(p => partName(p)).join(' ／ ')}` : '';
   const lb = $('#partListBtn'); if (lb) lb.hidden = !ps.length;
 }
 /* だれにわたすかをえらぶ */
 function openPartAssign() {
   if (!partDraw || partDraw.pts.length < 3) { toast('地図を3か所以上タップして、範囲を囲んでください'); return; }
-  const t = terrById(partDraw.tid); if (!t) return;
+  const t = terrById(partDraw.tid), po = partObj(partDraw); if (!t || !po) return;
   const poly = partDraw.pts.slice();
   const taken = new Set();
-  partsOf(t).forEach(p => (p.uids || []).forEach(u => taken.add(u)));
-  const gm = t.group ? groupMembers(t.group).filter(u => u.id !== me().id) : [];
+  partsOf(po).forEach(p => (p.uids || []).forEach(u => taken.add(u)));
+  const gm = po.group ? groupMembers(po.group).filter(u => u.id !== me().id) : [];
   const others = D().users.filter(u => !u.inactive && u.id !== me().id && !gm.some(g => g.id === u.id));
   const row = u => `<label class="check${taken.has(u.id) ? ' dimmed' : ''}" data-name="${esc(u.name)}"><input type="checkbox" data-pu="${u.id}">${esc(u.name)}${taken.has(u.id) ? '<span class="muted">（ほかの範囲に入っています）</span>' : ''}</label>`;
-  const n = housesOf(t.id).reduce((a, h) => a + (inPoly(h.lat, h.lng, poly) ? targets(h).length : 0), 0);
+  const n = partDraw.cid ? po.keys.filter(k => { const h = houseById(parseKey(k)[0]); return h && inPoly(h.lat, h.lng, poly); }).length
+    : housesOf(t.id).reduce((a, h) => a + (inPoly(h.lat, h.lng, poly) ? targets(h).length : 0), 0);
   setSheet(headHtml(t, 'この範囲をわたす人', `家・部屋 ${n}か所　今日の終わりまで`) + `
     <p class="hint">ふつうは2人1組です。えらんだ人の画面に、この範囲が今日だけ出ます。</p>
     <label class="field"><span>名前でさがす</span><input type="text" id="puQ" placeholder="名前の一部を入れる" autocomplete="off"></label>
     <div id="puList">
-      ${gm.length ? `<div class="hgrp"><b>${esc(t.group)}グループ</b></div>${gm.map(row).join('')}` : ''}
+      ${gm.length ? `<div class="hgrp"><b>${esc(po.group)}グループ</b></div>${gm.map(row).join('')}` : ''}
       ${others.length ? `<div class="hgrp"><b>ほかの人</b></div>${others.map(row).join('')}` : ''}
     </div>
     <button class="btn primary block" id="puSave">この範囲をわたす</button>
@@ -4953,14 +4986,14 @@ function openPartAssign() {
     const now = new Date().toISOString(), until = endOfToday();
     closeSheet();
     commit(`${uids.map(u => uname(u)).join('・')}さんに範囲をわたしました（今日まで）`, () => {
-      const t2 = terrById(partDraw.tid);
+      const t2 = partObj(partDraw);
       // 同じ人が前の範囲にも入っていたら、そちらからは外す（人がいなくなった範囲は消す）
       const rest = partsOf(t2)
         .map(x => Object.assign({}, x, { uids: (x.uids || []).filter(u => !uids.includes(u)) }))
         .filter(x => x.uids.length);
       t2.parts = rest.concat([{ id: 'p' + uid(), poly, uids, by: me().id, at: now, until }]);
       // 記録できるように「今日回る人」にも入れる
-      const cur = helpersOf(t2), have = new Set(cur.map(h => h.uid));
+      const cur = partDraw.cid ? cardHelpers(t2) : helpersOf(t2), have = new Set(cur.map(h => h.uid));
       t2.helpers = cur.concat(uids.filter(u => !have.has(u)).map(u => ({ uid: u, until, by: me().id, at: now })));
     });
     partDraw.pts = [];
@@ -4969,23 +5002,23 @@ function openPartAssign() {
   };
 }
 /* わたした範囲をやめる */
-function openPartList(tid) {
-  const t = terrById(tid); if (!t) return;
+function openPartList(tid, cid) {
+  const t0 = terrById(tid), t = cid ? D().awayCards.find(x => x.id === cid) : t0; if (!t0 || !t) return;
   const ps = partsOf(t);
-  setSheet(headHtml(t, '今日わたした範囲', `${ps.length}件　今日の終わりまで`) + `
+  setSheet(headHtml(t0, '今日わたした範囲', `${ps.length}件　今日の終わりまで`) + `
     ${ps.length ? ps.map(p => `<div class="setrow"><b>${esc(partName(p))}</b>
       <button class="btn small danger" data-pdel="${p.id}">取り消す</button></div>`).join('')
       : '<div class="empty">まだありません。</div>'}
-    <button class="btn primary block" id="plAdd">${partDraw && partDraw.tid === tid ? '地図にもどって続けて分ける' : '＋ 地図で範囲を分ける'}</button>
+    <button class="btn primary block" id="plAdd">${partDraw && partDraw.tid === tid && partDraw.cid === cid ? '地図にもどって続けて分ける' : '＋ 地図で範囲を分ける'}</button>
     <button class="btn block" data-close>閉じる</button>`);
   $$('[data-pdel]', $('#sheet')).forEach(b => b.onclick = async () => {
     const id = b.dataset.pdel, p = partsOf(t).find(x => x.id === id);
     if (!p || !await ask(`${partName(p)}の範囲を取り消します。よろしいですか？`)) return;
     commit('範囲を取り消しました', () => { t.parts = partsOf(t).filter(x => x.id !== id); });
     if (partDraw) { renderPartDraw(); renderTerrs(); renderHouses(); }
-    openPartList(tid);
+    openPartList(tid, cid);
   });
-  $('#plAdd').onclick = () => { closeSheet(); if (!partDraw || partDraw.tid !== tid) startPartSplit(tid); };
+  $('#plAdd').onclick = () => { closeSheet(); if (!partDraw || partDraw.tid !== tid || partDraw.cid !== cid) { if (cid) startCardSplit(cid); else startPartSplit(tid); } };
 }
 /* ---------- 家・部屋の記録 ---------- */
 function openTarget(hid, unit, fromBuilding, review) {
@@ -8628,7 +8661,7 @@ const activeCards = () => { const now = Date.now(); return D().awayCards.filter(
 const cardHelpers = c => { if (!c || !c.group || D().settings.groupOn === 0) return []; const now = Date.now(); return (c.helpers || []).filter(h => Date.parse(h.until) > now); };
 const isCardHelper = c => cardHelpers(c).some(h => h.uid === me().id);
 const myAwayCount = g => activeCards().filter(c => c.by === me().id && !!c.group === !!g).length; // 個人とグループは別々に数える
-let awayGroupSlot = null;
+let awayGroupSlot = null, awayGroupMode = 'share'; // グループの留守宅カードの回り方：'share'（シェア）／'split'（分ける）
 /* グループの次の集まり（2週間以内）の時間帯。なければ今の時間帯 */
 function nextGroupSlot() {
   const now = Date.now(), g = myGroup();
@@ -8764,7 +8797,7 @@ function takeAwayCard(tid, slot, grp) {
   const now = new Date();
   const card = { id: 'c' + uid(), terrId: tid, slot, by: me().id, at: now.toISOString(),
     expiresAt: awayExpiry(t, now.getTime()), keys, rl };
-  if (G) { card.group = myGroup(); card.helpers = []; }
+  if (G) { card.group = myGroup(); card.helpers = []; card.mode = awayGroupMode === 'split' ? 'split' : 'share'; card.view = 'new'; card.parts = []; }
   commit(`${G ? 'グループの' : ''}留守宅カード（区域${t.no}・${slotShort(slot)}）を受け取りました`, () => { D().awayCards.push(card); });
   if (G) openHelpers(null, card.id); // グループのカードは、続けて「今日回る人」をえらぶ
   else openAwayCard(card.id);
@@ -8990,11 +9023,11 @@ function cardStates(c) {
   const rl = c.rl || { cap: 15, gap: 0, nr: 1, sc: 0 }, now = Date.now();
   const items = new Map();
   (unmetIndex(c.terrId, rl).get(c.terrId) || []).forEach(x => items.set(x.k, x));
-  const share = !!c.group && c.mode !== 'split';
-  const map = new Map(), r = { map, cur, view, hl: 0, tried: 0, done: 0 };
+  const share = !!c.group && c.mode !== 'split', mine = cardMineSet(c);
+  const map = new Map(), r = { map, cur, view, hl: 0, tried: 0, done: 0, wait: !!mine && !mine.size };
   for (const k of c.keys) {
     if (D().dnc[k]) { map.set(k, 'refuse'); continue; }
-    if (!cardKeyMine(c, k)) { map.set(k, 'dim'); continue; } // 分けたとき：自分の範囲の外
+    if (mine && !mine.has(k)) { map.set(k, 'dim'); continue; } // 分けたとき：自分の範囲の外
     if (visitedSince(k, c.at)) { // 緑のチェックは残す。シェアでは、ほかの人が記録した家を薄くする
       r.done++;
       map.set(k, share && visitsOf(k).some(v => v.at >= c.at && v.by !== mid) ? 'done fade' : 'done');
@@ -9008,7 +9041,26 @@ function cardStates(c) {
   CST_MEMO = { key, src: D().visits, r };
   return r;
 }
-const cardKeyMine = () => true; // グループで「分ける」を選んだカードは、機能Cで自分の範囲だけにする
+/* グループで「分ける」を選んだカード：わたされた人の画面には、自分の範囲の家だけを出す（null＝制限なし）。
+   カードを持つ人（司会者）は、自分の範囲がなければ全部見える。範囲をわたされていない参加者には、まだ何も出さない */
+function cardMineSet(c) {
+  if (!c.group || c.mode !== 'split') return null;
+  const mp = myPart(c);
+  if (mp && okPoly(mp.poly)) {
+    const set = new Set();
+    c.keys.forEach(k => { const h = houseById(parseKey(k)[0]); if (h && inPoly(h.lat, h.lng, mp.poly)) set.add(k); });
+    return set;
+  }
+  return c.by === me().id ? null : new Set();
+}
+/* グループの留守宅カードの「分ける」「シェア」を切りかえる（カードを持つ人だけ） */
+function setCardMode(cid, mode) {
+  const c = D().awayCards.find(x => x.id === cid);
+  if (!c || !c.group || c.by !== me().id || c.endedAt) return;
+  mode = mode === 'split' ? 'split' : 'share';
+  if ((c.mode || 'share') === mode) return;
+  commit(mode === 'split' ? '「分ける」にしました。地図で範囲を分けてください' : '「シェア」にしました。全員が同じ家の一覧を見ます', () => { c.mode = mode; if (mode === 'share') c.parts = []; });
+}
 
 /* 家ごとの表示を返す関数（目立たせていないときは null） */
 function focusFn() {
@@ -9086,6 +9138,7 @@ function renderCardBar() {
     bar.hidden = false; bar.classList.remove('mini');
     bar.innerHTML = `<p><b>留守宅カード　区域${t ? esc(t.no) : '-'}</b>　${slotText(c.slot)}に訪ねてください</p>
       <p class="keys">${key(' hl', '', `今（${slotShort(r.cur)}）まだの家 ${r.hl}`)}${key(' done', '<u>✓</u>', `訪ねた家 ${p.done}`)}</p>
+      ${r.wait ? '<p class="hint-strong">司会者から範囲をわたされるまで、家は出ません。</p>' : ''}
       ${r.tried ? `<p class="muted">${slotShort(r.cur)}は試し済みの家 ${r.tried}軒は、${cv === 'all' ? '薄く出しています' : 'かくしています'}</p>` : ''}
       ${p.total && p.done === p.total ? '<p class="okmsg"><b>すべて訪ねました。</b>「区域カード」画面で「終える」を押してください。</p>' : ''}
       <div class="row"><button class="btn small" id="cardBarClose">表示を戻す</button></div>`;
@@ -9129,8 +9182,11 @@ function awayCardHtml(c, kind) {
       <p class="muted">訪ねた家 ${p.done} / ${p.total}　あと${left}日で自動的に終わります</p>
       ${poolLineHtml(c)}
       ${p.total && p.done === p.total ? `<p><b>すべて訪ねました。${kind === 'help' ? '' : '「終える」を押してください。'}</b></p>` : ''}
-      ${kind === 'gown' && hs.length ? `<p class="muted"><b>今日回る人（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : ''}</div>
-    ${kind === 'help' ? '' : `<div class="actions">${kind === 'gown' && D().settings.groupOn !== 0 ? `<button class="btn" data-chelpers="${c.id}">今日回る人をえらぶ</button>` : ''}<button class="btn" data-awayend="${c.id}">返却する</button></div>`}
+      ${kind === 'gown' && hs.length ? `<p class="muted"><b>今日回る人（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : ''}
+      ${kind === 'gown' && c.group ? `<div class="seg" role="group" aria-label="回り方（分ける・シェア）"><button type="button" data-cmode="share" data-cid="${c.id}" aria-pressed="${c.mode !== 'split'}">シェア</button><button type="button" data-cmode="split" data-cid="${c.id}" aria-pressed="${c.mode === 'split'}">分ける</button></div>
+        <p class="hint">${c.mode === 'split' ? '分ける：地図に線を引いて、人ごとに範囲を分けます。' : 'シェア：全員が同じ家の一覧を見ます。'}</p>
+        ${c.mode === 'split' && partsOf(c).length ? `<p class="muted"><b>今日わたした範囲：</b>${partsOf(c).map(x => esc(partName(x))).join(' ／ ')}</p>` : ''}` : ''}</div>
+    ${kind === 'help' ? '' : `<div class="actions">${kind === 'gown' && D().settings.groupOn !== 0 ? `<button class="btn" data-chelpers="${c.id}">今日回る人をえらぶ</button>${c.mode === 'split' ? `<button class="btn primary" data-cparts="${c.id}">回る範囲を分ける</button>` : ''}` : ''}<button class="btn" data-awayend="${c.id}">返却する</button></div>`}
   </article>`;
 }
 function renderMyAwayCards() {
@@ -9166,7 +9222,10 @@ function openAwayPick(grp) {
     setSheet(headHtml(null, G ? `${esc(myGroup())}グループで回る留守宅カード` : '留守宅カードをえらぶ',
         G ? `持てるのは${D().settings.awayMax}枚まで（今 ${myAwayCount(true)}枚）` : reg ? `行ける時間：${slots.map(slotShort).join('、')}` : `今の時間帯：${slotShort(cur)}`) + `
       ${G ? `<div class="seg" role="group" aria-label="もらうカード"><button type="button" data-gterr aria-pressed="false">区域カード</button><button type="button" aria-pressed="true">留守宅カード</button></div>
-        <label class="field"><span>集まりの時間帯</span><select id="apGSlot">${SLOTS.map(x => `<option value="${x}"${x === awayGroupSlot ? ' selected' : ''}>${slotText(x)}</option>`).join('')}</select></label>` : ''}
+        <label class="field"><span>集まりの時間帯</span><select id="apGSlot">${SLOTS.map(x => `<option value="${x}"${x === awayGroupSlot ? ' selected' : ''}>${slotText(x)}</option>`).join('')}</select></label>
+        <p class="q">回り方</p>
+        <div class="seg" role="group" aria-label="回り方（分ける・シェア）"><button type="button" data-gmode="share" aria-pressed="${awayGroupMode !== 'split'}">シェア</button><button type="button" data-gmode="split" aria-pressed="${awayGroupMode === 'split'}">分ける</button></div>
+        <p class="hint">${awayGroupMode === 'split' ? '分ける：受け取ったあと、地図に線を引いて人ごとに範囲を分けます。各自の画面には、わたされた範囲の家だけが出ます。' : 'シェア：全員が同じ家の一覧を見ます。だれかが記録した家は、みんなの画面で薄くなります。'}</p>` : ''}
       <div class="seg uiseg" role="group" aria-label="並び順">
         ${[['easy', '会いやすい順'], ['near', '近い順'], ['long', '長く会えていない順'], ['many', '家が多い順'], ['now', '今の時間帯']].filter(([v]) => !G || v !== 'now').map(([v, l]) =>
           `<button type="button" data-asort="${v}" aria-pressed="${sort === v}">${l}</button>`).join('')}
@@ -9186,6 +9245,7 @@ function openAwayPick(grp) {
     $$('[data-asort]', S).forEach(b => b.onclick = () => { lsSet(key, b.dataset.asort); paint(); });
     if ($('#apSlots')) $('#apSlots').onclick = openSlotSheet;
     if ($('#apGSlot')) $('#apGSlot').onchange = e => { awayGroupSlot = e.target.value; paint(); };
+    $$('[data-gmode]', S).forEach(b => b.onclick = () => { awayGroupMode = b.dataset.gmode === 'split' ? 'split' : 'share'; paint(); });
     if ($('[data-gterr]', S)) $('[data-gterr]', S).onclick = () => openRequestSheet(true);
     $$('[data-awaytake2]', S).forEach(b => b.onclick = () => { closeSheet(); takeAwayCard(b.dataset.awaytake2, b.dataset.slot, G); });
   };
@@ -13448,6 +13508,8 @@ function bindStatic() {
     else if (q('[data-awaypick]')) openAwayPick();
     else if (q('[data-gawaypick]')) openAwayPick(true);
     else if ((x = q('[data-chelpers]'))) openHelpers(null, x.dataset.chelpers);
+    else if ((x = q('[data-cmode]'))) setCardMode(x.dataset.cid, x.dataset.cmode);
+    else if ((x = q('[data-cparts]'))) startCardSplit(x.dataset.cparts);
     else if (q('[data-homeadd]')) openHomeGuide();
     else if (q('[data-homeoff]')) { lsSet(HOME_OFF, '1'); renderCards(); toast('「ホーム画面に追加する方法」は、いつでも下の「このスマホの操作」から開けます'); }
     else if ((x = q('[data-dguide]'))) openDummyGuide(x.dataset.dguide);
@@ -13493,7 +13555,7 @@ function bindStatic() {
   $$('#partBar [data-parttool]').forEach(b => b.onclick = () => setPartTool(b.dataset.parttool));
   $('#partDone').onclick = openPartAssign;
   $('#partCancel').onclick = endPartSplit;
-  $('#partListBtn').onclick = () => { if (partDraw) openPartList(partDraw.tid); };
+  $('#partListBtn').onclick = () => { if (partDraw) openPartList(partDraw.tid, partDraw.cid); };
   $$('#addBar [data-addmode]').forEach(b => b.onclick = () => {
     if (b.dataset.addmode === 'del' && simpleBlock('家を消すことは')) return;
     addMode = b.dataset.addmode; closeSheet(); updateAddBar();

@@ -2966,5 +2966,20 @@ window.KUIKI_I18N.es = {
 "{0}は試し済みの家 {1}軒は、かくしています": "Las {1} casas ya probadas en {0} están ocultas",
 "地図に、試し済みの家も薄く出します（みんなの画面も）": "El mapa mostrará atenuadas también las casas ya probadas (en la pantalla de todos)",
 "地図に、まだの時間帯の家だけ出します（みんなの画面も）": "El mapa mostrará solo las casas con franja pendiente (en la pantalla de todos)",
-"留守宅カードの地図に、「まだの時間帯だけ」「すべて」の切りかえがつきました": "El mapa de la tarjeta de ausentes ahora permite cambiar entre «Solo franjas pendientes» y «Todas»"
+"留守宅カードの地図に、「まだの時間帯だけ」「すべて」の切りかえがつきました": "El mapa de la tarjeta de ausentes ahora permite cambiar entre «Solo franjas pendientes» y «Todas»",
+"回り方": "Modalidad",
+"回り方（分ける・シェア）": "Modalidad (dividir / compartir)",
+"シェア": "Compartir",
+"分ける": "Dividir",
+"分ける：受け取ったあと、地図に線を引いて人ごとに範囲を分けます。各自の画面には、わたされた範囲の家だけが出ます。": "Dividir: después de recibirla, trace líneas en el mapa para repartir zonas entre las personas. En la pantalla de cada uno solo aparecen las casas de su zona.",
+"シェア：全員が同じ家の一覧を見ます。だれかが記録した家は、みんなの画面で薄くなります。": "Compartir: todos ven la misma lista de casas. Las casas anotadas por alguien se ven atenuadas en la pantalla de todos.",
+"分ける：地図に線を引いて、人ごとに範囲を分けます。": "Dividir: trace líneas en el mapa para repartir zonas entre las personas.",
+"シェア：全員が同じ家の一覧を見ます。": "Compartir: todos ven la misma lista de casas.",
+"「分ける」にしました。地図で範囲を分けてください": "Modo «Dividir». Reparta las zonas en el mapa.",
+"「シェア」にしました。全員が同じ家の一覧を見ます": "Modo «Compartir». Todos ven la misma lista de casas.",
+"このカードを持つ人だけが分けられます": "Solo quien tiene esta tarjeta puede dividirla",
+"「分ける」を選ぶと、範囲を分けられます": "Si elige «Dividir», podrá repartir zonas",
+"司会者から範囲をわたされるまで、家は出ません。": "No aparecerán casas hasta que el conductor le asigne una zona.",
+"同じ日に、同じ家を2回訪ねないようにしてください。": "Procure no visitar la misma casa dos veces el mismo día.",
+"グループの留守宅カードで、「分ける」「シェア」を選べるようになりました": "En la tarjeta de ausentes del grupo ahora puede elegir «Dividir» o «Compartir»"
 };
