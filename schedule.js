@@ -1328,7 +1328,7 @@
       closeSheet();
       commit(`区域${t.no}を${uname(v)}さんに貸し出しました`, () => {
         t.holder = v; t.lentAt = new Date().toISOString();
-        t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
+        t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
       });
     });
   }
@@ -2127,7 +2127,7 @@ body.duemode .terr-label:not(.duelab){display:none}
         const now = new Date().toISOString();
         recordHandover(t, now); // 前の担当者の行を S-13 に残す
         t.holder = v; t.lentAt = now;
-        t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
+        t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
       });
     });
     on('[data-kgrp]', 'onchange', e => {
@@ -2275,7 +2275,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     if (!wait.length && !auto.length && !old.length) return '';
     const rows = [];
     wait.slice(0, 20).forEach(([r, t]) => {
-      const pct = coverAt(t, r.lentAt || '', r.firstAt || r.at);
+      const pct = coverAt(t, lowFrom(r), r.firstAt || r.at);
       rows.push(`<li><span>区域${esc(t.no)}　返却 ${esc(fmtDay(r.at))}　記録 ${pct}%（目安${th}%）<br><small class="muted">${esc(fmtDay(new Date(Date.parse(r.at) + waitMs).toISOString()))}に確かめます</small></span>
         <span class="duebtns"><button type="button" class="btn small" data-lowconfirm="${esc(r.id)}">正式返却で確定</button> <button type="button" class="btn small" data-lownow="${esc(r.id)}">今すぐ途中にする</button></span></li>`);
     });
@@ -2288,10 +2288,10 @@ body.duemode .terr-label:not(.duelab){display:none}
     });
     const n = wait.length + auto.length;
     const oldHtml = old.length ? `<details class="dueset"><summary>以前の返却で、記録が目安に届いていないもの（自動では変えません・${old.length}件）</summary>
-      <p class="hint">この機能より前に正式返却にした区域です。紙で回った区域も出ますが、押さなければ何も変わりません。</p>
+      <p class="hint">自動で確かめる対象にならなかった正式返却です（もう自由に受け取れる区域・紙の記録で回り終えた区域・自動受け取りを使っていないときなど）。押さなければ何も変わりません。</p>
       <ul class="opsh">${old.slice(0, 20).map(t => `<li><span>区域${esc(t.no)}　正式返却 ${esc(fmtDay(t.completedAt))}（${Math.round(t.completedPct)}%）</span><span class="duebtns"><button type="button" class="btn small" data-lowold="${esc(t.id)}">途中の返却にする</button></span></li>`).join('')}</ul></details>` : '';
     return `<details class="dueset lownote"><summary>記録の少ない返却（自動で確かめます${n ? `・${n}件` : ''}）</summary>
-      <p class="hint">区域係が目安（${th}%）に届かないまま正式返却にした区域です。${lowWaitDays()}日たつと、記録を数え直し、届いていなければ自動で途中の返却にします。何もしなくてかまいません。</p>
+      <p class="hint">区域係が目安（${th}%）に届かないまま正式返却にした区域と、以前に記録が少ないまま正式返却になった区域です。${lowWaitDays()}日たつと、記録を数え直し、届いていなければ自動で途中の返却にします（すぐ受け取れるようになります）。何もしなくてかまいません。</p>
       ${rows.length ? `<ul class="opsh lowlist">${rows.join('')}</ul>` : ''}${oldHtml}</details>`;
   }
   /* ほかの区域係が、最近（24時間）対応したこと */
@@ -2341,7 +2341,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       if (t.holder) { toast(`区域${t.no}は、${uname(t.holder)}さんがすでに持っています。ほかの区域をえらんでください`); renderAll(); return; }
       commit(`区域${t.no}を${uname(r.by)}さんに貸し出しました`, () => {
         const now = new Date().toISOString();
-        t.holder = r.by; t.lentAt = now; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
+        t.holder = r.by; t.lentAt = now; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
         t.group = r.forGroup || null;
         Object.assign(r, { status: 'approved', terrId: t.id, decidedAt: now, decidedBy: me().id, seen: false });
       });
@@ -2435,7 +2435,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       closeSheet();
       commit(`区域${t.no}を${uname(v)}さんに${g ? `（${g}グループの区域として）` : ''}貸し出しました`, () => {
         t.holder = v; t.lentAt = new Date().toISOString();
-        t.helpers = []; t.group = g; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
+        t.helpers = []; t.group = g; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
       });
     });
   }

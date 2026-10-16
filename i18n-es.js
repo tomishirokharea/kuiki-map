@@ -3050,5 +3050,7 @@ window.KUIKI_I18N.es = {
 "途中の返却にする": "Pasar a devolución parcial",
 "正式に返却した日 {0}（記録が少ないため{1}に確かめます）": "Devolución formal: {0} (por pocos registros se verificará el {1})",
 "返却 {0}（記録が少なく途中扱い）": "Devuelto {0} (parcial por pocos registros)",
+"区域係が目安（{0}%）に届かないまま正式返却にした区域と、以前に記録が少ないまま正式返却になった区域です。{1}日たつと、記録を数え直し、届いていなければ自動で途中の返却にします（すぐ受け取れるようになります）。何もしなくてかまいません。": "Territorios que el encargado devolvió formalmente sin llegar al porcentaje indicado ({0}%) y territorios que antes quedaron con devolución formal con pocos registros. Pasados {1} días, se vuelven a contar los registros y, si no llegan, pasan solos a devolución parcial (se pueden tomar enseguida). No tiene que hacer nada.",
+"自動で確かめる対象にならなかった正式返却です（もう自由に受け取れる区域・紙の記録で回り終えた区域・自動受け取りを使っていないときなど）。押さなければ何も変わりません。": "Devoluciones formales que no entran en la verificación automática (territorios que ya se pueden tomar libremente, territorios terminados en papel, o cuando no se usa la entrega automática, etc.). Si no toca nada, no cambia nada.",
 "{0}{1}月{2}日": "{0}{2}/{1}"
 };

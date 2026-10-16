@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.6"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.7"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -8719,19 +8719,70 @@ function coverAt(t, since, until) {
 /* 区域係のスマホが開いたときに、記録の少ない正式返却を確かめる（finalizePools と同じ間引き）。
    待つ日数のあとに数え直し、届いていれば正式返却のまま、届いていなければ自動で途中の返却に切りかえる */
 let lowBusy = false;
+/* 返却の記録の「回りはじめた日」：受け取った日。印のない古い返却に足した記録（syn）は from に入れる（S-13 の行を作らないため lentAt は空） */
+const lowFrom = r => (r && (r.lentAt || r.from)) || '';
+/* 紙の記録で回り終えた日（t.paperDone・S-13 に転記した紙の記録）が、その巡回の中にあるか（あれば、紙で回り終えたとみなす） */
+function paperDoneIn(t, from, until) {
+  const lo = ymd(new Date(from ? Date.parse(from) : Date.parse(until) - lendDays() * DAY)), hi = ymd(new Date());
+  const c = [];
+  if (t.paperDone) c.push(dstr(String(t.paperDone)));
+  (D().s13 || []).forEach(x => { if (x && x.terrId === t.id && x.c) c.push(dstr(String(x.c))); });
+  return c.some(d => d && d >= lo && d <= hi);
+}
+/* 印のない正式返却（「記録の少ない返却」の機能より前の返却・係の「正式に返却したことにする」で終えた返却など）も、
+   まだ自動で受け取れる日になっていない区域だけ、同じように確かめる対象にする（2026-10-17。区域02：9月30日・0% が出てこなかった件）。
+   ・自動受け取りを使っていて、区域の貸し出しが「きまりのとおり」、正式返却から freeAfterDays 日がまだたっていない区域だけ
+     （たっていれば、もう受け取れるので変えない。S-13 の日付をむだに動かさない）
+   ・訪問記録が整理されて消えた古い返却は、数え直せないので対象にしない（keepMonths）
+   ・紙の記録で回り終えた日が、その巡回の中にある区域は対象にしない
+   ・1回目の割合が、目安から10ポイント下（サーバーの監査D5と同じ幅）に届いていない区域だけ。伝道者がふつうに返した区域を、数え方の少しの差で動かさない
+   ・返却の記録がない（古いデータ）ときは、S-13 の行を作らない記録を足して、あとで「正式返却に戻す」ができるようにする
+   返り値：[区域, 返却の記録（なければ null）, 回りはじめた日, 1回目の割合] */
+function lowAdoptList() {
+  const st = D().settings, fd = Number(st.freeAfterDays) || 0;
+  if (Number(st.autoFree) !== 1 || fd <= 0) return [];
+  const lim = Math.min(fd, Math.max(1, Number(st.keepMonths) || 12) * 30 - 7), th = Math.max(0, (Number(st.donePct) || 90) - 10), out = [];
+  for (const t of D().territories) {
+    if (t.dummy || t.holder || t.awayPoolAt || !t.completedAt || lendMode(t) !== 'auto') continue;
+    if (t.returnedAt && t.returnedAt > t.completedAt) continue;   // すでに途中の返却（すぐ受け取れる）
+    if (!(daysSince(t.completedAt) < lim)) continue;
+    const r = D().returns.find(x => x.terrId === t.id && x.completed && x.at === t.completedAt) || null;
+    if (r && (r.low || r.lowOk || r.lowAuto || r.lowSkip)) continue;
+    const from = r ? lowFrom(r) : (t.lastLentAt || '');
+    if (paperDoneIn(t, from, t.completedAt)) continue;
+    const pct = coverAt(t, from, (r && r.firstAt) || (!r && t.lastFirstAt) || t.completedAt);
+    if (pct < th) out.push([t, r, from, pct]);
+  }
+  return out;
+}
+/* 上の区域に、係が目安未満で返したときと同じ印を付ける（commit の中で呼ぶ）。印を付けた返却の記録を返す */
+function lowAdoptMark(t, r, from, pct) {
+  if (!r) {
+    r = { id: 'x' + uid(), terrId: t.id, by: null, lentAt: null, from: from || null, firstAt: t.lastFirstAt || null,
+      at: t.completedAt, completed: true, pct: t.completedPct == null ? null : t.completedPct, syn: 1 };
+    D().returns.push(r);
+  }
+  const prev = D().returns.filter(x => x.terrId === t.id && x.completed && x.at < r.at).sort((a, b) => (a.at < b.at ? -1 : 1)).pop();
+  if (r.prevAt == null) { r.prevAt = prev ? prev.at : null; r.prevPct = prev ? prev.pct : null; }
+  r.low = 1; r.p1 = pct; r.lowOld = 1;
+  return r;
+}
 function lowSweep() {
   if (!isAdmin() || lowBusy || !lowOnSet()) return;
   const wait = lowWaitDays() * DAY, now = Date.now(), th = D().settings.donePct, ok = [], flip = [], skip = [];
+  const adopt = lowAdoptList(); // 印のない正式返却のうち、まだ受け取れない・記録が少ない区域
   for (const r of D().returns) {
     if (!r.low || r.lowOk || r.lowAuto || r.lowSkip || !r.completed) continue;
     if (now - Date.parse(r.at) < wait) continue;                              // まだ待つ
     const t = terrById(r.terrId);
     if (!t) continue;
     if (t.holder || t.awayPoolAt || t.completedAt !== r.at) { skip.push(r); continue; } // あとの動きがあるので、何も変えない
-    const pct = coverAt(t, r.lentAt || '', r.firstAt || r.at);
+    const pct = coverAt(t, lowFrom(r), r.firstAt || r.at);
     (pct >= th ? ok : flip).push([r, t, pct]);
   }
-  if (!ok.length && !flip.length && !skip.length) return;
+  // 印のない返却：待つ日数がすぎていれば、そのまま途中の返却にする（まだなら印だけ付けて、確かめ待ちに出す）
+  const adoptFlip = adopt.filter(a => now - Date.parse(a[0].completedAt) >= wait);
+  if (!ok.length && !flip.length && !skip.length && !adopt.length) return;
   lowBusy = true;
   try {
     const apply = () => {
@@ -8739,8 +8790,13 @@ function lowSweep() {
       ok.forEach(([r, , pct]) => { r.lowOk = 1; r.lowAt = at; r.p1 = pct; });
       skip.forEach(r => { r.lowSkip = 1; r.lowAt = at; });
       flip.forEach(([r, t, pct]) => lowToPartial(r, t, at, pct));
+      adopt.forEach(([t, r0, from, pct]) => {
+        const r = lowAdoptMark(t, r0, from, pct);
+        if (adoptFlip.some(a => a[0] === t)) lowToPartial(r, t, at, pct);
+      });
     };
-    if (flip.length) commit(`記録が目安に届かなかった区域を、途中の返却にしました（${flip.map(x => x[1].no).join('・')}）`, apply);
+    const nos = flip.map(x => x[1].no).concat(adoptFlip.map(a => a[0].no));
+    if (nos.length) commit(`記録が目安に届かなかった区域を、途中の返却にしました（${nos.join('・')}）`, apply);
     else { apply(); Store.save(true); } // 切りかえがないときは、お知らせを出さず静かに保存
   } finally { lowBusy = false; }
 }
@@ -8755,7 +8811,7 @@ function lowToPartial(r, t, at, pct, by) {
   r.completed = false; r.lowAuto = at; if (pct != null) r.p1 = pct; if (by) r.lowBy = by;
   if (r.prevAt) { t.completedAt = r.prevAt; t.completedPct = r.prevPct; } else { delete t.completedAt; delete t.completedPct; }
   t.returnedAt = r.at;                  // 途中の返却として扱う（isPartial：returnedAt ＞ completedAt）
-  if (r.lentAt) t.lastRoundFrom = r.lentAt; else delete t.lastRoundFrom; // 「続きから」で前の人の続きを回れるように
+  if (lowFrom(r)) t.lastRoundFrom = lowFrom(r); else delete t.lastRoundFrom; // 「続きから」で前の人の続きを回れるように
 }
 function lowRestore(rid) { // 正式返却に戻す
   const r = D().returns.find(x => x.id === rid), t = r && terrById(r.terrId); if (!r || !t) return;
