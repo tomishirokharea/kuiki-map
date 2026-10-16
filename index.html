@@ -8851,11 +8851,16 @@ function takeAwayCard(tid, slot, grp) {
   const keys = cardKeys(unmetIndex().get(tid) || [], slot, lockedKeys(), rl);
   if (!keys.length) { toast('このカードの家は、今はありません'); renderAll(); return; }
   const now = new Date();
+  const eod = new Date(now); eod.setHours(23, 59, 59, 0); // 今日の終わり（端末の時刻）
   let exp = Date.parse(awayExpiry(t, now.getTime()));
-  if (xs) { const eod = new Date(now); eod.setHours(23, 59, 59, 0); exp = Math.max(Math.min(exp, xs.end), eod.getTime()); } // 返却後は出す期間の終わりまで（今日の終わりより前にはしない）
+  if (xs) exp = Math.max(Math.min(exp, xs.end), eod.getTime()); // 返却後は出す期間の終わりまで（今日の終わりより前にはしない）
+  // その日限り：家が少ないカード（awayDayOnly 軒以下。0＝使わない）は、受け取った日の終わりに自動で終わる。返却後に限らず、個人・グループのカードすべて
+  const dayOnly = Number(D().settings.awayDayOnly) || 0, day = dayOnly > 0 && keys.length <= dayOnly;
+  if (day) exp = eod.getTime();
   const card = { id: 'c' + uid(), terrId: tid, slot, by: me().id, at: now.toISOString(),
     expiresAt: new Date(exp).toISOString(), keys, rl };
   if (xs) card.ext = 1;
+  if (day) card.day = 1;
   if (G) { card.group = myGroup(); card.helpers = []; card.mode = awayGroupMode === 'split' ? 'split' : 'share'; card.view = 'new'; card.parts = []; }
   commit(`${G ? 'グループの' : ''}留守宅カード（区域${t.no}・${slotShort(slot)}）を受け取りました`, () => { D().awayCards.push(card); });
   if (G) openHelpers(null, card.id); // グループのカードは、続けて「今日回る人」をえらぶ
@@ -9231,6 +9236,7 @@ function awayCardHtml(c, kind) {
   const hs = cardHelpers(c), hh = kind === 'help' ? hs.find(h => h.uid === me().id) : null;
   const pct = p.total ? Math.round(p.done / p.total * 100) : 0;
   const left = Math.max(0, Math.ceil((Date.parse(c.expiresAt) - Date.now()) / DAY));
+  const endText = c.day ? '今日の終わりに自動で終わります' : `あと${left}日で自動的に終わります`; // その日限りのカード
   return `<article class="tcard tc2 away">
     ${openHead(`data-awayopen="${c.id}"`, `留守宅カード ${esc(slotText(c.slot))}`,
       `<span class="stamp away${t ? noCls(t.no) : ''}"><small>留守宅</small>${t ? esc(t.no) : '-'}</span>`,
@@ -9238,7 +9244,7 @@ function awayCardHtml(c, kind) {
         (hh ? `<br>${esc(uname(hh.by))}さんの留守宅カードを、今日回ります` : ''))}
     <div class="tbody">
       <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪ねた割合"><i style="width:${pct}%"></i></div>
-      <p class="muted">訪ねた家 ${p.done} / ${p.total}　あと${left}日で自動的に終わります</p>
+      <p class="muted">訪ねた家 ${p.done} / ${p.total}　${endText}</p>
       ${poolLineHtml(c)}
       ${p.total && p.done === p.total ? `<p><b>すべて訪ねました。${kind === 'help' ? '' : '「終える」を押してください。'}</b></p>` : ''}
       ${kind === 'gown' && hs.length ? `<p class="muted"><b>今日回る人（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : ''}

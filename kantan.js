@@ -254,7 +254,7 @@
         slotText(c.slot), (c.group ? `<span class="gbadge">${esc(c.group)}グループ</span> ` : '') + `区域${t ? esc(t.no) : '-'}　${t ? esc(t.name) : ''}` +
           (hh ? `<br>${esc(uname(hh.by))}さんの留守宅カードを、今日回ります` : ''))}
       <div class="tbody"><p class="kleft">あと <b>${left}</b> 軒</p>
-        <p class="muted">${fmtDay(c.expiresAt)}まで</p></div>
+        <p class="muted">${c.day ? '今日の終わりに自動で終わります' : fmtDay(c.expiresAt) + 'まで'}</p></div>
       <div class="actions"><button class="btn primary" data-awayopen="${c.id}">地図をひらく</button>${kind === 'help' ? '' : `<button class="btn" data-awayend="${c.id}">返す</button>`}</div>
       ${kind === 'gown' && D().settings.groupOn !== 0 ? `<div class="actions"><button class="btn small" data-chelpers="${c.id}">今日回る人をえらぶ</button></div>` : ''}
     </article>`;
