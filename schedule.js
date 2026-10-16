@@ -2115,7 +2115,9 @@ body.duemode .terr-label:not(.duelab){display:none}
       const v = e.target.value; if (!v) return;
       closeSheet();
       commit(`区域${t.no}の担当を${uname(v)}さんに変えました`, () => {
-        t.holder = v; t.lentAt = new Date().toISOString();
+        const now = new Date().toISOString();
+        recordHandover(t, now); // 前の担当者の行を S-13 に残す
+        t.holder = v; t.lentAt = now;
         t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
       });
     });

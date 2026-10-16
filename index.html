@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.3"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.4"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -8587,6 +8587,13 @@ function finishTerr(tid, done) {
   });
 }
 const returnTerr = (tid, completed) => finishTerr(tid, completed); // 以前の呼び方
+/* 区域係が担当を別の人に変えるとき、前の担当者の分を「途中の返却」として残す（S-13 から前の人の行が消えないように）。
+   commit の中で、t.holder を書きかえる前に呼ぶ。担当者がいない・受け取った日が分からないときは何もしない */
+function recordHandover(t, now) {
+  if (!t || !t.holder || !t.lentAt) return;
+  const r = roundInfo(t.id, true);
+  D().returns.push({ id: 'x' + uid(), terrId: t.id, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: false, pct: r ? r.pct : null, ho: 1 });
+}
 /* 1回目のあと、会えなかった家を「留守宅カード」（だれでも受け取れる）にして返す。
    決めた割合まで訪ね直された日が、正式な返却日（S-13 の完了した日付）になる（区域係のスマホが自動で記録する） */
 function poolReturn(tid) {
@@ -13845,9 +13852,12 @@ function bindStatic() {
     const s = e.target.closest('[data-holder]'); if (!s) return;
     const t = terrById(s.dataset.holder), val = s.value;
     if (!val) { renderAll(); openReturnSheet(t.id); return; } // 返却は「全部回ったか」を確認する
+    if (t.holder === val) return;
     commit(`区域${t.no}を${uname(val)}さんに貸し出しました`, () => {
+      const now = new Date().toISOString();
+      recordHandover(t, now); // 前の担当者の行を S-13 に残す
       t.holder = val;
-      t.lentAt = new Date().toISOString();
+      t.lentAt = now;
       t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
     });
   });
