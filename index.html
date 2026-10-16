@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.5"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.6"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -2099,7 +2099,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3 }, d.settings || {});
     d.s13 = d.s13 || [];
     d.agedata = d.agedata || [];
   },
@@ -8339,7 +8339,7 @@ async function takeTerr(id) {
   closeSheet();
   commit(`区域${t.no}を受け取りました`, () => {
     const now = new Date().toISOString();
-    t.holder = me().id; t.lentAt = now; t.selfTakenAt = now; t.selfSeen = false; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
+    t.holder = me().id; t.lentAt = now; t.selfTakenAt = now; t.selfSeen = false; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
     t.group = reqForGroup && canGroupTerr() ? myGroup() : null;
     D().requests = D().requests.filter(r => !(r.status === 'pending' && r.by === me().id && r.terrId === id));
   });
@@ -8469,6 +8469,15 @@ function renderInbox() {
     <span>区域カードを「完了」にできる目安<br><small class="hint">訪ねた家の割合。目安に届くと、本人の画面に「返却して完了にできます」と出ます</small></span>
     <div class="stepper"><button type="button" data-donepct="-5" aria-label="目安を下げる">−</button><output class="wide">${st.donePct}%</output>
     <button type="button" data-donepct="5" aria-label="目安を上げる">＋</button></div></div>
+    <div class="setrow" data-hk="lowOn">
+      <span>記録の少ない正式返却を、自動で確かめる<br><small class="hint">区域係が目安に届かないまま正式返却にしたとき、決めた日数のあとに記録を数え直し、届いていなければ途中の返却にします</small></span>
+      <div class="seg" role="group" aria-label="記録の少ない正式返却を自動で確かめる"><button type="button" data-sset="lowOn" data-v="1" aria-pressed="${Number(st.lowOn) !== 0}">使う</button>
+      <button type="button" data-sset="lowOn" data-v="0" aria-pressed="${Number(st.lowOn) === 0}">使わない</button></div></div>
+    ${Number(st.lowOn) !== 0 ? `<div class="setrow" data-hk="lowWait">
+      <span>確かめるまで待つ日数<br><small class="hint">この間に届いた記録（返却した日より前の日付）も数えます</small></span>
+      <div class="stepper"><button type="button" data-kset="lowWait" data-d="-1" aria-label="日数を減らす">−</button>
+        <output class="wide">${lowWaitDays()}日</output>
+        <button type="button" data-kset="lowWait" data-d="1" aria-label="日数を増やす">＋</button></div></div>` : ''}
     <div class="setrow">
       <span>「一緒に回る」を使う<br><small class="hint">区域の担当者が、今日の終わりまで仲間を加えて、同じ区域を一緒に回れます</small></span>
       <div class="seg" role="group" aria-label="一緒に回るを使う">
@@ -8511,7 +8520,7 @@ function approveReq(id) {
   if (!t || t.holder) { toast('その区域は貸し出せません'); return; }
   commit(`区域${t.no}を${uname(r.by)}さんに貸し出しました`, () => {
     const now = new Date().toISOString();
-    t.holder = r.by; t.lentAt = now; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
+    t.holder = r.by; t.lentAt = now; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
     t.group = r.forGroup || null; // グループ用の申し込みなら、グループの区域にする
     Object.assign(r, { status: 'approved', terrId: t.id, decidedAt: now, seen: false });
   });
@@ -8537,12 +8546,13 @@ function openReturnSheet(tid) {
       <p class="muted">1回目に会えなかった家 ${r.aw.n}軒のうち、訪ね直した家 ${r.aw.done}軒（${r.aw.pct}%）。返却の目安は${awayRetPct()}%です。</p>
       ${ok ? '<p class="hint-strong ok">留守宅を十分に訪ね直しました。返却すると、今日が区域を回り終えた日（S-13 の完了した日付）になります。</p>'
         : `<p class="hint-strong">あと ${Math.max(1, Math.ceil(r.aw.n * awayRetPct() / 100) - r.aw.done)}軒 訪ね直すと返却できます。${adm ? '（区域係は、このまま返却できます）' : '事情があるときは、区域係に相談してください。'}</p>${awayAdvice(r)}`}
+      ${adm && !ok && lowOnSet() && !t.firstLow && (lowP1(t, r) ?? 100) < th ? lowCheckHtml(th) : ''}
       <button class="btn primary block wrap" data-fin="1"${ok || adm ? '' : ' disabled'}>返却する（区域を回り終えました）</button>
       <button class="btn block wrap" data-pool>残りの留守宅を、留守宅カードにして返す（だれでも受け取れる）</button>
       <button class="btn block wrap" data-fin="0">途中で返却する（回り終えた記録はつけません）</button>
       <button class="btn block" data-close>もどる</button>`);
-    $$('[data-fin]', $('#sheet')).forEach(x => x.onclick = () => finishTerr(tid, x.dataset.fin === '1'));
-    $('[data-pool]', $('#sheet')).onclick = () => poolReturn(tid);
+    $$('[data-fin]', $('#sheet')).forEach(x => x.onclick = () => finishTerr(tid, x.dataset.fin === '1', lowChecked()));
+    $('[data-pool]', $('#sheet')).onclick = () => poolReturn(tid, lowChecked());
     return;
   }
   const total = r.c.todo + r.c.done, reached = r.pct >= th;
@@ -8552,6 +8562,7 @@ function openReturnSheet(tid) {
     <p class="q">区域を1回目、回り終えましたか？</p>
     <p class="hint">${reached ? '1回目を回り終えたら、留守だった家の回り方をえらびます。'
       : `1回目を終えるには、${th}%以上の家を訪ねてください。${adm ? '（区域係は、このまま進められます）' : ''}`}</p>
+    ${adm && !reached && lowOnSet() ? lowCheckHtml(th) : ''}
     <button class="btn primary block wrap" data-first${reached || adm ? '' : ' disabled'}>1回目を回り終えた：自分で留守宅を回る（カードを持ったまま）</button>
     <p class="hint">会えなかった家だけが目立つようになります。別の日・違う時間帯に訪ね直してください。</p>
     <button class="btn block wrap" data-pool${reached || adm ? '' : ' disabled'}>1回目を回り終えた：留守宅カードにして返す（だれでも受け取れる）</button>
@@ -8559,34 +8570,54 @@ function openReturnSheet(tid) {
     <button class="btn block wrap" data-fin="0">途中で返却する（回り終えた記録はつけません）</button>
     <p class="hint">残りの家は、次に回る人のおすすめに出ます。</p>
     <button class="btn block" data-close>もどる</button>`);
-  if ($('[data-first]', $('#sheet'))) $('[data-first]', $('#sheet')).onclick = () => firstDone(tid);
-  if ($('[data-pool]', $('#sheet'))) $('[data-pool]', $('#sheet')).onclick = () => poolReturn(tid);
+  if ($('[data-first]', $('#sheet'))) $('[data-first]', $('#sheet')).onclick = () => firstDone(tid, lowChecked());
+  if ($('[data-pool]', $('#sheet'))) $('[data-pool]', $('#sheet')).onclick = () => poolReturn(tid, lowChecked());
   $$('[data-fin]', $('#sheet')).forEach(x => x.onclick = () => finishTerr(tid, false));
 }
 /* 1回目を回り終えた（カードは本人が持ったまま、留守宅を回る段階になる） */
-function firstDone(tid) {
+function firstDone(tid, lowOk) {
   const t = terrById(tid); if (!t) return;
   const r = roundInfo(tid, true), pct = r ? r.pct : null;
   closeSheet();
   commit(`区域${t.no}の1回目を回り終えました（${pct}%）。留守宅を回る段階です`, () => {
     t.firstDoneAt = new Date().toISOString(); t.firstDonePct = pct;
+    // 係が目安未満のまま進めたときは、あとの正式返却で「記録の少ない返却」として確かめるために印を残す
+    if (lowOnSet() && isAdmin() && pct != null && pct < D().settings.donePct) t.firstLow = lowOk ? 'ok' : 1;
+    else delete t.firstLow;
   });
 }
 /* 返却。done＝留守宅も回り終えた（今日が「回り終えた日」） */
-function finishTerr(tid, done) {
+function finishTerr(tid, done, lowOk) {
   const t = terrById(tid); if (!t) return;
   const r = roundInfo(tid, true), pct = r ? r.pct : null;
   closeSheet();
   if (roundTerr === tid) roundTerr = null;
   commit(`区域${t.no}を返却しました${done ? '（回り終えました）' : ''}`, () => {
     const now = new Date().toISOString();
-    D().returns.push({ id: 'x' + uid(), terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: done, pct });
-    if (done) { t.completedAt = now; t.completedPct = r && r.phase === 'away' ? r.pct1 : pct; }
+    const rec = { id: 'x' + uid(), terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: done, pct };
+    D().returns.push(rec);
+    if (done) {
+      lowMark(rec, t, lowP1(t, r), t.firstLow ? t.firstLow === 'ok' : lowOk); // 印は、t.completedAt を書きかえる前に付ける
+      t.completedAt = now; t.completedPct = r && r.phase === 'away' ? r.pct1 : pct;
+    }
     t.lastLentAt = t.lentAt; t.lastFirstAt = t.firstDoneAt || null;
-    t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null;
+    t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
   });
 }
 const returnTerr = (tid, completed) => finishTerr(tid, completed); // 以前の呼び方
+/* ---- 記録の少ない正式返却（区域係が目安未満のまま正式返却にしたものを、待ってから自動で確かめる） ---- */
+const lowOnSet = () => Number(D().settings.lowOn) !== 0;
+const lowWaitDays = () => Math.max(3, Math.min(30, Number(D().settings.lowWait) || 7));
+/* 1回目の割合：1回目を終えたときの値（firstLow があればそれ）／1回目の段階なら今の割合 */
+const lowP1 = (t, r) => (t.firstLow && t.firstDonePct != null ? t.firstDonePct : (r && r.phase === 'away' ? (t.firstDonePct != null ? t.firstDonePct : r.pct1) : (r ? r.pct1 : null)));
+const lowChecked = () => !!(($('[data-lowok]', $('#sheet')) || {}).checked);
+const lowCheckHtml = th => `<label class="chk lowchk"><input type="checkbox" data-lowok> 紙や口頭で、回り終えたことを確かめた<br><small class="hint">チェックしないと、記録が目安（${th}%）に届いていないので、${lowWaitDays()}日後に記録を数え直し、届いていなければ自動で途中の返却にします。</small></label>`;
+/* 係が目安未満のまま正式返却にしたか（1回目の割合 p1 で決める）。印は返却の記録に付ける */
+function lowMark(rec, t, p1, lowOk) {
+  if (!lowOnSet() || !isAdmin() || p1 == null || p1 >= D().settings.donePct) return;
+  rec.p1 = p1; rec.prevAt = t.completedAt || null; rec.prevPct = t.completedPct == null ? null : t.completedPct;
+  if (lowOk) { rec.lowOk = 1; rec.lowBy = me().id; } else rec.low = 1;
+}
 /* 区域係が担当を別の人に変えるとき、前の担当者の分を「途中の返却」として残す（S-13 から前の人の行が消えないように）。
    commit の中で、t.holder を書きかえる前に呼ぶ。担当者がいない・受け取った日が分からないときは何もしない */
 function recordHandover(t, now) {
@@ -8596,16 +8627,18 @@ function recordHandover(t, now) {
 }
 /* 1回目のあと、会えなかった家を「留守宅カード」（だれでも受け取れる）にして返す。
    決めた割合まで訪ね直された日が、正式な返却日（S-13 の完了した日付）になる（区域係のスマホが自動で記録する） */
-function poolReturn(tid) {
+function poolReturn(tid, lowOk) {
   const t = terrById(tid); if (!t) return;
   const r = roundInfo(tid, true);
   closeSheet();
   if (roundTerr === tid) roundTerr = null;
   commit(`区域${t.no}を、留守宅カードにして返しました`, () => {
     const now = new Date().toISOString(), rid = 'x' + uid(), first = t.firstDoneAt || now;
-    D().returns.push({ id: rid, terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: first, at: now, completed: false, pct: r ? r.pct1 : null, pool: 1 });
+    const rec = { id: rid, terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: first, at: now, completed: false, pct: r ? r.pct1 : null, pool: 1 };
+    D().returns.push(rec);
+    lowMark(rec, t, lowP1(t, r), t.firstLow ? t.firstLow === 'ok' : lowOk); // まだ正式返却ではない。あとで留守宅カードが完了したとき、この印がそのまま使われる
     t.lastLentAt = t.lentAt; t.lastFirstAt = first; t.awayPoolAt = now; t.poolRetId = rid;
-    t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null;
+    t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
   });
 }
 /* 留守宅カードで回っている区域：1回目に会えなかった家のうち、何軒が訪ね直されたか。決めた割合に届いた日 */
@@ -8661,6 +8694,101 @@ function finalizePools() {
       });
     });
   } finally { poolBusy = false; }
+}
+
+/* 返却した区域の1回目の割合を、いま届いている記録で数え直す。since＝受け取った日、until＝返却（1回目を終えた）日。
+   roundInfo の1回目と同じ数え方。until より後の記録は数えない。最近会えた家は、受け取った日の時点で数える（3万件対策：その区域の家だけ見る） */
+function coverAt(t, since, until) {
+  const sp = isSpecial(t), inc = D().settings.skipDone !== 0, s0 = Date.parse(since) || 0;
+  let done = 0, total = 0;
+  for (const h of housesOf(t.id)) {
+    for (const u of (sp ? specialTargets(h, t) : targets(h))) {
+      if (!sp && coveredBySpecial(h, u)) continue;
+      const k = K(h.id, u);
+      if (D().dnc[k]) continue;
+      const vs = visitsOf(k);
+      if (vs.some(v => v.at >= since && v.at <= until)) { done++; total++; continue; }
+      const d = D().follows[k] ? followSkipDays() : skipDays();
+      const m = d ? vs.find(v => v.result === 'met' && v.at < since) : null; // 新しい順なので、最初に見つかったものが一番新しい
+      if (m && s0 - Date.parse(m.at) <= d * DAY) { if (inc) { done++; total++; } continue; }
+      total++;
+    }
+  }
+  return total ? Math.round(done / total * 100) : 100;
+}
+/* 区域係のスマホが開いたときに、記録の少ない正式返却を確かめる（finalizePools と同じ間引き）。
+   待つ日数のあとに数え直し、届いていれば正式返却のまま、届いていなければ自動で途中の返却に切りかえる */
+let lowBusy = false;
+function lowSweep() {
+  if (!isAdmin() || lowBusy || !lowOnSet()) return;
+  const wait = lowWaitDays() * DAY, now = Date.now(), th = D().settings.donePct, ok = [], flip = [], skip = [];
+  for (const r of D().returns) {
+    if (!r.low || r.lowOk || r.lowAuto || r.lowSkip || !r.completed) continue;
+    if (now - Date.parse(r.at) < wait) continue;                              // まだ待つ
+    const t = terrById(r.terrId);
+    if (!t) continue;
+    if (t.holder || t.awayPoolAt || t.completedAt !== r.at) { skip.push(r); continue; } // あとの動きがあるので、何も変えない
+    const pct = coverAt(t, r.lentAt || '', r.firstAt || r.at);
+    (pct >= th ? ok : flip).push([r, t, pct]);
+  }
+  if (!ok.length && !flip.length && !skip.length) return;
+  lowBusy = true;
+  try {
+    const apply = () => {
+      const at = new Date().toISOString();
+      ok.forEach(([r, , pct]) => { r.lowOk = 1; r.lowAt = at; r.p1 = pct; });
+      skip.forEach(r => { r.lowSkip = 1; r.lowAt = at; });
+      flip.forEach(([r, t, pct]) => lowToPartial(r, t, at, pct));
+    };
+    if (flip.length) commit(`記録が目安に届かなかった区域を、途中の返却にしました（${flip.map(x => x[1].no).join('・')}）`, apply);
+    else { apply(); Store.save(true); } // 切りかえがないときは、お知らせを出さず静かに保存
+  } finally { lowBusy = false; }
+}
+/* 係の区域一覧：確かめ待ちの正式返却に、小さく確かめる日を出す */
+function lowWaitNote(t) {
+  if (!lowOnSet() || !t || t.holder || t.awayPoolAt || !t.completedAt) return '';
+  const r = D().returns.find(x => x.terrId === t.id && x.low && !x.lowOk && !x.lowAuto && !x.lowSkip && x.completed && x.at === t.completedAt);
+  return r ? `（記録が少ないため${fmtDay(new Date(Date.parse(r.at) + lowWaitDays() * DAY).toISOString())}に確かめます）` : '';
+}
+/* 正式返却を、途中の返却に切りかえる（commit の中で呼ぶ）。前回回り終えた日（prevAt）に戻す */
+function lowToPartial(r, t, at, pct, by) {
+  r.completed = false; r.lowAuto = at; if (pct != null) r.p1 = pct; if (by) r.lowBy = by;
+  if (r.prevAt) { t.completedAt = r.prevAt; t.completedPct = r.prevPct; } else { delete t.completedAt; delete t.completedPct; }
+  t.returnedAt = r.at;                  // 途中の返却として扱う（isPartial：returnedAt ＞ completedAt）
+  if (r.lentAt) t.lastRoundFrom = r.lentAt; else delete t.lastRoundFrom; // 「続きから」で前の人の続きを回れるように
+}
+function lowRestore(rid) { // 正式返却に戻す
+  const r = D().returns.find(x => x.id === rid), t = r && terrById(r.terrId); if (!r || !t) return;
+  if (t.holder || t.awayPoolAt || t.returnedAt !== r.at) { toast('その区域は、もう次の動きがあります'); return; }
+  commit(`区域${t.no}を、正式な返却に戻しました`, () => {
+    r.completed = true; r.lowOk = 1; r.lowBy = me().id; delete r.lowAuto;
+    t.completedAt = r.at; t.completedPct = r.p1; delete t.lastRoundFrom;
+  });
+}
+function lowConfirm(rid) { // 待っている間に「正式返却で確定」
+  const r = D().returns.find(x => x.id === rid); if (!r) return;
+  commit('正式な返却で確定しました', () => { r.lowOk = 1; r.lowBy = me().id; });
+}
+function lowNow(rid) { // 待っている間に「今すぐ途中の返却にする」
+  const r = D().returns.find(x => x.id === rid), t = r && terrById(r.terrId); if (!r || !t) return;
+  if (t.holder || t.awayPoolAt || t.completedAt !== r.at) { toast('その区域は、もう次の動きがあります'); return; }
+  commit(`区域${t.no}を、途中の返却にしました`, () => lowToPartial(r, t, new Date().toISOString(), null, me().id));
+}
+/* この機能より前の正式返却を、係が押したときだけ途中の返却にする（自動では変えない） */
+function lowOld(tid) {
+  const t = terrById(tid); if (!t || t.holder || t.awayPoolAt || !t.completedAt) return;
+  const rs = D().returns.filter(x => x.terrId === tid && x.completed).sort((a, b) => (a.at < b.at ? -1 : 1));
+  const r = rs.find(x => x.at === t.completedAt), at = new Date().toISOString();
+  commit(`区域${t.no}を、途中の返却にしました`, () => {
+    if (r) {
+      const prev = rs.filter(x => x.at < r.at).pop();
+      if (r.prevAt == null) r.prevAt = prev ? prev.at : null;
+      if (r.prevPct == null) r.prevPct = prev ? prev.pct : null;
+      lowToPartial(r, t, at, t.completedPct, me().id);
+    } else { // 記録が残っていない（紙から移した）ときは、完了の日だけ外す
+      t.returnedAt = t.completedAt; delete t.completedAt; delete t.completedPct;
+    }
+  });
 }
 
 /* ---------- 留守宅カード ---------- */
@@ -11082,7 +11210,7 @@ let poolSweepAt = 0;
 function renderAdmin() {
   setAdPane(adPane);
   // 区域係の画面を開いたとき、目安に届いた留守宅カードの区域を正式な返却として記録する（5分に1回まで。描画の途中で記録しないよう、あとで動かす）
-  if (Date.now() - poolSweepAt > 300000) { poolSweepAt = Date.now(); setTimeout(finalizePools, 400); }
+  if (Date.now() - poolSweepAt > 300000) { poolSweepAt = Date.now(); setTimeout(() => { finalizePools(); lowSweep(); }, 400); }
   renderInbox(); // 承認待ちの数（タブの数字）は、いつも数える
   $('#adInbox').insertAdjacentHTML('afterbegin', ageNoticeHtml());
   if (adPane === 'inbox') renderDevices();
@@ -11136,7 +11264,7 @@ function renderAdmin() {
     const pool = poolInfo(t);
     return `<article class="trow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
       <div><b>${esc(t.name)}</b>${t.group ? ` <span class="gbadge">${esc(t.group)}グループ</span>` : ''}${isSpecial(t) ? `<span class="spbadge">特別区域：${esc(specialKindsText(t))}</span>` : ''} ${lendTag(t)}<div class="meta">
-        <span>貸し出した日 ${lent ? fmtDay(lent) : '—'}</span><span>1回目を回った日 ${firstAt ? fmtDay(firstAt) : '—'}</span><span>正式に返却した日 ${retAt ? fmtDay(retAt) : (t.holder ? '貸出中' : pool ? '留守宅カードで回っています' : '—')}</span>
+        <span>貸し出した日 ${lent ? fmtDay(lent) : '—'}</span><span>1回目を回った日 ${firstAt ? fmtDay(firstAt) : '—'}</span><span>正式に返却した日 ${retAt ? fmtDay(retAt) : (t.holder ? '貸出中' : pool ? '留守宅カードで回っています' : '—')}${lowWaitNote(t)}</span>
         ${pool ? `<span>留守宅の訪ね直し ${pool.done} / ${pool.n}（${pool.pct}%・目安 ${awayRetPct()}%）</span><button class="btn small" data-poolfin="${t.id}">正式に返却したことにする</button>` : ''}
         ${t.holder ? `<span class="${over ? 'tag-warn' : ''}">返却の目安 ${fmtDay(due)}${over ? '（過ぎています）' : ''}</span>` : ''}
         <span>家・部屋 ${s.n}</span><span>90日以内に訪問 ${s.visited}</span>
@@ -12939,7 +13067,7 @@ function s13Rows(y) {
   return D().territories.filter(t => !t.dummy).slice().sort(byNo).map(t => {
     const list = [];
     D().returns.filter(r => r.terrId === t.id && r.lentAt).forEach(r =>
-      list.push({ name: uname(r.by), a: dstr(r.lentAt), c: r.completed ? dstr(r.at) : '', ret: dstr(r.at), src: 'app' }));
+      list.push({ name: uname(r.by), a: dstr(r.lentAt), c: r.completed ? dstr(r.at) : '', ret: dstr(r.at), lw: r.lowAuto ? 1 : 0, src: 'app' }));
     if (t.holder && t.lentAt) list.push({ name: uname(t.holder), a: dstr(t.lentAt), c: '', ret: '', cur: true, src: 'app' });
     paper.filter(x => x.kind === 'a' && x.terrId === t.id).forEach(x =>
       list.push({ name: x.name, a: x.a, c: x.c || '', ret: '', src: 'paper', id: x.id }));
@@ -12971,7 +13099,7 @@ function s13BlockHtml(r, print) {
       if (!x) return '';
       if (x.c) return s13Fmt(x.c);
       if (print) return '';
-      return x.cur ? '<small>貸出中</small>' : x.ret ? `<small>返却 ${s13Fmt(x.ret)}</small>` : '';
+      return x.cur ? '<small>貸出中</small>' : x.ret ? `<small>返却 ${s13Fmt(x.ret)}${x.lw ? '（記録が少なく途中扱い）' : ''}</small>` : '';
     };
     const prevCls = !print && r.prevPaper && ci === 0 ? ' s13-paper' : '';
     return `<tbody class="s13blk"${print ? '' : ` data-s13t="${r.t.id}"`}>
@@ -13798,6 +13926,7 @@ function bindStatic() {
         : key === 'syncGroupSec' ? [5, 30] : key === 'syncNormalSec' ? [10, 120]
         : key === 'reqMaxPersonal' || key === 'reqMaxGroup' ? [1, 5]
         : key === 'holdMaxPersonal' || key === 'holdMaxGroup' ? [1, 10]
+        : key === 'lowWait' ? [3, 30]
         : key === 'freeAfterDays' ? [0, 365] : [5, 60]);
       const cv = st[key] == null || st[key] === '' ? NaN : Number(st[key]);
       st[key] = Math.min(lim[1], Math.max(lim[0], (isFinite(cv) ? cv : 2) + Number(x.dataset.d)));
@@ -13858,7 +13987,7 @@ function bindStatic() {
       recordHandover(t, now); // 前の担当者の行を S-13 に残す
       t.holder = val;
       t.lentAt = now;
-      t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; t.awayPoolAt = null; t.poolRetId = null;
+      t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
     });
   });
 }

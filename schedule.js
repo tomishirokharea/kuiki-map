@@ -489,8 +489,9 @@
   function partialInfo(t) {
     if (!isPartial(t)) return null;
     let r = null;
-    D().returns.forEach(x => { if (x.terrId === t.id && !x.pool && (!r || x.at > r.at)) r = x; });
-    const pct = r && r.pct != null ? Math.round(Number(r.pct)) : null;
+    D().returns.forEach(x => { if (x.terrId === t.id && (!x.pool || x.lowAuto) && (!r || x.at > r.at)) r = x; });
+    const pv = r ? (r.p1 != null ? r.p1 : r.pct) : null; // 記録が少なく途中にしたものは、1回目の割合（p1）で見せる
+    const pct = pv != null ? Math.round(Number(pv)) : null;
     return { pct, at: t.returnedAt, none: pct == null || pct <= 5 };
   }
   const partialTag = t => {
@@ -1149,13 +1150,21 @@
         else if ((x = q('[data-topen]'))) openTerr(x.dataset.topen);
         else if ((x = q('[data-tkarte]'))) openKarte(x.dataset.tkarte);
         else if (q('[data-tcardprint]')) printCardIntro();
+        else if ((x = q('[data-lowconfirm]'))) lowConfirm(x.dataset.lowconfirm);
+        else if ((x = q('[data-lownow]'))) lowNow(x.dataset.lownow);
+        else if ((x = q('[data-lowback]'))) lowRestore(x.dataset.lowback);
+        else if ((x = q('[data-lowold]'))) lowOld(x.dataset.lowold);
+        else if ((x = q('[data-lowstop]'))) {
+          const t = terrById(x.dataset.lowstop);
+          if (t) commit(`区域${t.no}を貸出中止にしました`, () => { t.lend = 'stop'; delete t.free; });
+        }
       });
     }
     const items = todayItems();
     box.innerHTML = coverHtml() + aheadHtml() + `<h2 class="sec">今日の対応</h2>` + (items.length
       ? items.map(i => `<div class="duerow tdrow" style="border-left-color:${i.tone}"><div><p><b>${i.title}</b></p><p class="muted">${i.sub}</p></div><div class="duebtns">${i.btns}</div></div>`).join('') +
         '<p class="hint">くわしい一覧と、そのほかの操作は、この下にあります。</p>'
-      : '<div class="tdnone"><b>今日対応することはありません</b><small>新しい申し込みや、急ぎの区域はありません</small></div>') + othersDoneHtml();
+      : '<div class="tdnone"><b>今日対応することはありません</b><small>新しい申し込みや、急ぎの区域はありません</small></div>') + othersDoneHtml() + lowNoticeHtml();
     // 以前の「待っているものはありません」の表示は、ここに一本化する
     const em = document.getElementById('adInboxEmpty');
     if (em) em.innerHTML = '';
@@ -1219,7 +1228,7 @@
 .kact{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.kact .btn{flex:1 1 9em}
 .klend{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
 .klend select{min-height:50px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;background:#fff;font-size:17px;max-width:100%}
-.opsrow .btn{white-space:normal}.opsh{list-style:none;margin:4px 0;padding:0}.opsh li{padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}`;
+.opsrow .btn{white-space:normal}.opsh{list-style:none;margin:4px 0;padding:0}.opsh li{padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}.lowlist li,.lownote .opsh li{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:space-between}.lownote .btn.small{white-space:normal}`;
   document.head.appendChild(css5);
 
   const karteState = { period: 4 };
@@ -2243,6 +2252,47 @@ body.duemode .terr-label:not(.duelab){display:none}
     return `<div class="ahead"><p>これからの1年の期限：${ms.map(x => `<span class="${x.list.length >= hot ? 'hot' : ''}">${x.label} <b>${x.list.length}</b>区域${x.list.length >= hot ? '（多い）' : ''}</span>`).join('　')}
       <button type="button" class="btn small" data-tgo="status" data-anchor="adDue">見る</button></p>
       <p>今月はじめて会えた家・部屋：<b>${a.first}</b>軒（うち時間帯を変えて会えた：<b>${a.changed}</b>軒）</p></div>`;
+  }
+  /* 記録の少ない正式返却：係が目安未満のまま正式返却にした区域を、待ってから自動で確かめる（index.html の lowSweep）。
+     「今日」タブのいちばん下に小さく出すだけ。「今日の対応」の件数には入れない。何もしなくてよい */
+  function lowNoticeHtml() {
+    if (typeof lowOnSet !== 'function' || !lowOnSet()) return '';
+    const th = D().settings.donePct, waitMs = lowWaitDays() * DAY, now = Date.now();
+    const wait = [], auto = [];
+    D().returns.forEach(r => {
+      const t = terrById(r.terrId);
+      if (!t) return;
+      if (r.low && !r.lowOk && !r.lowAuto && !r.lowSkip && r.completed) {
+        if (!t.holder && !t.awayPoolAt && t.completedAt === r.at) wait.push([r, t]);
+      } else if (r.lowAuto && now - Date.parse(r.lowAuto) <= 30 * DAY) auto.push([r, t]);
+    });
+    wait.sort((a, b) => (a[0].at < b[0].at ? 1 : -1)); auto.sort((a, b) => (a[0].lowAuto < b[0].lowAuto ? 1 : -1));
+    const old = D().territories.filter(t => {
+      if (t.holder || t.awayPoolAt || !t.completedAt || t.completedPct == null || t.completedPct >= th) return false;
+      const r = D().returns.find(x => x.terrId === t.id && x.completed && x.at === t.completedAt);
+      return !(r && (r.low || r.lowOk || r.pool)); // 留守宅カードの完了の割合は、留守宅の割合なので入れない
+    }).sort((a, b) => (a.completedAt < b.completedAt ? 1 : -1));
+    if (!wait.length && !auto.length && !old.length) return '';
+    const rows = [];
+    wait.slice(0, 20).forEach(([r, t]) => {
+      const pct = coverAt(t, r.lentAt || '', r.firstAt || r.at);
+      rows.push(`<li><span>区域${esc(t.no)}　返却 ${esc(fmtDay(r.at))}　記録 ${pct}%（目安${th}%）<br><small class="muted">${esc(fmtDay(new Date(Date.parse(r.at) + waitMs).toISOString()))}に確かめます</small></span>
+        <span class="duebtns"><button type="button" class="btn small" data-lowconfirm="${esc(r.id)}">正式返却で確定</button> <button type="button" class="btn small" data-lownow="${esc(r.id)}">今すぐ途中にする</button></span></li>`);
+    });
+    auto.slice(0, 20).forEach(([r, t]) => {
+      const live = !t.holder && !t.awayPoolAt && t.returnedAt === r.at;
+      const btns = !live ? '<small class="muted">次の人が回っています</small>'
+        : `<button type="button" class="btn small" data-lowback="${esc(r.id)}">正式返却に戻す</button> ` +
+          (lendMode(t) === 'stop' ? '<small class="muted">受け取りを止めています</small>' : `<button type="button" class="btn small" data-lowstop="${esc(t.id)}">受け取りを止める</button>`);
+      rows.push(`<li><span>区域${esc(t.no)}　${esc(fmtDay(r.lowAuto))}に途中の返却にしました${r.p1 != null ? `（記録 ${Math.round(r.p1)}%）` : ''}</span><span class="duebtns">${btns}</span></li>`);
+    });
+    const n = wait.length + auto.length;
+    const oldHtml = old.length ? `<details class="dueset"><summary>以前の返却で、記録が目安に届いていないもの（自動では変えません・${old.length}件）</summary>
+      <p class="hint">この機能より前に正式返却にした区域です。紙で回った区域も出ますが、押さなければ何も変わりません。</p>
+      <ul class="opsh">${old.slice(0, 20).map(t => `<li><span>区域${esc(t.no)}　正式返却 ${esc(fmtDay(t.completedAt))}（${Math.round(t.completedPct)}%）</span><span class="duebtns"><button type="button" class="btn small" data-lowold="${esc(t.id)}">途中の返却にする</button></span></li>`).join('')}</ul></details>` : '';
+    return `<details class="dueset lownote"><summary>記録の少ない返却（自動で確かめます${n ? `・${n}件` : ''}）</summary>
+      <p class="hint">区域係が目安（${th}%）に届かないまま正式返却にした区域です。${lowWaitDays()}日たつと、記録を数え直し、届いていなければ自動で途中の返却にします。何もしなくてかまいません。</p>
+      ${rows.length ? `<ul class="opsh lowlist">${rows.join('')}</ul>` : ''}${oldHtml}</details>`;
   }
   /* ほかの区域係が、最近（24時間）対応したこと */
   function othersDoneHtml() {
