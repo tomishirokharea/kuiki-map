@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.12.9"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.0"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -1875,7 +1875,7 @@ function makeDemo() {
     { id: 'p4', kind: 'p', terrId: 't2', year: svcYearOf(new Date(now - 365 * DAY)), c: dAgo(420), at: iso(now), by: 'u3' }
   ];
   return { version: 4, users, territories, houses, visits, dnc, follows, released, requests, awayCards: [], returns, s13, schedules,
-    settings: { remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90 }, currentUser: 'u1' };
+    settings: { remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, awayCap: 3, awayNoRepeat: 1, awayScope: 0 }, currentUser: 'u1' };
 }
 
 /* ---------- 保存 ----------
@@ -8639,22 +8639,74 @@ const awayEligibleBase = (t, uid) => (t.holder ? t.holder === uid : (!!t.awayPoo
 const focusSlots = t => { const today = ymd(new Date()); return (Array.isArray(t && t.focus) ? t.focus : []).filter(f => f && SLOTS.includes(f.s) && String(f.until || '') >= today).map(f => f.s); };
 const awayEligibleTerr = (t, uid) => awayEligibleBase(t, uid) || (!t.holder && focusSlots(t).length > 0);
 
-/* 区域ごとの「まだ会えていない家」 */
+/* ---------- 留守宅訪問のルール（係の設定：「区域」＞「状況」の「留守宅訪問のルール」） ----------
+   ・上限回数（awayCap）：今回の巡回で「留守」だった日の数（同じ日は何回記録しても1回）。届いた家は、次の巡回まで留守宅カードに入れない
+   ・最短間隔（awayRecentDays）：最後の訪問から、この日数がたつまでは入れない
+   ・同じ時間帯を重ねない（awayNoRepeat）／試した時間帯の数え方（awayScope：0＝今回の巡回だけ、1＝前回の巡回も含める）
+   カードを受け取ったときの値は、カード（c.rl）に控える。係が設定を変えても、出ているカードは変わらない */
+const awayRule = () => {
+  const s = D().settings, n = (v, lo, hi, d) => { v = Number(v); return isFinite(v) && v !== null ? Math.max(lo, Math.min(hi, Math.round(v))) : d; };
+  return { cap: n(s.awayCap == null ? 3 : s.awayCap, 1, 15, 3), gap: n(s.awayRecentDays == null ? 3 : s.awayRecentDays, 0, 30, 3),
+    nr: Number(s.awayNoRepeat) === 0 ? 0 : 1, sc: Number(s.awayScope) === 1 ? 1 : 0 };
+};
+const FULL_SLOTS = (1 << SLOTS.length) - 1; // 10通りすべて
+/* 巡回：その区域の直近の正式返却日の翌日から、次の正式返却まで（正式返却がまだない区域は、すべての記録）。
+   前回の巡回の始まりは、その1つ前の正式返却日の翌日（分からなければ、すべての記録。記録は2年で消える既存の範囲だけ） */
+function nextDayIso(ymdStr) { const a = String(ymdStr).split('-').map(Number); return new Date(a[0], a[1] - 1, a[2] + 1).toISOString(); }
+function roundBounds(tid) {
+  const t = terrById(tid), ends = [];
+  (D().returns || []).forEach(r => { if (r.terrId === tid && r.completed && r.at) ends.push(r.at); });
+  if (t && t.completedAt) ends.push(t.completedAt);
+  const days = [...new Set(ends.map(x => ymd(new Date(x))))].sort(), n = days.length;
+  return { start: n ? nextDayIso(days[n - 1]) : '', prev: n > 1 ? nextDayIso(days[n - 2]) : '' };
+}
+/* 留守宅として訪ねてよい家か（上限回数・最短間隔・時間帯）。拒否の家は、そもそも unmetIndex に入らない。
+   時間帯は「未試行の時間帯が0（10通りすべて試し済み）」になったら、いちばん前に試した時間帯から順に候補に戻す */
+function awayOk(x, slot, rl, now) {
+  if (x.awayN >= rl.cap) return false;
+  if (rl.gap && now - Date.parse(x.lastAt) < rl.gap * DAY) return false;
+  if (rl.nr && hasSlot(x.tried, slot) && !(x.tried === FULL_SLOTS && x.oldSlot === slot)) return false;
+  return true;
+}
+
+/* 区域ごとの「まだ会えていない家」＝今回の巡回で、会えていない家（留守の記録がある家）。
+   tried：試した時間帯（留守の記録がある時間帯。10ビットの整数。数える範囲は awayScope）／awayN：今回の巡回で留守だった日の数
+   triedAll・first：これまでの全記録（「手紙の候補」「いつから会えていないか」の材料として残す） */
+let UM_MEMO = null; // 全体を調べた結果は、同じ画面の描きかえの間（同じ処理の中）だけ使い回す（3万件を何度も1周しない）
 function unmetIndex(onlyTid) {
   // onlyTid：1つの区域だけ調べるとき（区域のようすなど）。3万件を1周せず、その区域の家だけ見る。結果は全体を調べたときと同じ
-  const m = new Map(), now = Date.now();
+  const rl = awayRule(), memoKey = D().visits.length + '|' + JSON.stringify(rl) + '|' + D().houses.length + '|' + (D().returns || []).length;
+  if (!onlyTid && UM_MEMO && UM_MEMO.src === D().visits && UM_MEMO.key === memoKey) return UM_MEMO.m;
+  const m = new Map(), now = Date.now(), bm = new Map(), gapMs = rl.gap * DAY;
   for (const h of (onlyTid ? (HBT.get(onlyTid) || []) : D().houses)) {
     if (!h.terrId) continue;
     for (const u of targets(h)) {
       const k = K(h.id, u);
-      if (D().dnc[k] || D().follows[k] || relOf(k) || !isUnmet(k)) continue;
-      const s = sum(k), tried = s.slots;
+      if (D().dnc[k] || D().follows[k] || relOf(k)) continue;
+      const s = sum(k);
+      if (!s.n) continue; // 一度も訪ねていない家は、留守宅ではない
+      let b = bm.get(h.terrId); if (!b) { b = roundBounds(h.terrId); bm.set(h.terrId, b); }
+      const sc = rl.sc ? b.prev : b.start, lo = sc < b.start ? sc : b.start;
+      let tried = 0, other = false; const days = new Set();
+      for (const v of visitsOf(k)) { // 新しい順
+        if (v.at < lo) break;
+        if (v.at >= b.start) { if (v.result !== 'away') { other = true; break; } days.add(ymd(new Date(v.at))); }
+        if (v.result === 'away' && v.at >= sc) tried |= SLOT_BIT[slotOfVisit(v)];
+      }
+      if (other || !days.size) continue; // 今回の巡回で会えた家・留守の記録がない家は、対象外
+      let oldSlot = null;
+      if (tried === FULL_SLOTS) { // いちばん前に試した時間帯（最後に留守だった日がいちばん古い時間帯）
+        const at = {};
+        for (const v of visitsOf(k)) { if (v.result === 'away' && v.at >= sc) { const sl = slotOfVisit(v); if (!at[sl]) at[sl] = v.at; } }
+        oldSlot = SLOTS.reduce((a, sl) => (!a || at[sl] < at[a] ? sl : a), null);
+      }
       if (!m.has(h.terrId)) m.set(h.terrId, []);
       const first = visitsOf(k)[visitsOf(k).length - 1]; // いちばん古い記録（いつから会えていないか）
-      m.get(h.terrId).push({ k, h, u, tried, first: first ? first.at : s.last.at,
-        recent: now - Date.parse(s.last.at) < (Number(D().settings.awayRecentDays) || 0) * DAY, hard: slotCount(tried) >= SLOTS.length });
+      m.get(h.terrId).push({ k, h, u, tried, triedAll: s.slots, awayN: days.size, oldSlot, lastAt: s.last.at, first: first ? first.at : s.last.at,
+        recent: now - Date.parse(s.last.at) < gapMs, hard: slotCount(s.slots) >= SLOTS.length });
     }
   }
+  if (!onlyTid) { UM_MEMO = { src: D().visits, key: memoKey, m }; Promise.resolve().then(() => { if (UM_MEMO && UM_MEMO.m === m) UM_MEMO = null; }); }
   return m;
 }
 /* 区域の「試した時間帯」：まだ会えていない家で試した時間帯を、すべて合わせた数（分母は SLOTS.length）。
@@ -8663,10 +8715,11 @@ function unmetIndex(onlyTid) {
 const triedUnion = items => { let m = 0; for (const x of (items || [])) m |= x.tried; return m; };
 const triedOf = items => { const xs = (items || []).filter(x => !x.hard); return xs.length ? slotCount(triedUnion(xs)) : null; }; // 10通りすべて留守の家（hard）は、カード・um と同じく除く（入れると必ず 10/10 になる）
 function lockedKeys() { const s = new Set(); activeCards().forEach(c => c.keys.forEach(k => s.add(k))); return s; }
-/* カードに入れる家：長く会えていない家から、上限の数まで */
-function cardKeys(items, slot, locked) {
-  const max = Number(D().settings.awayCardMax) || 0;
-  const list = items.filter(x => !x.hard && !x.recent && !hasSlot(x.tried, slot) && !locked.has(x.k))
+/* カードに入れる家：上限回数・最短間隔・時間帯のルール（rl。なければ今の設定）に合う家を、長く会えていない家から、上限の数まで */
+function cardKeys(items, slot, locked, rl) {
+  rl = rl || awayRule();
+  const max = Number(D().settings.awayCardMax) || 0, now = Date.now();
+  const list = items.filter(x => awayOk(x, slot, rl, now) && !locked.has(x.k))
     .sort((a, b) => (a.first < b.first ? -1 : 1)).map(x => x.k);
   return max ? list.slice(0, max) : list;
 }
@@ -8696,11 +8749,12 @@ function takeAwayCard(tid, slot, grp) {
   }
   const t = terrById(tid);
   if (!t || !awayEligibleTerr(t, me().id) || (!awayEligibleBase(t, me().id) && !focusSlots(t).includes(slot))) { toast('このカードは受け取れません'); return; }
-  const keys = cardKeys(unmetIndex().get(tid) || [], slot, lockedKeys());
+  const rl = awayRule(); // 受け取った時点のルールを、カードに控える（あとで係が設定を変えても、このカードは変わらない）
+  const keys = cardKeys(unmetIndex().get(tid) || [], slot, lockedKeys(), rl);
   if (!keys.length) { toast('このカードの家は、今はありません'); renderAll(); return; }
   const now = new Date();
   const card = { id: 'c' + uid(), terrId: tid, slot, by: me().id, at: now.toISOString(),
-    expiresAt: awayExpiry(t, now.getTime()), keys };
+    expiresAt: awayExpiry(t, now.getTime()), keys, rl };
   if (G) { card.group = myGroup(); card.helpers = []; }
   commit(`${G ? 'グループの' : ''}留守宅カード（区域${t.no}・${slotShort(slot)}）を受け取りました`, () => { D().awayCards.push(card); });
   if (G) openHelpers(null, card.id); // グループのカードは、続けて「今日回る人」をえらぶ
@@ -9116,11 +9170,24 @@ function renderAwayAdmin() {
   const step = (key, label, unit, d) => `<div class="setrow"><span>${label}</span><div class="stepper">
     <button type="button" data-aset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${st[key]}${unit}</output>
     <button type="button" data-aset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div></div>`;
-  $('#adAwaySet').innerHTML = `<div class="setrow"><span>留守宅カードが自動で終わるとき<br><small class="hint">「区域の返却の目安まで」は、区域を受け取った日から返却の目安（${lendDays()}日）までです。目安がない区域は、下の日数で終わります</small></span>
+  const rl = awayRule();
+  const stp = (key, val, unit, label) => `<div class="stepper"><button type="button" data-aset="${key}" data-d="-1" aria-label="${label}を減らす">−</button><output class="wide">${val}${unit}</output>
+    <button type="button" data-aset="${key}" data-d="1" aria-label="${label}を増やす">＋</button></div>`;
+  const two = (key, cur, a, b) => `<div class="seg" role="group"><button type="button" data-sset="${key}" data-v="${a[0]}" aria-pressed="${cur === a[0]}">${a[1]}</button>
+    <button type="button" data-sset="${key}" data-v="${b[0]}" aria-pressed="${cur === b[0]}">${b[1]}</button></div>`;
+  const rrow = (label, hint, ctl) => `<div class="setrow"><span>${label}<br><small class="hint">${hint}</small></span>${ctl}</div>`;
+  $('#adAwaySet').innerHTML = `<p class="q"><b>留守宅訪問のルール</b></p>` +
+    rrow('留守宅として訪ねる上限回数', '今回の巡回で留守だった日の数です（同じ日は1回）。届いた家は、次の巡回が始まるまで留守宅カードに入りません', stp('awayCap', rl.cap, '回', '上限回数')) +
+    rrow('この日数以内に訪ねた家は、カードに入れない', '同じ家を次に訪ねるまでの最短の間隔です。0にすると、間隔をあけません', stp('awayRecentDays', rl.gap, '日', '最短間隔')) +
+    rrow('同じ家に同じ時間帯を重ねない', 'オンのときは、同じ家を同じ時間帯（例：平日の朝）では訪ねません。10通りすべて試した家は、いちばん前に試した時間帯から順に戻ります', two('awayNoRepeat', rl.nr, [1, 'オン'], [0, 'オフ'])) +
+    rrow('試した時間帯の数え方', 'どの時間帯を「試した」とみなすかだけが変わります。留守宅になる家の範囲は変わりません（今回の巡回で会えていない家です）', two('awayScope', rl.sc, [0, '今回の巡回だけ'], [1, '前回の巡回も含める'])) +
+    `<p class="hint">設定を変えても、今出ているカードには反映されません。次に受け取るカードから変わります。</p>
+    <p class="hint">巡回：その区域の直近の正式返却日の翌日から、次の正式返却まで。</p>
+    <p class="q"><b>留守宅カードの出し方</b></p>` +
+    `<div class="setrow"><span>留守宅カードが自動で終わるとき<br><small class="hint">「区域の返却の目安まで」は、区域を受け取った日から返却の目安（${lendDays()}日）までです。目安がない区域は、下の日数で終わります</small></span>
       <div class="seg" role="group"><button type="button" data-sset="awayExp" data-v="0" aria-pressed="${Number(st.awayExp) !== 1}">日数で</button>
       <button type="button" data-sset="awayExp" data-v="1" aria-pressed="${Number(st.awayExp) === 1}">区域の返却の目安まで</button></div></div>` +
     step('awayDays', '留守宅カードが自動で終わるまで', '日', 1) + step('awayMax', '1人が同時に持てる留守宅カード', '枚まで', 1) +
-    step('awayRecentDays', 'この日数以内に訪ねた家は、カードに入れない', '日', 1) +
     `<div class="setrow"><span>1枚のカードに入れる家の数<br><small class="hint">長く会えていない家から入れます</small></span><div class="stepper">
       <button type="button" data-aset="awayCardMax" data-d="-5" aria-label="減らす">−</button><output class="wide">${st.awayCardMax ? st.awayCardMax + '軒まで' : '制限なし'}</output>
       <button type="button" data-aset="awayCardMax" data-d="5" aria-label="増やす">＋</button></div></div>
@@ -13476,8 +13543,9 @@ function bindStatic() {
     }
     else if ((x = q('[data-aset]'))) {
       const st = D().settings, key = x.dataset.aset;
-      const lim = key === 'awayDays' ? [3, 14] : key === 'awayRecentDays' ? [0, 30] : key === 'awayCardMax' ? [0, 50] : [1, 5];
-      st[key] = Math.min(lim[1], Math.max(lim[0], st[key] + Number(x.dataset.d)));
+      const lim = key === 'awayDays' ? [3, 14] : key === 'awayRecentDays' ? [0, 30] : key === 'awayCardMax' ? [0, 50] : key === 'awayCap' ? [1, 15] : [1, 5];
+      const cur = st[key] == null || !isFinite(Number(st[key])) ? (key === 'awayCap' || key === 'awayRecentDays' ? 3 : 1) : Number(st[key]);
+      st[key] = Math.min(lim[1], Math.max(lim[0], cur + Number(x.dataset.d)));
       Store.save(); renderAll(); toast('設定を変えました');
     }
     else if ((x = q('[data-reqok]'))) approveReq(x.dataset.reqok);

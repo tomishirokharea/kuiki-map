@@ -2943,5 +2943,20 @@ window.KUIKI_I18N.es = {
 "{0}通りすべてを試す必要はありません。会えなかった家の{1}%を訪ね直すと、区域が完了します": "No hace falta probar las {0} combinaciones. Al revisitar el {1} % de las casas donde no hubo respuesta, el territorio queda completo",
 "同じ家に、続けて何人も行かないように。": "Para que no vayan varias personas seguidas a la misma casa.",
 "留守宅カードに入れる家は、『区域 ＞ 状況』の『この日数以内に訪ねた家は、カードに入れない』で決めます。": "Las casas que entran en la tarjeta de ausentes se definen en «Territorio > Situación», en «No incluir casas visitadas dentro de estos días».",
-"留守宅カードに、区域全体の進み具合と、試した時間帯が出るようになりました": "La tarjeta de ausentes ahora muestra el avance de todo el territorio y las franjas intentadas"
+"留守宅カードに、区域全体の進み具合と、試した時間帯が出るようになりました": "La tarjeta de ausentes ahora muestra el avance de todo el territorio y las franjas intentadas",
+"留守宅訪問のルール": "Reglas de visita a ausentes",
+"留守宅として訪ねる上限回数": "Máximo de visitas como ausentes",
+"今回の巡回で留守だった日の数です（同じ日は1回）。届いた家は、次の巡回が始まるまで留守宅カードに入りません": "Es el número de días en que no había nadie en esta vuelta (el mismo día cuenta una vez). La casa que llega al máximo no entra en tarjetas de ausentes hasta que empiece la siguiente vuelta",
+"同じ家を次に訪ねるまでの最短の間隔です。0にすると、間隔をあけません": "Es el intervalo mínimo hasta volver a visitar la misma casa. Con 0 no se deja intervalo",
+"同じ家に同じ時間帯を重ねない": "No repetir la misma franja en la misma casa",
+"オンのときは、同じ家を同じ時間帯（例：平日の朝）では訪ねません。10通りすべて試した家は、いちばん前に試した時間帯から順に戻ります": "Si está en «Sí», no se visita la misma casa en la misma franja (p. ej., mañana de entre semana). Una casa con las 10 franjas probadas vuelve a entrar empezando por la franja probada hace más tiempo",
+"試した時間帯の数え方": "Cómo contar las franjas probadas",
+"どの時間帯を「試した」とみなすかだけが変わります。留守宅になる家の範囲は変わりません（今回の巡回で会えていない家です）": "Solo cambia qué franjas se consideran «probadas». No cambia qué casas son de ausentes (las que no se encontró en esta vuelta)",
+"今回の巡回だけ": "Solo esta vuelta",
+"前回の巡回も含める": "Incluir también la vuelta anterior",
+"設定を変えても、今出ているカードには反映されません。次に受け取るカードから変わります。": "Aunque cambie los ajustes, no afecta a las tarjetas ya entregadas. Cambia desde la próxima tarjeta que se reciba.",
+"巡回：その区域の直近の正式返却日の翌日から、次の正式返却まで。": "Vuelta: desde el día siguiente a la última devolución oficial del territorio hasta la siguiente devolución oficial.",
+"留守宅カードの出し方": "Cómo se entregan las tarjetas de ausentes",
+"違う時間帯でこの回数留守だった家を「手紙の候補」の一覧に出します（留守宅の画面に出ます）。留守宅カードに入れるかどうかは、「留守宅訪問のルール」で決めます。": "Las casas sin nadie en esta cantidad de franjas distintas aparecen en la lista de «candidatas a carta». Si entran en la tarjeta de ausentes se define en «Reglas de visita a ausentes».",
+"違う時間帯でこの回数留守だった家を「手紙の候補」の一覧に出します。単身向けのアパートが多い区域などは、回数を増やします。": "Las casas sin nadie en esta cantidad de franjas distintas aparecen en la lista de «candidatas a carta». En territorios con muchos apartamentos para personas solas, suba la cantidad."
 };

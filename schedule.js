@@ -229,7 +229,7 @@
       const m = _unmetIndex.apply(this, arguments);
       m.forEach((items, tid) => {
         const n = triesFor(TID.get(tid));
-        items.forEach(x => { if (!x.hard && slotCount(x.tried) >= n) { x.hard = true; x.letter = true; } });
+        items.forEach(x => { if (!x.hard && slotCount(x.triedAll != null ? x.triedAll : x.tried) >= n) { x.hard = true; x.letter = true; } }); // 手紙の候補は、これまでの全記録で数える（留守宅カードに入れるかは、「留守宅訪問のルール」で決める）
       });
       return m;
     };
@@ -246,14 +246,15 @@
     if (!box) return;
     const head = box.previousElementSibling && box.previousElementSibling.previousElementSibling;
     if (head && head.tagName === 'H3') head.textContent = '手紙の候補（違う時間帯で何度も留守だった家）';
+    const tr = x => (x.triedAll != null ? x.triedAll : x.tried);
     const hard = [...unmetIndex().values()].flat().filter(x => x.hard)
-      .sort((a, b) => slotCount(b.tried) - slotCount(a.tried) || (a.first < b.first ? -1 : 1));
-    box.innerHTML = `<p class="hint">違う時間帯で${triesAll()}回（区域ごとに変えたときは、その回数）留守だった家は、留守宅カードに入れません。ふだんの区域カードでは、これまでどおり訪ねます。</p>` +
+      .sort((a, b) => slotCount(tr(b)) - slotCount(tr(a)) || (a.first < b.first ? -1 : 1));
+    box.innerHTML = `<p class="hint">違う時間帯で${triesAll()}回（区域ごとに変えたときは、その回数）留守だった家の一覧です。留守宅カードに入れるかどうかは、「区域」＞「状況」の「留守宅訪問のルール」で決めます。ふだんの区域カードでは、これまでどおり訪ねます。</p>` +
       (hard.length ? hard.slice(0, 30).map(x => {
         const t = TID.get(x.h.terrId);
         return `<article class="ritem k-new"><div>
           <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(x.h, x.u)}</p>
-          <p class="muted">留守 ${visitsOf(x.k).length}回・試した時間帯 ${slotCount(x.tried)}つ（${slotList(x.tried).map(slotShort).join('、')}）</p>
+          <p class="muted">留守 ${visitsOf(x.k).length}回・試した時間帯 ${slotCount(tr(x))}つ（${slotList(tr(x)).map(slotShort).join('、')}）</p>
         </div><button class="btn small" data-go="${x.h.id}" data-unit="${esc(x.u)}">地図で見る</button></article>`;
       }).join('') + (hard.length > 30 ? `<p class="muted">ほか ${hard.length - 30}件</p>` : '')
         : '<div class="empty">今はありません。</div>');
@@ -308,7 +309,7 @@
   const adjTag = t => {
     const a = [];
     if (fixOf(t) != null) a.push(`若い世代 ${fixOf(t)}%（手直し）`);
-    if (t.awayTries != null) a.push(`留守宅は${triesFor(t)}回まで`);
+    if (t.awayTries != null) a.push(`手紙の候補は${triesFor(t)}回から`);
     return a.length ? `<p class="muted">この区域だけの決め：${a.join('・')}</p>` : '';
   };
 
@@ -379,10 +380,10 @@
     const yw = wYoung(), yl = (YW.find(x => x[0] === yw) || [0, yw + '点'])[1], offs = offDays().filter(x => x >= ymd(new Date()));
     const seg = (key, opts, cur) => `<div class="seg" role="group">${opts.map(([v, l]) =>
       `<button type="button" data-sset="${key}" data-v="${v}" aria-pressed="${cur === v}">${l}</button>`).join('')}</div>`;
-    return `<details class="dueset"${setOpen ? ' open' : ''}><summary>区域係の決め（若い世代 ${yl}・留守宅は${triesAll()}回まで・控える日 ${offs.length}日）</summary>
+    return `<details class="dueset"${setOpen ? ' open' : ''}><summary>区域係の決め（若い世代 ${yl}・手紙の候補は${triesAll()}回から・控える日 ${offs.length}日）</summary>
       <div class="setrow"><span>おすすめ順で、若い世代の多い区域をどれだけ前に出すか<br><small class="hint">夏休み・年末年始・連休など、若い世代が家にいやすい時期は「強」にします。どれにしても、期限の近い区域がいちばん前です</small></span>
         ${seg('youngW', YW, yw)}</div>
-      <div class="setrow"><span>留守宅を終える回数<br><small class="hint">違う時間帯でこの回数留守だった家は、留守宅カードに入れず「手紙の候補」にします（留守宅の画面に出ます）。区域ごとにも変えられます（各区域の「調整」）</small></span>
+      <div class="setrow"><span>留守宅を終える回数<br><small class="hint">違う時間帯でこの回数留守だった家を「手紙の候補」の一覧に出します（留守宅の画面に出ます）。留守宅カードに入れるかどうかは、「留守宅訪問のルール」で決めます。区域ごとにも変えられます（各区域の「調整」）</small></span>
         <div class="stepper"><button type="button" data-dueset="awayTries" data-d="-1" aria-label="減らす">−</button><output class="wide">${triesAll()}回</output>
         <button type="button" data-dueset="awayTries" data-d="1" aria-label="増やす">＋</button></div></div>
       <div class="setrow"><span>夜（19時〜）も、留守宅を訪ねる時間帯として提案する</span>
@@ -425,7 +426,7 @@
           <button type="button" class="btn small primary" id="adjYoungSave">この数字にする</button>
           ${f != null ? '<button type="button" class="btn small" id="adjYoungClear">手直しをやめる</button>' : ''}</div>
         <p class="q">留守宅を終える回数</p>
-        <p class="hint">違う時間帯でこの回数留守だった家は、留守宅カードに入れず「手紙の候補」にします。単身向けのアパートが多い区域などは、回数を増やします。</p>
+        <p class="hint">違う時間帯でこの回数留守だった家を「手紙の候補」の一覧に出します。単身向けのアパートが多い区域などは、回数を増やします。</p>
         <div class="setrow"><span>${tries == null ? `全体の決め（${triesAll()}回）に合わせる` : `この区域は${tries}回まで`}</span>
           <div class="stepper"><button type="button" data-adjt="-1" aria-label="減らす">−</button><output class="wide">${tries == null ? triesAll() : tries}回</output>
           <button type="button" data-adjt="1" aria-label="増やす">＋</button></div></div>
