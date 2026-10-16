@@ -3052,5 +3052,27 @@ window.KUIKI_I18N.es = {
 "返却 {0}（記録が少なく途中扱い）": "Devuelto {0} (parcial por pocos registros)",
 "区域係が目安（{0}%）に届かないまま正式返却にした区域と、以前に記録が少ないまま正式返却になった区域です。{1}日たつと、記録を数え直し、届いていなければ自動で途中の返却にします（すぐ受け取れるようになります）。何もしなくてかまいません。": "Territorios que el encargado devolvió formalmente sin llegar al porcentaje indicado ({0}%) y territorios que antes quedaron con devolución formal con pocos registros. Pasados {1} días, se vuelven a contar los registros y, si no llegan, pasan solos a devolución parcial (se pueden tomar enseguida). No tiene que hacer nada.",
 "自動で確かめる対象にならなかった正式返却です（もう自由に受け取れる区域・紙の記録で回り終えた区域・自動受け取りを使っていないときなど）。押さなければ何も変わりません。": "Devoluciones formales que no entran en la verificación automática (territorios que ya se pueden tomar libremente, territorios terminados en papel, o cuando no se usa la entrega automática, etc.). Si no toca nada, no cambia nada.",
-"{0}{1}月{2}日": "{0}{2}/{1}"
+"{0}{1}月{2}日": "{0}{2}/{1}",
+/* 2026-10-17 返却ボタンの自動の決め方 */
+"1回目に訪ねた家": "Casas visitadas en la 1.ª vuelta",
+"1回目に訪ねた割合": "Porcentaje visitado en la 1.ª vuelta",
+"{0} / {1}軒（{2}%）・目安 {3}%": "{0} / {1} casas ({2} %) · meta {3} %",
+"留守だった家を、別の日に訪ね直した": "Casas sin respuesta revisitadas otro día",
+"{0}軒のうち {1}軒（{2}%）・目安 {3}%": "{1} de {0} casas ({2} %) · meta {3} %",
+"区域を回り終えました。返却すると、今日が区域を回り終えた日（S-13 の完了した日付）になります。": "Territorio completado. Al devolver, hoy será la fecha en que se completó (S-13).",
+"残りの留守宅 {0}軒を、留守宅カードにして返します。": "Las {0} casas ausentes restantes se devuelven como tarjetas de ausentes.",
+"だれでも受け取って、違う曜日・時間帯に訪ねられます。留守宅が目安（{0}%）まで訪ね直されたときに、区域の返却が完了します。": "Cualquiera puede recibirlas y visitar en otro día u horario. Cuando se revisite el {0} % de las casas ausentes, la devolución del territorio quedará completa.",
+"途中の返却になります。回った家が、目安（{0}%）に届いていません。": "Será una devolución sin terminar. Las casas visitadas no llegan a la meta ({0} %).",
+"この区域は貸出中止なので、区域係が次の人を決めます。": "La asignación de este territorio está suspendida; el encargado decidirá a quién se asigna.",
+"区域はすぐに、ほかの人が受け取れるようになります。次の人は、続きから回れます。": "Otra persona podrá recibir el territorio enseguida y seguir donde usted quedó.",
+"区域係が、次に回る人に貸し出します。": "El encargado lo asignará a la siguiente persona.",
+"まだ回るときは「もどる」を押して、続けて回ってください。": "Si todavía va a seguir, toque «Volver» y continúe.",
+"返却しないで、自分で留守宅を回る（カードを持ったまま）": "No devolver: yo revisito las casas ausentes (conservo la tarjeta)",
+"区域係の操作（目安に関係なく決める）": "Opciones del encargado (sin importar la meta)",
+"正式に返却する（区域を回り終えた）": "Devolución oficial (territorio completado)",
+"留守宅カードにして返す（だれでも受け取れる）": "Devolver como tarjetas de ausentes (cualquiera puede recibirlas)",
+"1回目を終えたことにして、本人が留守宅を回る": "Dar por terminada la 1.ª vuelta; el publicador revisita las casas ausentes",
+"返却の目安：留守だった家の{0}%を訪ね直す（届かないまま「返却する」を押すと、残りの家は留守宅カードになります）": "Para devolver: revisitar el {0} % de las casas ausentes (si toca «Devolver» antes, las casas restantes pasan a tarjetas de ausentes)",
+"すべての家に緑のチェックがつきました。「返却する」を押すと、会えなかった家は留守宅カードになります。": "Todas las casas tienen marca verde. Al tocar «Devolver», las casas sin respuesta pasan a tarjetas de ausentes.",
+"「返却する」を押すと、会えなかった家は留守宅カードになります。": "Al tocar «Devolver», las casas sin respuesta pasan a tarjetas de ausentes."
 };

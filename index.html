@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.7"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.8"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -260,6 +260,9 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .cardbar .progress{margin:6px 0 0}
 .cardbar .progress>i{background:var(--terr)}
 .progress.big{height:16px}
+.retlbl{margin:12px 0 4px;font-weight:700;font-size:15px}
+details.retadm{margin-top:14px;border-top:1px solid var(--line,#ddd);padding-top:8px}
+details.retadm>summary{min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer;color:var(--ink2)}
 .barhead{display:flex;align-items:center;gap:8px}
 .barhead p{flex:1}
 .foldbtn{flex:none;min-height:40px;border:2px solid var(--line);border-radius:10px;background:#fff;padding:0 12px;font-weight:700;font-size:15px}
@@ -8533,46 +8536,68 @@ async function declineReq(id) {
   });
 }
 
-/* ---------- 区域の返却（回り終えた日の記録） ---------- */
+/* ---------- 区域の返却（回り終えた日の記録） ----------
+   「返却する」を押したら、区域係が決めた目安で、自動で決める（returnPlan）。奉仕者はえらばなくてよい
+   ・1回目が目安に届いていない → 途中の返却（自動受け取りを使っていれば、すぐほかの人が受け取れる。続きから回れる）
+   ・1回目が届いていて、留守宅も目安まで訪ね直した → 正式な返却（今日が S-13 の完了した日付）
+   ・1回目は届いたが、留守宅が届いていない → 残りの留守宅を留守宅カードにして返す（留守宅カードの返却で目安に届いた日が正式な返却日）
+   区域係は「区域係の操作」をひらくと、目安に関係なく、今までどおりえらべる */
+function returnFreeText(t) {
+  const m = lendMode(t);
+  if (m === 'stop') return 'この区域は貸出中止なので、区域係が次の人を決めます。';
+  if (m === 'open' || Number(D().settings.autoFree) === 1) return '区域はすぐに、ほかの人が受け取れるようになります。次の人は、続きから回れます。';
+  return '区域係が、次に回る人に貸し出します。';
+}
 function openReturnSheet(tid) {
   const t = terrById(tid); if (!t || !t.holder) return;
-  const r = roundInfo(tid, true), th = D().settings.donePct, adm = isAdmin();
+  const r = roundInfo(tid, true); if (!r) return;
+  const th = D().settings.donePct, ret = awayRetPct(), adm = isAdmin(), plan = returnPlan(r), a = plan.a;
+  const simple = typeof isSimple === 'function' && isSimple();
   const sub = `${esc(uname(t.holder))}さん${t.lentAt ? `　受け取ってから ${daysSince(t.lentAt)}日・返却の目安 ${fmtDay(dueOf(t))}` : ''}`;
-  if (r.phase === 'away') {
-    const ok = r.aw.pct >= awayRetPct() || !r.aw.n;
-    setSheet(headHtml(t, `区域${t.no}を返却します`, sub) + `
-      <p class="muted">1回目を回り終えた日：<b>${fmtDay(t.firstDoneAt)}</b></p>
-      <div class="progress big" role="progressbar" aria-valuenow="${r.aw.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="留守宅を訪ね直した割合"><i style="width:${r.aw.pct}%"></i></div>
-      <p class="muted">1回目に会えなかった家 ${r.aw.n}軒のうち、訪ね直した家 ${r.aw.done}軒（${r.aw.pct}%）。返却の目安は${awayRetPct()}%です。</p>
-      ${ok ? '<p class="hint-strong ok">留守宅を十分に訪ね直しました。返却すると、今日が区域を回り終えた日（S-13 の完了した日付）になります。</p>'
-        : `<p class="hint-strong">あと ${Math.max(1, Math.ceil(r.aw.n * awayRetPct() / 100) - r.aw.done)}軒 訪ね直すと返却できます。${adm ? '（区域係は、このまま返却できます）' : '事情があるときは、区域係に相談してください。'}</p>${awayAdvice(r)}`}
-      ${adm && !ok && lowOnSet() && !t.firstLow && (lowP1(t, r) ?? 100) < th ? lowCheckHtml(th) : ''}
-      <button class="btn primary block wrap" data-fin="1"${ok || adm ? '' : ' disabled'}>返却する（区域を回り終えました）</button>
-      <button class="btn block wrap" data-pool>残りの留守宅を、留守宅カードにして返す（だれでも受け取れる）</button>
-      <button class="btn block wrap" data-fin="0">途中で返却する（回り終えた記録はつけません）</button>
-      <button class="btn block" data-close>もどる</button>`);
-    $$('[data-fin]', $('#sheet')).forEach(x => x.onclick = () => finishTerr(tid, x.dataset.fin === '1', lowChecked()));
-    $('[data-pool]', $('#sheet')).onclick = () => poolReturn(tid, lowChecked());
-    return;
-  }
-  const total = r.c.todo + r.c.done, reached = r.pct >= th;
-  setSheet(headHtml(t, `区域${t.no}の1回目`, sub) + `
-    <div class="progress big" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${r.pct}%"></i></div>
-    <p class="muted">受け取ってから訪ねた家 ${r.c.done} / ${total}（${r.pct}%）${r.c.todo ? `　残り ${r.c.todo}軒` : ''}</p>
-    <p class="q">区域を1回目、回り終えましたか？</p>
-    <p class="hint">${reached ? '1回目を回り終えたら、留守だった家の回り方をえらびます。'
-      : `1回目を終えるには、${th}%以上の家を訪ねてください。${adm ? '（区域係は、このまま進められます）' : ''}`}</p>
-    ${adm && !reached && lowOnSet() ? lowCheckHtml(th) : ''}
-    <button class="btn primary block wrap" data-first${reached || adm ? '' : ' disabled'}>1回目を回り終えた：自分で留守宅を回る（カードを持ったまま）</button>
-    <p class="hint">会えなかった家だけが目立つようになります。別の日・違う時間帯に訪ね直してください。</p>
-    <button class="btn block wrap" data-pool${reached || adm ? '' : ' disabled'}>1回目を回り終えた：留守宅カードにして返す（だれでも受け取れる）</button>
-    <p class="hint">会えなかった家は、時間帯ごとの「留守宅カード」になり、ほかの人が回ります。留守宅カードを返却したときに、決めた割合まで訪ね直されていれば、その日が正式な返却日（S-13 の完了した日付）になります。届いていなければ、残りの家はまた留守宅カードに出ます。</p>
-    <button class="btn block wrap" data-fin="0">途中で返却する（回り終えた記録はつけません）</button>
-    <p class="hint">残りの家は、次に回る人のおすすめに出ます。</p>
-    <button class="btn block" data-close>もどる</button>`);
-  if ($('[data-first]', $('#sheet'))) $('[data-first]', $('#sheet')).onclick = () => firstDone(tid, lowChecked());
-  if ($('[data-pool]', $('#sheet'))) $('[data-pool]', $('#sheet')).onclick = () => poolReturn(tid, lowChecked());
-  $$('[data-fin]', $('#sheet')).forEach(x => x.onclick = () => finishTerr(tid, false));
+  const bar = (pct, label) => `<div class="progress big" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="${label}"><i style="width:${pct}%"></i></div>`;
+  const total = r.c.todo + r.c.done;
+  const firstPart = r.phase === 'away'
+    ? `<p class="muted">1回目を回り終えた日：<b>${fmtDay(t.firstDoneAt)}</b></p>`
+    : `<p class="retlbl">1回目に訪ねた家</p>${bar(r.pct1, '1回目に訪ねた割合')}
+       <p class="muted">${r.c.done} / ${total}軒（${r.pct1}%）・目安 ${th}%</p>`;
+  const awayPart = plan.kind === 'partial' || !a.n ? ''
+    : `<p class="retlbl">留守だった家を、別の日に訪ね直した</p>${bar(a.pct, '留守宅を訪ね直した割合')}
+       <p class="muted">${a.n}軒のうち ${a.done}軒（${a.pct}%）・目安 ${ret}%</p>`;
+  const left = Math.max(0, a.n - a.done);
+  const result = plan.kind === 'done'
+    ? `<p class="hint-strong ok">区域を回り終えました。返却すると、今日が区域を回り終えた日（S-13 の完了した日付）になります。</p>`
+    : plan.kind === 'pool'
+      ? `<p class="hint-strong">残りの留守宅 ${left}軒を、留守宅カードにして返します。</p>
+         <p class="muted">だれでも受け取って、違う曜日・時間帯に訪ねられます。留守宅が目安（${ret}%）まで訪ね直されたときに、区域の返却が完了します。</p>`
+      : `<p class="hint-strong">途中の返却になります。回った家が、目安（${th}%）に届いていません。</p>
+         <p class="muted">${returnFreeText(t)}</p>
+         <p class="hint">まだ回るときは「もどる」を押して、続けて回ってください。</p>`;
+  const self = plan.kind === 'pool' && r.phase === 'first' && !simple
+    ? `<button class="btn block wrap" data-first>返却しないで、自分で留守宅を回る（カードを持ったまま）</button>` : '';
+  // 区域係の操作：目安に関係なく、今までどおりえらべる（記録の少ない返却の確かめも、今までどおり）
+  const low = lowOnSet() && (r.phase === 'first' ? r.pct1 < th : (!t.firstLow && (lowP1(t, r) ?? 100) < th)) ? lowCheckHtml(th) : '';
+  const admBox = !adm ? '' : `<details class="retadm"><summary>区域係の操作（目安に関係なく決める）</summary>
+      ${low}
+      <button class="btn block wrap" data-fin="1">正式に返却する（区域を回り終えた）</button>
+      <button class="btn block wrap" data-pool>留守宅カードにして返す（だれでも受け取れる）</button>
+      ${r.phase === 'first' ? '<button class="btn block wrap" data-afirst>1回目を終えたことにして、本人が留守宅を回る</button>' : ''}
+      <button class="btn block wrap" data-fin="0">途中で返却する（回り終えた記録はつけません）</button></details>`;
+  setSheet(headHtml(t, `区域${t.no}を返却します`, sub) + `
+    ${firstPart}${awayPart}${result}
+    <button class="btn primary block wrap" data-retgo>返却する</button>
+    ${self}
+    <button class="btn block" data-close>もどる</button>
+    ${admBox}`);
+  const sh = $('#sheet'), on = (q, f) => { const e = $(q, sh); if (e) e.onclick = f; };
+  on('[data-retgo]', () => {
+    if (plan.kind === 'done') finishTerr(tid, true);
+    else if (plan.kind === 'pool') poolReturn(tid);
+    else finishTerr(tid, false);
+  });
+  on('[data-first]', () => firstDone(tid));
+  on('[data-afirst]', () => firstDone(tid, lowChecked()));
+  on('[data-pool]', () => poolReturn(tid, lowChecked()));
+  $$('[data-fin]', sh).forEach(x => x.onclick = () => finishTerr(tid, x.dataset.fin === '1', lowChecked()));
 }
 /* 1回目を回り終えた（カードは本人が持ったまま、留守宅を回る段階になる） */
 function firstDone(tid, lowOk) {
@@ -8645,12 +8670,27 @@ function poolReturn(tid, lowOk) {
 function poolInfo(t) {
   if (!t || !t.awayPoolAt || t.holder) return null;
   const since = t.lastLentAt || '', first = t.lastFirstAt || t.awayPoolAt, sp = isSpecial(t), times = [];
+  // 1回目の段階から、そのまま留守宅カードにして返した区域（返却ボタンの自動の決め方。1回目を終えた日＝返した日）は、
+  // 返却ボタンと同じ数え方（awayAgain）：1回目の段階で別の日に訪ね直した家も「訪ね直した」に数える
+  const ph1 = first >= t.awayPoolAt;
   let n = 0;
   for (const h of housesOf(t.id)) {
     for (const u of (sp ? specialTargets(h, t) : targets(h))) {
       if (!sp && coveredBySpecial(h, u)) continue;
       const k = K(h.id, u);
-      if (D().dnc[k] || metBetween(k, since, first)) continue;
+      if (D().dnc[k]) continue;
+      if (ph1) {
+        const after = visitsOf(k).filter(v => v.at > first);
+        if (!visitsOf(k).some(v => v.at >= since && v.at <= first)) { // 1回目の段階で訪ねていなかった家：返したあとに1回訪ねれば「訪ね直した」
+          if (recentMet(k) && !after.length) continue;
+          n++; if (after.length) times.push(after[after.length - 1].at);
+          continue;
+        }
+        const a = awayAgain(k, since); if (a === null) continue;
+        n++; if (a) times.push(a);
+        continue;
+      }
+      if (metBetween(k, since, first)) continue;
       if (!visitsOf(k).some(v => v.at >= since && v.at <= first) && recentMet(k)) continue;
       n++;
       const after = visitsOf(k).filter(v => v.at > first);
@@ -8671,7 +8711,8 @@ function poolEndAt(t, p) {
   if (activeCards().some(c => c.terrId === t.id)) return null; // 受け取り中：返却を待つ
   const ends = D().awayCards.filter(c => c.terrId === t.id && c.at >= t.awayPoolAt).map(c => c.endedAt || c.expiresAt).filter(Boolean).sort();
   const last = ends.length ? ends[ends.length - 1] : '';
-  return last > p.doneAt ? last : p.doneAt;
+  // 留守宅カードにして返した日より前にはしない（返した日より前に届いていた区域で、完了日が返却日より前になり「途中の返却」に見えないように）
+  return [last, p.doneAt, t.awayPoolAt].filter(Boolean).sort().pop();
 }
 let poolBusy = false;
 function finalizePools() {
@@ -9168,6 +9209,7 @@ function roundInfo(tid, anyHolder) {
   const since = t.lentAt || '', first = t.firstDoneAt || '', cur = slotOf(new Date()), sp = isSpecial(t);
   const map = new Map(), items = [], c = { todo: 0, done: 0, recent: 0, other: 0 };
   const aw = { n: 0, done: 0, slots: 0 };
+  const aw0 = { n: 0, done: 0 }; // 1回目の段階の留守宅（返却ボタンで「留守宅も回り終えたか」を決める。awayAgain）
   for (const h of housesOf(tid)) {
     for (const u of (sp ? specialTargets(h, t) : targets(h))) {
       if (!sp && coveredBySpecial(h, u)) continue; // 特別区域（コンビニなど）で回る家は、ふつうの区域カードに入れない
@@ -9186,6 +9228,7 @@ function roundInfo(tid, anyHolder) {
       else if (since && visitedSince(k, since)) st = otherMetOnly(k, since) ? 'other' : 'done'; // other＝ほかの人が会えた（青いチェック）
       else if (recentMet(k)) st = 'recent';  // 最近会えた家は、今回はとばしてよい
       else { st = 'todo'; items.push(Object.assign({ k, h, u }, scoreTarget(k, cur))); }
+      if (!first && st !== 'refuse' && st !== 'recent') { const a = awayAgain(k, since); if (a !== null) { aw0.n++; if (a) aw0.done++; } }
       map.set(k, st);
       if (st === 'todo' || st === 'done') c[st]++;
       else if (st === 'other') { c.done++; c.other++; } // 済みの数には入れる（青いチェックで区別するだけ）
@@ -9197,7 +9240,35 @@ function roundInfo(tid, anyHolder) {
   const total = c.todo + c.done + inc;
   const pct1 = total ? Math.round((c.done + inc) / total * 100) : 100;
   aw.pct = aw.n ? Math.round(aw.done / aw.n * 100) : 100;
-  return { t, cur, map, c, items, pct: first ? aw.pct : pct1, pct1, phase: first ? 'away' : 'first', aw };
+  aw0.pct = aw0.n ? Math.round(aw0.done / aw0.n * 100) : 100;
+  return { t, cur, map, c, items, pct: first ? aw.pct : pct1, pct1, phase: first ? 'away' : 'first', aw, aw0 };
+}
+/* 1回目の段階の留守宅：回りはじめた日（since）から見て、最初に訪ねた日に会えなかった家（まだ訪ねていない家もふくむ）。
+   返り値：null＝留守宅ではない（最初に訪ねた日に会えた）／''＝まだ別の日に訪ね直していない／日時＝別の日に訪ね直した最初の時刻
+   （同じ日に何回訪ねても1回。別の日に訪ねたら、会えても留守でも「訪ね直した」） */
+function awayAgain(k, since) {
+  const vs = visitsOf(k); // 新しい順
+  let i = vs.length - 1;
+  while (i >= 0 && vs[i].at < since) i--;
+  if (i < 0) return '';
+  const d0 = ymd(new Date(vs[i].at));
+  for (; i >= 0; i--) { // 古い順にたどる
+    const v = vs[i];
+    if (ymd(new Date(v.at)) !== d0) return v.at;
+    if (v.result === 'met') return null;
+  }
+  return '';
+}
+/* 返却ボタンを押したときの決め方（区域係の設定の目安で、自動で決める）
+   ・1回目が目安（donePct）に届いていない → 'partial'：途中の返却（自動受け取りを使っていれば、すぐほかの人が受け取れる・続きから回れる）
+   ・1回目が届いていて、留守宅も目安（awayRetPct）まで訪ね直されている → 'done'：正式な返却（今日が S-13 の完了した日付）
+   ・1回目は届いたが、留守宅が届いていない → 'pool'：残りの留守宅を留守宅カードにして返す（だれでも受け取れる）。
+     留守宅カードを返却したときに目安に届けば、その日が正式な返却日（endAwayCard・poolFinish。今までどおり） */
+function returnPlan(r) {
+  if (!r) return null;
+  const a = r.phase === 'away' ? r.aw : r.aw0;
+  if (r.phase === 'first' && r.pct1 < D().settings.donePct) return { kind: 'partial', a };
+  return { kind: !a.n || a.pct >= awayRetPct() ? 'done' : 'pool', a };
 }
 const lendDays = () => Number(D().settings.lendDays) || 120;
 const awayRetPct = () => (D().settings.awayRetPct == null ? 70 : Number(D().settings.awayRetPct));
@@ -9242,16 +9313,16 @@ function roundHint(t) {
     const head = `<p class="hint-strong">留守宅を回る段階です。1回目に会えなかった家 ${r.aw.n}軒のうち、${r.aw.done}軒を訪ね直しました（${r.aw.pct}%）。</p>`;
     const ok = r.aw.pct >= awayRetPct()
       ? `<p class="hint-strong ok">留守宅を十分に訪ね直しました。${own ? '「返却する」から、区域を返却できます。' : ''}</p>`
-      : `<p class="muted">返却の目安：留守だった家の${awayRetPct()}%を訪ね直す（回れないときは「返却する」から留守宅カードにして返せます）</p>`;
+      : `<p class="muted">返却の目安：留守だった家の${awayRetPct()}%を訪ね直す（届かないまま「返却する」を押すと、残りの家は留守宅カードになります）</p>`;
     if (!r.c.todo) return head + ok;
     const plan = roundPlan(r);
     return head + ok + awayAdvice(r) + (plan.length ? `<p class="hint-strong">今（${slotShort(r.cur)}）のおすすめ ${plan.length}か所。地図をひらくと、番号順に回れます。</p>` : '');
   }
   if (!r.c.todo) return own
-    ? `<p class="hint-strong ok">すべての家に緑のチェックがつきました。「返却する」から、留守宅の回り方（自分で回る・留守宅カードにして返す）をえらびます。</p>`
+    ? `<p class="hint-strong ok">すべての家に緑のチェックがつきました。「返却する」を押すと、会えなかった家は留守宅カードになります。</p>`
     : `<p class="hint-strong ok">すべての家に緑のチェックがつきました。</p>`;
   const near = r.pct >= D().settings.donePct
-    ? `<p class="hint-strong ok">1回目をほぼ回り終えました（${r.pct}%）。${own ? '「返却する」から、留守宅の回り方（自分で回る・留守宅カードにして返す）をえらびます。' : ''}</p>` : '';
+    ? `<p class="hint-strong ok">1回目をほぼ回り終えました（${r.pct}%）。${own ? '「返却する」を押すと、会えなかった家は留守宅カードになります。' : ''}</p>` : '';
   const plan = roundPlan(r);
   if (!plan.length) return near;
   const intr = plan.filter(s => s.reasons.some(y => y.includes('★'))).length;
