@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.2"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.3"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -335,6 +335,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .cardbar{position:absolute;left:10px;right:64px;bottom:22px;z-index:500;background:var(--paper);border:3px solid var(--draw);border-radius:var(--r);padding:8px 12px;box-shadow:0 4px 12px #0004}
 .cardbar p{margin:0}
 .nowtag{display:inline-block;background:var(--brand);color:#fff;border-radius:6px;padding:0 6px;font-size:14px;vertical-align:middle}
+.daytag{display:inline-block;background:var(--warn-bg);border:2px solid var(--away);border-radius:6px;padding:0 6px;font-size:14px;font-weight:700;vertical-align:middle}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .slotpick{width:100%;border-collapse:collapse;text-align:center;margin:8px 0}
 .slotpick th{font-size:15px;padding:4px 2px;font-weight:700}
@@ -3545,6 +3546,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.3', items: [
+    ['返', '正式に返却された区域の、まだ会えていない家を、寝かせてから「返却後の留守宅カード」で回れるようになりました'],
+    ['今', '家が少ない留守宅カードは、「今日だけ」になりました']
+  ] },
   { v: '2026.13.2', items: [
     ['分', 'グループの留守宅カードで、「分ける」「シェア」を選べるようになりました']
   ] },
@@ -8725,6 +8730,8 @@ function extState(t) {
 }
 const extRl = () => { const r = awayRule(), x = extSet(); return Object.assign({}, r, { cap: x.cap, gap: Math.max(r.gap, x.rest) }); };
 const rlFor = t => (extState(t) ? extRl() : awayRule());
+/* その日限りのカード：家が awayDayOnly 軒以下（0＝使わない）。受け取るときの期限と、一覧の「今日だけ」の印に使う */
+const dayOnlyN = n => { const d = Number(D().settings.awayDayOnly) || 0; return d > 0 && n <= d; };
 const FULL_SLOTS = (1 << SLOTS.length) - 1; // 10通りすべて
 /* 巡回：正式返却のあと、次に区域カードとして受け取った日から、次の正式返却まで（正式返却がまだない区域は、すべての記録）。
    返却後の留守宅カードの期間は、前の巡回の続きとして数える（返却後のカードで訪ねた記録が、次の巡回の上限回数に入らないように）。
@@ -8856,7 +8863,7 @@ function takeAwayCard(tid, slot, grp) {
   let exp = Date.parse(awayExpiry(t, now.getTime()));
   if (xs) exp = Math.max(Math.min(exp, xs.end), eod.getTime()); // 返却後は出す期間の終わりまで（今日の終わりより前にはしない）
   // その日限り：家が少ないカード（awayDayOnly 軒以下。0＝使わない）は、受け取った日の終わりに自動で終わる。返却後に限らず、個人・グループのカードすべて
-  const dayOnly = Number(D().settings.awayDayOnly) || 0, day = dayOnly > 0 && keys.length <= dayOnly;
+  const day = dayOnlyN(keys.length);
   if (day) exp = eod.getTime();
   const card = { id: 'c' + uid(), terrId: tid, slot, by: me().id, at: now.toISOString(),
     expiresAt: new Date(exp).toISOString(), keys, rl };
@@ -9299,10 +9306,11 @@ function openAwayPick(grp) {
       ${G ? '' : `<div class="row"><button class="btn small" id="apSlots">${reg ? '行ける時間を変える' : '行ける時間を登録する'}</button></div>`}
       ${full ? `<div class="notice warn">${G ? 'グループの' : ''}留守宅カードは${D().settings.awayMax}枚まで持てます。受け取り中のカードを終えると、受け取れます。</div>` : ''}
       ${list.length ? list.slice(0, 20).map(x => `<article class="ritem k-away"><div>
-          <p class="rt"><span class="stamp xs${noCls(x.t.no)}">${esc(x.t.no)}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}</p>
+          <p class="rt"><span class="stamp xs${noCls(x.t.no)}">${esc(x.t.no)}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}${dayOnlyN(x.keys.length) ? ' <span class="daytag">今日だけ</span>' : ''}</p>
           <p class="metline">会える見込み 約${pctTxt(x.chance)}<small class="muted">（目安）</small></p>
           ${ageLine(x.t)}
           <p class="muted">まだ会えていない家 ${x.keys.length}軒${x.longDays ? `　いちばん長い家は${x.longDays}日会えていない` : ''}${x.dist != null ? `　ここから約${fmtDist(x.dist)}` : ''}${x.t.holder ? '　あなたの区域' : ''}</p>
+          ${x.ext ? '<p class="muted">区域は回り終えています（残りの留守宅）</p>' : ''}
         </div><button class="btn small primary" data-awaytake2="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`).join('')
         : `<div class="empty">今、合う留守宅カードはありません。${G ? '<br>集まりの時間帯を変えると、ほかのカードが見つかることがあります。' : reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`}
       <p class="hint">${awayExpText()}回り終えたら「返却する」を押します。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>
@@ -9330,8 +9338,9 @@ function renderAwaySuggest() {
     (mine ? `<br><b>受け取り中 ${mine}枚</b>（${st.awayMax}枚まで）。「区域カード」画面にあります。` : '');
   const list = awaySuggestions(u.id, slots).slice(0, 10);
   $('#awayList').innerHTML = list.length ? list.map(x => `<article class="ritem k-away"><div>
-      <p class="rt"><span class="stamp xs${noCls(x.t.no)}">${esc(x.t.no)}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}</p>
+      <p class="rt"><span class="stamp xs${noCls(x.t.no)}">${esc(x.t.no)}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}${dayOnlyN(x.keys.length) ? ' <span class="daytag">今日だけ</span>' : ''}</p>
       <p class="muted">まだ会えていない家 ${x.keys.length}軒${x.dist != null ? `　ここから約${fmtDist(x.dist)}` : ''}${x.t.holder ? '　あなたの区域' : ''}</p>
+      ${x.ext ? '<p class="muted">区域は回り終えています（残りの留守宅）</p>' : ''}
     </div><button class="btn small primary" data-awaytake="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`).join('') +
     (full ? `<p class="hint">持てる枚数に達しています。受け取り中のカードを終えると、受け取れます。</p>` : '')
     : `<div class="empty">今、合う留守宅カードはありません。${reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`;
@@ -9377,7 +9386,7 @@ function extAdminHtml(idx, rrow, stpd) {
     const xs = extState(t); if (!xs) return '';
     const items = idx.get(t.id) || [], tc = triedOf(items);
     const state = xs.why === 'rest' ? `寝かせ中（${fmtDay(new Date(xs.until).toISOString())}から）` : xs.why === 'open' ? '出せる'
-      : xs.why === 'using' ? `受け取り中（${xs.using && xs.using.by && xs.using.by !== 'x' ? esc(uname(xs.using.by)) + 'さん' : '—'}）`
+      : xs.why === 'using' ? `受け取り中${xs.using && xs.using.by && xs.using.by !== 'x' ? `<span data-notr>（${esc(uname(xs.using.by))}さん）</span>` : ''}`
       : xs.why === 'over' ? `期間が終わった（${fmtDay(new Date(xs.end - 1).toISOString())}まで）` : '止めている';
     return `<tr><th>区域${esc(t.no)}</th><td>${items.length}軒</td><td>${tc == null ? '—' : tc + ' / ' + SLOTS.length}</td><td>${state}</td>
       <td>${lendMode(t) === 'stop' ? '<span class="muted">貸出中止</span>' : `<button type="button" class="btn small" data-extstop="${t.id}">${t.extStop ? '出す' : '止める'}</button>`}</td></tr>`;

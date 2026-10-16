@@ -763,12 +763,13 @@
 
   /* 留守宅カードの一覧：地域のようすと、「この時間帯にまだ訪ねていない家」の数を出す */
   const awayItem = (x, cur, full, attr) => `<article class="ritem k-away"><div>
-      <p class="rt"><span class="stamp xs${noCls(x.t.no)}">${esc(x.t.no)}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}${x.focus ? ' <span class="focustag">区域係のおすすめ</span>' : ''}</p>
+      <p class="rt"><span class="stamp xs${noCls(x.t.no)}">${esc(x.t.no)}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}${x.focus ? ' <span class="focustag">区域係のおすすめ</span>' : ''}${dayOnlyN(x.keys.length) ? ' <span class="daytag">今日だけ</span>' : ''}</p>
       ${x.chance != null ? `<p class="metline">会える見込み 約${pctTxt(x.chance)}<small class="muted">（目安）</small></p>` : ''}
       ${profLine(x.t, 'away')}
       <p class="muted">会えていない家 ${x.um}軒のうち、<b>${slotShort(x.slot)}にまだ訪ねていない ${x.keys.length}軒</b>がこのカードに入ります${x.longDays ? `。いちばん長い家は${x.longDays}日会えていません` : ''}</p>
       ${x.dist != null || x.t.holder ? `<p class="muted">${[x.dist != null ? `ここから約${fmtDist(x.dist)}` : '', x.t.holder ? 'あなたの区域' : ''].filter(Boolean).join('　')}</p>` : ''}
       ${x.tc != null && !isSimple() ? `<p class="muted">試した時間帯 ${x.tc}/${SLOTS.length}</p>` : ''}
+      ${x.ext && !isSimple() ? '<p class="muted">区域は回り終えています（残りの留守宅）</p>' : ''}
     </div><button class="btn small primary" ${attr}="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`;
   const withAway = (list, idx) => list.map(x => {
     const items = idx.get(x.t.id) || [], ks = new Set(x.keys);
