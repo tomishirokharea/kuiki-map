@@ -419,7 +419,7 @@
     let tries = t.awayTries != null ? triesFor(t) : null;
     const paint = () => {
       setSheet(headHtml(t, `区域${esc(t.no)}の調整`, esc(t.name || '')) + `
-        <p class="q">若い世代の割合</p>
+        <p class="q" data-hqk="adjYoung">若い世代の割合</p>
         <p class="muted">今の数字：${orig.pct != null ? `${orig.pct}%（${orig.city ? `市の年齢データ・${orig.lbl || '20〜39歳'}` : `会えた記録 ${orig.n}件から`}）` : 'データがありません'}</p>
         <p class="hint">大きな団地が一か所だけあるなど、実際とずれているときに、区域係が直します。「おすすめ順」と「会える見込み」に使います。</p>
         <div class="dueadd"><input type="number" id="adjYoung" min="0" max="100" step="1" inputmode="numeric" value="${f != null ? f : ''}" placeholder="例：35" style="width:7em"> %

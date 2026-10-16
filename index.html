@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.4"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.5"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -1525,7 +1525,7 @@ body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
         <div class="scroll" id="adMeet"></div>
         </div>
         <div class="apane" data-apane="terr" hidden>
-        <h2 class="sec">区域の一覧</h2>
+        <h2 class="sec" data-hqk="terrList">区域の一覧</h2>
         <div class="row"><button class="btn primary" id="adNewTerr">＋ 新しい区域の線を引く</button></div>
         <details class="dueset"><summary>区域の取り込み・特別区域・アパートの登録</summary>
         <div class="row">
@@ -9398,7 +9398,7 @@ function extAdminHtml(idx, rrow, stpd) {
     return `<tr><th>区域${esc(t.no)}</th><td>${items.length}軒</td><td>${tc == null ? '—' : tc + ' / ' + SLOTS.length}</td><td>${state}</td>
       <td>${lendMode(t) === 'stop' ? '<span class="muted">貸出中止</span>' : `<button type="button" class="btn small" data-extstop="${t.id}">${t.extStop ? '出す' : '止める'}</button>`}</td></tr>`;
   }).join('');
-  return head + `<p class="q">返却後の区域</p>` + (rows
+  return head + `<p class="q" data-hqk="extList">返却後の区域</p>` + (rows
     ? `<div class="scroll"><table class="slots narrow"><tr><th>区域</th><th>残りの家</th><th>区域で試した時間帯</th><th>状態</th><th></th></tr>${rows}</table></div>`
     : '<p class="muted">今、返却後の区域はありません。</p>');
 }
@@ -12320,7 +12320,7 @@ function renderRecoAdmin() {
   box.innerHTML = `<h2 class="sec">おすすめ</h2>
     <p class="hint">カードを受け取らなくても、空いた時間に2〜3件回れる家を、全員の画面の下のタブ「おすすめ」に出します。</p>
     ${flag('recoOn', 'おすすめを出す', '出さないにすると、全員の画面から「おすすめ」のタブが消えます', '出す', '出さない')}
-    ${on ? `<p class="q">出すおすすめの種類</p>
+    ${on ? `<p class="q" data-hqk="recoKinds">出すおすすめの種類</p>
     <div class="chips">${RECO_KINDS2.map(r => `<button type="button" class="chip" data-recok="${r[1]}" aria-pressed="${!!(bits & r[1])}">${r[2]}</button>`).join('')}</div>
     <p class="hint">${RECO_KINDS2.map(r => `<b>${r[2]}</b>：${r[3]}`).join('<br>')}<br>えらんだ種類から、順番に1件ずつ出します。</p>
     ${step('recoCount', '一度に出す件数', st.recoCount + '件', 1)}
@@ -14015,5 +14015,6 @@ init();
 <script src="apt-import.js"></script>
 <script src="apt-wizard.js"></script>
 <script src="naoshi.js"></script><!-- まちがえた記録の直し方・二世帯住宅 -->
+<script src="help.js"></script><!-- 区域係の設定の「？」の説明（文はこのファイルだけで直せます） -->
 </body>
 </html>
