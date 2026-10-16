@@ -2163,7 +2163,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     const t = terrById(tid);
     if (!t || !isAdmin() || !SLOTS.includes(slot)) return;
     let days = 14;
-    const keys = cardKeys(unmetIndex().get(t.id) || [], slot, lockedKeys());
+    const keys = cardKeys(unmetIndex().get(t.id) || [], slot, lockedKeys(), rlFor(t)); // 返却後の区域は、返却後のルール
     const paint = () => {
       setSheet(headHtml(t, `区域${esc(t.no)}の留守宅カードを出す`, slotText(slot)) + `
         <p>この区域で、まだ会えていない家のうち、<b>${esc(slotShort(slot))}にまだ訪ねていない家が ${keys.length}軒</b>あります。</p>
