@@ -8738,6 +8738,7 @@ function roundBounds(tid) {
   (D().returns || []).forEach(r => { if (r.terrId !== tid) return; if (r.completed && r.at) ends.push(r.at); if (r.lentAt) lends.push(r.lentAt); });
   if (t && t.completedAt) ends.push(t.completedAt);
   if (t && t.holder && t.lentAt) lends.push(t.lentAt);
+  if (t && !t.holder && t.lastLentAt) lends.push(t.lastLentAt); // 返却のあとの区域は、いちばん新しい受け取り日。伝道者の端末には他の人の返却記録が来ないので、この手がかりも使う
   lends.sort();
   const days = [...new Set(ends.map(x => ymd(new Date(x))))].sort(), n = days.length;
   const lendAfter = d => { const nx = nextDayIso(d); return lends.find(x => x >= nx) || null; }; // 正式返却のあと、最初に受け取った日
@@ -9359,6 +9360,38 @@ function openSlotSheet() {
   paint();
 }
 
+/* 係：返却後の留守宅カード（区域＞状況の「留守宅カードの出し方」の下）。設定と、返却後の区域の一覧
+   一覧は renderAwayAdmin で作った idx（unmetIndex の結果）を使い回す（区域ごとに unmetIndex を呼ばない）。受け取り中の人の名前は係の画面だけ */
+function extAdminHtml(idx, rrow, stpd) {
+  const x = extSet(), st = D().settings, fd = Number(st.freeAfterDays) || 0, auto = Number(st.autoFree) === 1 && fd > 0;
+  const head = `<p class="q"><b>返却後の留守宅カード</b></p>` +
+    rrow('返却後の留守宅カード', '区域が正式に返却されたあと、まだ会えていない家を、まだ試していない時間帯だけで、だれでも受け取れるカードにします',
+      `<div class="seg" role="group"><button type="button" data-sset="extOn" data-v="1" aria-pressed="${x.on}">使う</button>
+        <button type="button" data-sset="extOn" data-v="0" aria-pressed="${!x.on}">使わない</button></div>`) +
+    (x.on ? rrow('寝かせる日数', '正式返却から、また前のカードが終わってから、この日数は出しません。家ごとにも、最後に訪ねてからこの日数は入れません', stpd('extRest', x.rest, '日', '寝かせる日数', 1)) +
+      rrow('1軒あたりの回数', '返却後に、同じ家を訪ねる上限です（同じ日は1回）', stpd('extCap', x.cap, '回', '1軒あたりの回数', 1)) +
+      rrow('出す期間', '正式返却から、この日数で止めます' + (auto && x.days >= fd ? `<br><b>自由に受け取れる日のほうが先に来ます。その${x.before}日前で止まります</b>` : ''), stpd('extDays', x.days, '日', '出す期間', 7)) +
+      rrow('次の新規の前に止める', `自動受け取りを使う区域では、自由に受け取れる日（${fd > 0 ? `返却から${fd}日` : 'まだ決めていません'}）のこの日数前で止めます`, stpd('extStopBefore', x.before, '日', '次の新規の前に止める日数', 7)) : '');
+  if (!x.on) return head;
+  const rows = D().territories.slice().sort(byNo).map(t => {
+    const xs = extState(t); if (!xs) return '';
+    const items = idx.get(t.id) || [], tc = triedOf(items);
+    const state = xs.why === 'rest' ? `寝かせ中（${fmtDay(new Date(xs.until).toISOString())}から）` : xs.why === 'open' ? '出せる'
+      : xs.why === 'using' ? `受け取り中（${xs.using && xs.using.by && xs.using.by !== 'x' ? esc(uname(xs.using.by)) + 'さん' : '—'}）`
+      : xs.why === 'over' ? `期間が終わった（${fmtDay(new Date(xs.end - 1).toISOString())}まで）` : '止めている';
+    return `<tr><th>区域${esc(t.no)}</th><td>${items.length}軒</td><td>${tc == null ? '—' : tc + ' / ' + SLOTS.length}</td><td>${state}</td>
+      <td>${lendMode(t) === 'stop' ? '<span class="muted">貸出中止</span>' : `<button type="button" class="btn small" data-extstop="${t.id}">${t.extStop ? '出す' : '止める'}</button>`}</td></tr>`;
+  }).join('');
+  return head + `<p class="q">返却後の区域</p>` + (rows
+    ? `<div class="scroll"><table class="slots narrow"><tr><th>区域</th><th>残りの家</th><th>区域で試した時間帯</th><th>状態</th><th></th></tr>${rows}</table></div>`
+    : '<p class="muted">今、返却後の区域はありません。</p>');
+}
+/* 係の画面：返却後の留守宅カードを、区域ごとに止める／出す */
+function toggleExtStop(tid) {
+  const t = terrById(tid); if (!t) return;
+  commit(t.extStop ? `区域${t.no}の返却後の留守宅カードを、出すようにしました` : `区域${t.no}の返却後の留守宅カードを、止めました`, () => { if (t.extStop) delete t.extStop; else t.extStop = true; });
+}
+
 /* 係：留守宅の状況 */
 function renderAwayAdmin() {
   const st = D().settings, idx = unmetIndex(), act = activeCards();
@@ -9371,6 +9404,9 @@ function renderAwayAdmin() {
   const two = (key, cur, a, b) => `<div class="seg" role="group"><button type="button" data-sset="${key}" data-v="${a[0]}" aria-pressed="${cur === a[0]}">${a[1]}</button>
     <button type="button" data-sset="${key}" data-v="${b[0]}" aria-pressed="${cur === b[0]}">${b[1]}</button></div>`;
   const rrow = (label, hint, ctl) => `<div class="setrow"><span>${label}<br><small class="hint">${hint}</small></span>${ctl}</div>`;
+  const stpd = (key, val, unit, label, d) => `<div class="stepper"><button type="button" data-aset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${val}${unit}</output>
+    <button type="button" data-aset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div>`;
+  const dayOnly = Number(st.awayDayOnly) || 0;
   $('#adAwaySet').innerHTML = `<p class="q"><b>留守宅訪問のルール</b></p>` +
     rrow('留守宅として訪ねる上限回数', '今回の巡回で留守だった日の数です（同じ日は1回）。届いた家は、次の巡回が始まるまで留守宅カードに入りません', stp('awayCap', rl.cap, '回', '上限回数')) +
     rrow('この日数以内に訪ねた家は、カードに入れない', '同じ家を次に訪ねるまでの最短の間隔です。0にすると、間隔をあけません', stp('awayRecentDays', rl.gap, '日', '最短間隔')) +
@@ -9388,7 +9424,9 @@ function renderAwayAdmin() {
       <button type="button" data-aset="awayCardMax" data-d="5" aria-label="増やす">＋</button></div></div>
     <div class="setrow"><span>回り終えた記録がない区域（担当者なし）も使う<br><small class="hint">「使わない」は、回り終えた区域だけからカードを作ります</small></span>
       <div class="seg" role="group"><button type="button" data-sset="awayAllTerr" data-v="1" aria-pressed="${st.awayAllTerr === 1}">使う</button>
-      <button type="button" data-sset="awayAllTerr" data-v="0" aria-pressed="${st.awayAllTerr !== 1}">使わない</button></div></div>`;
+      <button type="button" data-sset="awayAllTerr" data-v="0" aria-pressed="${st.awayAllTerr !== 1}">使わない</button></div></div>` +
+    rrow('その日限りにする軒数', 'この軒数以下のカードは、受け取った日の終わりに自動で終わります（用事のついでに寄る人向け）。0にすると使いません', stpd('awayDayOnly', dayOnly, dayOnly ? '軒まで' : '（使わない）', 'その日限りにする軒数', 1)) +
+    extAdminHtml(idx, rrow, stpd);
 
   const all = [...idx.values()].flat();
   const cnt = {};
@@ -13756,11 +13794,13 @@ function bindStatic() {
     }
     else if ((x = q('[data-aset]'))) {
       const st = D().settings, key = x.dataset.aset;
-      const lim = key === 'awayDays' ? [3, 14] : key === 'awayRecentDays' ? [0, 30] : key === 'awayCardMax' ? [0, 50] : key === 'awayCap' ? [1, 15] : [1, 5];
-      const cur = st[key] == null || !isFinite(Number(st[key])) ? (key === 'awayCap' || key === 'awayRecentDays' ? 3 : 1) : Number(st[key]);
+      const EXT_LIM = { extRest: [7, 30, 7], extCap: [1, 5, 2], extDays: [14, 180, 60], extStopBefore: [0, 60, 14], awayDayOnly: [0, 10, 3] }; // 下限・上限・はじめの値
+      const lim = EXT_LIM[key] || (key === 'awayDays' ? [3, 14] : key === 'awayRecentDays' ? [0, 30] : key === 'awayCardMax' ? [0, 50] : key === 'awayCap' ? [1, 15] : [1, 5]);
+      const cur = st[key] == null || !isFinite(Number(st[key])) ? (EXT_LIM[key] ? EXT_LIM[key][2] : key === 'awayCap' || key === 'awayRecentDays' ? 3 : 1) : Number(st[key]);
       st[key] = Math.min(lim[1], Math.max(lim[0], cur + Number(x.dataset.d)));
       Store.save(); renderAll(); toast('設定を変えました');
     }
+    else if ((x = q('[data-extstop]'))) toggleExtStop(x.dataset.extstop);
     else if ((x = q('[data-reqok]'))) approveReq(x.dataset.reqok);
     else if ((x = q('[data-delok]'))) approveDel(x.dataset.delok);
     else if ((x = q('[data-delno]'))) { const r = D().requests.find(y => y.id === x.dataset.delno); if (r && !houseById(r.houseId)) approveDel(r.id); else declineDel(x.dataset.delno); }
