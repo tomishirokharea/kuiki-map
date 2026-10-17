@@ -1,0 +1,58 @@
+# 区域マップ：地番の地図（chiban/）を作り直す
+# ・tools/chiban-sources.txt を書きかえてコミットすると動きます（「Actions」→「地番の地図」→「Run workflow」でも動きます）
+# ・AIGID が公開している GeoJSON（法務省の登記所備付地図を変換したもの・CC BY）をダウンロードして、tools/moj-chiban.py で表にします
+# ・結果は chiban-update ブランチに入ります。中身を確かめてから main にまぜてください（本番の画面にすぐは出ません）
+name: 地番の地図
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - tools/chiban-sources.txt
+      - .github/workflows/chiban.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: chiban
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 道具を入れる
+        run: pip install -q pyproj shapely
+
+      - name: GeoJSON をダウンロードして表にする
+        run: |
+          set -e
+          mkdir -p dl
+          grep -v '^#' tools/chiban-sources.txt | grep -v '^\s*$' | while read -r code asof url; do
+            echo "ダウンロード：$code（$asof）"
+            mkdir -p "dl/$code"
+            curl -fsSL --retry 3 -o "dl/$code/$code.geojson" "$url"
+            ls -la "dl/$code"
+            rm -rf "chiban/$code"
+            python3 tools/moj-chiban.py "dl/$code" chiban "$asof"
+          done
+          du -sh chiban
+          cat chiban/index.json
+
+      - name: chiban-update ブランチに入れる
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B chiban-update
+          git add chiban
+          git commit -m "地番の地図を作り直す（tools/chiban-sources.txt から）" || echo "変わったところはありません"
+          git push -f origin chiban-update
