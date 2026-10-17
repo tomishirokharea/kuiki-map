@@ -530,7 +530,7 @@
     setSheet(headHtml(null, '登録しました', '') + `
       <p>家に重ねた建物：<b>${plan.convert.length}</b>　新しく置いた建物：<b>${plan.create.length}</b>${plan.miss.length ? `　作れなかった建物：<b>${plan.miss.length}</b>` : ''}</p>
       ${live.length ? `<h3 class="sub">確かめる建物（${live.length}棟）</h3>
-        <p class="hint">押すと地図がその建物に移ります。場所がちがうときは、建物の画面の「建物の編集」→「この建物の場所を直す」で直せます。近くに残った「仮の家」は、家の画面の「ここは家ではない（消す）」で消せます。</p>
+        <p class="hint">押すと地図がその建物に移ります。場所がちがうときは、建物の「建物の編集」→「区域係だけの操作」→「この建物の場所を直す」で直せます。近くに残った「仮の家」は、家の画面の「ここは家ではない（消す）」で消せます。</p>
         <div class="list">${live.map(c => `<button class="btn block" data-aigo="${esc(c.id)}">区域${esc(c.b.terr)}　${lineOf(c.b)}${c.note ? `<br><small class="muted">${esc(c.note)}</small>` : ''}</button>`).join('')}</div>` : '<p class="hint">すべて、住所の場所のすぐ近くの家に重ねました。</p>'}
       <button class="btn block" data-close>閉じる</button>`);
     $$('[data-aigo]', $('#sheet')).forEach(x => x.onclick = () => {

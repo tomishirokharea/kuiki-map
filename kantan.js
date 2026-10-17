@@ -300,7 +300,7 @@
       const dnc = D().dnc[k], f = fol(k), mineF = !!f && f.by === me().id, other = !!f && !mineF;
       const blocked = (dnc && !isAdmin()) || (other && !isAdmin() && !st.override && recentMet(k));
       let b = headHtml(t, title, sub);
-      if (fromBuilding) b += '<button class="btn small" id="backBld">← 部屋の一覧にもどる</button>';
+      if (fromBuilding) b += '<button class="btn small" id="backBld">← 部屋の入力にもどる</button>';
       // 大事なお知らせだけ（どれも1〜2行）
       if (dnc) {
         b += `<div class="notice refnote"><b>拒否の${what}です。訪問しないでください。</b>${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : ''}</div>`;
@@ -338,7 +338,7 @@
       $$('[data-refok]', S2).forEach(x => x.onclick = () => saveVisit(hid, unit, 'refused', { dnc: true }));
       $$('[data-back]', S2).forEach(x => x.onclick = () => { st.step = x.dataset.back; paint(); });
       const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
-      on('backBld', () => openBuilding(hid));
+      on('backBld', () => openAptSeq(hid, unit));
       on('unDnc', () => { commit('拒否マークを外しました', () => { delete D().dnc[k]; }); paint(); });
       on('shOverride', () => { st.override = true; paint(); });
     };
