@@ -3109,5 +3109,7 @@ window.KUIKI_I18N.es = {
 "「{0}」という部屋は、もうあります": "Ya existe un departamento «{0}»",
 "記録のある部屋は、区域係だけが消せます": "Solo el encargado puede eliminar departamentos con registros",
 "建物の編集が、建物の形のまま部屋を足したり消したりできる画面になりました（＋で次の番号を足す・部屋をタップで直す）": "Editar edificio ahora muestra el edificio por pisos: agregue con «＋» y toque un departamento para cambiarlo",
-"iPhoneで、下のタブの下に空白が出ることがあったのを直しました": "Se corrigió el espacio en blanco debajo de las pestañas en iPhone"
+"iPhoneで、下のタブの下に空白が出ることがあったのを直しました": "Se corrigió el espacio en blanco debajo de las pestañas en iPhone",
+"アプリを開くたびに、同じアップデートのお知らせが出てしまうことがあったのを直しました": "Se corrigió que el mismo aviso de novedades apareciera cada vez que se abría la aplicación",
+"区域係が拒否をエクセル・CSVから取り込むとき、必要な行だけをえらべるようになりました。同じ住所がすでにあるときに、上書きするかどうかもえらべます": "Al importar casas «No visitar» desde Excel o CSV, el encargado ahora puede elegir solo las filas necesarias y decidir si se reemplazan las direcciones que ya existen"
 };

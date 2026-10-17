@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.15"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.16"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3620,6 +3620,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.16', items: [
+    ['直', 'アプリを開くたびに、同じアップデートのお知らせが出てしまうことがあったのを直しました'],
+    ['拒', '区域係が拒否をエクセル・CSVから取り込むとき、必要な行だけをえらべるようになりました。同じ住所がすでにあるときに、上書きするかどうかもえらべます']
+  ] },
   { v: '2026.13.9', items: [
     ['建', '建物の編集が、建物の形のまま部屋を足したり消したりできる画面になりました（＋で次の番号を足す・部屋をタップで直す）'],
     ['下', 'iPhoneで、下のタブの下に空白が出ることがあったのを直しました']
@@ -3661,6 +3665,14 @@ const CHANGELOG = [
   ] }
 ];
 const SEEN_VER = 'kuiki_seen_ver';
+/* 版の番号のくらべ方：「2026.13.9」と「2026.13.15」を、文字ではなく数字としてくらべる
+   （文字のままだと 9 が 15 より大きいことになり、見たお知らせが毎回出てしまっていた） */
+function verCmp(a, b) {
+  const x = String(a || '0').split('.').map(n => parseInt(n, 10) || 0), y = String(b || '0').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d < 0 ? -1 : 1; }
+  return 0;
+}
+const verMax = list => list.reduce((m, v) => (verCmp(v, m) > 0 ? v : m), '0');
 /* ---------- 新しい版があるか確かめる ----------
    ・開いたとき、ほかのアプリから戻ったとき（5分に1回まで）、開きっぱなしなら30分ごと
    ・ファイルの先頭（版の番号の meta）だけを読むので、通信はわずか
@@ -3676,7 +3688,7 @@ async function checkUpdate(force) {
     if (!res.ok && res.status !== 206) return;
     const head = (await res.text()).slice(0, 4096);
     const m = head.match(/<meta name="app-version" content="([^"]+)"/);
-    if (m && m[1] > APP_VERSION) { updFound = m[1]; $('#btnUpd').hidden = false; }
+    if (m && verCmp(m[1], APP_VERSION) > 0) { updFound = m[1]; $('#btnUpd').hidden = false; }
   } catch (e) { /* 通信できないときは、次の機会にまた確かめる */ }
 }
 async function doUpdate() {
@@ -3699,10 +3711,11 @@ function watchUpdate() {
 }
 function showNewsIfAny(then) {
   const seen = lsGet(SEEN_VER);
-  lsSet(SEEN_VER, APP_VERSION);
+  // 見た版として残すのは、今の版とお知らせの中で一番新しい番号（古い画面を開いても下がらない）
+  lsSet(SEEN_VER, verMax([seen || '0', APP_VERSION].concat(CHANGELOG.map(c => c.v))));
   if (!seen) { then(); return; } // はじめて使う人には出さない
   const who = NS ? 'test' : 'prod'; // only のあるお知らせは、テスト版・本番版のどちらかだけに出す
-  const items = CHANGELOG.filter(c => c.v > seen && (!c.only || c.only === who)).flatMap(c => c.items);
+  const items = CHANGELOG.filter(c => verCmp(c.v, seen) > 0 && (!c.only || c.only === who)).flatMap(c => c.items);
   if (!items.length) { then(); return; }
   const el = $('#news');
   el.innerHTML = `<div class="newsbox"><div class="newshead"><p>アップデートのお知らせ</p><h2>区域マップが新しくなりました</h2></div>

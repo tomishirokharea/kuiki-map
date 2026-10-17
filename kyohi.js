@@ -118,6 +118,29 @@
   .dnc-unit button{min-height:56px;border-radius:12px;border:2px solid var(--ink);background:#fff;font:inherit;font-weight:700;color:var(--ink)}
   .dnc-sel{width:100%;min-height:50px;font-size:17px;border:2px solid var(--line);border-radius:12px;padding:0 10px;background:#fff;color:var(--ink)}
   .dnc-unit button:disabled{border-color:var(--ref);background:var(--ref-bg);color:#8B1A1A}
+  .dx-cols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  @media (max-width:420px){.dx-cols{grid-template-columns:1fr}}
+  .dx-sample{margin:2px 0 6px;font-size:14px;word-break:break-all}
+  .dx-tools{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
+  .dx-tools .btn{flex:1 1 auto;white-space:normal;line-height:1.2}
+  .dx-cnt{margin:8px 0 4px;font-size:15px}
+  .dx-list{border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 10px;margin:6px 0 10px}
+  .dx-row{display:flex;gap:12px;align-items:flex-start;padding:10px 2px;border-bottom:1px solid #E6ECE9;min-height:56px;cursor:pointer}
+  .dx-row:last-child{border-bottom:0}
+  .dx-row input{flex:none;width:26px;height:26px;margin:2px 0 0;accent-color:var(--brand)}
+  .dx-row .tx{flex:1;min-width:0;line-height:1.35}
+  .dx-row .tx b{display:block;font-size:16px;word-break:break-all}
+  .dx-row .tx small{display:block;color:var(--ink2);font-size:13px;word-break:break-all}
+  .dx-row.off{opacity:.55;cursor:default}
+  .dx-more{margin:8px 0}
+  .dx-mode{border:1px solid var(--line);border-radius:12px;background:#fff;padding:4px 12px 8px;margin:10px 0}
+  .dx-mode legend{font-weight:700;padding:0 4px}
+  .dx-mode label.check{align-items:flex-start;padding:8px 0;border-bottom:1px solid #E6ECE9}
+  .dx-mode label.check:last-child{border-bottom:0}
+  .dx-mode input{flex:none;width:24px;height:24px;margin-top:2px;accent-color:var(--brand)}
+  .dx-mode b{display:block}
+  .dx-mode small{display:block;color:var(--ink2);font-size:14px;line-height:1.4}
+  .dx-foot{position:sticky;bottom:0;background:var(--paper);padding:6px 0 2px;box-shadow:0 -8px 10px -8px #0002}
   `;
   document.head.appendChild(css);
 
@@ -224,14 +247,15 @@
         <button type="button" class="btn primary" id="dncAddMap">＋ 地図でえらぶ</button>
         <button type="button" class="btn" id="dncAddAddr">＋ 住所で追加</button>
       </div>
-      <details class="dnc-imp"${all.length ? '' : ' open'}><summary>エクセル・マイマップから取り込む</summary>
+      <details class="dnc-imp"${all.length ? '' : ' open'}><summary>エクセル・CSV・マイマップから取り込む</summary>
         <div class="row">
-          <label class="btn">エクセル（住所の一覧）<input type="file" id="dncXl" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
+          <label class="btn">エクセル・CSV（住所の一覧）<input type="file" id="dncXl" accept=".xlsx,.xls,.csv,.tsv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
           <!-- iPhoneでは accept に .kml を書くとファイルを選べないことがあるため、あえて指定しない -->
           <label class="btn">マイマップ（ピン）<input type="file" id="dncKml" hidden></label>
         </div>
-        <p class="hint">エクセルは<b>住所の列だけ</b>を読みます（区域番号の列やシート名があれば、その区域に入れます）。名前などほかの列は読みません。<br>
-          マイマップは「KML/KMZにエクスポート」したファイルを選び、拒否のピンのレイヤーをえらびます。</p>
+        <p class="hint">エクセル・CSVは、ファイルを選ぶと<b>取り込む行をえらぶ画面</b>が出ます。使うのは<b>住所の列と区域番号の列だけ</b>で、名前などほかの列は保存しません。<br>
+          マイマップは「KML/KMZにエクスポート」したファイルを選び、拒否のピンのレイヤーをえらびます。<br>
+          どちらも、すでに同じ拒否があるときに「上書きしない／上書きする」をえらべます。</p>
       </details>
       ${all.length ? `<input type="search" class="dnc-q" id="dncQ" placeholder="住所・区域番号でさがす" value="${esc(ui.q)}" aria-label="住所・区域番号でさがす">` : ''}
       <div id="dncGroups">${!all.length
@@ -798,77 +822,262 @@
   }
 
   /* =========================================================
-     エクセルの取り込み
+     エクセル・CSVの取り込み（2026.13.16）
+     ① ファイルを読む（CSVは文字コードを見分ける：UTF-8でなければ、エクセルで保存した Shift_JIS として読む）
+     ② 取り込む行をえらぶ：住所の列・区域番号の列をえらび、文字でしぼりこんで、行ごとにチェック
+        （ほかの列は、えらびやすいように画面に出すだけ。保存も送信もしない）
+     ③ 同じ住所の拒否がすでにあるとき：「上書きしない（新しい住所だけ足す）」か「上書きする」をえらぶ
+        上書きしても、地図で確かめて家とつないだ拒否・訪問で記録した拒否は、家とのつながりを残し、住所の書き方だけ新しくする
      ========================================================= */
   const HEAD_A = /^(住所|所在地|住所1|住所１|address|direcci[oó]n ?1?)$/i;
+  const HEAD_A2 = /住所|所在地|address|direcci[oó]n/i; // 「拒否の住所」など、見出しに住所をふくむ列
   const HEAD_N = /^(区域|区域番号|区域no\.?|区域NO|番号|no\.?|territorio|zona)$/i;
+  const MODE_KEY = 'kuiki_dnc_mode';
+  const MAX_ROWS = 20000;   // 1つのファイルで読む行の上限（それ以上は読まない）
+  const PAGE = 150;          // 行をえらぶ画面に一度に出す行の数（多くても軽いように）
+  const getMode = () => (lsGet(MODE_KEY) === 'over' ? 'over' : 'add');
+  const colName = i => { let s = '', n = i + 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+  /* 家につながっていて、自動でつないだものではない拒否（係が地図で確かめた・訪問で記録した）。上書きでも家とのつながりは消さない */
+  const isFirm = (k, v) => !isPinKey(k) && !(v && typeof v === 'object' && v.auto);
+  /* 住所 → 今ある拒否のキー（アパートの部屋ごとの拒否は、建物の住所と同じことがあるので入れない） */
+  function addrIndex() {
+    const m = new Map(), d = D().dnc;
+    for (const k in d) {
+      const v = d[k];
+      if (!v || typeof v !== 'object' || !v.a || v.room) continue;
+      const key = addrKey(v.a);
+      (m.get(key) || m.set(key, []).get(key)).push(k);
+    }
+    return m;
+  }
+  function modeHtml(mode) {
+    return `<fieldset class="dx-mode"><legend>すでに同じ拒否があるとき</legend>
+      <label class="check"><input type="radio" name="dxMode" value="add"${mode === 'add' ? ' checked' : ''}><span><b>上書きしない</b><small>今ある拒否はそのまま。新しいものだけを足します</small></span></label>
+      <label class="check"><input type="radio" name="dxMode" value="over"${mode === 'over' ? ' checked' : ''}><span><b>上書きする</b><small>新しい一覧の内容（住所の書き方・区域・場所）で入れかえます。地図で確かめて家とつないだ拒否は、家とのつながりを残します</small></span></label>
+    </fieldset>`;
+  }
+  function bindMode(root, onChange) {
+    $$('input[name="dxMode"]', root).forEach(x => x.onchange = () => { if (x.checked) { lsSet(MODE_KEY, x.value); if (onChange) onChange(x.value); } });
+  }
+
+  async function fileText(file) {
+    const buf = await file.arrayBuffer();
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(buf).replace(/^﻿/, ''); }
+    catch (e) { return new TextDecoder('shift_jis').decode(buf); } // エクセルで「CSV」として保存したファイル
+  }
   async function readXl(file) {
-    let rows = [];
+    const sheets = [];
+    let cut = false;
     try {
-      toast('エクセルを読んでいます…');
+      toast('ファイルを読んでいます…');
       await loadScript(LIB.xlsx);
-      const wb = window.XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+      const isText = /\.(csv|tsv|txt)$/i.test(file.name || '') || /^text\//.test(file.type || '');
+      // CSVは文字のまま読む（「01」「53-1」の区域番号が数字や日付に変わらないように）
+      const wb = isText
+        ? window.XLSX.read(await fileText(file), { type: 'string', raw: true })
+        : window.XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+      let total = 0;
       wb.SheetNames.forEach(n => {
-        const data = window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' });
+        if (total >= MAX_ROWS) { cut = true; return; }
+        let data = window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' })
+          .filter(r => Array.isArray(r) && r.some(c => xlNorm(c)));
+        if (!data.length) return;
         const tm = /^\s*\(([^)]+)\)/.exec(n), sno = normNo(tm ? tm[1] : n);
         const sheetNo = NO_RE.test(sno) && D().territories.some(t => t.no === sno) ? sno : '';
-        const hi = data.slice(0, 10).findIndex(r => (r || []).some(c => HEAD_A.test(xlNorm(c))));
-        let aCol = -1, nCol = -1, start = 0;
-        if (hi >= 0) {
-          const head = data[hi].map(c => xlNorm(c));
-          aCol = head.findIndex(h => HEAD_A.test(h)); nCol = head.findIndex(h => HEAD_N.test(h)); start = hi + 1;
-        }
-        data.slice(start).forEach(r => {
-          if (!r) return;
-          const raw = aCol >= 0 ? xlNorm(r[aCol]) : (r.map(xlNorm).find(looksAddr) || '');
-          if (!raw) return;
-          const no = nCol >= 0 ? normNo(r[nCol]) : sheetNo;
-          rows.push({ raw, no: NO_RE.test(no) ? no : '' });
-        });
+        const top = data.slice(0, 10).map(r => r.map(xlNorm));
+        let hi = top.findIndex(r => r.some(c => HEAD_A.test(c)));
+        if (hi < 0) hi = top.findIndex(r => r.some(c => HEAD_A2.test(c) && !looksAddr(c)));
+        // 見出しの名前に「住所」がなくても、1行目が文字だけで、下の行に住所がある形なら、1行目を見出しにする
+        if (hi < 0 && top.length > 1 && !top[0].some(looksAddr) && top[0].every(c => !c || !/^\d+$/.test(c)) && top.slice(1, 6).some(r => r.some(looksAddr))) hi = 0;
+        const head = hi >= 0 ? top[hi] : [];
+        let rows = data.slice(hi + 1);
+        if (total + rows.length > MAX_ROWS) { rows = rows.slice(0, MAX_ROWS - total); cut = true; }
+        total += rows.length;
+        sheets.push({ name: n, sheetNo, head, rows: rows.map(r => r.map(xlNorm)) });
       });
     } catch (e) {
-      infoSheet('ファイルを読み込めませんでした', 'エクセル（.xlsx）のファイルを選んでください。はじめて使うときは、インターネットにつながっている必要があります。');
+      infoSheet('ファイルを読み込めませんでした', 'エクセル（.xlsx）かCSVのファイルを選んでください。はじめて使うときは、インターネットにつながっている必要があります。');
       return;
     }
+    const rows = [];
+    sheets.forEach((s, si) => s.rows.forEach(cells => rows.push({ si, cells })));
     if (!rows.length) {
-      infoSheet('住所が見つかりませんでした', '「住所」という見出しの列に、住所を入れてください（例：豊見城市字高安123）。見出しがないときは、住所の入ったセルをさがして読みます。');
+      infoSheet('住所が見つかりませんでした', 'ファイルの中に、読める行がありませんでした。<br>「住所」という見出しの列に、住所を入れてください（例：豊見城市字高安123）。');
       return;
     }
-    xlConfirm(rows, file.name || '', null);
+    if (cut) toast(`行が多いので、はじめの ${MAX_ROWS.toLocaleString()}行だけを読みました`);
+    pickRows({ sheets, rows, fileName: file.name || '' });
   }
-  function xlPrepare(rows, muni) {
-    const have = haveAddr(), seen = new Set(), ok = [], bad = [];
+
+  /* ---------- 取り込む行をえらぶ ---------- */
+  function pickRows(S) {
+    const width = Math.min(40, S.rows.reduce((m, r) => Math.max(m, r.cells.length), 0));
+    const head0 = (S.sheets.find(s => s.head.length) || { head: [] }).head;
+    const findCol = re => head0.findIndex(h => re.test(h));
+    let ai = findCol(HEAD_A); if (ai < 0) ai = head0.findIndex(h => HEAD_A2.test(h));
+    const ni = findCol(HEAD_N);
+    const st = {
+      a: ai >= 0 ? { i: ai, name: head0[ai] } : { i: -1 },   // i: -1 は「住所らしいセルを自動でさがす」
+      n: ni >= 0 ? { i: ni, name: head0[ni] } : { i: -1 },   // i: -1 は「なし（シート名か地図の線で決める）」
+      q: '', limit: PAGE, mode: getMode(), sel: new Set(), note: ''
+    };
+    // 列の場所はシートごとにちがうことがあるので、見出しの名前で合わせる（名前がないときは左からの位置）
+    const colOf = (s, ch) => { if (ch.i < 0) return -1; if (ch.name && s.head.length) { const j = s.head.indexOf(ch.name); if (j >= 0) return j; } return ch.i; };
+    const colLabel = i => `${colName(i)}列${head0[i] ? `「${head0[i]}」` : ''}`;
+    const sampleOf = i => { const r = S.rows.find(x => x.cells[i]); return r ? r.cells[i] : ''; };
+
+    function compute() {
+      const probe = [];
+      S.rows.forEach(r => {
+        const s = S.sheets[r.si], ac = colOf(s, st.a), nc = colOf(s, st.n);
+        r.ac = ac >= 0 ? ac : r.cells.findIndex(looksAddr);
+        r.raw = r.ac >= 0 ? r.cells[r.ac] || '' : '';
+        r.nc = nc;
+        const no = nc >= 0 ? normNo(r.cells[nc]) : s.sheetNo;
+        r.no = NO_RE.test(no) ? no : '';
+        const p = r.raw ? parseAddr(r.raw, '') : null; if (p) probe.push(p);
+        if (r.txt === undefined) r.txt = r.cells.join(' ').normalize('NFKC').toLowerCase();
+      });
+      const muni = defMuni(probe), have = addrIndex();
+      S.muni = muni;
+      S.rows.forEach(r => {
+        const e = r.raw ? parseAddr(r.raw, muni) : null;
+        r.ok = !!e; r.a = e ? e.a : '';
+        r.have = !!(e && have.has(addrKey(e.a)));
+      });
+    }
+    /* はじめのえらび方：住所以外の列に「拒」をふくむ行と、ふくまない行がまざっていれば、「拒」の行だけをえらんでおく */
+    function firstSelect() {
+      st.sel.clear();
+      const okRows = S.rows.map((r, i) => [r, i]).filter(([r]) => r.ok);
+      const hit = okRows.filter(([r]) => r.cells.some((c, j) => j !== r.ac && /拒/.test(c)));
+      if (hit.length && hit.length < okRows.length) {
+        st.q = '拒';
+        hit.forEach(([, i]) => st.sel.add(i));
+        st.note = `「拒」と書かれた行だけを、先にえらんでおきました（${hit.length}行）。ちがうときは、しぼりこみの文字を消して、えらび直してください。`;
+      } else {
+        okRows.forEach(([, i]) => st.sel.add(i));
+        st.note = '';
+      }
+    }
+    const shownIdx = () => {
+      const q = st.q.trim().normalize('NFKC').toLowerCase(), out = [];
+      S.rows.forEach((r, i) => { if (!q || r.txt.includes(q)) out.push(i); });
+      return out;
+    };
+    const tagsOf = r => !r.ok ? '<span class="dtag nopos">住所が読めません</span>'
+      : r.have ? (st.mode === 'over' ? '<span class="dtag auto">登録ずみ → 上書き</span>' : '<span class="dtag pin">登録ずみ → 入れない</span>') : '';
+    function rowHtml(r, i) {
+      const others = r.cells.filter((c, j) => c && j !== r.ac && j !== r.nc).join('・'); // 住所と区域番号は上に出すので、ほかの列だけ
+      const sh = S.sheets.length > 1 ? `<span data-notr>${esc(S.sheets[r.si].name)}</span>・` : '';
+      return `<label class="dx-row${r.ok ? '' : ' off'}"><input type="checkbox" data-xr="${i}"${st.sel.has(i) && r.ok ? ' checked' : ''}${r.ok ? '' : ' disabled'}>
+        <span class="tx"><b data-notr>${esc(r.ok ? r.a : r.raw || '（住所の列が空です）')}</b>
+        <small>${tagsOf(r)}${r.no ? `区域${esc(r.no)}・` : ''}${sh}<span data-notr>${esc(others.length > 70 ? others.slice(0, 70) + '…' : others)}</span></small></span></label>`;
+    }
+    const counts = () => {
+      let n = 0, nNew = 0, nHave = 0;
+      st.sel.forEach(i => { const r = S.rows[i]; if (!r.ok) return; n++; if (r.have) nHave++; else nNew++; });
+      return { n, nNew, nHave, go: st.mode === 'over' ? n : nNew };
+    };
+    function paintList() {
+      const idx = shownIdx(), list = $('#dxList');
+      if (!list) return;
+      list.innerHTML = idx.length
+        ? idx.slice(0, st.limit).map(i => rowHtml(S.rows[i], i)).join('') +
+          (idx.length > st.limit ? `<button type="button" class="btn block dx-more" id="dxMore">さらに表示（のこり ${idx.length - st.limit}行）</button>` : '')
+        : '<p class="dnc-none">この文字をふくむ行はありません</p>';
+      $$('[data-xr]', list).forEach(x => x.onchange = () => { const i = Number(x.dataset.xr); if (x.checked) st.sel.add(i); else st.sel.delete(i); paintCount(); });
+      const more = $('#dxMore'); if (more) more.onclick = () => { st.limit += PAGE; paintList(); };
+      paintCount(idx.length);
+    }
+    function paintCount(nShown) {
+      const c = counts(), el = $('#dxCnt'), go = $('#dxNext');
+      if (nShown === undefined) nShown = shownIdx().length;
+      if (el) el.innerHTML = `えらんだ行 <b>${c.n}</b>（表示中 ${nShown}行／ぜんぶ ${S.rows.length}行）` +
+        (c.nHave ? `<br>うち登録ずみの住所 ${c.nHave}件は、${st.mode === 'over' ? '<b>上書きします</b>' : '<b>入れません</b>'}` : '');
+      if (go) { go.disabled = !c.go; go.textContent = c.go ? `えらんだ ${c.go}件で次へ` : (c.n ? '新しく入れる住所がありません' : '行をえらんでください'); }
+    }
+    function paint() {
+      const opts = [];
+      for (let i = 0; i < width; i++) opts.push(i);
+      setSheet(headHtml(null, '取り込む行をえらぶ', esc(S.fileName)) + `
+        <p class="hint">住所の列と区域番号の列だけを使います。ほかの列は、えらびやすいように画面に出すだけで、<b>保存も送信もしません</b>。</p>
+        <div class="dx-cols">
+          <label class="field"><span>住所の列</span><select class="dnc-sel" id="dxA">
+            <option value="-1"${st.a.i < 0 ? ' selected' : ''}>自動（住所らしいセル）</option>
+            ${opts.map(i => `<option value="${i}"${st.a.i === i ? ' selected' : ''}>${esc(colLabel(i))}</option>`).join('')}</select></label>
+          <label class="field"><span>区域番号の列</span><select class="dnc-sel" id="dxN">
+            <option value="-1"${st.n.i < 0 ? ' selected' : ''}>${S.sheets.some(s => s.sheetNo) ? 'なし（シート名で決める）' : 'なし（地図の区域の線で決める）'}</option>
+            ${opts.map(i => `<option value="${i}"${st.n.i === i ? ' selected' : ''}>${esc(colLabel(i))}</option>`).join('')}</select></label>
+        </div>
+        ${st.a.i >= 0 && sampleOf(st.a.i) ? `<p class="muted dx-sample">住所の列の例：<span data-notr>${esc(sampleOf(st.a.i).slice(0, 60))}</span></p>` : ''}
+        ${st.note ? `<div class="notice info">${esc(st.note)}</div>` : ''}
+        <input type="search" class="dnc-q" id="dxQ" placeholder="この文字をふくむ行だけ表示（例：拒否）" value="${esc(st.q)}" aria-label="しぼりこむ文字">
+        <div class="dx-tools">
+          <button type="button" class="btn small" id="dxAll">表示中をすべてえらぶ</button>
+          <button type="button" class="btn small" id="dxNone">表示中を外す</button>
+          <button type="button" class="btn small" id="dxOnly">表示中の行だけにする</button>
+        </div>
+        <p class="dx-cnt" id="dxCnt"></p>
+        <div class="dx-list" id="dxList"></div>
+        ${modeHtml(st.mode)}
+        <div class="dx-foot">
+          <button type="button" class="btn primary block" id="dxNext">次へ</button>
+          <button type="button" class="btn block" data-close>やめる</button>
+        </div>`);
+      const setCol = (key, v) => { const i = Number(v); st[key] = i >= 0 ? { i, name: head0[i] || '' } : { i: -1 }; };
+      $('#dxA').onchange = e => { setCol('a', e.target.value); compute(); firstSelect(); st.limit = PAGE; sheetKeep = true; paint(); };
+      $('#dxN').onchange = e => { setCol('n', e.target.value); compute(); paintList(); };
+      let tm = null;
+      $('#dxQ').oninput = e => { clearTimeout(tm); tm = setTimeout(() => { st.q = e.target.value; st.limit = PAGE; paintList(); }, 250); };
+      $('#dxAll').onclick = () => { shownIdx().forEach(i => { if (S.rows[i].ok) st.sel.add(i); }); paintList(); };
+      $('#dxNone').onclick = () => { shownIdx().forEach(i => st.sel.delete(i)); paintList(); };
+      $('#dxOnly').onclick = () => { const s = new Set(shownIdx()); [...st.sel].forEach(i => { if (!s.has(i)) st.sel.delete(i); }); paintList(); };
+      bindMode($('#sheet'), m => { st.mode = m; paintList(); });
+      $('#dxNext').onclick = () => {
+        const pick = [];
+        S.rows.forEach((r, i) => { if (st.sel.has(i) && r.ok && (st.mode === 'over' || !r.have)) pick.push({ raw: r.raw, no: r.no }); });
+        if (!pick.length) return;
+        xlConfirm(pick, S.fileName, S.muni, st.mode);
+      };
+      paintList();
+    }
+    compute(); firstSelect(); paint();
+  }
+
+  function xlPrepare(rows, muni, mode) {
+    const have = addrIndex(), seen = new Set(), ok = [], bad = [];
     let dup = 0, exist = 0;
     rows.forEach(r => {
       const e = parseAddr(r.raw, muni);
       if (!e) { bad.push(r.raw); return; }
       const key = addrKey(e.a);
-      if (have.has(key)) { exist++; return; }
+      if (have.has(key)) { exist++; if (mode !== 'over') return; }
       if (seen.has(key)) { dup++; return; }
       seen.add(key);
       ok.push(Object.assign(e, { no: r.no }));
     });
     return { ok, bad, dup, exist };
   }
-  function xlConfirm(rows, fileName, muniSel) {
+  function xlConfirm(rows, fileName, muniSel, mode) {
+    mode = mode === 'over' ? 'over' : 'add';
     const probe = rows.map(r => parseAddr(r.raw, '')).filter(Boolean);
     const muni = muniSel || defMuni(probe);
-    const P = xlPrepare(rows, muni), noMuni = P.ok.filter(e => e.noMuni).length;
+    const P = xlPrepare(rows, muni, mode), noMuni = P.ok.filter(e => e.noMuni).length;
     const withNo = P.ok.filter(e => e.no).length;
-    setSheet(headHtml(null, 'エクセルから拒否の住所を取り込む', esc(fileName)) + `
-      <div class="notice info">住所が <b>${P.ok.length}件</b> 見つかりました。${withNo ? `<br>（うち区域番号つき ${withNo}件）` : ''}
-        ${P.exist ? `<br>すでに登録されている住所 ${P.exist}件は入れません。` : ''}${P.dup ? `<br>同じ住所の重なり ${P.dup}件は1件にまとめます。` : ''}</div>
-      <p class="hint">読むのは<b>住所と区域番号の列だけ</b>です。名前などほかの列は読みません。<br>
-        「場所を調べる」を押すと、まず<b>地番の地図</b>（法務省の地図をもとにした表。この端末の中で調べます）で土地を調べます。見つからない住所だけ、住所の文字を国土地理院の住所検索に送ります。</p>
+    setSheet(headHtml(null, 'エクセル・CSVから拒否の住所を取り込む', esc(fileName)) + `
+      <div class="notice info">取り込む住所は <b>${P.ok.length}件</b> です。${withNo ? `<br>（うち区域番号つき ${withNo}件）` : ''}
+        ${P.exist ? (mode === 'over' ? `<br>すでに登録されている住所 ${P.exist}件は、<b>新しい内容で上書きします</b>。` : `<br>すでに登録されている住所 ${P.exist}件は入れません。`) : ''}${P.dup ? `<br>同じ住所の重なり ${P.dup}件は1件にまとめます。` : ''}</div>
+      <p class="hint">「場所を調べる」を押すと、まず<b>地番の地図</b>（法務省の地図をもとにした表。この端末の中で調べます）で土地を調べます。見つからない住所だけ、住所の文字を国土地理院の住所検索に送ります。</p>
       ${noMuni ? `<label class="field"><span>市町村が書いていない住所（${noMuni}件）の市町村</span><select id="dxMuni" class="dnc-sel">${XL_MUNI_LIST.slice().sort().map(m => `<option${m === muni ? ' selected' : ''}>${m}</option>`).join('')}</select></label>` : ''}
       ${P.bad.length ? `<details class="dncfold"><summary>読めなかった住所（${P.bad.length}件）</summary><p class="hint">番地のない住所などです。「＋ 住所で追加」で1件ずつ入れられます。</p><ul>${P.bad.slice(0, 200).map(x => `<li data-notr>${esc(x)}</li>`).join('')}</ul></details>` : ''}
       <button type="button" class="btn primary block" id="dxGo"${P.ok.length ? '' : ' disabled'}>場所を調べる（${P.ok.length}件）</button>
       <button type="button" class="btn block" data-close>やめる</button>`);
     const ms = $('#dxMuni');
-    if (ms) ms.onchange = () => { lsSet('kuiki_dnc_muni', ms.value); xlConfirm(rows, fileName, ms.value); };
-    $('#dxGo').onclick = () => xlLocateAll(P.ok, fileName);
+    if (ms) ms.onchange = () => { lsSet('kuiki_dnc_muni', ms.value); xlConfirm(rows, fileName, ms.value, mode); };
+    $('#dxGo').onclick = () => xlLocateAll(P.ok, fileName, mode);
   }
-  async function xlLocateAll(list, fileName) {
+  async function xlLocateAll(list, fileName, mode) {
     setSheet(headHtml(null, '住所から場所を調べています', esc(fileName)) + `<p class="hint">住所 ${list.length}件。しばらくお待ちください（この画面を閉じないでください）。</p>
       <div class="bar"><i id="dxBar" style="width:0%"></i></div><p class="muted" id="dxCnt">地番の地図で調べています…</p>`);
     const cbs = new Map();
@@ -900,12 +1109,20 @@
       }
       plan.push(item);
     });
-    showPlan(plan, 'xl', fileName);
+    showPlan(plan, 'xl', fileName, mode);
   }
 
   const cbSrc = () => '出典：' + (CB.src || '「登記所備付地図データ」（法務省）を加工して作成');
+  /* 上書きの対象：エクセルは同じ住所の拒否、マイマップはピンのすぐそば（3m）の拒否（kmlPlan で p.replace に入れる） */
+  function overTargets(p, idx) {
+    if (p.replace) return p.replace.filter(k => D().dnc[k] !== undefined);
+    if (!p.e.a || !idx) return [];
+    return (idx.get(addrKey(p.e.a)) || []).filter(k => D().dnc[k] !== undefined);
+  }
   /* 取り込む前の確認（エクセル・マイマップ共通） */
-  function showPlan(plan, src, fileName) {
+  function showPlan(plan, src, fileName, mode) {
+    const over = mode === 'over', idx = over ? addrIndex() : null;
+    const nOver = over ? plan.filter(p => overTargets(p, idx).length).length : 0;
     const nH = plan.filter(p => p.pl.kind === 'house' && !D().dnc[K(p.pl.h.id, p.pl.unit)]).length;
     const nSame = plan.filter(p => p.pl.kind === 'house' && D().dnc[K(p.pl.h.id, p.pl.unit)]).length;
     const nPin = plan.filter(p => p.pl.kind === 'pin').length, nNo = plan.filter(p => p.pl.kind === 'nopos').length;
@@ -915,26 +1132,48 @@
       <div class="tiles"><div class="tile"><b>${nH}</b><span>家に自動でつなぐ</span></div>
         <div class="tile"><b>${nPin}</b><span>地図に印だけ置く</span></div>
         ${nNo ? `<div class="tile alert"><b>${nNo}</b><span>場所が分からない</span></div>` : ''}</div>
-      ${nSame ? `<p class="hint">すでに拒否になっている家 ${nSame}件は、住所だけを書き足します。</p>` : ''}
+      ${nOver ? `<div class="notice warn"><b>上書き：${nOver}件</b><br>すでにある同じ拒否を、新しい内容で入れかえます。地図で確かめて家とつないだ拒否・訪問で記録した拒否は、家とのつながりを残し、住所の書き方だけ新しくします。</div>` : ''}
+      ${nSame ? `<p class="hint">すでに拒否になっている家 ${nSame}件は、${over ? '新しい住所の書き方で上書きします' : '住所が空いているときだけ、住所を書き足します（ほかは変えません）'}。</p>` : ''}
       ${plan.some(p => p.pl.cb) ? `<p class="hint">${plan.filter(p => p.pl.cb).length}件は、地番の地図で土地まで分かりました（その土地の中に家が1軒だけなら、その家につなぎます）。${plan.some(p => p.cbOld) ? `<br>うち<b>${plan.filter(p => p.cbOld).length}件</b>は今の地図にない古い地番で、前の年の地図で、その土地があった場所を見つけました。` : ''}</p>` : ''}
       ${nNo ? `<p class="hint">「場所が分からない」${nNo}件も一覧には入ります（地図には出ません）。あとで地図で家をえらんでください。</p>` : ''}
       <p class="hint">「自動でつなぐ」は、近くに家の印が1軒だけあったものです。印だけのもの・場所が分からないものと一緒に「要確認」に入るので、あとで「地図で順に確かめる」で片づけられます。<br>
-        どれも、取り込んだときから地図に拒否の印が出ます（場所が分からないものをのぞく）。</p>
+        どれも、取り込んだときから地図に拒否の印が出ます（場所が分からないものをのぞく）。取り込んだすぐあとなら、下に出る「取り消す」で元にもどせます。</p>
       <details class="dncfold"><summary>区域ごとの件数</summary><ul>${[...byT.entries()].sort((a, b) => (a[0] === '？') - (b[0] === '？') || cmpNo(a[0], b[0])).map(([no, n]) => `<li>${no === '？' ? '区域が分からない' : '区域' + esc(no)}：${n}件</li>`).join('')}</ul></details>
       <button type="button" class="btn primary block" id="dpGo"${plan.length ? '' : ' disabled'}>拒否 ${plan.length}件を取り込む</button>
       ${plan.some(p => p.pl.cb) ? `<p class="hint dnc-src">地番の場所は、${esc(cbSrc())}</p>` : ''}
       <button type="button" class="btn block" data-close>やめる</button>`);
-    $('#dpGo').onclick = () => commitPlan(plan, src);
+    $('#dpGo').onclick = () => commitPlan(plan, src, mode);
   }
-  function commitPlan(plan, src) {
-    const at = now();
+  function commitPlan(plan, src, mode) {
+    const at = now(), over = mode === 'over';
+    const idx0 = over ? addrIndex() : null, nOver = over ? plan.filter(p => overTargets(p, idx0).length).length : 0; // 先に数える（あとでお知らせを出すと「取り消す」が消えるため）
     closeSheet();
-    commit(`拒否 ${plan.length}件を取り込みました`, () => {
+    commit(`拒否 ${plan.length}件を取り込みました${nOver ? `（うち上書き ${nOver}件）` : ''}`, () => {
+      const idx = over ? addrIndex() : null;
       plan.forEach(p => {
         const base = Object.assign({ s: src, at }, p.e.a ? { a: p.e.a } : {});
+        if (over) {
+          const olds = overTargets(p, idx);
+          if (olds.length) {
+            const firm = olds.filter(k => isFirm(k, D().dnc[k]));
+            olds.forEach(k => { if (!firm.includes(k)) delete D().dnc[k]; });
+            if (firm.length) { // 家とのつながりは残し、住所の書き方だけ新しくする
+              if (base.a) firm.forEach(k => { const cur = D().dnc[k]; D().dnc[k] = Object.assign({}, cur && typeof cur === 'object' ? cur : {}, { a: base.a }); });
+              return;
+            }
+          }
+        }
         if (p.pl.kind === 'house') {
           const h = p.pl.h, k = K(h.id, p.pl.unit), cur = D().dnc[k];
-          if (cur) { if (typeof cur === 'object') { if (!cur.a && base.a) D().dnc[k] = Object.assign({}, cur, { a: base.a }); } else D().dnc[k] = Object.assign(base, { lat: r6(h.lat), lng: r6(h.lng) }); return; }
+          if (cur) {
+            if (over) {
+              if (isFirm(k, cur)) { if (base.a) D().dnc[k] = Object.assign({}, cur && typeof cur === 'object' ? cur : {}, { a: base.a }); }
+              else D().dnc[k] = Object.assign(base, { lat: r6(h.lat), lng: r6(h.lng), auto: 1 });
+              return;
+            }
+            if (typeof cur === 'object') { if (!cur.a && base.a) D().dnc[k] = Object.assign({}, cur, { a: base.a }); } else D().dnc[k] = Object.assign(base, { lat: r6(h.lat), lng: r6(h.lng) });
+            return;
+          }
           D().dnc[k] = Object.assign(base, { lat: r6(h.lat), lng: r6(h.lng), auto: 1 });
           delete D().follows[k]; delete D().released[k];
           return;
@@ -992,36 +1231,45 @@
     pins.forEach(p => fs.set(p.folder, (fs.get(p.folder) || 0) + 1));
     const names = [...fs.keys()], hit = names.filter(n => /拒/.test(n));
     const use = new Set(hit.length ? hit : names);
+    let mode = getMode();
     const paint = () => {
       const n = pins.filter(p => use.has(p.folder)).length;
       setSheet(headHtml(null, 'マイマップから拒否のピンを取り込む', esc(fileName)) + `
         <p class="q">拒否の家のピンが入っているレイヤーをえらんでください</p>
         <div class="dnc-flist">${names.map((f, i) => `<label class="check"><input type="checkbox" data-kf="${i}"${use.has(f) ? ' checked' : ''}><span><b data-notr>${esc(f)}</b>　ピン ${fs.get(f)}本</span></label>`).join('')}</div>
         ${!hit.length ? '<div class="notice warn">「拒否」という名前のレイヤーがありませんでした。拒否の家ではないピンがまざっていないか、確かめてからえらんでください。</div>' : ''}
-        <p class="hint">ピンの場所をそのまま使います。ピンの名前・説明は、住所の形のときだけ住所として残します（人の名前などは残しません）。すでに拒否の印がある場所のピンは入れません。</p>
+        <p class="hint">ピンの場所をそのまま使います。ピンの名前・説明は、住所の形のときだけ住所として残します（人の名前などは残しません）。「同じ拒否」は、ピンのすぐそば（3m以内）にある拒否の印のことです。</p>
+        ${modeHtml(mode)}
         <button type="button" class="btn primary block" id="dkGo"${n ? '' : ' disabled'}>${n}本のピンを調べる</button>
         <button type="button" class="btn block" data-close>やめる</button>`);
       $$('[data-kf]', $('#sheet')).forEach(x => x.onchange = () => { const f = names[Number(x.dataset.kf)]; if (x.checked) use.add(f); else use.delete(f); sheetKeep = true; paint(); });
-      $('#dkGo').onclick = () => kmlPlan(pins.filter(p => use.has(p.folder)), fileName);
+      bindMode($('#sheet'), m => { mode = m; });
+      $('#dkGo').onclick = () => kmlPlan(pins.filter(p => use.has(p.folder)), fileName, mode);
     };
     paint();
   }
-  function kmlPlan(pins, fileName) {
-    const near = houseGrid(), muni = defMuni([]);
-    const old = allEntries().filter(e => e.lat != null).map(e => [e.lat, e.lng]);
-    const plan = [];
+  function kmlPlan(pins, fileName, mode) {
+    const over = mode === 'over', near = houseGrid(), muni = defMuni([]);
+    const old = allEntries().filter(e => e.lat != null).map(e => ({ k: e.k, p: [e.lat, e.lng], room: e.state === 'room' }));
+    const plan = [], taken = [];
     let skip = 0;
     pins.forEach(p => {
-      if (old.some(x => xlDist(x, [p.lat, p.lng]) < 3)) { skip++; return; }
-      old.push([p.lat, p.lng]);
+      const pt = [p.lat, p.lng];
+      if (taken.some(x => xlDist(x, pt) < 3)) { skip++; return; } // 同じファイルの中で重なるピン
+      const hits = old.filter(x => xlDist(x.p, pt) < 3);
+      // 上書きしない：すでに拒否の印がある場所は入れない／上書きする：その印を入れかえる（アパートの部屋ごとの拒否には手をふれない）
+      if (hits.length && (!over || hits.some(x => x.room))) { skip++; return; }
+      taken.push(pt);
       const parsed = p.texts.map(tx => (looksAddr(xlNorm(tx)) ? parseAddr(tx, muni) : null)).find(Boolean);
       const pos = { lat: p.lat, lng: p.lng, good: true };
       const pl = placeOne(near, pos, parsed ? parsed.unit : '', true);
-      plan.push({ e: { a: parsed ? parsed.a : '' }, pos, tid: terrOf(p.lat, p.lng), pl });
+      const item = { e: { a: parsed ? parsed.a : '' }, pos, tid: terrOf(p.lat, p.lng), pl };
+      if (over) item.replace = hits.map(x => x.k);
+      plan.push(item);
     });
     if (!plan.length) { infoSheet('取り込むピンはありません', `えらんだピン ${pins.length}本は、どれも、すでに拒否の印がある場所でした。`); return; }
-    if (skip) toast(`すでに拒否の印がある場所のピン ${skip}本は入れません`);
-    showPlan(plan, 'kml', fileName);
+    if (skip) toast(over ? `重なるピン・アパートの部屋の拒否のそばのピン ${skip}本は入れません` : `すでに拒否の印がある場所のピン ${skip}本は入れません`);
+    showPlan(plan, 'kml', fileName, mode);
   }
 
   /* ---------- 地図の「印の見かた」に、場所だけの拒否を足す ---------- */
