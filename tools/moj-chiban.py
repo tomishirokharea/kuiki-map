@@ -155,10 +155,10 @@ def parse_geojson(name, data, out, stats):
             continue
         no = norm_no(pr.get('地番'))
         aza = norm_aza(str(pr.get('大字名') or '') + str(pr.get('丁目名') or ''))
-        if not no or not aza:
+        if not no or not aza or not code:
             stats['数字でない地番（使わない）'] = stats.get('数字でない地番（使わない）', 0) + 1
             continue
-        code = str(pr.get('市区町村コード') or '')
+        code = str(pr.get('市区町村コード') or pr.get('市区町村C') or '')  # AIGID の GeoJSON は「市区町村C」
         muni = str(pr.get('市区町村名') or '')
         acode = str(pr.get('大字コード') or '000').zfill(3) + str(pr.get('丁目コード') or '000').zfill(3)
         rings = []
