@@ -7,6 +7,8 @@ moj-chiban.py  法務省の登記所備付地図データ（地図XML）から�
     python3 tools/moj-chiban.py <地図XMLのZIPかXMLが入ったフォルダ> <出力先フォルダ（例：chiban）> [データの時点 例：2026-02]
 
   入力：G空間情報センターの「法務省登記所備付地図データ」からダウンロードした ZIP（中に XML／ZIP が入っていてもよい）
+        または、AIGID が変換して公開している GeoJSON（例：47212_豊見城市_公共座標15系_筆R_2026.geojson。ログイン不要・CC BY）
+        https://www.geospatial.jp/ckan/dataset/aigid-moj-47212
   出力：<出力先>/<市区町村コード>/index.json と、大字ごとの <大字コード>.json
         地番ごとに「土地の中の1点（代表点）」と「土地の形」を、小さな形にして入れる
         ・公共座標の地図だけを使う（任意座標＝古い公図の地図は、位置が合わないので入れない）
@@ -142,6 +144,56 @@ def parse(name, data, out, stats):
     return code
 
 
+def parse_geojson(name, data, out, stats):
+    """AIGID の GeoJSON（mojxml2ogr で変換。経緯度 JGD2011）を読む"""
+    j = json.loads(data)
+    for ft in j.get('features', []):
+        pr = ft.get('properties') or {}
+        g = ft.get('geometry') or {}
+        if '任意' in str(pr.get('座標系', '')):
+            stats['任意座標の地図（使わない）'] = stats.get('任意座標の地図（使わない）', 0) + 1
+            continue
+        no = norm_no(pr.get('地番'))
+        aza = norm_aza(str(pr.get('大字名') or '') + str(pr.get('丁目名') or ''))
+        if not no or not aza:
+            stats['数字でない地番（使わない）'] = stats.get('数字でない地番（使わない）', 0) + 1
+            continue
+        code = str(pr.get('市区町村コード') or '')
+        muni = str(pr.get('市区町村名') or '')
+        acode = str(pr.get('大字コード') or '000').zfill(3) + str(pr.get('丁目コード') or '000').zfill(3)
+        rings = []
+        if g.get('type') == 'Polygon':
+            rings = [g['coordinates'][0]]
+        elif g.get('type') == 'MultiPolygon':
+            rings = [pp[0] for pp in g['coordinates']]
+        if not rings:
+            stats['形のない土地（使わない）'] = stats.get('形のない土地（使わない）', 0) + 1
+            continue
+        # 経緯度のままでは面積・簡略化の単位がずれるので、平面（m）に直して計算する
+        lat0 = rings[0][0][1]
+        k = 111320 * __import__('math').cos(__import__('math').radians(lat0))
+        polys = [Polygon([((x - rings[0][0][0]) * k, (y - lat0) * 110540) for x, y in r[:]]) for r in rings if len(r) >= 4]
+        polys = [pp if pp.is_valid else pp.buffer(0) for pp in polys]
+        polys = [pp for pp in polys if not pp.is_empty]
+        if not polys:
+            continue
+        poly = max(polys, key=lambda pp: pp.area)
+        if poly.geom_type != 'Polygon':
+            poly = max(poly.geoms, key=lambda pp: pp.area)
+        simp = poly.simplify(0.3, preserve_topology=True)
+        back = lambda x, y: (y / 110540 + lat0, x / k + rings[0][0][0])
+        c = poly.representative_point()
+        clat, clng = back(c.x, c.y)
+        cy, cx = round(clat * 1e6), round(clng * 1e6)
+        enc = [no, cy, cx]
+        for x, y in list(simp.exterior.coords)[:-1]:
+            la, ln = back(x, y)
+            enc += [round(la * 1e6) - cy, round(ln * 1e6) - cx]
+        m = out.setdefault(code, {'muni': muni, 'azas': {}})
+        m['azas'].setdefault(acode, {'name': aza, 'p': []})['p'].append(enc)
+        stats['使った土地'] = stats.get('使った土地', 0) + 1
+
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__)
@@ -149,14 +201,19 @@ def main():
     src, dst = sys.argv[1], sys.argv[2]
     asof = sys.argv[3] if len(sys.argv) > 3 else ''
     out, stats = {}, {}
-    for name, data in xml_sources(src):
+    gjs = [f for f in glob.glob(os.path.join(src, '**', '*.geojson'), recursive=True)] if os.path.isdir(src) else ([src] if src.endswith('.geojson') else [])
+    for f in gjs:
+        parse_geojson(f, open(f, 'rb').read(), out, stats)
+        print('読みました：', f, file=sys.stderr)
+    for name, data in (xml_sources(src) if os.path.isdir(src) else []):
         parse(name, data, out, stats)
         print('読みました：', name, file=sys.stderr)
     for code, m in out.items():
         d = os.path.join(dst, code)
         os.makedirs(d, exist_ok=True)
         index = {'v': 1, 'code': code, 'muni': m['muni'], 'asof': asof,
-                 'src': f'「登記所備付地図データ {m["muni"]}」（法務省）（https://front.geospatial.jp/moj-chizu-xml-readme/）を加工して作成',
+                 'src': (f'「登記所備付地図データ {m["muni"]}」（法務省）をAIGIDがGeoJSONに変換したもの（CC BY、https://www.geospatial.jp/ckan/dataset/aigid-moj-{code}）を加工して作成'
+                         if gjs else f'「登記所備付地図データ {m["muni"]}」（法務省）（https://front.geospatial.jp/moj-chizu-xml-readme/）を加工して作成'),
                  'azas': {}}
         for acode, a in sorted(m['azas'].items()):
             a['p'].sort(key=lambda e: [int(n) for n in e[0].split('-')])
