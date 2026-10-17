@@ -1,4 +1,4 @@
-# 地番の地図（chiban/）のもとにする GeoJSON の一覧（2026年版）
+# 地番の地図（chiban/）のもとにする GeoJSON の一覧（2026年版・AIGID）
 # 1行に「市区町村コード  公開年月  URL」。AIGID の公開ページ（例：https://www.geospatial.jp/ckan/dataset/aigid-moj-47212）の
 # 「GeoJSON」のダウンロードURLを貼ります。この行を書きかえてコミットすると、GitHub Actions が自動で chiban/ を作り直します
 # （結果は chiban-update ブランチに入るので、中身を確かめてから main にまぜます）
