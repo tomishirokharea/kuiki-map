@@ -97,7 +97,11 @@ def main():
             except Exception as e:
                 log('  古い地番', asof, 'は作れませんでした：', e)
                 continue
-            oi = json.load(open(os.path.join(out, code, 'index.json'), encoding='utf-8'))
+            oi_path = os.path.join(out, code, 'index.json')
+            if not os.path.exists(oi_path):
+                log('  古い地番', asof, '：読める土地がありませんでした（項目名がちがう形式かもしれません）')
+                continue
+            oi = json.load(open(oi_path, encoding='utf-8'))
             n = 0
             for aza, v in oi['azas'].items():
                 p = json.load(open(os.path.join(out, code, v['f'] + '.json'), encoding='utf-8'))['p']
@@ -131,4 +135,11 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:  # 失敗しても、記録だけは残す
+        import traceback
+        LOG.append('失敗：' + traceback.format_exc())
+        os.makedirs(DST, exist_ok=True)
+        with open(os.path.join(DST, '_log.txt'), 'w', encoding='utf-8') as f:
+            f.write('\n'.join(LOG) + '\n')
