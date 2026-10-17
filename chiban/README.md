@@ -9,14 +9,18 @@
 
 ## 出典
 
-出典：「登記所備付地図データ 豊見城市」（法務省）（https://front.geospatial.jp/moj-chizu-xml-readme/）を加工して作成
-（2023年1月公開のデータ。公共座標の地図だけを使い、地番ごとの代表点と簡略化した土地の形に加工しています）
+出典：「登記所備付地図データ 豊見城市」（法務省）を、一般社団法人 社会基盤情報流通推進協議会（AIGID）が GeoJSON に変換して公開したもの（CC BY 4.0、https://www.geospatial.jp/ckan/dataset/aigid-moj-47212 ）を加工して作成
+（2026年版。公共座標の地図だけを使い、地番ごとの代表点と簡略化した土地の形に加工しています）
 
 利用にあたっては「登記所備付地図データ利用規約」に従います。所有者などの個人を調べる目的には使いません。
 
 ## 作り直し方（新しいデータが出たとき）
 
-1. G空間情報センターの「法務省登記所備付地図データ」から、市町村のZIPをすべてダウンロードする（無料の利用者登録が必要）
-2. `pip install pyproj shapely`
-3. `python3 tools/moj-chiban.py <ZIPを入れたフォルダ> chiban 2026-04`（最後はデータの公開年月）
-4. できた `chiban/` をコミットする。README の出典の年月も直す
+スマホからでもできます。
+
+1. AIGID の公開ページ（上のURL）で、新しい年の「GeoJSON」のダウンロードURLをコピーする
+2. GitHub で `tools/chiban-sources.txt` を開き、URL と公開年月を書きかえてコミットする
+3. GitHub Actions の「地番の地図」が自動で動き、結果が `chiban-update` ブランチに入る（記録は `chiban/_log.txt`）
+4. 中身を確かめてから main にまぜる（README の出典の年も直す）
+
+パソコンで作るときは：`pip install pyproj shapely` → `python3 tools/moj-chiban.py <GeoJSONかZIPのフォルダ> chiban 2026-04`
