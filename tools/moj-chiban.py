@@ -227,6 +227,7 @@ def main():
             json.dump(index, f, ensure_ascii=False, separators=(',', ':'))
         print(f'{m["muni"]}（{code}）：大字 {len(m["azas"])}・土地 {sum(len(a["p"]) for a in m["azas"].values())}', file=sys.stderr)
     # 市区町村の一覧（画面は、ここを見て、どの市町村の表があるかを知る）
+    os.makedirs(dst, exist_ok=True)
     lst_path = os.path.join(dst, 'index.json')
     lst = json.load(open(lst_path, encoding='utf-8')) if os.path.exists(lst_path) else {'v': 1, 'munis': {}}
     for code, m in out.items():

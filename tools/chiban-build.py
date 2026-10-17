@@ -88,6 +88,9 @@ def main():
             try:
                 d = os.path.join(TMP, code, asof)
                 download(url, os.path.join(d, code + '.geojson'))
+                with open(os.path.join(d, code + '.geojson'), 'rb') as f:
+                    head = f.read(1500).decode('utf-8', 'replace')
+                log('  はじめの部分：', head.replace('\n', ' ')[:900])
                 out = os.path.join(TMP, 'built', asof)
                 shutil.rmtree(out, ignore_errors=True)
                 build(d, out, asof)
