@@ -25,6 +25,11 @@
   'use strict';
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof isPinKey !== 'function') return;
 
+  if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.11')) {
+    CHANGELOG.unshift({ v: '2026.13.11', items: [
+      ['地', '区域係が住所から拒否の家をさがすとき、豊見城市は法務省の地番の地図で土地まで調べるようになりました（より正確になりました）']
+    ] });
+  }
   if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.10')) {
     CHANGELOG.unshift({ v: '2026.13.10', items: [
       ['拒', '区域係の画面の「区域」に「拒否」の一覧ができました（エクセルの住所・マイマップのピンから取り込めます）'],
@@ -399,15 +404,24 @@
   /* 追加：家をタップ → 拒否。家の印がない所は、その場所に印を置く */
   function startAdd(o) {
     closeSheet();
-    pick = { kind: 'add', a: o.a || '', n: 0, one: !!o.a };
+    pick = { kind: 'add', a: o.a || '', n: 0, one: !!o.a, parcel: !!(o.polys && o.polys.length) };
     showView('map');
     pickOn();
     paintAddBar();
-    if (o.lat != null) setTimeout(() => { map.setView([o.lat, o.lng], o.appx ? 17 : 18); setRing(o.lat, o.lng, o.appx ? 60 : 0); }, 120);
+    if (o.lat != null) setTimeout(() => {
+      if (o.polys && o.polys.length) { setParcels(o.polys); map.fitBounds(ring.getBounds(), { maxZoom: 19, paddingTopLeft: [20, 220], paddingBottomRight: [20, 40] }); }
+      else { map.setView([o.lat, o.lng], o.appx ? 17 : 18); setRing(o.lat, o.lng, o.appx ? 60 : 0); }
+    }, 120);
+  }
+  /* 地番の土地の形を、オレンジの点線で出す（住所の土地がひと目で分かるように） */
+  function setParcels(polys) {
+    if (ring) { map.removeLayer(ring); ring = null; }
+    ring = L.featureGroup(polys.filter(r => r.length >= 3).map(r => L.polygon(r, { color: '#C2410C', weight: 3, dashArray: '6 5', fillOpacity: 0.08, interactive: false }))).addTo(map);
   }
   function paintAddBar() {
-    setBar(`<p>${pick.a ? `<span class="addr" data-notr><b>${esc(pick.a)}</b></span><br>` : ''}<b>拒否にする家をタップしてください。</b>
-      <br><small class="muted">アパートは、そのあと部屋をえらびます。家の印がない所は、その場所をタップすると印だけ置けます。</small></p>
+    setBar(`<p>${pick.a ? `<span class="addr" data-notr><b>${esc(pick.a)}</b></span><br>` : ''}${pick.parcel
+      ? '<b>点線で囲んだ土地（住所の地番）の、拒否の家をタップしてください。</b><br><small class="muted">家の印がない所は、その場所をタップすると印だけ置けます。</small>'
+      : '<b>拒否にする家をタップしてください。</b><br><small class="muted">アパートは、そのあと部屋をえらびます。家の印がない所は、その場所をタップすると印だけ置けます。</small>'}</p>
       <div class="row">${pick.n ? `<span class="muted">${pick.n}件 追加しました</span>` : ''}<button type="button" class="btn small primary" data-dncb="end">${pick.n ? 'おわって一覧へ' : 'やめる'}</button></div>`);
   }
 
@@ -555,7 +569,8 @@
     if (!pick) return;
     pick.n++;
     if (pick.one) { dncPickEnd(true); toast('拒否を追加しました。一覧は「係の画面」＞「区域」＞「拒否」で見られます'); return; }
-    pick.a = '';
+    pick.a = ''; pick.parcel = false;
+    if (ring) { map.removeLayer(ring); ring = null; }
     paintAddBar();
   }
   /* 追加の確認：住所（メモ）を入れられる */
@@ -573,7 +588,7 @@
   function openAddrSheet() {
     setSheet(headHtml(null, '住所で拒否を追加', '') + `
       <label class="field"><span>住所</span><input type="text" id="daA" maxlength="120" placeholder="例：豊見城市字高安123" autocomplete="off"></label>
-      <p class="hint">住所の場所の地図を出します。拒否の家の印をタップしてください。<br>住所の文字だけを国土地理院の住所検索に送って、場所を調べます。</p>
+      <p class="hint">住所の場所の地図を出します。拒否の家の印をタップしてください。<br>地番の地図（この端末の中で調べます）で見つからないときだけ、住所の文字を国土地理院の住所検索に送ります。</p>
       <button type="button" class="btn primary block" id="daGo">地図で家をえらぶ</button>
       <button type="button" class="btn block" id="daOnly" style="white-space:normal;line-height:1.3">住所だけ登録する<br><small>（あとで地図で家とつなぐ）</small></button>
       <button type="button" class="btn block" data-close>やめる</button>`);
@@ -582,10 +597,12 @@
       const a = inp.value.trim().slice(0, 120);
       if (!a) { toast('住所を入れてください'); inp.focus(); return; }
       const e = parseAddr(a, defMuni([]));
-      let pos = null;
+      let pos = null, cb = null;
       if (e) {
         toast('場所を調べています…');
-        try { const g = await xlGeocode([e.q], () => {}); pos = xlPick(e, g.get(e.q)); } catch (err) { pos = null; }
+        cb = await chibanFind(e).catch(() => null);
+        if (cb) { pos = Object.assign({}, cb.pos); if (!cb.pos.exact) pos.good = false; }
+        else { try { const g = await xlGeocode([e.q], () => {}); pos = xlPick(e, g.get(e.q)); } catch (err) { pos = null; } }
         const tt = $('#toast'); if (tt && !tt.querySelector('button')) tt.hidden = true;
       }
       if (onlyAddr) {
@@ -598,7 +615,7 @@
         return;
       }
       if (!pos) toast('住所から場所が分かりませんでした。地図を動かして、家をさがしてください');
-      startAdd(Object.assign({ a }, pos ? { lat: pos.lat, lng: pos.lng, appx: !pos.good } : {}));
+      startAdd(Object.assign({ a }, pos ? { lat: pos.lat, lng: pos.lng, appx: !pos.good } : {}, cb ? { polys: cb.polys } : {}));
     };
     $('#daGo').onclick = () => go(false);
     $('#daOnly').onclick = () => go(true);
@@ -620,7 +637,70 @@
     const tail = xlSplitTail(p.rest);
     const label = tail.label && BLD_RE.test(tail.label) ? tail.label : ''; // 建物の名前だけ残す（人の名前は残さない）
     const a = `${p.muni}${p.town}${p.nums.join('-')}${label ? ' ' + label : ''}${tail.unit ? ' ' + tail.unit : ''}`;
-    return { q: '沖縄県' + p.muni + p.town + p.nums.join('-'), muni: p.muni, town: p.town, nums: p.nums, unit: tail.unit, a: a.slice(0, 120), noMuni };
+    return { q: '沖縄県' + p.muni + p.town + p.nums.join('-'), muni: p.muni, town: p.town, nums: p.nums, unit: tail.unit, a: a.slice(0, 120), noMuni, raw: s };
+  }
+
+  /* =========================================================
+     地番の地図（法務省の登記所備付地図を加工した表。chiban/ に置く。作り方は tools/moj-chiban.py）
+     ・住所の「字高安123番地」→ 字高安の地番123の土地 → その土地の中の家、と調べる（国土地理院より正確）
+     ・表はこの端末に読み込んで調べるので、住所の文字を外に送らない。表にない住所だけ、国土地理院に聞く
+     ・住居表示の住所（〇丁目〇番〇号）は地番とちがうので使わない
+     ========================================================= */
+  const CB = { list: undefined, idx: {}, aza: {} };
+  const cbJson = path => fetch('chiban/' + path).then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); });
+  async function cbIndex(muni) {
+    if (CB.list === undefined) { try { CB.list = await cbJson('index.json'); } catch (e) { CB.list = null; } }
+    const m = CB.list && CB.list.munis && CB.list.munis[muni];
+    if (!m) return null;
+    if (!CB.idx[m.code]) CB.idx[m.code] = cbJson(m.code + '/index.json').catch(() => null);
+    return CB.idx[m.code];
+  }
+  function cbAza(code, f) {
+    const key = code + '/' + f;
+    if (!CB.aza[key]) {
+      CB.aza[key] = cbJson(key + '.json').then(j => {
+        const m = new Map();
+        (j.p || []).forEach(e => {
+          const cy = e[1], cx = e[2], ring = [];
+          for (let i = 3; i + 1 < e.length; i += 2) ring.push([(cy + e[i]) / 1e6, (cx + e[i + 1]) / 1e6]);
+          const x = { lat: cy / 1e6, lng: cx / 1e6, ring };
+          (m.get(e[0]) || m.set(e[0], []).get(e[0])).push(x);
+        });
+        return m;
+      }).catch(() => null);
+    }
+    return CB.aza[key];
+  }
+  /* 住所 → 地番の土地（見つからないときは null）。exact：地番がそのまま合った */
+  async function chibanFind(e) {
+    if (!e || !e.nums || !e.nums.length) return null;
+    const raw = String(e.raw || e.a || '');
+    if (/\d\s*号/.test(raw) && !/番地/.test(raw)) return null; // 住居表示（〇番〇号）は地番ではない
+    const idx = await cbIndex(e.muni);
+    if (!idx || !idx.azas) return null;
+    CB.src = idx.src + (idx.asof ? `（${idx.asof.replace(/^(\d+)-0?(\d+)$/, '$1年$2月')}公開のデータ）` : '');
+    let town = String(e.town || '').normalize('NFKC').replace(/^(大字|字)/, ''), nums = e.nums.slice();
+    if (/丁目/.test(raw) && idx.azas[town + nums[0] + '丁目']) { town = town + nums[0] + '丁目'; nums = nums.slice(1); }
+    const a = idx.azas[town];
+    if (!a || !nums.length) return null;
+    const m = await cbAza(idx.code, a.f);
+    if (!m) return null;
+    let ps = m.get(nums.slice(0, 2).join('-')), exact = true;
+    if (!ps && nums.length >= 2) { ps = m.get(nums[0]); exact = false; } // 地図のあとに分かれた土地：もとの地番
+    if (!ps && nums.length === 1) { // 「123番地」だが、地図では 123-1・123-2…に分かれている
+      const kids = [];
+      m.forEach((v, k) => { if (k.startsWith(nums[0] + '-')) kids.push(...v); });
+      if (kids.length) { ps = kids; exact = false; }
+    }
+    if (!ps || !ps.length) return null;
+    return { pos: { lat: ps[0].lat, lng: ps[0].lng, good: true, chiban: true, exact }, polys: ps.map(x => x.ring), src: idx.src, asof: idx.asof };
+  }
+  window.chibanFind = chibanFind; // index.html のエクセル取り込みでも使う
+  /* 土地の中にある家 */
+  function housesIn(near, cb) {
+    const out = [];
+    near(cb.pos.lat, cb.pos.lng, 150).forEach(([h, d]) => { if (cb.polys.some(r => r.length >= 3 && inPoly(h.lat, h.lng, r))) out.push([h, d]); });
+    return out;
   }
   function defMuni(list) {
     const cnt = {};
@@ -650,7 +730,17 @@
   const unitMatch = (h, unit) => h.units.find(u => u === unit || uName(h, u) === unit || String(uName(h, u)).replace(/号室?$/, '') === unit);
 
   /* 1件の行き先を決める：家につなぐ（自動）／場所だけ／場所が分からない */
-  function placeOne(near, pos, unit, exact) {
+  function placeOne(near, pos, unit, exact, cb) {
+    if (cb) { // 地番の土地が分かったとき：土地の中の家だけを見る
+      const inside = housesIn(near, cb);
+      if (unit) {
+        const apt = inside.find(([h]) => h.type === 'apt' && unitMatch(h, unit));
+        if (apt) return { kind: 'house', h: apt[0], unit: unitMatch(apt[0], unit), cb: 1 };
+      }
+      const hs = inside.filter(([h]) => h.type !== 'apt');
+      if (hs.length === 1 && !inside.some(([h]) => h.type === 'apt')) return { kind: 'house', h: hs[0][0], unit: '', cb: 1 };
+      return { kind: 'pin', cb: 1 };
+    }
     if (!pos) return { kind: 'nopos' };
     if (unit) {
       const apt = near(pos.lat, pos.lng, exact ? 15 : 30).find(([h]) => h.type === 'apt' && unitMatch(h, unit));
@@ -725,7 +815,7 @@
       <div class="notice info">住所が <b>${P.ok.length}件</b> 見つかりました。${withNo ? `<br>（うち区域番号つき ${withNo}件）` : ''}
         ${P.exist ? `<br>すでに登録されている住所 ${P.exist}件は入れません。` : ''}${P.dup ? `<br>同じ住所の重なり ${P.dup}件は1件にまとめます。` : ''}</div>
       <p class="hint">読むのは<b>住所と区域番号の列だけ</b>です。名前などほかの列は読みません。<br>
-        「場所を調べる」を押すと、住所の文字だけを国土地理院の住所検索に送って、地図の位置にします。</p>
+        「場所を調べる」を押すと、まず<b>地番の地図</b>（法務省の地図をもとにした表。この端末の中で調べます）で土地を調べます。見つからない住所だけ、住所の文字を国土地理院の住所検索に送ります。</p>
       ${noMuni ? `<label class="field"><span>市町村が書いていない住所（${noMuni}件）の市町村</span><select id="dxMuni" class="dnc-sel">${XL_MUNI_LIST.slice().sort().map(m => `<option${m === muni ? ' selected' : ''}>${m}</option>`).join('')}</select></label>` : ''}
       ${P.bad.length ? `<details class="dncfold"><summary>読めなかった住所（${P.bad.length}件）</summary><p class="hint">番地のない住所などです。「＋ 住所で追加」で1件ずつ入れられます。</p><ul>${P.bad.slice(0, 200).map(x => `<li data-notr>${esc(x)}</li>`).join('')}</ul></details>` : ''}
       <button type="button" class="btn primary block" id="dxGo"${P.ok.length ? '' : ' disabled'}>場所を調べる（${P.ok.length}件）</button>
@@ -735,21 +825,28 @@
     $('#dxGo').onclick = () => xlLocateAll(P.ok, fileName);
   }
   async function xlLocateAll(list, fileName) {
-    const qs = Array.from(new Set(list.map(e => e.q)));
-    setSheet(headHtml(null, '住所から場所を調べています', esc(fileName)) + `<p class="hint">住所 ${qs.length}件。しばらくお待ちください（この画面を閉じないでください）。</p>
-      <div class="bar"><i id="dxBar" style="width:0%"></i></div><p class="muted" id="dxCnt">0 / ${qs.length}</p>`);
-    let geo;
-    try {
-      geo = await xlGeocode(qs, n => { const b = $('#dxBar'), c = $('#dxCnt'); if (b) b.style.width = Math.round(n / qs.length * 100) + '%'; if (c) c.textContent = `${n} / ${qs.length}`; });
-    } catch (e) {
-      infoSheet('場所を調べられませんでした', 'インターネットの接続を確かめて、もう一度ためしてください。');
-      return;
+    setSheet(headHtml(null, '住所から場所を調べています', esc(fileName)) + `<p class="hint">住所 ${list.length}件。しばらくお待ちください（この画面を閉じないでください）。</p>
+      <div class="bar"><i id="dxBar" style="width:0%"></i></div><p class="muted" id="dxCnt">地番の地図で調べています…</p>`);
+    const cbs = new Map();
+    for (const e of list) { const r = await chibanFind(e).catch(() => null); if (r) cbs.set(e, r); } // 同じ字の表は1回だけ読む
+    const qs = Array.from(new Set(list.filter(e => !cbs.has(e)).map(e => e.q)));
+    let geo = new Map();
+    if (qs.length) {
+      const cnt = $('#dxCnt'); if (cnt) cnt.textContent = `国土地理院で調べています 0 / ${qs.length}`;
+      try {
+        geo = await xlGeocode(qs, n => { const b = $('#dxBar'), c = $('#dxCnt'); if (b) b.style.width = Math.round(n / qs.length * 100) + '%'; if (c) c.textContent = `国土地理院で調べています ${n} / ${qs.length}`; });
+      } catch (e) {
+        infoSheet('場所を調べられませんでした', 'インターネットの接続を確かめて、もう一度ためしてください。');
+        return;
+      }
     }
     const near = houseGrid(), plan = [], seenPos = [];
     list.forEach(e => {
-      const pos = xlPick(e, geo.get(e.q));
+      const cb = cbs.get(e);
+      const pos = cb ? cb.pos : xlPick(e, geo.get(e.q));
       const t = e.no ? D().territories.find(x => x.no === e.no) : null;
-      const pl = placeOne(near, pos, e.unit, false);
+      const pl = placeOne(near, pos, e.unit, false, cb);
+      if (cb && !cb.pos.exact) pos.good = false; // 地番が分かれていたときは「だいたいの場所」
       const item = { e, pos, tid: t ? t.id : pos ? terrOf(pos.lat, pos.lng) : null, pl };
       if (pl.kind === 'pin') { // 同じ場所に重なる印は、少しずつずらす（丁目までしか分からなかったときなど）
         const p = [pos.lat, pos.lng], k = seenPos.filter(x => xlDist(x, p) < 4).length;
@@ -761,6 +858,7 @@
     showPlan(plan, 'xl', fileName);
   }
 
+  const cbSrc = () => '出典：' + (CB.src || '「登記所備付地図データ」（法務省）を加工して作成');
   /* 取り込む前の確認（エクセル・マイマップ共通） */
   function showPlan(plan, src, fileName) {
     const nH = plan.filter(p => p.pl.kind === 'house' && !D().dnc[K(p.pl.h.id, p.pl.unit)]).length;
@@ -773,11 +871,13 @@
         <div class="tile"><b>${nPin}</b><span>地図に印だけ置く</span></div>
         ${nNo ? `<div class="tile alert"><b>${nNo}</b><span>場所が分からない</span></div>` : ''}</div>
       ${nSame ? `<p class="hint">すでに拒否になっている家 ${nSame}件は、住所だけを書き足します。</p>` : ''}
+      ${plan.some(p => p.pl.cb) ? `<p class="hint">${plan.filter(p => p.pl.cb).length}件は、地番の地図で土地まで分かりました（その土地の中に家が1軒だけなら、その家につなぎます）。</p>` : ''}
       ${nNo ? `<p class="hint">「場所が分からない」${nNo}件も一覧には入ります（地図には出ません）。あとで地図で家をえらんでください。</p>` : ''}
       <p class="hint">「自動でつなぐ」は、近くに家の印が1軒だけあったものです。印だけのもの・場所が分からないものと一緒に「要確認」に入るので、あとで「地図で順に確かめる」で片づけられます。<br>
         どれも、取り込んだときから地図に拒否の印が出ます（場所が分からないものをのぞく）。</p>
       <details class="dncfold"><summary>区域ごとの件数</summary><ul>${[...byT.entries()].sort((a, b) => (a[0] === '？') - (b[0] === '？') || cmpNo(a[0], b[0])).map(([no, n]) => `<li>${no === '？' ? '区域が分からない' : '区域' + esc(no)}：${n}件</li>`).join('')}</ul></details>
       <button type="button" class="btn primary block" id="dpGo"${plan.length ? '' : ' disabled'}>拒否 ${plan.length}件を取り込む</button>
+      ${plan.some(p => p.pl.cb) ? `<p class="hint dnc-src">地番の場所は、${esc(cbSrc())}</p>` : ''}
       <button type="button" class="btn block" data-close>やめる</button>`);
     $('#dpGo').onclick = () => commitPlan(plan, src);
   }

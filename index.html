@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.10"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.11"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -7961,6 +7961,7 @@ async function xlGeocode(qs, onProg) {
 }
 /* 検索の答えから、いちばん合うものと、どれくらい正確かを決める */
 function xlPick(entry, cands) {
+  if (cands && cands[0] && cands[0].cb) { const p = cands[0].cb.pos; return { lat: p.lat, lng: p.lng, good: !!p.exact }; } // 地番の地図で分かった
   const muniCore = entry.muni.replace(/[市町村]$/, '');
   const c = (cands || []).find(x => x && x.c && x.t && x.t.indexOf(muniCore) >= 0 && x.t.indexOf(entry.town.slice(0, 2)) >= 0)
     || (cands || []).find(x => x && x.c && x.t && x.t.indexOf(muniCore) >= 0);
@@ -8039,8 +8040,13 @@ async function xlLocate(sheets, fileName) {
   setSheet(headHtml(null, '住所から場所を調べています', esc(fileName)) + `<p class="hint">住所 ${qs.length}件。しばらくお待ちください（この画面を閉じないでください）。</p>
     <div class="bar"><i id="xlBar" style="width:0%"></i></div><p class="muted" id="xlCnt">0 / ${qs.length}</p>`);
   let geo;
+  // 地番の地図（kyohi.js の chibanFind。表のある市町村だけ）で分かる住所は、国土地理院に聞かない
+  const cbq = new Map();
+  if (window.chibanFind) for (const s of use) for (const e of s.entries) { if (!cbq.has(e.q)) { const r = await window.chibanFind(e).catch(() => null); if (r) cbq.set(e.q, r); } }
+  const qs2 = qs.filter(q => !cbq.has(q));
   try {
-    geo = await xlGeocode(qs, n => { const b = $('#xlBar'), c = $('#xlCnt'); if (b) b.style.width = Math.round(n / qs.length * 100) + '%'; if (c) c.textContent = `${n} / ${qs.length}`; });
+    geo = await xlGeocode(qs2, n => { const b = $('#xlBar'), c = $('#xlCnt'); if (b) b.style.width = Math.round(n / qs2.length * 100) + '%'; if (c) c.textContent = `${n} / ${qs2.length}`; });
+    cbq.forEach((r, q) => geo.set(q, [{ cb: r }]));
   } catch (e) {
     infoSheet('場所を調べられませんでした', 'インターネットの接続を確かめて、もう一度ためしてください。続くときは、スプレッドシートのプログラム（Code.gs と appsscript.json）が新しい版か確かめてください。');
     return;
