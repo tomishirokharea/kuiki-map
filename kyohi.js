@@ -25,6 +25,11 @@
   'use strict';
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof isPinKey !== 'function') return;
 
+  if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.13')) {
+    CHANGELOG.unshift({ v: '2026.13.13', items: [
+      ['地', '古い一覧の住所（今はない地番・合併前の市町村名）でも、場所を調べられるようになりました']
+    ] });
+  }
   if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.12')) {
     CHANGELOG.unshift({ v: '2026.13.12', items: [
       ['集', 'アパートの登録（取り込み）も、法務省の地番の地図で住所の土地を調べ、その土地の中の家に重ねるようになりました']
@@ -651,7 +656,7 @@
      ・表はこの端末に読み込んで調べるので、住所の文字を外に送らない。表にない住所だけ、国土地理院に聞く
      ・住居表示の住所（〇丁目〇番〇号）は地番とちがうので使わない
      ========================================================= */
-  const CB = { list: undefined, idx: {}, aza: {} };
+  const CB = { list: undefined, idx: {}, aza: {}, old: {} };
   const cbJson = path => fetch('chiban/' + path).then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); });
   async function cbIndex(muni) {
     if (CB.list === undefined) { try { CB.list = await cbJson('index.json'); } catch (e) { CB.list = null; } }
@@ -676,7 +681,23 @@
     }
     return CB.aza[key];
   }
-  /* 住所 → 地番の土地（見つからないときは null）。exact：地番がそのまま合った */
+  /* 古い地番の表（chiban/<コード>/old/）：今の地図にない地番（合わさった・番号が変わった・分かれる前の番号）。年は y */
+  function cbOldAza(code, f) {
+    const key = code + '/old/' + f;
+    if (!CB.old[key]) {
+      CB.old[key] = cbJson(key + '.json').then(j => {
+        const m = new Map();
+        (j.p || []).forEach((e, i) => {
+          const cy = e[1], cx = e[2], ring = [];
+          for (let k = 3; k + 1 < e.length; k += 2) ring.push([(cy + e[k]) / 1e6, (cx + e[k + 1]) / 1e6]);
+          (m.get(e[0]) || m.set(e[0], []).get(e[0])).push({ lat: cy / 1e6, lng: cx / 1e6, ring, y: (j.y || [])[i] || 0 });
+        });
+        return m;
+      }).catch(() => null);
+    }
+    return CB.old[key];
+  }
+  /* 住所 → 地番の土地（見つからないときは null）。exact：地番がそのまま合った・old：古い地番の地図で見つかった（その年） */
   async function chibanFind(e) {
     if (!e || !e.nums || !e.nums.length) return null;
     const raw = String(e.raw || e.a || '');
@@ -690,7 +711,13 @@
     if (!a || !nums.length) return null;
     const m = await cbAza(idx.code, a.f);
     if (!m) return null;
-    let ps = m.get(nums.slice(0, 2).join('-')), exact = true;
+    const want = nums.slice(0, 2).join('-');
+    let ps = m.get(want), exact = true;
+    if (!ps && idx.old && idx.old[town]) { // 今の地図にない番号：古い地番の地図で、その土地があった場所をさがす
+      const om = await cbOldAza(idx.code, idx.old[town].f);
+      const ops = om && om.get(want);
+      if (ops && ops.length) return { pos: { lat: ops[0].lat, lng: ops[0].lng, good: true, chiban: true, exact: true, old: ops[0].y || 1 }, polys: ops.map(x => x.ring), src: idx.src, asof: idx.asof };
+    }
     if (!ps && nums.length >= 2) { ps = m.get(nums[0]); exact = false; } // 地図のあとに分かれた土地：もとの地番
     if (!ps && nums.length === 1) { // 「123番地」だが、地図では 123-1・123-2…に分かれている
       const kids = [];
@@ -851,8 +878,9 @@
       const pos = cb ? cb.pos : xlPick(e, geo.get(e.q));
       const t = e.no ? D().territories.find(x => x.no === e.no) : null;
       const pl = placeOne(near, pos, e.unit, false, cb);
+      const cbOld = !!(cb && cb.pos.old);
       if (cb && !cb.pos.exact) pos.good = false; // 地番が分かれていたときは「だいたいの場所」
-      const item = { e, pos, tid: t ? t.id : pos ? terrOf(pos.lat, pos.lng) : null, pl };
+      const item = { e, pos, tid: t ? t.id : pos ? terrOf(pos.lat, pos.lng) : null, pl, cbOld };
       if (pl.kind === 'pin') { // 同じ場所に重なる印は、少しずつずらす（丁目までしか分からなかったときなど）
         const p = [pos.lat, pos.lng], k = seenPos.filter(x => xlDist(x, p) < 4).length;
         seenPos.push(p);
@@ -876,7 +904,7 @@
         <div class="tile"><b>${nPin}</b><span>地図に印だけ置く</span></div>
         ${nNo ? `<div class="tile alert"><b>${nNo}</b><span>場所が分からない</span></div>` : ''}</div>
       ${nSame ? `<p class="hint">すでに拒否になっている家 ${nSame}件は、住所だけを書き足します。</p>` : ''}
-      ${plan.some(p => p.pl.cb) ? `<p class="hint">${plan.filter(p => p.pl.cb).length}件は、地番の地図で土地まで分かりました（その土地の中に家が1軒だけなら、その家につなぎます）。</p>` : ''}
+      ${plan.some(p => p.pl.cb) ? `<p class="hint">${plan.filter(p => p.pl.cb).length}件は、地番の地図で土地まで分かりました（その土地の中に家が1軒だけなら、その家につなぎます）。${plan.some(p => p.cbOld) ? `<br>うち<b>${plan.filter(p => p.cbOld).length}件</b>は今の地図にない古い地番で、前の年の地図で、その土地があった場所を見つけました。` : ''}</p>` : ''}
       ${nNo ? `<p class="hint">「場所が分からない」${nNo}件も一覧には入ります（地図には出ません）。あとで地図で家をえらんでください。</p>` : ''}
       <p class="hint">「自動でつなぐ」は、近くに家の印が1軒だけあったものです。印だけのもの・場所が分からないものと一緒に「要確認」に入るので、あとで「地図で順に確かめる」で片づけられます。<br>
         どれも、取り込んだときから地図に拒否の印が出ます（場所が分からないものをのぞく）。</p>

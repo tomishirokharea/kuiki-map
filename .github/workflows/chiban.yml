@@ -9,6 +9,8 @@ on:
     branches: [main]
     paths:
       - tools/chiban-sources.txt
+      - tools/chiban-build.py
+      - tools/moj-chiban.py
       - .github/workflows/chiban.yml
   workflow_dispatch:
 
@@ -33,27 +35,11 @@ jobs:
       - name: 道具を入れる
         run: pip install -q pyproj shapely
 
-      - name: GeoJSON をダウンロードして表にする
+      - name: GeoJSON をダウンロードして表にする（今の地番と古い地番）
         run: |
-          mkdir -p dl
-          LOG=chiban/_log.txt
-          mkdir -p chiban
-          : > "$LOG"
-          ok=1
-          while read -r code asof url; do
-            case "$code" in ''|\#*) continue;; esac
-            echo "ダウンロード：$code（$asof）" | tee -a "$LOG"
-            mkdir -p "dl/$code"
-            if ! curl -fsSL --retry 3 -o "dl/$code/$code.geojson" "$url" 2>>"$LOG"; then echo "ダウンロードできませんでした" | tee -a "$LOG"; ok=0; continue; fi
-            ls -la "dl/$code" | tee -a "$LOG"
-            python3 -c "import json,sys; j=json.load(open(sys.argv[1])); f=j['features']; print('件数', len(f)); print(json.dumps(f[0]['properties'], ensure_ascii=False)); print(f[0]['geometry']['type'], str(f[0]['geometry']['coordinates'])[:200])" "dl/$code/$code.geojson" 2>&1 | tee -a "$LOG"
-            rm -rf "chiban/$code"
-            if ! python3 tools/moj-chiban.py "dl/$code" chiban "$asof" 2>&1 | grep -v '^読みました' | tee -a "$LOG"; then ok=0; fi
-            [ "${PIPESTATUS[0]}" = "0" ] || ok=0
-          done < tools/chiban-sources.txt
-          du -sh chiban | tee -a "$LOG"
-          cat chiban/index.json | tee -a "$LOG" || true
-          echo "ok=$ok" | tee -a "$LOG"
+          python3 tools/chiban-build.py tools/chiban-sources.txt chiban
+          du -sh chiban
+          cat chiban/_log.txt
 
       - name: chiban-update ブランチに入れる
         run: |

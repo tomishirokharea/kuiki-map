@@ -503,6 +503,7 @@
       usedB.add(p.i); usedH.add(p.h.id);
       const b = sure[p.i];
       if (b.cb && b.inside > 1) b.note = `土地の中に家の印が${b.inside}つあったので、いちばん土地のまん中に近い家をアパートにしました`;
+      if (b.cb && b.cb.pos.old) b.note = ((b.note ? b.note + '。' : '') + `今の地図にない古い地番なので、${b.cb.pos.old}年の地図で場所を調べました`);
       else if (b.cb && b.note) { /* 地番が分かれていたときの説明をそのまま使う */ }
       plan.convert.push({ b, h: p.h });
     });
@@ -518,6 +519,7 @@
       b.lat = la; b.lng = ln;
     });
     plan.nCb = list.filter(b => b.cb && b.pos).length;
+    plan.nOld = list.filter(b => b.cb && b.cb.pos.old && b.pos).length;
     return plan;
   }
 
@@ -532,7 +534,7 @@
         <div class="tile"><b>${nMiss}</b><span>場所が分からない</span></div></div>
       ${plan.already ? `<p class="hint">すでに登録してある ${plan.already}棟は、入れません。</p>` : ''}
       ${noCols ? `<p class="hint">取り込み用の列がないピン ${noCols}個は、読まずにとばしました。</p>` : ''}
-      ${plan.nCb ? `<p class="hint"><b>${plan.nCb}棟</b>は、地番の地図で住所の土地まで分かりました。その土地の中にある家をアパートにします。</p>` : ''}
+      ${plan.nCb ? `<p class="hint"><b>${plan.nCb}棟</b>は、地番の地図で住所の土地まで分かりました。その土地の中にある家をアパートにします。${plan.nOld ? `<br>うち<b>${plan.nOld}棟</b>は今の地図にない古い地番で、前の年の地図で場所を調べました。` : ''}</p>` : ''}
       <p class="hint"><b>家に重ねる</b>：住所の土地の中の家（地番の地図で分かったとき）か、住所の場所のすぐ近くの家（仮の家を優先）を、アパートに変えます。<br>
         <b>新しく置く</b>：近くに家がない・場所があいまい・ピンが重なっている建物です。取り込んだあとの一覧で、1棟ずつ地図で確かめてください。</p>
       ${noT.length ? `<div class="notice warn">一覧の区域 ${esc(noT.join('・'))} は、アプリに区域がありません。場所の線の中にある区域に入ります。</div>` : ''}

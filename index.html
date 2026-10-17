@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.12"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.13"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -7837,8 +7837,18 @@ function xlKanjiNum(s) { // 「十二」→ 12（住所検索の返事の「二�
   });
 }
 /* 日本語の住所を「市町村・字・番地・残り（建物や部屋）」に分ける */
+/* 合併する前の市町村名 → 今の住所の書き方（古い一覧の住所でも読めるように） */
+const XL_OLD_MUNI = [
+  [/^豊見城村/, '豊見城市'],
+  [/^具志川市(字)?/, 'うるま市'], [/^石川市(字)?/, 'うるま市石川'], [/^与那城町(字)?/, 'うるま市与那城'], [/^勝連町(字)?/, 'うるま市勝連'],
+  [/^佐敷町(字)?/, '南城市佐敷'], [/^知念村(字)?/, '南城市知念'], [/^玉城村(字)?/, '南城市玉城'], [/^大里村(字)?/, '南城市大里'],
+  [/^東風平町/, '八重瀬町'], [/^具志頭村/, '八重瀬町'],
+  [/^平良市(字)?/, '宮古島市平良'], [/^城辺町(字)?/, '宮古島市城辺'], [/^下地町(字)?/, '宮古島市下地'], [/^上野村(字)?/, '宮古島市上野'], [/^伊良部町(字)?/, '宮古島市伊良部'],
+  [/^具志川村/, '久米島町'], [/^仲里村/, '久米島町']
+];
 function xlParseJa(raw) {
-  const s = xlNorm(raw).replace(/^沖縄県/, '').replace(/^(島尻郡|中頭郡|国頭郡)/, '');
+  let s = xlNorm(raw).replace(/^沖縄県/, '').replace(/^(島尻郡|中頭郡|国頭郡|宮古郡|八重山郡)/, '');
+  for (const [re, to] of XL_OLD_MUNI) { if (re.test(s)) { s = s.replace(re, to); break; } }
   const muni = XL_MUNI_LIST.find(m => s.startsWith(m));
   if (!muni) return null;
   let rest = s.slice(muni.length).replace(/^\s*字/, '');

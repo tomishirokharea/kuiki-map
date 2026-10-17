@@ -1,5 +1,11 @@
-# 地番の地図（chiban/）のもとにする GeoJSON の一覧（2026年版・AIGID）
+# 地番の地図（chiban/）のもとにする GeoJSON の一覧（AIGID・CC BY）
 # 1行に「市区町村コード  公開年月  URL」。AIGID の公開ページ（例：https://www.geospatial.jp/ckan/dataset/aigid-moj-47212）の
-# 「GeoJSON」のダウンロードURLを貼ります。この行を書きかえてコミットすると、GitHub Actions が自動で chiban/ を作り直します
+# 「GeoJSON」のダウンロードURLを貼ります。この一覧を書きかえてコミットすると、GitHub Actions が自動で chiban/ を作り直します
 # （結果は chiban-update ブランチに入るので、中身を確かめてから main にまぜます）
+# ・同じ市区町村で、いちばん新しい年が「今の地番」、それより古い年は「古い地番」（今はない番号を調べるため）になります
+# ・新しい年が出たら、その行を足すだけです（古い行は残しておきます）
 47212  2026-04  https://gsic-opendata.s3.ap-northeast-1.amazonaws.com/aigid/aigid-moj/2026/47/aigid-moj-47212/47212_%E8%B1%8A%E8%A6%8B%E5%9F%8E%E5%B8%82_%E5%85%AC%E5%85%B1%E5%BA%A7%E6%A8%9915%E7%B3%BB_%E7%AD%86R_2026.geojson
+47212  2025-01  https://www.geospatial.jp/ckan/dataset/80a011b8-3e5c-43e9-8aa5-eadd7026acd3/resource/a5cc2971-c70f-47b8-95a2-240aa596d8d0/download/47212__15_r_2025.geojson
+47212  2024-01  https://www.geospatial.jp/ckan/dataset/80a011b8-3e5c-43e9-8aa5-eadd7026acd3/resource/7880f8aa-4299-4823-813a-315f3471f667/download/47212__15_r_2024.geojson
+47212  2023-01  https://www.geospatial.jp/ckan/dataset/80a011b8-3e5c-43e9-8aa5-eadd7026acd3/resource/eb7770af-805b-430b-bca0-1e4a69e38850/download/47212__15_r_2023.geojson
+47212  2022-01  https://www.geospatial.jp/ckan/dataset/80a011b8-3e5c-43e9-8aa5-eadd7026acd3/resource/ad6b50df-f537-4337-b89d-05ba3206c891/download/47212__15_r.geojson
