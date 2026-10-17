@@ -25,6 +25,11 @@
   'use strict';
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof isPinKey !== 'function') return;
 
+  if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.12')) {
+    CHANGELOG.unshift({ v: '2026.13.12', items: [
+      ['集', 'アパートの登録（取り込み）も、法務省の地番の地図で住所の土地を調べ、その土地の中の家に重ねるようになりました']
+    ] });
+  }
   if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.11')) {
     CHANGELOG.unshift({ v: '2026.13.11', items: [
       ['地', '区域係が住所から拒否の家をさがすとき、豊見城市は法務省の地番の地図で土地まで調べるようになりました（より正確になりました）']
@@ -988,6 +993,7 @@
     if (ref) ref.after(sp); else lg.appendChild(sp);
   }
 
+  window.chibanSrc = () => cbSrc(); // apt-import.js の出典の表示に使う
   window.renderDncAdmin = renderDncAdmin;
   window.renderDncPins = renderDncPins;
   window.dncPickHouse = dncPickHouse;

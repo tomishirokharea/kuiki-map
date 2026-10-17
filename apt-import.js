@@ -16,6 +16,8 @@
      B) マイマップのKML/KMZ：CSVをGoogleマイマップに読ませて、ピンを地図で確かめ・直してから書き出したもの
         （位置はマイマップのピンの位置をそのまま使う。ピンの「建物名・区域・階数・1F有・オートロック・立入」の列だけを読む）
    index.html の xlParseJa / xlGeocode / xlPick（エクセル取り込みと同じ仕組み）を使います。
+   地番の地図（kyohi.js の chibanFind・法務省の登記所備付地図）がある市町村では、先に住所の地番の土地を調べ、
+   「土地の中にある家」に重ねます（国土地理院の点から近い家をえらぶより正確）。土地の中に家の印がなければ、土地の中に新しく置きます。
    ========================================================= */
 (function () {
   'use strict';
@@ -27,6 +29,29 @@
   const tkey = s => { const x = normNo(s); return /^\d+$/.test(x) ? String(parseInt(x, 10)) : x; }; // 「01」と「1」を同じ区域にする
   const terrByNo = no => D().territories.find(t => tkey(t.no) === tkey(no));
   const round6 = v => Math.round(v * 1e6) / 1e6;
+
+  /* ---------- 地番の地図（kyohi.js） ---------- */
+  /* 住所の地番の土地をさがす。見つかった建物は、国土地理院に聞かない（住所の文字を外に送らない） */
+  async function chibanAll(list) {
+    if (typeof window.chibanFind !== 'function') return 0;
+    let n = 0;
+    for (const b of list) {
+      if (b.fromMap || !b.entry || !b.entry.nums.length) continue;
+      const r = await window.chibanFind(Object.assign({ raw: b.addr }, b.entry)).catch(() => null);
+      if (r) { b.cb = r; n++; }
+    }
+    return n;
+  }
+  const cbPos = b => ({ lat: b.cb.pos.lat, lng: b.cb.pos.lng, good: !!b.cb.pos.exact, chiban: true });
+  const inParcel = (b, la, ln) => b.cb.polys.some(r => r.length >= 3 && inPoly(la, ln, r));
+  /* 地番の土地の、地図のます目（cell）の範囲 */
+  function parcelCells(b) {
+    let s = 90, n = -90, w = 180, e = -180;
+    b.cb.polys.forEach(r => r.forEach(([la, ln]) => { s = Math.min(s, la); n = Math.max(n, la); w = Math.min(w, ln); e = Math.max(e, ln); }));
+    const out = [];
+    for (let y = Math.round(s * 2000) - 1; y <= Math.round(n * 2000) + 1; y++) for (let x = Math.round(w * 2000) - 1; x <= Math.round(e * 2000) + 1; x++) out.push(y + ':' + x);
+    return out.slice(0, 400); // とても大きな土地（畑など）でも重くならないように
+  }
 
   /* ---------- CSV ---------- */
   function parseCsv(text) {
@@ -185,14 +210,17 @@
       const p = b.addr ? xlParseJa('沖縄県' + b.addr) : null;
       if (p) b.entry = { q: '沖縄県' + p.muni + p.town + p.nums.join('-'), nums: p.nums, muni: p.muni, town: p.town };
     });
-    const qs = Array.from(new Set(list.filter(b => b.entry).map(b => b.entry.q)));
-    setSheet(headHtml(null, '住所から場所を調べています', esc(file.name || '')) + `<p class="hint">住所 ${qs.length}件。しばらくお待ちください（この画面を閉じないでください）。</p>
-      <div class="bar"><i id="aiBar" style="width:0%"></i></div><p class="muted" id="aiCnt">0 / ${qs.length}</p>`);
-    let geo;
-    try {
-      geo = await xlGeocode(qs, n => { const b = $('#aiBar'), c = $('#aiCnt'); if (b) b.style.width = Math.round(n / Math.max(1, qs.length) * 100) + '%'; if (c) c.textContent = `${n} / ${qs.length}`; });
-    } catch (e) { infoSheet('場所を調べられませんでした', 'インターネットの接続を確かめて、もう一度ためしてください。'); return; }
-    list.forEach(b => { b.pos = b.entry ? xlPick(b.entry, geo.get(b.entry.q)) : null; });
+    setSheet(headHtml(null, '住所から場所を調べています', esc(file.name || '')) + `<p class="hint">しばらくお待ちください（この画面を閉じないでください）。</p>
+      <div class="bar"><i id="aiBar" style="width:0%"></i></div><p class="muted" id="aiCnt">地番の地図で調べています…</p>`);
+    await chibanAll(list);
+    const qs = Array.from(new Set(list.filter(b => b.entry && !b.cb).map(b => b.entry.q)));
+    let geo = new Map();
+    if (qs.length) {
+      try {
+        geo = await xlGeocode(qs, n => { const b = $('#aiBar'), c = $('#aiCnt'); if (b) b.style.width = Math.round(n / Math.max(1, qs.length) * 100) + '%'; if (c) c.textContent = `国土地理院で調べています ${n} / ${qs.length}`; });
+      } catch (e) { infoSheet('場所を調べられませんでした', 'インターネットの接続を確かめて、もう一度ためしてください。'); return; }
+    }
+    list.forEach(b => { b.pos = b.cb ? cbPos(b) : b.entry ? xlPick(b.entry, geo.get(b.entry.q)) : null; });
     showCandPlan(makeCandPlan(list), file.name || '');
   }
   function makeCandPlan(list) {
@@ -392,15 +420,18 @@
       const p = b.addr ? xlParseJa('沖縄県' + b.addr) : null;
       if (p) { b.entry = { q: '沖縄県' + p.muni + p.town + p.nums.join('-'), nums: p.nums, muni: p.muni, town: p.town }; }
     });
-    const qs = Array.from(new Set(list.filter(b => b.entry).map(b => b.entry.q))); // 番地のない住所も、町のまん中だけ調べる
-    setSheet(headHtml(null, '住所から場所を調べています', esc(fileName)) + `<p class="hint">住所 ${qs.length}件。しばらくお待ちください（この画面を閉じないでください）。</p>
-      <div class="bar"><i id="aiBar" style="width:0%"></i></div><p class="muted" id="aiCnt">0 / ${qs.length}</p>`);
-    let geo;
-    try {
-      geo = await xlGeocode(qs, n => { const b = $('#aiBar'), c = $('#aiCnt'); if (b) b.style.width = Math.round(n / Math.max(1, qs.length) * 100) + '%'; if (c) c.textContent = `${n} / ${qs.length}`; });
-    } catch (e) {
-      infoSheet('場所を調べられませんでした', 'インターネットの接続を確かめて、もう一度ためしてください。');
-      return;
+    setSheet(headHtml(null, '住所から場所を調べています', esc(fileName)) + `<p class="hint">しばらくお待ちください（この画面を閉じないでください）。</p>
+      <div class="bar"><i id="aiBar" style="width:0%"></i></div><p class="muted" id="aiCnt">地番の地図で調べています…</p>`);
+    await chibanAll(list);
+    const qs = Array.from(new Set(list.filter(b => b.entry && !b.cb).map(b => b.entry.q))); // 番地のない住所も、町のまん中だけ調べる
+    let geo = new Map();
+    if (qs.length) {
+      try {
+        geo = await xlGeocode(qs, n => { const b = $('#aiBar'), c = $('#aiCnt'); if (b) b.style.width = Math.round(n / Math.max(1, qs.length) * 100) + '%'; if (c) c.textContent = `国土地理院で調べています ${n} / ${qs.length}`; });
+      } catch (e) {
+        infoSheet('場所を調べられませんでした', 'インターネットの接続を確かめて、もう一度ためしてください。');
+        return;
+      }
     }
     const plan = makePlan(list, geo);
     showPlan(plan, fileName);
@@ -415,9 +446,15 @@
     const ex = list.map(b => {
       const t = terrByNo(b.terr); if (!t) plan.noTerr.add(b.terr);
       b.t = t || null;
-      if (!b.fromMap) b.pos = b.entry ? xlPick(b.entry, geo.get(b.entry.q)) : null;
+      if (!b.fromMap) b.pos = b.cb ? cbPos(b) : b.entry ? xlPick(b.entry, geo.get(b.entry.q)) : null;
       return b;
     });
+    const grid = new Map(), cell = (la, ln) => Math.round(la * 2000) + ':' + Math.round(ln * 2000);
+    D().houses.forEach(h => {
+      if (h.type !== 'house') return;
+      const k = cell(h.lat, h.lng); (grid.get(k) || grid.set(k, []).get(k)).push(h);
+    });
+    const insideOf = b => { const out = []; parcelCells(b).forEach(k => (grid.get(k) || []).forEach(h => { if (inParcel(b, h.lat, h.lng)) out.push(h); })); return out; };
     const placeable = [];
     ex.forEach(b => {
       if (!b.pos) { plan.miss.push(b); return; }
@@ -425,7 +462,11 @@
       b.why = [];
       if (!b.fromMap) {
         if (!b.entry.nums.length) b.why.push('番地が分からないため、だいたいの場所');
-        else if (!b.pos.good) b.why.push('番地まで合わず、だいたいの場所');
+        else if (!b.pos.good && b.cb) {
+          // 地番が分かれていた（123 → 123-1・123-2…）：分かれた土地ぜんぶの中に家が1軒だけなら、その家に重ねる
+          if (insideOf(b).length === 1 && !(cnt.get(b.entry.q) > 1)) b.note = '住所の地番が分かれていたので、分かれた土地の中にある1軒に重ねました';
+          else b.why.push('住所の地番が分かれていて、どの土地か決められなかったため、もとの地番の土地の中に置きました');
+        } else if (!b.pos.good) b.why.push('番地まで合わず、だいたいの場所');
         if (cnt.get(b.entry.q) > 1 && b.entry.nums.length) b.why.push('同じ住所に建物が複数あります');
       }
       placeable.push(b);
@@ -436,13 +477,17 @@
     });
     // 確実な建物（番地が合う・住所がひとつだけ）は、近くの家に重ねる
     const sure = placeable.filter(b => !b.why.length);
-    const grid = new Map(), cell = (la, ln) => Math.round(la * 2000) + ':' + Math.round(ln * 2000);
-    D().houses.forEach(h => {
-      if (h.type !== 'house') return;
-      const k = cell(h.lat, h.lng); (grid.get(k) || grid.set(k, []).get(k)).push(h);
-    });
     const pairs = [];
     sure.forEach((b, i) => {
+      if (b.cb) { // 地番の土地が分かった建物：土地の中にある家だけを見る（距離は関係ない）
+        const inside = insideOf(b);
+        b.inside = inside.length;
+        inside.forEach(h => {
+          const d = xlDist([h.lat, h.lng], [b.pos.lat, b.pos.lng]);
+          pairs.push({ i, h, d, score: d - 1000 - (h.prov ? 3 : 0) }); // 土地の中の家は、ほかの建物の「近くの家」より先にえらぶ
+        });
+        return;
+      }
       const cy = Math.round(b.pos.lat * 2000), cx = Math.round(b.pos.lng * 2000);
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         (grid.get((cy + dy) + ':' + (cx + dx)) || []).forEach(h => {
@@ -456,9 +501,12 @@
     pairs.forEach(p => {
       if (usedB.has(p.i) || usedH.has(p.h.id)) return;
       usedB.add(p.i); usedH.add(p.h.id);
-      plan.convert.push({ b: sure[p.i], h: p.h });
+      const b = sure[p.i];
+      if (b.cb && b.inside > 1) b.note = `土地の中に家の印が${b.inside}つあったので、いちばん土地のまん中に近い家をアパートにしました`;
+      else if (b.cb && b.note) { /* 地番が分かれていたときの説明をそのまま使う */ }
+      plan.convert.push({ b, h: p.h });
     });
-    sure.forEach((b, i) => { if (!usedB.has(i)) { b.why.push('近くに家がなかったため、新しく置きました'); plan.create.push(b); } });
+    sure.forEach((b, i) => { if (!usedB.has(i)) { b.why.push(b.cb ? '地番の土地の中に家の印がなかったため、土地の中に新しく置きました' : '近くに家がなかったため、新しく置きました'); plan.create.push(b); } });
     placeable.filter(b => b.why.length && !sure.includes(b)).forEach(b => plan.create.push(b));
     // 同じ場所に重なる建物は、少しずつずらして並べる
     const seen = [];
@@ -469,6 +517,7 @@
       if (k) { const r = 9 * Math.sqrt(k), a = k * 2.4; la += r * Math.sin(a) / 110540; ln += r * Math.cos(a) / (111320 * Math.cos(la * Math.PI / 180)); }
       b.lat = la; b.lng = ln;
     });
+    plan.nCb = list.filter(b => b.cb && b.pos).length;
     return plan;
   }
 
@@ -483,14 +532,16 @@
         <div class="tile"><b>${nMiss}</b><span>場所が分からない</span></div></div>
       ${plan.already ? `<p class="hint">すでに登録してある ${plan.already}棟は、入れません。</p>` : ''}
       ${noCols ? `<p class="hint">取り込み用の列がないピン ${noCols}個は、読まずにとばしました。</p>` : ''}
-      <p class="hint"><b>家に重ねる</b>：住所の場所のすぐ近くにある家（仮の家を優先）を、アパートに変えます。<br>
+      ${plan.nCb ? `<p class="hint"><b>${plan.nCb}棟</b>は、地番の地図で住所の土地まで分かりました。その土地の中にある家をアパートにします。</p>` : ''}
+      <p class="hint"><b>家に重ねる</b>：住所の土地の中の家（地番の地図で分かったとき）か、住所の場所のすぐ近くの家（仮の家を優先）を、アパートに変えます。<br>
         <b>新しく置く</b>：近くに家がない・場所があいまい・ピンが重なっている建物です。取り込んだあとの一覧で、1棟ずつ地図で確かめてください。</p>
       ${noT.length ? `<div class="notice warn">一覧の区域 ${esc(noT.join('・'))} は、アプリに区域がありません。場所の線の中にある区域に入ります。</div>` : ''}
       ${nMiss ? `<details class="more"><summary>場所が分からない建物（${nMiss}棟）：作りません</summary>
         <p class="hint">地図で「＋ 家」から入れてください。</p><ul>${plan.miss.map(b => `<li>区域${esc(b.terr)}　${lineOf(b)}</li>`).join('')}</ul>
         <button class="btn small" id="aiCopyMiss">この一覧をコピー</button></details>` : ''}
       <button class="btn primary block" id="aiCommit"${nCv + nCr ? '' : ' disabled'}>${nCv + nCr}棟を登録する</button>
-      <button class="btn block" data-close>やめる</button>`);
+      <button class="btn block" data-close>やめる</button>
+      ${plan.nCb && window.chibanSrc ? `<p class="hint">地番の場所は、${esc(window.chibanSrc())}</p>` : ''}`);
     if ($('#aiCopyMiss')) $('#aiCopyMiss').onclick = async () => {
       const t = plan.miss.map(b => `区域${b.terr}\t${b.name}\t${b.addr}`).join('\n');
       try { await navigator.clipboard.writeText(t); toast('コピーしました'); } catch (e) { toast('コピーできませんでした'); }
@@ -511,8 +562,8 @@
     const diffTerr = (b, h) => { const a = terrOf(h.lat, h.lng); return b.t && a !== b.t.id ? ` 一覧の区域${b.terr}と、線の区域がちがいます` : ''; };
     plan.convert.forEach(({ b, h }) => {
       apply(b, h);
-      const w = diffTerr(b, h);
-      if (w) check.push({ id: h.id, b, note: w.trim() });
+      const w = ((b.note || '') + diffTerr(b, h)).trim();
+      if (w) check.push({ id: h.id, b, note: w });
     });
     plan.create.forEach(b => {
       const h = { id: 'h' + uid(), terrId: terrOf(b.lat, b.lng), type: 'apt', lat: round6(b.lat), lng: round6(b.lng), label: '', units: [], createdAt: now, createdBy: me().id, imp: true };
