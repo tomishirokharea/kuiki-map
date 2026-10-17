@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.9"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.10"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -689,7 +689,7 @@ body.strong .pin.st-plain{border-width:4px}
 .atabs button{min-height:54px;font-size:17px;border-left:0!important;border-top:0;padding:0 4px!important;white-space:nowrap}
 .atabs button:not([hidden]) ~ button{border-left:2px solid var(--ink)!important}
 .adsub{display:flex;flex-wrap:wrap;margin:-4px 0 12px}
-.adsub button{flex:1 1 6em;min-height:50px;font-size:16px}
+.adsub button{flex:1 1 4em;min-height:50px;font-size:16px}
 .adsub [data-admap]{flex:0 1 auto}
 .atabs .cnt{position:static;display:inline-grid;margin-left:4px;vertical-align:middle}
 
@@ -1551,6 +1551,7 @@ body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
         <div class="seg adsub" id="adTerrSub" role="group" aria-label="区域の見かた" hidden>
           <button type="button" data-ap="terr" aria-pressed="true">一覧</button>
           <button type="button" data-ap="status" aria-pressed="false">状況</button>
+          <button type="button" data-ap="dnc" aria-pressed="false">拒否</button>
           <button type="button" data-admap>期限の地図</button>
         </div>
         <div id="adTopBar"></div>
@@ -1588,6 +1589,7 @@ body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
         <div id="adTakeSet"></div>
         <div id="adTerrs"></div>
         </div>
+        <div class="apane" data-apane="dnc" hidden><div id="adDnc"></div></div>
         <div class="apane" data-apane="status2" hidden>
         <h2 class="sec">留守宅の状況</h2>
         <div id="adAwaySet"></div>
@@ -3446,6 +3448,29 @@ const fol = k => D().follows[k] || null;
 const followIdle = f => daysSince(f.touchedAt);
 function followStage(f) { const d = followIdle(f), s = D().settings; return d >= s.escalateDays ? 2 : d >= s.remindDays ? 1 : 0; }
 function parseKey(k) { const i = k.indexOf('|'); return [k.slice(0, i), k.slice(i + 1)]; }
+/* ---------- 拒否の印（D().dnc） ----------
+   キー：「家id|部屋」＝家につながった拒否／「pin:…」＝家とつながっていない、場所だけの拒否（区域係が取り込み・追加したもの）
+   値：true（訪問で記録した拒否）か { a: 住所, s: 登録元（xl・kml・adm）, at, lat, lng, p: 1（場所だけ）, appx: 1（場所はだいたい）, auto: 1（自動でつないだ）, t: 区域id, no: 区域番号 }
+   くわしくは kyohi.js */
+const isPinKey = k => String(k).indexOf('|') < 0;
+const dncTerrOf = d => (d && d.t && terrById(d.t) ? d.t : d && isFinite(d.lat) && d.lat != null ? terrOf(d.lat, d.lng) : null); // 場所だけの拒否の区域
+function dncPins() { // 場所だけの拒否（地図に出せるもの）
+  const out = [], m = D().dnc || {};
+  for (const k in m) { const v = m[k]; if (isPinKey(k) && v && typeof v === 'object' && isFinite(v.lat) && isFinite(v.lng) && v.lat != null) out.push([k, v]); }
+  return out;
+}
+/* 家や部屋を消すとき：住所のある拒否（取り込み・係が追加したもの）は、場所だけの拒否にして残す。訪問で記録した拒否は消す */
+function dncDrop(k, h) {
+  const m = D().dnc, v = m[k];
+  if (v === undefined) return;
+  delete m[k];
+  if (!v || typeof v !== 'object' || !(v.a || v.s)) return;
+  h = h || houseById(parseKey(k)[0]);
+  const o = Object.assign({}, v, { p: 1 });
+  delete o.auto;
+  if (h) { o.lat = h.lat; o.lng = h.lng; if (h.terrId) o.t = h.terrId; }
+  m['pin:' + uid()] = o;
+}
 /* 部屋の「表示名」：部屋には変わらない中の番号（units）があり、名前だけを ul で変えられる。
    記録は中の番号に結びついているので、名前を何度直しても記録はそのまま */
 const uName = (h, u) => (h && h.ul && h.ul[u]) || u;
@@ -4104,6 +4129,7 @@ function initMap() {
   map.on('click', e => {
     if (moveHid) { moveHouseTo(e.latlng); return; } // 区域係が「この家の場所を直す」を押したあと
     if (pickPlace) { const f = pickPlace; pickPlace = null; f(e.latlng); return; } // 集まりの場所を地図でえらぶ
+    if (window.dncPickClick && window.dncPickClick(e.latlng)) return; // 区域係が拒否の家を地図でえらんでいるとき（kyohi.js）
     if (mode === 'draw') { if (drawTap === 'line') drawClick(e.latlng); else addAt(e.latlng, true); }
     else if (mode === 'add') addAt(e.latlng, false);
     else if (mode === 'part') partTap(e.latlng);
@@ -4603,6 +4629,7 @@ function iconFade() {
 function renderHouses() {
   if (!map) return;
   houseLayer.clearLayers();
+  if (window.renderDncPins) window.renderDncPins(); // 場所だけの拒否の印（kyohi.js）
   const fkeys = followMap ? new Set(myFollowKeys()) : null;
   const ff = fkeys ? (k => (fkeys.has(k) ? 'hl' : 'dim')) : focusFn();
   renderCardBar();
@@ -4812,6 +4839,7 @@ function guardTerr(tid, keys, proceed) {
 }
 async function onHouseTap(id) {
   const h = houseById(id); if (!h) return;
+  if (window.dncPickHouse && window.dncPickHouse(id)) return; // 区域係が拒否の家を地図でえらんでいるとき（kyohi.js）
   if (mode === 'part') { // 回る範囲を分けている最中：記録の画面は出さない
     if (partDraw && partDraw.tool !== 'pen') partTap(L.latLng(h.lat, h.lng));
     return;
@@ -5094,7 +5122,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     const blocked = (dnc && !isAdmin()) || (other && !isAdmin() && !st.override && recentMet(k));
     let b = headHtml(t, title, sub);
     if (fromBuilding) b += `<button class="btn small" id="backBld">← 建物の編集にもどる</button>`;
-    if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
+    if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() && dnc.a ? `<br><small>住所：<span data-notr>${esc(dnc.a)}</span>${dnc.auto ? '（住所から自動でつないだ家です）' : ''}</small>` : ''}${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
     if (h.ban) b += banNotice(h);
     if (!dnc && other) b += `<div class="notice warn"><b>ほかの人が再訪問している${unit ? '部屋' : '家'}です。</b>${recentMet(k) ? '最近会えているので、訪問は控えてください。' : 'しばらく会えていないので、訪ねてもかまいません。'}${blocked ? '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
 
@@ -5398,7 +5426,7 @@ function saveVisit(hid, unit, result, extra, keepOpen, onUndo) {
     const f = D().follows[k];
     if (f && f.by === me().id) f.touchedAt = now; // 受け持ち本人の記録で期限を延ばす
     if (follow) startFollow(k, me().id);
-    if (extra.dnc) { D().dnc[k] = true; delete D().follows[k]; delete D().released[k]; }
+    if (extra.dnc) { D().dnc[k] = D().dnc[k] || true; delete D().follows[k]; delete D().released[k]; } // 係が入れた住所は残す
   }, onUndo);
 }
 /* かんたんモードでは、家の追加・削除をさせない（ボタンを隠すだけでなく、処理でも止める） */
@@ -5415,9 +5443,10 @@ function deleteHouse(hid) {
 }
 function deleteHouseData(hid) {
   const h = houseById(hid);
+  if (h) targets(h).concat(h.type === 'apt' ? [''] : []).forEach(u => dncDrop(K(hid, u), h)); // 住所のある拒否は、場所だけの拒否として残す
   D().houses = D().houses.filter(x => x.id !== hid);
   D().visits = D().visits.filter(v => v.houseId !== hid);
-  if (h) targets(h).forEach(u => { const k = K(hid, u); delete D().dnc[k]; delete D().follows[k]; delete D().released[k]; });
+  if (h) targets(h).forEach(u => { const k = K(hid, u); delete D().follows[k]; delete D().released[k]; });
 }
 /* ---------- 家の削除の申請（伝道者 → 区域係が確認して消す） ---------- */
 const delReqs = () => D().requests.filter(r => r.type === 'delHouse' && r.status === 'pending');
@@ -6346,7 +6375,7 @@ function dropUnitData(h, us) {
   us.forEach(u => {
     if (h.ul) delete h.ul[u];
     if (h.uk) delete h.uk[u];
-    const k = K(h.id, u); delete D().dnc[k]; delete D().follows[k]; delete D().released[k];
+    const k = K(h.id, u); dncDrop(k, h); delete D().follows[k]; delete D().released[k];
   });
   if (h.ul && !Object.keys(h.ul).length) delete h.ul;
   if (h.uk && !Object.keys(h.uk).length) delete h.uk;
@@ -6546,7 +6575,7 @@ function openUnitBulkDel(hid) {
         us.forEach(u => {
           if (h2.ul) delete h2.ul[u];
           if (h2.uk) delete h2.uk[u];
-          const k = K(hid, u); delete D().dnc[k]; delete D().follows[k]; delete D().released[k];
+          const k = K(hid, u); dncDrop(k, h2); delete D().follows[k]; delete D().released[k];
         });
         if (h2.ul && !Object.keys(h2.ul).length) delete h2.ul;
         if (h2.uk && !Object.keys(h2.uk).length) delete h2.uk;
@@ -11544,6 +11573,7 @@ function renderAdmin() {
   if (adPane === 'people') renderPeople();
   if (adPane === 'set') renderDataSet();
   if (adPane === 'status') { renderAwayAdmin(); renderMeetAdmin(); }
+  if (adPane === 'dnc') { if (window.renderDncAdmin) window.renderDncAdmin(); return; } // 拒否の一覧（kyohi.js）
   if (adPane !== 'status' && adPane !== 'terr') return;
   const now = Date.now();
   const ts = D().territories.slice().sort(byNo);
@@ -11652,6 +11682,7 @@ function deleteTerrData(tid, withHouses) {
   {
     if (withHouses) {
       const set = new Set(ids);
+      Object.keys(D().dnc).forEach(k => { if (!isPinKey(k) && set.has(k.split('|')[0])) dncDrop(k); }); // 住所のある拒否は残す（家を消す前に）
       D().houses = D().houses.filter(h => !set.has(h.id));
       D().visits = D().visits.filter(v => !set.has(v.houseId));
       [D().dnc, D().follows, D().released].forEach(m => Object.keys(m).forEach(k => { if (set.has(k.split('|')[0])) delete m[k]; }));
@@ -13630,7 +13661,8 @@ function s12Labeled() {
 }
 function s12RefCount(c) {
   const dnc = s12Dnc();
-  return c.hs.reduce((n, h) => n + (h.type === 'apt' ? h.units.filter(u => dnc[K(h.id, u)]).length : (dnc[K(h.id, '')] ? 1 : 0)), 0);
+  return c.hs.reduce((n, h) => n + (h.type === 'apt' ? h.units.filter(u => dnc[K(h.id, u)]).length : (dnc[K(h.id, '')] ? 1 : 0)), 0) +
+    dncPins().filter(([, d]) => dncTerrOf(d) === c.t.id).length;
 }
 /* 凡例の小さな印 */
 const S12_ICO = {
@@ -13712,6 +13744,15 @@ function s12MapSvg(c, tileUrl) {
       s += `<text x="${x}" y="${f(y + mm(h.type === 'apt' ? 2.2 : 1.5))}" font-size="${mm(1.9)}" font-weight="700" fill="${isFc ? '#4A148C' : '#263238'}" text-anchor="middle" dominant-baseline="hanging" ${halo}>${esc(name)}</text>`;
     }
   }
+  // 場所だけの拒否（家の印とまだつながっていない拒否）も、同じ赤い印で出す
+  dncPins().forEach(([, d]) => {
+    if (dncTerrOf(d) !== t.id) return;
+    const [x, y] = P(d.lat, d.lng).map(f);
+    if (!inView(x, y)) return;
+    const r = mm(1.25), a = mm(0.55);
+    L4.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="#D32F2F" stroke="#fff" stroke-width="${mm(0.3)}"/>` +
+      `<path d="M${f(x - a)},${f(y - a)} L${f(x + a)},${f(y + a)} M${f(x + a)},${f(y - a)} L${f(x - a)},${f(y + a)}" stroke="#fff" stroke-width="${mm(0.35)}"/>`);
+  });
   s += L4.join('');
   // 方位（北）
   const nx = v.w - mm(5), ny = mm(5.5);
@@ -13938,7 +13979,7 @@ function showView(name) {
   if (name === 'admin' && !isAdmin()) name = 'cards'; // ②の対応：グループ監督は「グループ」タブがなくなったため、係の画面には入れない
   if (name === 'follow' && !featFollow()) name = 'cards';
   if (currentView === 'map' && name !== 'map' && mode !== 'normal') { if (draw) endDraw(); else setMode('normal'); }
-  if (name !== 'map') { clearTarget(); followMap = false; hideNextPanel(); }
+  if (name !== 'map') { clearTarget(); followMap = false; hideNextPanel(); if (window.dncPickEnd) window.dncPickEnd(true); }
   currentView = name;
   $$('.view').forEach(v => { v.hidden = v.id !== 'view-' + name; });
   $$('#tabs button').forEach(b => { if (b.dataset.view === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
@@ -13963,10 +14004,10 @@ function showView(name) {
 /* 係の画面の中のタブ（監督は「予定」と「人・グループ」だけ） */
 let adPane = 'inbox';
 function setAdPane(v) {
-  const allowed = isAdmin() ? ['inbox', 'terr', 'sched', 'status', 'people', 'set'] : ['sched', 'people'];
+  const allowed = isAdmin() ? ['inbox', 'terr', 'sched', 'status', 'dnc', 'people', 'set'] : ['sched', 'people'];
   adPane = allowed.includes(v) ? v : allowed[0];
   // 「状況」は「区域」タブの中の切りかえ（上のタブは「区域」が選ばれたまま）
-  const tabOf = p => (p === 'status' ? 'terr' : p);
+  const tabOf = p => (p === 'status' || p === 'dnc' ? 'terr' : p);
   $$('#adTabs [data-ap]').forEach(b => { b.hidden = b.dataset.ap === 'status' || !allowed.includes(b.dataset.ap); b.setAttribute('aria-pressed', String(b.dataset.ap === tabOf(adPane))); });
   const sub = $('#adTerrSub');
   if (sub) { sub.hidden = tabOf(adPane) !== 'terr'; $$('[data-ap]', sub).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ap === adPane))); }
@@ -14470,6 +14511,7 @@ init();
 <script src="apt-import.js"></script>
 <script src="apt-wizard.js"></script>
 <script src="naoshi.js"></script><!-- まちがえた記録の直し方・二世帯住宅 -->
+<script src="kyohi.js"></script><!-- 係の画面の「拒否」：一覧・エクセル／マイマップの取り込み・地図でえらぶ -->
 <script src="help.js"></script><!-- 区域係の設定の「？」の説明（文はこのファイルだけで直せます） -->
 </body>
 </html>

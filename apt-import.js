@@ -82,7 +82,7 @@
     const d = D();
     const apt = d.houses.filter(h => h.type === 'apt');
     return {
-      visits: d.visits.length, dnc: Object.keys(d.dnc || {}).length, follows: Object.keys(d.follows || {}).length,
+      visits: d.visits.length, dnc: Object.keys(d.dnc || {}).filter(k => { const v = d.dnc[k]; return k.indexOf('|') > 0 && !(v && typeof v === 'object' && (v.a || v.s)); }).length, // 住所のある拒否は残すので数えない follows: Object.keys(d.follows || {}).length,
       cards: (d.awayCards || []).length, apt: apt.length, houses: d.houses.length, prov: d.houses.filter(h => h.prov).length,
       imp: apt.filter(isNewImp).length, legacy: apt.filter(isLegacyNew).length
     };
@@ -90,7 +90,9 @@
   function resetData(opt) {
     const d = D();
     opt = opt || {};
-    d.visits = []; d.dnc = {}; d.follows = {}; d.awayCards = [];
+    d.visits = []; d.follows = {}; d.awayCards = [];
+    // 拒否：訪問で記録したものは消す。取り込み・係が追加した住所のある拒否は、場所だけの拒否にして残す（kyohi.js）
+    Object.keys(d.dnc || {}).forEach(k => { if (k.indexOf('|') < 0) return; if (typeof dncDrop === 'function') dncDrop(k); else delete d.dnc[k]; });
     // 取り込みで新しく置いた家は、家ごと消す（元からあった家は残して、ふつうの家にもどす）
     d.houses = d.houses.filter(h => !(isNewImp(h) || (opt.legacy && isLegacyNew(h))));
     d.houses.forEach(h => {
@@ -122,7 +124,7 @@
     const apt = new Set(d.houses.filter(h => h.type === 'apt').map(h => h.id));
     const inApt = k => { const i = k.lastIndexOf('|'); if (i <= 0) return false; const id = k.slice(0, i); return gone.has(id) || (apt.has(id) && k.slice(i + 1) !== ''); };
     d.visits = d.visits.filter(v => !(gone.has(v.houseId) || (apt.has(v.houseId) && v.unit)));
-    Object.keys(d.dnc || {}).forEach(k => { if (inApt(k)) delete d.dnc[k]; });
+    Object.keys(d.dnc || {}).forEach(k => { if (inApt(k)) { if (typeof dncDrop === 'function') dncDrop(k); else delete d.dnc[k]; } });
     Object.keys(d.follows || {}).forEach(k => { if (inApt(k)) delete d.follows[k]; });
     d.houses = d.houses.filter(h => !gone.has(h.id));
     d.houses.forEach(h => {

@@ -102,7 +102,7 @@
     if (!cur) { toast('この記録は、もう取り消されています'); if (after) after(); return; }
     if (!canFixVisit(cur)) { toast(denyMsg(cur)); return; }
     const k = K(cur.houseId, cur.unit);
-    const dropDnc = cur.result === 'refused' && !!D().dnc[k] && !visitsOf(k).some(x => x.id !== cur.id && x.result === 'refused');
+    const dv = D().dnc[k], dropDnc = cur.result === 'refused' && !!dv && !(typeof dv === 'object' && (dv.a || dv.s)) && !visitsOf(k).some(x => x.id !== cur.id && x.result === 'refused'); // 係が取り込んだ・追加した拒否は残す
     const nv = action === 'met' || action === 'away'
       ? { id: uid(), houseId: cur.houseId, unit: cur.unit || '', result: action, at: cur.at, by: me().id } : null;
     const msg = nv ? `「${RESULT_LABEL[action]}」に直しました` : (dropDnc ? '記録を取り消し、拒否の印も外しました' : '記録を取り消しました');
@@ -491,7 +491,7 @@
     closeSheet();
     commit('1軒の家にもどしました', () => {
       const h2 = houseById(hid); if (!h2) return;
-      h2.units.forEach(u => { const k = K(hid, u); delete D().dnc[k]; delete D().follows[k]; delete D().released[k]; });
+      h2.units.forEach(u => { const k = K(hid, u); if (typeof dncDrop === 'function') dncDrop(k, h2); else delete D().dnc[k]; delete D().follows[k]; delete D().released[k]; });
       h2.type = 'house'; h2.units = []; delete h2.mu;
       if (h2.label === '二世帯住宅') h2.label = '';
     });
