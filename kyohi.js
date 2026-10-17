@@ -25,6 +25,11 @@
   'use strict';
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof isPinKey !== 'function') return;
 
+  if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.15')) {
+    CHANGELOG.unshift({ v: '2026.13.15', items: [
+      ['拒', 'アパートの一覧の備考にある部屋ごとの拒否（例：603拒）を、拒否の一覧に入れられるようになりました。建物の画面にも「拒否の部屋」と出ます']
+    ] });
+  }
   if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.14')) {
     CHANGELOG.unshift({ v: '2026.13.14', items: [
       ['集', 'アパートの一覧（CSV）を、見出しの名前がちがう形（区域番号・建物タイプ・TRUE/FALSE）でも読めるようになりました']
@@ -135,7 +140,7 @@
     if (isPinKey(k)) {
       const has = v.lat != null && isFinite(v.lat);
       const tid = dncTerrOf(v);
-      return { k, v, h: null, unit: '', tid, no: v.no || '', lat: has ? v.lat : null, lng: has ? v.lng : null, state: has ? 'pin' : 'nopos', at: v.at || '' };
+      return { k, v, h: null, unit: '', tid, no: v.no || '', lat: has ? v.lat : null, lng: has ? v.lng : null, state: v.room ? 'room' : has ? 'pin' : 'nopos', at: v.at || '' };
     }
     const [hid, unit] = parseKey(k), h = houseById(hid);
     if (!h) return null; // 家がもう無い（ほかの端末で消えた）
@@ -146,7 +151,7 @@
     for (const k in D().dnc) { const e = entryOf(k); if (e) out.push(e); }
     return out;
   }
-  const isCheck = e => e.state !== 'ok';
+  const isCheck = e => e.state !== 'ok' && e.state !== 'room'; // アパートの部屋ごとの拒否は、家とつながなくてよい
   function placeName(e) {
     if (!e.h) return '';
     const h = e.h;
@@ -160,6 +165,7 @@
   }
   function stateTag(e) {
     if (e.state === 'auto') return '<span class="dtag auto">自動でつないだ</span>';
+    if (e.state === 'room') return '<span class="dtag pin">アパートの部屋</span>';
     if (e.state === 'pin') return `<span class="dtag pin">${e.v.appx ? '場所はだいたい' : '家とつながっていない'}</span>`;
     if (e.state === 'nopos') return '<span class="dtag nopos">場所が分からない</span>';
     return '';
@@ -296,6 +302,7 @@
       <label class="field"><span>住所（メモ）</span><input type="text" id="ddA" maxlength="120" value="${esc(e.v.a || '')}" placeholder="例：豊見城市字高安123"></label>
       <button type="button" class="btn block" id="ddSaveA" hidden>住所を保存する</button>
       ${e.lat != null ? '<button type="button" class="btn block" id="ddMap">地図で見る</button>' : ''}
+      ${e.state === 'room' ? '<p class="hint">アパートの部屋ごとの拒否です（部屋は階ごとに登録しているため、建物のそばに印を出しています）。建物の画面にも「拒否の部屋」として出ます。</p>' : ''}
       ${e.state === 'ok' ? '<button type="button" class="btn block" id="ddPick">ちがう家につなぎ直す</button>' : ''}
       <button type="button" class="btn block danger" id="ddDel">拒否を外す</button>
       <button type="button" class="btn block" data-close>閉じる</button>`);
@@ -1027,6 +1034,20 @@
   }
 
   window.chibanSrc = () => cbSrc(); // apt-import.js の出典の表示に使う
+  /* 建物の画面に出す「拒否の部屋」（備考から取り込んだ、部屋ごとの拒否）。index.html の banNotice から呼ぶ */
+  function dncRoomNote(h) {
+    if (!h || h.type !== 'apt') return '';
+    const rooms = [], m = D().dnc || {};
+    for (const k in m) {
+      const v = m[k];
+      if (v && v.room && ((v.h && v.h === h.id) || (v.cid && h.cid && v.cid === h.cid)) && !rooms.includes(v.room)) rooms.push(v.room);
+    }
+    if (!rooms.length) return '';
+    rooms.sort((a, b) => a.localeCompare(b, 'ja', { numeric: true }));
+    const lab = r => (/^[0-9\-]+$/.test(r) && /\d$/.test(r) ? r + '号室' : r);
+    return `<div class="notice refnote"><b>拒否の部屋：</b><span data-notr>${rooms.map(r => esc(lab(r))).join('・')}</span><br>この部屋は訪問しないでください。</div>`;
+  }
+  window.dncRoomNote = dncRoomNote;
   window.renderDncAdmin = renderDncAdmin;
   window.renderDncPins = renderDncPins;
   window.dncPickHouse = dncPickHouse;

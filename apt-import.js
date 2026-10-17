@@ -53,6 +53,35 @@
     return out.slice(0, 400); // とても大きな土地（畑など）でも重くならないように
   }
 
+  /* ---------- 備考の部屋ごとの拒否 → 拒否の一覧（場所だけの拒否。建物のそばに印） ---------- */
+  const roomLabel = r => (/^[0-9\-]+$/.test(r) && /\d$/.test(r) ? r + '号室' : r);
+  function refCount(list) { return list.reduce((n, b) => n + ((b.refs || []).length), 0); }
+  /* at：{ lat, lng, tid, h（家id）, cid（候補の番号） } */
+  function addRoomRefs(b, at, now) {
+    if (!b.refs || !b.refs.length || at.lat == null) return 0;
+    const dnc = D().dnc;
+    const have = new Set();
+    Object.keys(dnc).forEach(k => {
+      const v = dnc[k];
+      if (v && v.room && ((at.h && v.h === at.h) || (at.cid && v.cid === at.cid))) have.add(v.room);
+    });
+    let n = 0;
+    b.refs.forEach((room, i) => {
+      if (have.has(room)) return;
+      const ang = i * 2.4, r = 3 + 1.5 * i; // 同じ建物の印が重ならないように、建物のまわりに少しずつずらす
+      const lat = at.lat + r * Math.sin(ang) / 110540, lng = at.lng + r * Math.cos(ang) / (111320 * Math.cos(at.lat * Math.PI / 180));
+      const o = { p: 1, s: 'xl', at: now, room, a: `${b.addr ? b.addr.replace(/^沖縄県/, '') + ' ' : ''}${b.name || '集合住宅'} ${roomLabel(room)}`.slice(0, 120),
+        lat: round6(lat), lng: round6(lng) };
+      if (at.tid) o.t = at.tid;
+      if (at.h) o.h = at.h;
+      if (at.cid) o.cid = at.cid;
+      dnc['pin:' + uid()] = o;
+      n++;
+    });
+    return n;
+  }
+  const refBox = (n, id) => n ? `<label class="check"><input type="checkbox" id="${id}" checked><span>備考の<b>部屋ごとの拒否 ${n}件</b>を、拒否の一覧に入れる<br><small class="muted">例：「603拒」→「〇〇アパート 603号室」。建物のそばに拒否の印を出し、建物の画面にも「拒否の部屋」として出します。備考のほかの文字は入れません。</small></span></label>` : '';
+
   /* ---------- CSV ---------- */
   function parseCsv(text) {
     text = String(text || '').replace(/^﻿/, '');
@@ -83,8 +112,22 @@
      見出しの前に余計な行がある一覧も読む。読むのは必要な列だけ（司会者・日付・備考などの列は読まない） */
   const HEAD = {
     ref: /^(建物ID|建物id|ID)$/i, terr: /^(区域|区域番号|区域No\.?|区域NO)$/i, name: /^(建物名|建物の名前|名前)$/, addr: /^(住所|所在地)$/,
-    fl: /^(階数|階)$/, f1: /^(1F有|１F有|1階有|1階に部屋)$/i, lock: /^(オートロック)$/, ban: /^(立入|立ち入り)$/, type: /^(建物タイプ|種類|タイプ)$/, memo: /^(確認事項)$/
+    fl: /^(階数|階)$/, f1: /^(1F有|１F有|1階有|1階に部屋)$/i, lock: /^(オートロック)$/, ban: /^(立入|立ち入り)$/, type: /^(建物タイプ|種類|タイプ)$/, memo: /^(確認事項)$/,
+    note: /^(備考|メモ)$/
   };
+  /* 備考から、部屋ごとの拒否だけを取り出す（例：「603拒」「1-1001拒」「拒302」「302(B302)拒」）。
+     備考のほかの文字は読まない。部屋の書き方の漢字・かな（人の名前のこともある）は捨て、数字・英字・記号だけ残す。
+     「拒」のあとの文字（日付・年代などのメモ）も捨てる */
+  function refRooms(note) {
+    const out = [];
+    String(note || '').normalize('NFKC').split(/[,、，\s]+/).forEach(tok => {
+      if (tok.indexOf('拒') < 0) return;
+      let room = tok.startsWith('拒') ? tok.slice(1) : tok.slice(0, tok.indexOf('拒'));
+      room = room.replace(/[^0-9A-Za-z\-()#]/g, ' ').replace(/\(\s*\)/g, '').replace(/\s+/g, ' ').trim().slice(0, 20);
+      if (room && /\d/.test(room) && !out.includes(room)) out.push(room);
+    });
+    return out;
+  }
   const yes = v => /^(1|true|有|あり|○|〇|はい|yes)$/i.test(String(v || '').trim());
   const noo = v => /^(0|false|無|なし|×|いいえ|no)$/i.test(String(v || '').trim());
   function buildings(rows) {
@@ -102,7 +145,8 @@
       return {
         ref: g(r, C.ref), terr: g(r, C.terr), name: g(r, C.name).slice(0, 40), addr: g(r, C.addr),
         floors: Math.max(0, Math.min(MAX_FLOORS, Math.floor(num(g(r, C.fl))))), floor1: noo(g(r, C.f1)) ? '0' : '1',
-        lock: yes(g(r, C.lock)) || /オートロック/.test(type), ban, memo: g(r, C.memo)
+        lock: yes(g(r, C.lock)) || /オートロック/.test(type), ban, memo: g(r, C.memo),
+        refs: refRooms(g(r, C.note))
       };
     }).filter(b => b.name || b.addr);
   }
@@ -249,6 +293,7 @@
       if (seen.has(id)) id = (id + '-' + idx).slice(0, 40);
       seen.add(id);
       const c = { i: id, n: b.name.slice(0, 40), la: round6(b.pos.lat), ln: round6(b.pos.lng) };
+      if (b.refs && b.refs.length) (plan.refs || (plan.refs = [])).push({ b, c, tid: t.id });
       if (b.floors) c.f = b.floors;
       if (b.floor1 === '0') c.g = 0;
       if (b.lock) c.k = 1;
@@ -270,16 +315,27 @@
       ${noT.length ? `<div class="notice warn">一覧の区域 ${esc(noT.join('・'))} は、アプリに区域がありません。その建物は候補にしません。</div>` : ''}
       ${nMiss ? `<details class="more"><summary>場所が分からない建物（${nMiss}棟）：候補にしません</summary>
         <p class="hint">場所がないと「付近の候補」に出せません。マイマップのKMLで場所を直して、もう一度取り込めます。</p><ul>${plan.miss.map(b => `<li>区域${esc(b.terr)}　${lineOf(b)}</li>`).join('')}</ul></details>` : ''}
+      ${refBox((plan.refs || []).reduce((n, x) => n + x.b.refs.length, 0), 'aiCandRefs')}
       <button class="btn primary block" id="aiCandGo"${plan.n ? '' : ' disabled'}>${plan.n}棟を候補にする</button>
       <button class="btn block" data-close>やめる</button>`);
     $('#aiCandGo').onclick = () => {
       if (!isAdmin()) return;
+      const withRefs = $('#aiCandRefs') && $('#aiCandRefs').checked;
       plan.by.forEach((list, tid) => {
         const t = terrById(tid); if (!t) return;
         t.cands = list.sort((a, b) => String(a.n).localeCompare(String(b.n), 'ja'));
       });
+      let nRef = 0;
+      if (withRefs) {
+        const now = new Date().toISOString(), used = new Map();
+        D().houses.forEach(h => { if (h.cid) used.set(h.cid, h); });
+        (plan.refs || []).forEach(({ b, c, tid }) => {
+          const h = used.get(c.i); // もうアパートにした候補は、その家につなぐ
+          nRef += addRoomRefs(b, h ? { lat: h.lat, lng: h.lng, tid: h.terrId || tid, h: h.id, cid: c.i } : { lat: c.la, lng: c.ln, tid, cid: c.i }, now);
+        });
+      }
       Store.save(); renderAll();
-      toast(`${plan.n}棟を候補にしました`);
+      toast(`${plan.n}棟を候補にしました${nRef ? `。部屋ごとの拒否 ${nRef}件を拒否の一覧に入れました` : ''}`);
       openMain();
     };
   }
@@ -556,6 +612,7 @@
       ${nMiss ? `<details class="more"><summary>場所が分からない建物（${nMiss}棟）：作りません</summary>
         <p class="hint">地図で「＋ 家」から入れてください。</p><ul>${plan.miss.map(b => `<li>区域${esc(b.terr)}　${lineOf(b)}</li>`).join('')}</ul>
         <button class="btn small" id="aiCopyMiss">この一覧をコピー</button></details>` : ''}
+      ${refBox(refCount(plan.convert.map(x => x.b).concat(plan.create)), 'aiRefs')}
       <button class="btn primary block" id="aiCommit"${nCv + nCr ? '' : ' disabled'}>${nCv + nCr}棟を登録する</button>
       <button class="btn block" data-close>やめる</button>
       ${plan.nCb && window.chibanSrc ? `<p class="hint">地番の場所は、${esc(window.chibanSrc())}</p>` : ''}`);
@@ -563,7 +620,7 @@
       const t = plan.miss.map(b => `区域${b.terr}\t${b.name}\t${b.addr}`).join('\n');
       try { await navigator.clipboard.writeText(t); toast('コピーしました'); } catch (e) { toast('コピーできませんでした'); }
     };
-    $('#aiCommit').onclick = () => commitPlan(plan);
+    $('#aiCommit').onclick = () => { plan.withRefs = !!($('#aiRefs') && $('#aiRefs').checked); commitPlan(plan); };
   }
 
   function apply(b, h) {
@@ -579,6 +636,7 @@
     const diffTerr = (b, h) => { const a = terrOf(h.lat, h.lng); return b.t && a !== b.t.id ? ` 一覧の区域${b.terr}と、線の区域がちがいます` : ''; };
     plan.convert.forEach(({ b, h }) => {
       apply(b, h);
+      if (plan.withRefs) addRoomRefs(b, { lat: h.lat, lng: h.lng, tid: h.terrId, h: h.id }, now);
       const w = ((b.note || '') + diffTerr(b, h)).trim();
       if (w) check.push({ id: h.id, b, note: w });
     });
@@ -586,6 +644,7 @@
       const h = { id: 'h' + uid(), terrId: terrOf(b.lat, b.lng), type: 'apt', lat: round6(b.lat), lng: round6(b.lng), label: '', units: [], createdAt: now, createdBy: me().id, imp: true };
       apply(b, h);
       D().houses.push(h);
+      if (plan.withRefs) addRoomRefs(b, { lat: h.lat, lng: h.lng, tid: h.terrId, h: h.id }, now);
       check.push({ id: h.id, b, note: (b.why.join('。') + diffTerr(b, h)).trim() });
     });
     Store.save();

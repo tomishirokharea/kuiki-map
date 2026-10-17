@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.14"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.15"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -4221,7 +4221,8 @@ const lockBadge = h => (h.lock ? `<b class="lk" title="オートロック">${LOC
 const BAN_TEXT = { no: ['禁', '立入禁止'], letter: ['手', '手紙のみ'] };
 const banBadge = h => (h.type === 'apt' && BAN_TEXT[h.ban] ? `<b class="ban${h.ban === 'letter' ? ' letter' : ''}" title="${BAN_TEXT[h.ban][1]}">${BAN_TEXT[h.ban][0]}</b>` : '');
 const banNotice = h => (h && h.type === 'apt' && h.ban === 'no' ? '<div class="notice warn"><b>立入禁止の建物です。</b>中には入らないでください。</div>'
-  : h && h.type === 'apt' && h.ban === 'letter' ? '<div class="notice warn"><b>手紙のみの建物です。</b>訪問はせず、手紙を入れてください。</div>' : '');
+  : h && h.type === 'apt' && h.ban === 'letter' ? '<div class="notice warn"><b>手紙のみの建物です。</b>訪問はせず、手紙を入れてください。</div>' : '')
+  + (window.dncRoomNote ? window.dncRoomNote(h) : ''); // 備考から取り込んだ、部屋ごとの拒否（kyohi.js）
 function periodStart(h) {
   const t = h.terrId ? terrById(h.terrId) : null;
   return t ? (t.lentAt || t.returnedAt || t.completedAt || '') : ''; // 担当者のいない区域は、返却・回り終えた日から
