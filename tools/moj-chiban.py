@@ -158,11 +158,11 @@ def parse_geojson(name, data, out, stats):
         if not no or not aza:
             stats['数字でない地番（使わない）'] = stats.get('数字でない地番（使わない）', 0) + 1
             continue
-        code = str(pr.get('市区町村コード') or pr.get('市区町村C') or '')  # AIGID の GeoJSON は「市区町村C」
+        code = str(pr.get('市区町村コード') or pr.get('市区町村C') or pr.get('市町村C') or '')  # AIGID の GeoJSON は「市区町村C」（2023年までは「市町村C」）
         if not code:
             stats['市区町村コードのない土地（使わない）'] = stats.get('市区町村コードのない土地（使わない）', 0) + 1
             continue
-        muni = str(pr.get('市区町村名') or '')
+        muni = str(pr.get('市区町村名') or pr.get('市町村名') or '')
         acode = str(pr.get('大字コード') or '000').zfill(3) + str(pr.get('丁目コード') or '000').zfill(3)
         rings = []
         if g.get('type') == 'Polygon':
