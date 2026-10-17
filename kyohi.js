@@ -25,6 +25,11 @@
   'use strict';
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof isPinKey !== 'function') return;
 
+  if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.14')) {
+    CHANGELOG.unshift({ v: '2026.13.14', items: [
+      ['集', 'アパートの一覧（CSV）を、見出しの名前がちがう形（区域番号・建物タイプ・TRUE/FALSE）でも読めるようになりました']
+    ] });
+  }
   if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.13')) {
     CHANGELOG.unshift({ v: '2026.13.13', items: [
       ['地', '古い一覧の住所（今はない地番・合併前の市町村名）でも、場所を調べられるようになりました']

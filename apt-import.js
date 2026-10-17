@@ -10,7 +10,7 @@
         ・同じ住所に建物が複数ある・番地までは分からない・近くに家がない建物は、新しく置いて「確認する建物」に出す
         ・場所が分からない建物は作らず、一覧にして出す（地図で「＋ 家」から入れる）
         ・部屋は「1階・2階…」の階ごとの枠（1階に部屋がない建物は2階から）
-   CSVの列：建物ID,区域,建物名,住所,階数,1F有,オートロック,立入,確認事項
+   CSVの列：建物ID,区域,建物名,住所,階数,1F有,オートロック,立入,確認事項（見出しの名前は「区域番号」「建物タイプ（オートロック・立入禁止・手紙のみ）」、1F有は TRUE/FALSE でもよい。見出しの前に余計な行があってもよい）
    取り込みのしかたは2通り
      A) CSV：住所を国土地理院の住所検索で位置にする
      B) マイマップのKML/KMZ：CSVをGoogleマイマップに読ませて、ピンを地図で確かめ・直してから書き出したもの
@@ -79,17 +79,32 @@
     try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); }
     catch (e) { return new TextDecoder('shift_jis').decode(buf); } // エクセルで保存し直したCSV
   }
+  /* 一覧の読み取り。見出しの名前がちがう一覧（「区域番号」「建物タイプ」、1F有が TRUE/FALSE など）や、
+     見出しの前に余計な行がある一覧も読む。読むのは必要な列だけ（司会者・日付・備考などの列は読まない） */
+  const HEAD = {
+    ref: /^(建物ID|建物id|ID)$/i, terr: /^(区域|区域番号|区域No\.?|区域NO)$/i, name: /^(建物名|建物の名前|名前)$/, addr: /^(住所|所在地)$/,
+    fl: /^(階数|階)$/, f1: /^(1F有|１F有|1階有|1階に部屋)$/i, lock: /^(オートロック)$/, ban: /^(立入|立ち入り)$/, type: /^(建物タイプ|種類|タイプ)$/, memo: /^(確認事項)$/
+  };
+  const yes = v => /^(1|true|有|あり|○|〇|はい|yes)$/i.test(String(v || '').trim());
+  const noo = v => /^(0|false|無|なし|×|いいえ|no)$/i.test(String(v || '').trim());
   function buildings(rows) {
-    const head = rows[0].map(c => String(c || '').trim());
-    const col = n => head.indexOf(n);
-    const C = { ref: col('建物ID'), terr: col('区域'), name: col('建物名'), addr: col('住所'), fl: col('階数'), f1: col('1F有'), lock: col('オートロック'), ban: col('立入'), memo: col('確認事項') };
+    const norm = c => String(c == null ? '' : c).normalize('NFKC').trim();
+    const hi = rows.slice(0, 10).findIndex(r => r.some(c => HEAD.name.test(norm(c))) && r.some(c => HEAD.addr.test(norm(c))));
+    if (hi < 0) return null;
+    const head = rows[hi].map(norm);
+    const col = k => head.findIndex(h => HEAD[k].test(h));
+    const C = {}; Object.keys(HEAD).forEach(k => { C[k] = col(k); });
     if (C.name < 0 || C.addr < 0 || C.terr < 0) return null;
     const g = (r, i) => (i >= 0 ? String(r[i] == null ? '' : r[i]).trim() : '');
-    return rows.slice(1, MAX_ROWS + 1).map(r => ({
-      ref: g(r, C.ref), terr: g(r, C.terr), name: g(r, C.name).slice(0, 40), addr: g(r, C.addr),
-      floors: Math.max(0, Math.min(MAX_FLOORS, Math.floor(num(g(r, C.fl))))), floor1: g(r, C.f1) === '0' ? '0' : '1',
-      lock: g(r, C.lock) === '1', ban: g(r, C.ban) === 'no' || g(r, C.ban) === 'letter' ? g(r, C.ban) : '', memo: g(r, C.memo)
-    })).filter(b => b.name || b.addr);
+    return rows.slice(hi + 1, hi + 1 + MAX_ROWS).map(r => {
+      const type = g(r, C.type), banV = g(r, C.ban);
+      const ban = banV === 'no' || banV === 'letter' ? banV : /立入禁止|立ち入り禁止/.test(type) ? 'no' : /手紙/.test(type) ? 'letter' : '';
+      return {
+        ref: g(r, C.ref), terr: g(r, C.terr), name: g(r, C.name).slice(0, 40), addr: g(r, C.addr),
+        floors: Math.max(0, Math.min(MAX_FLOORS, Math.floor(num(g(r, C.fl))))), floor1: noo(g(r, C.f1)) ? '0' : '1',
+        lock: yes(g(r, C.lock)) || /オートロック/.test(type), ban, memo: g(r, C.memo)
+      };
+    }).filter(b => b.name || b.addr);
   }
   function unitsOf(b) { // 階ごとの枠。階数が分からない建物は「?」ひとつ
     if (!b.floors) return ['?'];
@@ -205,9 +220,9 @@
     }
     let list;
     try { const rows = parseCsv(await readText(file)); list = rows.length > 1 ? buildings(rows) : null; } catch (e) { list = null; }
-    if (!list || !list.length) { infoSheet('一覧を読み込めませんでした', '「建物ID,区域,建物名,住所,階数,1F有,オートロック,立入,確認事項」の見出しがあるCSVを選んでください。'); return; }
+    if (!list || !list.length) { infoSheet('一覧を読み込めませんでした', '「区域（区域番号）」「建物名」「住所」の見出しがあるCSVを選んでください。<br>あれば「建物ID」「階数」「1F有」「オートロック」「立入」「建物タイプ」も読みます（ほかの列は読みません）。'); return; }
     list.forEach(b => {
-      const p = b.addr ? xlParseJa('沖縄県' + b.addr) : null;
+      const p = b.addr ? xlParseJa(b.addr) : null; // 「沖縄県」があってもなくても読める
       if (p) b.entry = { q: '沖縄県' + p.muni + p.town + p.nums.join('-'), nums: p.nums, muni: p.muni, town: p.town };
     });
     setSheet(headHtml(null, '住所から場所を調べています', esc(file.name || '')) + `<p class="hint">しばらくお待ちください（この画面を閉じないでください）。</p>
@@ -407,7 +422,7 @@
       list = rows.length > 1 ? buildings(rows) : null;
     } catch (e) { list = null; }
     if (!list || !list.length) {
-      infoSheet('一覧を読み込めませんでした', '「建物ID,区域,建物名,住所,階数,1F有,オートロック,立入,確認事項」の見出しがあるCSVを選んでください。');
+      infoSheet('一覧を読み込めませんでした', '「区域（区域番号）」「建物名」「住所」の見出しがあるCSVを選んでください。<br>あれば「建物ID」「階数」「1F有」「オートロック」「立入」「建物タイプ」も読みます（ほかの列は読みません）。');
       return;
     }
     locate(list, file.name || '');
@@ -417,7 +432,7 @@
   async function locate(list, fileName) {
     list.forEach(b => {
       b.units = unitsOf(b);
-      const p = b.addr ? xlParseJa('沖縄県' + b.addr) : null;
+      const p = b.addr ? xlParseJa(b.addr) : null; // 「沖縄県」があってもなくても読める
       if (p) { b.entry = { q: '沖縄県' + p.muni + p.town + p.nums.join('-'), nums: p.nums, muni: p.muni, town: p.town }; }
     });
     setSheet(headHtml(null, '住所から場所を調べています', esc(fileName)) + `<p class="hint">しばらくお待ちください（この画面を閉じないでください）。</p>
