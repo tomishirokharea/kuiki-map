@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.24"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.25"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -127,6 +127,12 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .notice{border-radius:12px;padding:10px 12px;margin:14px 0;font-size:16px}
 .notice.warn{background:var(--warn-bg);border:2px solid var(--away)}
 .notice.info{background:var(--terr-soft);border:2px solid var(--terr)}
+.notice.bmemo{background:#F6F8F7;border:2px solid var(--line);font-size:16px;line-height:1.5}
+.notice.bmemo .bmac{display:inline-block;font-size:14px;font-weight:700;border-radius:99px;padding:2px 10px;margin:0 0 4px;background:var(--terr-soft);color:#0b3d32}
+.notice.bmemo .bmtx{display:block;white-space:pre-wrap;word-break:break-word}
+.notice.bmemo .bmtx b{display:block;font-size:14px;color:var(--ink2)}
+.field select.big{width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:18px;background:#fff}
+.bnote textarea{width:100%;min-height:72px;border-radius:10px;border:2px solid var(--ink2);padding:8px 10px;font:inherit;font-size:17px;line-height:1.5;resize:vertical}
 
 /* ===== 地図 ===== */
 #overlayImg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:0}
@@ -2801,7 +2807,7 @@ function expandHouse(a) {
     lat: a[3], lng: a[4], label: a[5] || '',
     units: a[6] ? String(a[6]).split('|') : [],
     createdAt: new Date((a[8] || 0) * 1000).toISOString(), createdBy: a[7] || '',
-    kind: a[9] || undefined, lock: a[10] ? true : undefined, prov: a[12] ? true : undefined, ban: a[14] === 'n' ? 'no' : a[14] === 'l' ? 'letter' : undefined, imp: a[15] ? true : undefined, cid: a[16] || undefined, mu: a[17] || undefined,
+    kind: a[9] || undefined, lock: a[10] ? true : undefined, prov: a[12] ? true : undefined, ban: a[14] === 'n' ? 'no' : a[14] === 'l' ? 'letter' : undefined, imp: a[15] ? true : undefined, cid: a[16] || undefined, mu: a[17] || undefined, bn: a[18] || undefined, ac: a[19] || undefined,
     uk: a[11] ? (() => { try { return JSON.parse(a[11]); } catch (e) { return undefined; } })() : undefined,
     ul: a[13] ? (() => { try { return JSON.parse(a[13]); } catch (e) { return undefined; } })() : undefined
   };
@@ -4291,6 +4297,12 @@ const banBadge = h => (h.type === 'apt' && BAN_TEXT[h.ban] ? `<b class="ban${h.b
 const banNotice = h => (h && h.type === 'apt' && h.ban === 'no' ? '<div class="notice warn"><b>立入禁止の建物です。</b>中には入らないでください。</div>'
   : h && h.type === 'apt' && h.ban === 'letter' ? '<div class="notice warn"><b>手紙のみの建物です。</b>訪問はせず、手紙を入れてください。</div>' : '')
   + (window.dncRoomNote ? window.dncRoomNote(h) : ''); // 備考から取り込んだ、部屋ごとの拒否（kyohi.js）
+/* 建物のメモ（備考）と、エレベーター・縦階段（2026.13.25）。部屋を入力する画面の上に出す */
+const AC_NAME = { ev: 'エレベーターあり', st: '縦階段（階段ごとに上り下り）' };
+function bldMemoHtml(h) {
+  if (!h || h.type !== 'apt' || (!h.bn && !h.ac)) return '';
+  return `<div class="notice bmemo">${h.ac ? `<span class="bmac">${AC_NAME[h.ac] || ''}</span>` : ''}${h.bn ? `<span class="bmtx"><b>建物のメモ</b>${esc(h.bn)}</span>` : ''}</div>`;
+}
 function periodStart(h) {
   const t = h.terrId ? terrById(h.terrId) : null;
   return t ? (t.lentAt || t.returnedAt || t.completedAt || '') : ''; // 担当者のいない区域は、返却・回り終えた日から
@@ -5229,6 +5241,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (fromBuilding) b += `<button class="btn small" id="backBld">← 建物の編集にもどる</button>`;
     if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() && dnc.a ? `<br><small>住所：<span data-notr>${esc(dnc.a)}</span>${dnc.auto ? '（住所から自動でつないだ家です）' : ''}</small>` : ''}${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
     if (h.ban) b += banNotice(h);
+    if (unit) b += bldMemoHtml(h);
     if (window.chuiNotice) b += window.chuiNotice(h, unit); // 注意（！）
     if (!dnc && other) b += `<div class="notice warn"><b>ほかの人が再訪問している${unit ? '部屋' : '家'}です。</b>${recentMet(k) ? '最近会えているので、訪問は控えてください。' : 'しばらく会えていないので、訪ねてもかまいません。'}${blocked ? '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
 
@@ -6502,7 +6515,7 @@ function openBuilding(hid, startSel) {
   // かんたんな表示では編集しない。部屋があれば入力の画面へ
   if (isSimple()) {
     if (h0.units.length) { openAptSeq(hid); return; }
-    setSheet(headHtml(terrById(h0.terrId), esc(h0.label || '集合住宅'), '') + `${banNotice(h0)}${window.chuiNotice ? window.chuiNotice(h0, '') : ''}
+    setSheet(headHtml(terrById(h0.terrId), esc(h0.label || '集合住宅'), '') + `${banNotice(h0)}${bldMemoHtml(h0)}${window.chuiNotice ? window.chuiNotice(h0, '') : ''}
       <p class="notice">部屋がまだ登録されていません。</p><button class="btn primary block" data-close>閉じる</button>`);
     return;
   }
@@ -6559,6 +6572,11 @@ function openBuilding(hid, startSel) {
       <label class="field bname"><span>建物名</span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="${esc(h.label)}" placeholder="例：〇〇ハイツ"><button class="btn small" id="fLabelSave">保存</button></span>
         <small class="hint">住んでいる人の名前は書かないでください。</small></label>
       <label class="check locrow"><input type="checkbox" id="fLock"${h.lock ? ' checked' : ''}>オートロックの建物</label>
+      <label class="field"><span>階段・エレベーター</span><select id="fAc" class="big" aria-label="階段・エレベーター">
+        <option value=""${!h.ac ? ' selected' : ''}>とくになし</option><option value="ev"${h.ac === 'ev' ? ' selected' : ''}>エレベーターあり</option><option value="st"${h.ac === 'st' ? ' selected' : ''}>縦階段（階段ごとに上り下り）</option></select></label>
+      <label class="field bnote"><span>建物のメモ</span><textarea id="fNote" maxlength="200" rows="3" placeholder="例：1階は店、2階は駐車場。奥の階段からも入れる">${esc(h.bn || '')}</textarea></label>
+      <p class="hint" style="margin-top:-6px">部屋を入力する画面の上に出ます。<b>住んでいる人の名前・国籍・年齢・病気などは書かないでください。</b></p>
+      <button class="btn small" id="fNoteSave">メモを保存</button>
       <p class="q">建物ぜんたいの種別</p>${kindChips(kindOf(h))}
       <p class="hint">部屋ごとの種別は、部屋をタップして「種別・記録」で変えられます。</p>
       ${h.units.length > 1 ? '<button class="btn block" id="fRename" style="flex-direction:column;gap:0;white-space:normal;min-height:62px">部屋の名前をまとめて変える<small style="font-weight:400;font-size:14px">101→A-1 など</small></button>' : ''}
@@ -6641,6 +6659,14 @@ function openBuilding(hid, startSel) {
     on('seqStart', () => openAptSeq(hid));
     on('fRename', () => openUnitNames(hid, () => openBuilding(hid)));
     on('fLabelSave', () => { const v = $('#fLabel').value.trim().slice(0, 30); save('建物名を変えました', h => { h.label = v; }); });
+    if ($('#fAc')) $('#fAc').onchange = e => { const v = e.target.value; save(v ? `${AC_NAME[v]}にしました` : '階段・エレベーターを「とくになし」にしました', h => { if (v) h.ac = v; else delete h.ac; }); };
+    on('fNoteSave', async () => {
+      const v = String($('#fNote').value || '').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 200);
+      const h2 = houseById(hid); if (!h2 || v === (h2.bn || '')) { toast('変わったところはありません'); return; }
+      const w = window.bldSens ? window.bldSens(v) : [];
+      if (w.length && !await ask(`メモに「${w.join('・')}」とあります。建物のメモは、みんなが見ます。住んでいる人のこと（名前・国籍・年齢・病気など）が入っていなければ、このまま保存してください。`, { title: 'このまま保存しますか？', body: `メモに「${w.join('・')}」とあります。建物のメモは、くわしい表示の人みんなが見ます。住んでいる人のこと（名前・国籍・年齢・病気など）が入っていなければ、このまま保存してください。`, ok: '保存する', danger: false })) return;
+      save(v ? '建物のメモを保存しました' : '建物のメモを消しました', h => { if (v) h.bn = v; else delete h.bn; });
+    });
     on('fUnitBulk', () => openUnitBulkDel(hid));
     on('fDel', async () => {
       const h2 = houseById(hid); if (!h2) return;
@@ -6745,7 +6771,7 @@ function openAptSeq(hid, startUnit) {
       const uk = unitKind(h, u);
       return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}へ">${kindBadge(uk)}${esc(uName(h, u))}</button>`;
     }).join('')}</div>`;
-    b += banNotice(h);
+    b += banNotice(h) + bldMemoHtml(h);
     if (window.chuiNotice) b += window.chuiNotice(h, st.finished ? '' : h.units[idx]); // 注意（！）
     if (st.finished) {
       b += `<div class="okmsg"><b>${cnt === need ? 'すべての部屋に緑のチェックがつきました。' : '最後の部屋まで進みました。'}</b>部屋番号をタップすると、その部屋を入力できます。</div>

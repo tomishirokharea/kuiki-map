@@ -29,6 +29,7 @@
 .aw-cand span{display:block;font-size:15px;color:var(--ink2);margin-top:2px}
 .aw-cand:active{background:var(--terr-soft);border-color:var(--terr)}
 .aw-tag{display:inline-block;font-size:13px;font-weight:700;border-radius:99px;padding:2px 10px;margin:4px 6px 0 0;background:var(--terr-soft);color:#0b3d32}
+.aw-cand span.aw-tag{display:inline-block;margin-top:4px}
 .aw-tag.ban{background:var(--ref-bg);color:var(--danger)}
 .aw-tag.warn{background:var(--warn-bg);color:#6b4700}
 .aw-from{display:flex;align-items:center;gap:8px;background:var(--terr-soft);border-radius:12px;padding:10px 12px;margin:0 0 12px;font-size:15px}
@@ -65,7 +66,7 @@
         if (used.has(c.i)) return;
         if (t.id === tid) left++;
         const d = distM([ll.lat, ll.lng], [c.la, c.ln]);
-        if (d <= RADIUS) out.push({ c, d, tid: t.id });
+        if (d <= (c.p ? RADIUS * 2.5 : RADIUS)) out.push({ c, d, tid: t.id }); // 場所がだいたいの候補は、広めに探す
       });
     });
     out.sort((a, b) => a.d - b.d);
@@ -73,7 +74,7 @@
   }
   const candCount = (tid) => { const t = terrById(tid); if (!t || !t.cands) return 0; const u = usedCids(); return t.cands.filter(c => !u.has(c.i)).length; };
   const dTxt = d => d < 20 ? 'すぐ近く' : d < 1000 ? `約${Math.round(d / 10) * 10}m` : `約${(d / 1000).toFixed(1)}km`;
-  const tags = c => `${c.f ? `<span class="aw-tag">${c.f}階建て</span>` : '<span class="aw-tag warn">階数 不明</span>'}${c.g === 0 ? '<span class="aw-tag">1階に部屋なし</span>' : ''}${c.k ? '<span class="aw-tag">オートロック</span>' : ''}${c.b === 'no' ? '<span class="aw-tag ban">立入禁止</span>' : c.b === 'letter' ? '<span class="aw-tag ban">手紙のみ</span>' : ''}`;
+  const tags = c => `${c.f ? `<span class="aw-tag">${c.f}階建て</span>` : '<span class="aw-tag warn">階数 不明</span>'}${c.g === 0 ? '<span class="aw-tag">1階に部屋なし</span>' : ''}${c.k ? '<span class="aw-tag">オートロック</span>' : ''}${c.b === 'no' ? '<span class="aw-tag ban">立入禁止</span>' : c.b === 'letter' ? '<span class="aw-tag ban">手紙のみ</span>' : ''}${c.ac === 'ev' ? '<span class="aw-tag">エレベーター</span>' : c.ac === 'st' ? '<span class="aw-tag">縦階段</span>' : ''}${c.p ? '<span class="aw-tag warn">場所はだいたい</span>' : ''}${c.m ? `<span style="font-size:14px;margin-top:4px">メモ：${esc(c.m.length > 40 ? c.m.slice(0, 40) + '…' : c.m)}</span>` : ''}`;
 
   /* ---------- 部屋の名前 ---------- */
   const FMTS = [['n3', '101', '階＋番号'], ['dash', '2-1', '階－番号'], ['alpha', '2A', '階＋英字'], ['free', '自由', '自分で入力']];
@@ -296,7 +297,11 @@
       if (s.lock) h.lock = true; else delete h.lock;
       if (isAdmin()) { if (s.ban) h.ban = s.ban; else delete h.ban; }
       else if (s.cand && s.cand.b) h.ban = s.cand.b; // 候補の立入禁止。サーバーも候補と照らして確かめる
-      if (s.cand) h.cid = s.cand.i;
+      if (s.cand) {
+        h.cid = s.cand.i;
+        if (s.cand.m && !h.bn) h.bn = s.cand.m;   // 一覧の備考を、建物のメモに
+        if (s.cand.ac && !h.ac) h.ac = s.cand.ac; // エレベーター・縦階段
+      }
       if (!s.edit) { delete h.prov; delete h.uk; } // 確かめた建物なので「仮の家」ではなくなる
       const ul = {};
       us.forEach(u => {
