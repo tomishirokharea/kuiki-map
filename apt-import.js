@@ -21,6 +21,11 @@
    ========================================================= */
 (function () {
   'use strict';
+  if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.24')) {
+    CHANGELOG.unshift({ v: '2026.13.24', items: [
+      ['集', 'アパートの一覧の建物のうち、住所の土地の中（または場所のすぐ近く）に家の印が1つだけあるものは、候補にせず、その家に自動で入れるようになりました（区域係が建物の画面で確かめられます）']
+    ] });
+  }
   const MATCH_M = 25;      // 住所の位置から、この距離以内の家を「その建物」とみなす（m）
   const MAX_ROWS = 3000;
   const MAX_FLOORS = 40;
@@ -283,7 +288,7 @@
     showCandPlan(makeCandPlan(list), file.name || '');
   }
   function makeCandPlan(list) {
-    const plan = { by: new Map(), miss: [], noTerr: new Set(), n: 0 };
+    const plan = { by: new Map(), miss: [], noTerr: new Set(), n: 0, items: [] };
     const seen = new Set();
     list.forEach((b, idx) => {
       const t = terrByNo(b.terr);
@@ -293,6 +298,7 @@
       if (seen.has(id)) id = (id + '-' + idx).slice(0, 40);
       seen.add(id);
       const c = { i: id, n: b.name.slice(0, 40), la: round6(b.pos.lat), ln: round6(b.pos.lng) };
+      plan.items.push({ b, c, tid: t.id });
       if (b.refs && b.refs.length) (plan.refs || (plan.refs = [])).push({ b, c, tid: t.id });
       if (b.floors) c.f = b.floors;
       if (b.floor1 === '0') c.g = 0;
@@ -302,14 +308,165 @@
       plan.by.get(t.id).push(c);
       plan.n++;
     });
+    plan.auto = autoPicks(plan);
     return plan;
   }
+
+  /* ---------- 候補のうち、家の印と一致するものは自動で入れる（2026.13.24） ----------
+     拒否の取り込み（kyohi.js の placeOne）と同じ考え方です。
+       ・地番の土地が分かった建物：土地の中にある家の印が1つだけなら、その家
+       ・マイマップのピン：10m以内の家の印が1つだけ（または4m以内に1つで、ほかは9mより遠い）なら、その家
+       ・住所の検索で番地まで合った建物：同じく15m以内で1つだけなら、その家
+     迷うもの（土地の中に印が2つ以上・同じ住所に建物が複数・地番が分かれていた・二世帯住宅・会社や店など）は、
+     今までどおり候補として残し、現場でえらびます。
+     自動で入れた候補には a（1：家をアパートに変えた／2：すでにあったアパートにつないだ）の目印をつけ、
+     区域係が建物の編集画面で「合っている」「ちがう（元にもどす）」を押して片づけます */
+  function autoPicks(plan) {
+    const used = new Set(); D().houses.forEach(h => { if (h.cid) used.add(h.cid); });
+    const grid = new Map(), cell = (la, ln) => Math.round(la * 2000) + ':' + Math.round(ln * 2000);
+    D().houses.forEach(h => { const k = cell(h.lat, h.lng); (grid.get(k) || grid.set(k, []).get(k)).push(h); });
+    const near = (la, ln, r) => {
+      const cy = Math.round(la * 2000), cx = Math.round(ln * 2000), out = [];
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        (grid.get((cy + dy) + ':' + (cx + dx)) || []).forEach(h => { const d = xlDist([h.lat, h.lng], [la, ln]); if (d <= r) out.push([h, d]); });
+      }
+      return out.sort((a, b) => a[1] - b[1]);
+    };
+    const qCnt = new Map();
+    plan.items.forEach(({ b }) => { if (b.entry && b.entry.nums.length) qCnt.set(b.entry.q, (qCnt.get(b.entry.q) || 0) + 1); });
+    const picks = [];
+    plan.items.forEach(it => {
+      const { b, c } = it;
+      if (used.has(c.i)) return;                                   // もう使った候補
+      if (b.entry && qCnt.get(b.entry.q) > 1) return;               // 同じ住所に建物が複数
+      let h = null;
+      if (b.cb) {
+        if (!b.cb.pos.exact) return;                                // 地番が分かれていて、土地を決められない
+        const marks = [];
+        parcelCells(b).forEach(k => (grid.get(k) || []).forEach(x => { if (inParcel(b, x.lat, x.lng)) marks.push(x); }));
+        if (marks.length !== 1) return;
+        h = marks[0];
+      } else {
+        const exact = !!b.fromMap;
+        if (!exact && !(b.pos && b.pos.good)) return;               // 番地まで合っていない
+        if (exact && plan.items.some(o => o !== it && o.b.fromMap && xlDist([o.c.la, o.c.ln], [c.la, c.ln]) < 4)) return; // ピンが重なっている
+        const hs = near(c.la, c.ln, exact ? 10 : 15);
+        if (!(hs.length === 1 || (hs.length > 1 && hs[0][1] <= 4 && hs[1][1] > (exact ? 9 : 14)))) return;
+        h = hs[0][0];
+      }
+      if (h.type === 'apt') { if (!h.cid) picks.push({ it, h, kind: 2 }); return; }
+      if (h.units && h.units.length) return;                        // 二世帯住宅
+      if (h.kind && h.kind !== 'home') return;                      // 会社・店などにした家
+      picks.push({ it, h, kind: 1 });
+    });
+    const cnt = new Map(); picks.forEach(p => cnt.set(p.h.id, (cnt.get(p.h.id) || 0) + 1));
+    return picks.filter(p => cnt.get(p.h.id) === 1);                // 同じ家を2つの候補がえらんだら、どちらも入れない
+  }
+  function applyAuto(p) {
+    const h = houseById(p.h.id), c = p.it.c;
+    if (!h || h.cid) return false;
+    if (p.kind === 1) {
+      if (h.type !== 'house' || (h.units && h.units.length)) return false;
+      h.type = 'apt'; h.label = String(c.n || '').slice(0, 40);
+      h.units = unitsOf({ floors: c.f || 0, floor1: c.g === 0 ? '0' : '1' });
+      delete h.prov; delete h.kind; delete h.uk; delete h.ul;
+      if (c.k) h.lock = true; else delete h.lock;
+      if (c.b) h.ban = c.b; else delete h.ban;
+    } else if (h.type !== 'apt') return false;
+    h.cid = c.i; c.a = p.kind;
+    return true;
+  }
+  function candOf(cid) {
+    for (const t of D().territories) { const c = (t.cands || []).find(x => x.i === cid); if (c) return { c, t }; }
+    return null;
+  }
+  /* 自動で入れて、まだ確かめていない建物 */
+  function autoPending() {
+    const out = [];
+    D().houses.forEach(h => { if (!h.cid) return; const f = candOf(h.cid); if (f && f.c.a) out.push({ h, c: f.c, t: f.t }); });
+    return out.sort((a, b) => String(a.t.no).localeCompare(String(b.t.no), 'ja', { numeric: true }) || String(a.c.n).localeCompare(String(b.c.n), 'ja'));
+  }
+  const autoBox = n => n ? `<label class="check"><input type="checkbox" id="aiCandAuto" checked><span>家の印と一致した<b>${n}棟</b>は、その家にそのまま入れる<br><small class="muted">住所の土地の中（または場所のすぐ近く）に家の印が1つだけある建物です。拒否と同じく「自動」の目印をつけるので、あとで確かめられます。残りは今までどおり、現場でえらぶ候補として出ます。</small></span></label>` : '';
+
+  /* 建物の編集画面のお知らせ（区域係だけ）。index.html の openBuilding から呼ぶ */
+  window.aptAutoNotice = h => {
+    if (!h || !h.cid || !isAdmin()) return '';
+    const f = candOf(h.cid); if (!f || !f.c.a) return '';
+    const conv = f.c.a === 1;
+    return `<div class="notice info"><b>一覧の「${esc(f.c.n || '名前なし')}」を、自動でこの${conv ? '家の印' : '建物'}に入れました。</b><br>
+      <small>${conv ? '住所の場所にあった家の印を、アパートに変えています。' : 'すでにあったアパートに、一覧の建物をつなぎました。'}場所と建物が合っているか確かめてください。</small>
+      <div class="inline" style="margin-top:8px;gap:8px;flex-wrap:wrap"><button class="btn small primary" data-aaok="${esc(h.id)}">合っている</button>
+      <button class="btn small" data-aaundo="${esc(h.id)}">ちがう（${conv ? '元の家にもどす' : 'つながりを外す'}）</button></div></div>`;
+  };
+  let autoQueue = null; // 「順に確かめる」の残り
+  function nextAuto() {
+    if (!autoQueue) return false;
+    autoQueue = autoQueue.filter(id => { const h = houseById(id); const f = h && h.cid && candOf(h.cid); return f && f.c.a; });
+    const id = autoQueue[0];
+    if (!id) { autoQueue = null; toast('自動で入れた建物を、すべて確かめました'); return false; }
+    const h = houseById(id);
+    closeSheet(); showView('map');
+    setTimeout(() => { map.setView([h.lat, h.lng], 18); openBuilding(id); }, 150);
+    return true;
+  }
+  function autoOk(hid) {
+    const h = houseById(hid), f = h && h.cid && candOf(h.cid); if (!f) return;
+    commit('合っていることにしました', () => { delete f.c.a; });
+    if (!nextAuto()) setTimeout(() => openBuilding(hid), 30);
+  }
+  async function autoUndo(hid) {
+    const h = houseById(hid), f = h && h.cid && candOf(h.cid); if (!f) return;
+    const conv = f.c.a === 1;
+    if (conv && h.units.some(u => unitHasRec(hid, u))) { toast('部屋に記録があるので、もどせません。建物の編集で直してください'); return; }
+    if (!await ask(conv ? `「${h.label || '集合住宅'}」を元の家にもどします。一覧の建物は、また現場でえらべる候補になります。` : '一覧の建物とのつながりを外します。建物はそのまま残ります。')) return;
+    commit(conv ? '元の家にもどしました' : 'つながりを外しました', () => {
+      const x = houseById(hid); if (!x) return;
+      delete f.c.a; delete x.cid;
+      if (conv) {
+        x.type = 'house'; x.units = []; x.label = '';
+        delete x.lock; delete x.ban; delete x.ul; delete x.uk;
+        const dnc = D().dnc; // 部屋ごとの拒否の印は、建物とのつながりだけ外して、場所の印として残す
+        Object.keys(dnc).forEach(k => { const v = dnc[k]; if (v && typeof v === 'object' && v.room && v.h === hid) delete v.h; });
+      }
+    });
+    if (!nextAuto()) { closeSheet(); if (conv) setTimeout(() => openTarget(hid, '', false), 30); else setTimeout(() => openBuilding(hid), 30); }
+  }
+  function openAutoList() {
+    const list = autoPending();
+    setSheet(headHtml(null, '自動で入れた建物', `まだ確かめていない ${list.length}棟`) + `
+      <p class="hint">一覧の建物を、家の印と一致したので自動で入れたものです。押すと地図がその建物に移り、「合っている」「ちがう」をえらべます。</p>
+      ${list.length ? `<button class="btn primary block" id="aaSeq">地図で順に確かめる</button>
+        <div class="list">${list.map(x => `<button class="btn block" data-aigo="${esc(x.h.id)}">区域${esc(x.t.no)}　${esc(x.c.n || '（名前なし）')}${x.h.terrId !== x.t.id ? '<br><small class="muted">一覧の区域と、線の区域がちがいます</small>' : ''}${x.c.a === 2 ? '<br><small class="muted">すでにあったアパートにつないだ</small>' : ''}</button>`).join('')}</div>
+        <button class="btn block" id="aaAllOk">全部、合っていることにする</button>` : '<p class="notice">確かめる建物はありません。</p>'}
+      <button class="btn block" id="aaBack">もどる</button>`);
+    if ($('#aaSeq')) $('#aaSeq').onclick = () => { autoQueue = list.map(x => x.h.id); nextAuto(); };
+    $$('[data-aigo]', $('#sheet')).forEach(x => x.onclick = () => {
+      const h = houseById(x.dataset.aigo); if (!h) return;
+      autoQueue = null; closeSheet(); showView('map');
+      setTimeout(() => { map.setView([h.lat, h.lng], 18); openBuilding(h.id); }, 150);
+    });
+    if ($('#aaAllOk')) $('#aaAllOk').onclick = async () => {
+      if (!await ask(`${list.length}棟を、地図で見ずに「合っている」にします。よろしいですか？`)) return;
+      commit(`${list.length}棟を合っていることにしました`, () => { autoPending().forEach(x => { delete x.c.a; }); });
+      openAutoList();
+    };
+    $('#aaBack').onclick = openMain;
+  }
+  document.addEventListener('click', e => {
+    const a = e.target.closest && e.target.closest('[data-aaok],[data-aaundo]');
+    if (!a) return;
+    e.preventDefault();
+    if (!isAdmin()) { toast('区域係だけが使えます'); return; }
+    if (a.dataset.aaok) autoOk(a.dataset.aaok); else autoUndo(a.dataset.aaundo);
+  });
+
   function showCandPlan(plan, fileName) {
     const noT = Array.from(plan.noTerr), nMiss = plan.miss.length;
     setSheet(headHtml(null, '候補として登録する内容', esc(fileName)) + `
       <div class="tiles"><div class="tile"><b>${plan.n}</b><span>候補にする建物</span></div>
         <div class="tile"><b>${plan.by.size}</b><span>区域</span></div>
         <div class="tile"><b>${nMiss}</b><span>場所が分からない</span></div></div>
+      ${autoBox(plan.auto.length)}
       <p class="hint">家は作りません。区域ごとに「候補」として持たせます。現場で家の画面から「アパート・マンションだった」を押すと、付近の候補が近い順に出て、えらぶと階数などが自動で入ります。使った候補は、次から出ません。<br>
         同じ区域の候補は、このファイルの内容に置きかわります（登録ずみの建物はそのままです）。</p>
       ${noT.length ? `<div class="notice warn">一覧の区域 ${esc(noT.join('・'))} は、アプリに区域がありません。その建物は候補にしません。</div>` : ''}
@@ -321,10 +478,18 @@
     $('#aiCandGo').onclick = () => {
       if (!isAdmin()) return;
       const withRefs = $('#aiCandRefs') && $('#aiCandRefs').checked;
+      const withAuto = $('#aiCandAuto') && $('#aiCandAuto').checked;
+      // 前の取り込みで自動で入れた目印（まだ確かめていないもの）は、同じ建物IDなら引きつぐ
+      const oldA = new Map(), usedIds = new Set();
+      D().territories.forEach(t => (t.cands || []).forEach(c => { if (c.a) oldA.set(c.i, c.a); }));
+      D().houses.forEach(h => { if (h.cid) usedIds.add(h.cid); });
       plan.by.forEach((list, tid) => {
         const t = terrById(tid); if (!t) return;
+        list.forEach(c => { if (oldA.has(c.i) && usedIds.has(c.i)) c.a = oldA.get(c.i); });
         t.cands = list.sort((a, b) => String(a.n).localeCompare(String(b.n), 'ja'));
       });
+      let nAuto = 0;
+      if (withAuto) plan.auto.forEach(p => { if (applyAuto(p)) nAuto++; });
       let nRef = 0;
       if (withRefs) {
         const now = new Date().toISOString(), used = new Map();
@@ -335,8 +500,8 @@
         });
       }
       Store.save(); renderAll();
-      toast(`${plan.n}棟を候補にしました${nRef ? `。部屋ごとの拒否 ${nRef}件を拒否の一覧に入れました` : ''}`);
-      openMain();
+      toast(`${plan.n}棟を候補にしました${nAuto ? `。うち${nAuto}棟は家の印に自動で入れました` : ''}${nRef ? `。部屋ごとの拒否 ${nRef}件を拒否の一覧に入れました` : ''}`);
+      if (nAuto) openAutoList(); else openMain();
     };
   }
   function downloadBackup() {
@@ -352,7 +517,7 @@
 
   /* ---------- 画面 ---------- */
   function openMain() {
-    const c = counts(), cs = candStats();
+    const c = counts(), cs = candStats(), nAutoP = autoPending().length;
     setSheet(headHtml(null, 'アパートの登録', 'けす → 候補をいれる の順に進めます') + `
       <div class="notice info">使いはじめの前に、実際のアパートの一覧に合わせるための画面です。<b>区域係だけ</b>が使えます。</div>
       <h3 class="sub">① 先にバックアップをとる</h3>
@@ -362,7 +527,9 @@
       <button class="btn block danger" id="aiResetApt">アパートだけ全部消す…</button>
       <h3 class="sub">③ エクセルの建物を「候補」にする（おすすめ）</h3>
       <p class="hint">家は作らず、区域ごとに候補として持たせます。現場で付近の候補をえらぶだけで、名前・階数・オートロックが入ります。<br>
-        いまの候補：<b>${cs.all}棟</b>（使った ${cs.used}／残り ${cs.left}）</p>
+        いまの候補：<b>${cs.all}棟</b>（使った ${cs.used}／残り ${cs.left}）<br>
+        住所の土地の中（または場所のすぐ近く）に家の印が1つだけある建物は、その家に自動で入れます（拒否と同じ）。前に候補にした一覧も、同じファイルをもう一度えらぶと自動で入ります。</p>
+      ${nAutoP ? `<button class="btn block" id="aiAutoList">自動で入れた建物を確かめる（${nAutoP}棟）</button>` : ''}
       <label class="btn primary block">KML・KMZ・CSVを選んで、候補にする<input type="file" id="aiCandFile" accept=".kml,.kmz,.csv,text/csv,text/plain,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden></label>
       <p class="hint">場所は、マイマップで直したKML／KMZのピンの場所を使います（CSVのときは住所から調べます）。住所はアプリに保存しません。</p>
       <details class="more"><summary>くわしい方法（全部の記録のリセット・家に直接取り込む）</summary>
@@ -375,6 +542,7 @@
       </details>
       <button class="btn block" data-close>閉じる</button>`);
     $('#aiReset').onclick = openReset;
+    if ($('#aiAutoList')) $('#aiAutoList').onclick = openAutoList;
     $('#aiResetApt').onclick = openResetApt;
     $('#aiFile').onchange = e => {
       const f = e.target.files && e.target.files[0];
@@ -676,5 +844,5 @@
     if (!isAdmin()) { toast('区域係だけが使えます'); return; }
     openMain();
   });
-  window.AptImport = { parseCsv, buildings, unitsOf, makePlan, parseMyMap, resetData, counts, makeCandPlan, resetApts, aptCounts };
+  window.AptImport = { parseCsv, buildings, unitsOf, makePlan, parseMyMap, resetData, counts, makeCandPlan, autoPicks, autoPending, resetApts, aptCounts };
 })();

@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.23"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.24"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -6548,7 +6548,7 @@ function openBuilding(hid, startSel) {
     }
 
     setSheet(headHtml(t, esc(h.label || '集合住宅') + 'の編集', `区域${t ? esc(t.no) : '-'}　${fl ? fl + '階建て・' : ''}${h.units.filter(u => !B_FRAME.test(u)).length}部屋`) + `
-      ${banNotice(h)}${window.chuiNotice ? window.chuiNotice(h, '') : ''}
+      ${banNotice(h)}${window.chuiNotice ? window.chuiNotice(h, '') : ''}${window.aptAutoNotice ? window.aptAutoNotice(h) : ''}
       ${h.units.length ? '<button class="btn block bback" id="seqStart">← 続けて入力にもどる</button>' : ''}
       ${frames || !h.units.length ? `<button class="btn primary block" data-aptedit="${esc(h.id)}">部屋番号を入れる（階ごとにまとめて）</button>` : ''}
       <div class="bgrid">${grid || '<p class="muted">部屋がまだありません。</p>'}</div>
