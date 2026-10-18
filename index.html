@@ -153,6 +153,13 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .modebar .row{margin:8px 0 0}
 .modebar input[type=range]{width:150px;vertical-align:middle}
 .terr-label.faint span{opacity:.45}
+.pgrp{display:flex;align-items:center;gap:10px;margin:14px 0 -4px;padding:6px 10px;border-left:6px solid #1E3A5F;background:#EEF3F8;border-radius:8px}
+.pgrp b{font-size:18px}
+.trow .stamp.kid{background:#fff}
+.terr-label.par span{transform:translate(-50%,-115%);background:#1E3A5F;border-color:#1E3A5F;color:#fff;font-size:17px;padding:1px 10px}
+.terr-label.kidl span i{font-style:normal;font-size:.72em;opacity:.75}
+#map.zfar .terr-label.kidl span{font-size:12px;padding:0 5px;border-width:2px}
+#map.zfar .terr-label.kidl span i{display:none}
 .terr-label span{display:inline-block;transform:translate(-50%,-50%);background:#ffffffee;border:3px solid var(--terr);color:var(--terr);font-weight:700;font-size:18px;border-radius:10px;padding:0 10px;white-space:nowrap;font-family:"BIZ UDPGothic",sans-serif}
 
 /* ===== 家の印（色＋文字で区別） ===== */
@@ -1591,11 +1598,13 @@ body.renshu #btnUpd{display:none!important}
         <details class="dueset"><summary>区域の取り込み・特別区域・アパートの登録</summary>
         <div class="row">
           <!-- iPhoneでは accept に .kml を書くとファイルを選べないことがあるため、あえて指定しない（中身で判定する） -->
+          <label class="btn primary">マイマップで区域と拒否を新しくする（全部置きかえ）<input type="file" id="adKmlAll" multiple hidden></label>
           <label class="btn">マイマップから区域を取り込む<input type="file" id="adKml" hidden></label>
           <button class="btn" id="adSpecial">＋ 特別区域（コンビニなど）をつくる</button>
           <button class="btn" id="adAptImp">アパートの登録（やり直し・取り込み）</button>
           <label class="btn">エクセルから区域と家を取り込む<input type="file" id="adXlsx" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label></div>
-        <p class="hint">Googleマイマップで「KML/KMZにエクスポート」したファイルを選びます。区域の線だけを取り込み、ピン（家の印）は取り込みません。</p>
+        <p class="hint"><b>全部置きかえ</b>：区域ごとのKMLを<b>まとめて</b>（またはフォルダのZIPを）選びます。親の区域（A05）・枝番（5-①）の線と、拒否・注意のピンで、今の区域と拒否を新しくします。選ぶと、置きかえる前に確認の画面が出ます。<br>
+          <b>取り込む</b>：Googleマイマップで「KML/KMZにエクスポート」したファイルを選びます。区域の線だけを取り込み、ピン（家の印）は取り込みません。</p>
         </details>
         <div id="adTakeSet"></div>
         <div id="adTerrs"></div>
@@ -3548,10 +3557,13 @@ function bboxOf(poly) {
   for (const p of poly) { if (p[0] < a) a = p[0]; if (p[0] > b) b = p[0]; if (p[1] < c) c = p[1]; if (p[1] > d) d = p[1]; }
   return [a, b, c, d];
 }
-function terrOf(lat, lng) { const t = polyTerrs().find(t => inPoly(lat, lng, t.polygon)); return t ? t.id : null; }
+function terrOf(lat, lng) {
+  const ts = polyTerrs(), t = ts.find(t => !t.rest && inPoly(lat, lng, t.polygon)) || ts.find(t => t.rest && inPoly(lat, lng, t.polygon)); // 親の残りの部分は、枝番のあとで見る
+  return t ? t.id : null;
+}
 /* 家がどの区域に入るかを決め直す（3万件でも速いように、先に四角の範囲で絞る） */
 function reassign() {
-  const bx = polyTerrs().map(t => ({ t, b: bboxOf(t.polygon) }));
+  const bx = polyTerrs().map(t => ({ t, b: bboxOf(t.polygon) })).sort((a, b) => (a.t.rest ? 1 : 0) - (b.t.rest ? 1 : 0)); // 親の残りの部分は最後に見る
   for (const h of D().houses) {
     let id = null;
     for (const x of bx) {
@@ -4137,7 +4149,7 @@ function initMap() {
   map = L.map('map', { zoomControl: false, zoomSnap: 0.125, zoomDelta: 1, wheelPxPerZoomLevel: 120, doubleClickZoom: false }).setView(HOME_VIEW, Store.data && (Store.data.territories || []).some(t => okPoly(t.polygon)) ? 17 : HOME_ZOOM);
   map._kmRotOn = rotSupported(); // 回せる端末では、家の印などを「まっすぐ立たせる」準備をしておく（回していないときは何も変わらない）
   bindDoubleTap();
-  map.on('zoomend', () => { zoomEndAt = Date.now(); });
+  map.on('zoomend', () => { zoomEndAt = Date.now(); map.getContainer().classList.toggle('zfar', map.getZoom() < 16); }); // 遠くから見るときは枝番の札を小さく
   bindRotate();
   map.createPane('cardPane'); // 古いカードの写真（地図の下）
   map.getPane('cardPane').style.zIndex = 150;
@@ -4566,12 +4578,35 @@ function renderLegend() {
   if ($('#lgReturn')) $('#lgReturn').onclick = () => { toggleLegend(false); openReturnSheet(r.t.id); };
   if ($('#barSync')) { updateSyncAge(); $('#barSync').onclick = () => { $('#barAge').textContent = '更新しています…'; (Store.queue.length ? flush() : refresh(true)).catch(() => {}).then(updateSyncAge); }; }
 }
+/* 親番号と枝番（2026-10-18）：枝番の区域（例：5-1）は t.pno＝親の番号（5）・t.pnm＝マイマップでの親の名前（A05）・t.pp＝親の線 を持つ。
+   t.rest＝1 は「親の線の中で、どの枝番にも入らない部分」の区域（枝番より後に家を割り当てる）
+   地図では親の線を太い線で囲み、親の番号を線の上に出す。遠くから見るときは枝番の札を小さくする */
+const kidNo = t => (t && t.pno && String(t.no).startsWith(t.pno + '-') ? String(t.no).slice(String(t.pno).length + 1) : '');
+function terrLabelHtml(t) {
+  const k = kidNo(t);
+  return k ? `<span class="kid"><i>${esc(t.pno)}-</i>${esc(k)}</span>` : `<span>${t.group ? 'G ' : ''}${esc(t.no)}</span>`;
+}
+function renderParents(cur) {
+  const ps = new Map();
+  for (const t of polyTerrs()) if (t.pno && okPoly(t.pp) && !ps.has(t.pno)) ps.set(t.pno, t);
+  const curT = cur ? terrById(cur) : null;
+  ps.forEach((t, pno) => {
+    const on = !!curT && curT.pno === pno;
+    L.polygon(t.pp, { color: '#1E3A5F', weight: on ? 6 : 4.5, opacity: curT && !on ? 0.45 : 0.9, fill: false, interactive: false }).addTo(terrLayer);
+    const b = bboxOf(t.pp); // 親の番号は、親の線のいちばん上に出す（枝番の札と重ならないように）
+    L.marker([b[1], (b[2] + b[3]) / 2], {
+      icon: L.divIcon({ className: `terr-label par${curT && !on ? ' faint' : ''}`, html: `<span>区域 ${esc(pno)}</span>`, iconSize: [0, 0] }),
+      interactive: false, keyboard: false, pane: 'labelPane'
+    }).addTo(terrLayer);
+  });
+}
 function renderTerrs() {
   terrLayer.clearLayers();
   const cur = selTerrId();
   const tapOk = mode === 'normal'; // 線引き・家の追加のときは、地図のタップを区域の選択に使わない
   const lock = lockOn(), okT = lock ? openTerrIds() : null;
-  for (const t of polyTerrs()) {
+  const list = polyTerrs().slice().sort((a, b) => (b.rest ? 1 : 0) - (a.rest ? 1 : 0)); // 親の残りの部分は下に描く（枝番を押せるように）
+  for (const t of list) {
     const on = t.id === cur, dim = !!cur && !on; // えらんだ区域以外は薄く
     const gray = lock && !okT.has(t.id);          // 選べない区域は灰色
     const col = gray ? '#9AA5A0' : terrLineColor();
@@ -4582,7 +4617,7 @@ function renderTerrs() {
     }).addTo(terrLayer);
     if (tapOk && !gray) poly.on('click', () => selectTerr(t.id === cur ? null : t.id, { toast: t.id !== cur }));
     L.marker(center(t.polygon), {
-      icon: L.divIcon({ className: `terr-label${dim ? ' faint' : ''}${gray ? ' gray' : ''}${t.group && !gray ? ' grp' : ''}`, html: `<span>${t.group ? 'G ' : ''}${esc(t.no)}</span>`, iconSize: [0, 0] }),
+      icon: L.divIcon({ className: `terr-label${dim ? ' faint' : ''}${gray ? ' gray' : ''}${t.group && !gray ? ' grp' : ''}${kidNo(t) ? ' kidl' : ''}`, html: terrLabelHtml(t), iconSize: [0, 0] }),
       interactive: false, keyboard: false, pane: 'labelPane'
     }).addTo(terrLayer);
     // 今日わたした範囲（担当者には全部、わたされた人には自分の範囲だけ）
@@ -4596,6 +4631,7 @@ function renderTerrs() {
       L.marker(center(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
     });
   }
+  renderParents(cur); // 親番号の線と番号
   // グループの留守宅カードで分けた範囲（カードを持つ人には全部、わたされた人には自分の範囲だけ）
   const fc = focusCard ? activeCards().find(x => x.id === focusCard) : null;
   if (fc && fc.group && fc.mode === 'split') {
@@ -4802,7 +4838,16 @@ function fillTerrJump() {
   const freeT = t => !t.holder && isFree(t);
   const ts = isAdmin() ? all : all.filter(t => myTerr(t) || freeT(t));
   const head = ts.length ? '区域をえらぶ' : '受け取っている区域はありません';
-  sel.innerHTML = `<option value="">${head}</option>` + ts.map(t => `<option value="${t.id}">区域 ${esc(t.no)}${!isAdmin() && !myTerr(t) && freeT(t) ? '（自由に受け取れる）' : ''}</option>`).join('');
+  // 枝番の区域は、親の番号ごとにまとめる（例：区域5 の中に 5-1・5-2…）
+  const opt = t => `<option value="${t.id}">区域 ${esc(t.no)}${t.rest ? '（枝番の外）' : ''}${!isAdmin() && !myTerr(t) && freeT(t) ? '（自由に受け取れる）' : ''}</option>`;
+  let html = '', gp = null;
+  ts.forEach(t => {
+    const p = t.pno || null;
+    if (p !== gp) { if (gp) html += '</optgroup>'; if (p) html += `<optgroup label="区域 ${esc(p)}（枝番）">`; gp = p; }
+    html += opt(t);
+  });
+  if (gp) html += '</optgroup>';
+  sel.innerHTML = `<option value="">${head}</option>` + html;
   syncTerrJump();
 }
 /* 左上のえらび欄：留守宅カードを見ているときは、そのことが分かるようにする */
@@ -11684,7 +11729,16 @@ function renderAdmin() {
   // 区域一覧
   const userOpts = sel => `<option value="">（だれも持っていない）</option>` +
     D().users.map(u => `<option value="${u.id}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
+  const pcount = new Map();
+  ts.forEach(t => { if (t.pno) pcount.set(t.pno, (pcount.get(t.pno) || 0) + 1); });
+  let lastP = null;
   $('#adTerrs').innerHTML = ts.map(t => {
+    // 親番号が変わるところに見出し（枝番の区域を親ごとにまとめて見せる）
+    const ph = t.pno && t.pno !== lastP ? `<div class="pgrp"><span class="stamp sm${noCls(t.pno)}">${esc(t.pno)}</span><b>区域 ${esc(t.pno)}</b><span class="muted">${t.pnm ? esc(t.pnm) + '・' : ''}枝番 ${pcount.get(t.pno)}つ</span></div>` : '';
+    lastP = t.pno || null;
+    return ph + trowOf(t);
+  }).join('');
+  function trowOf(t) {
     const s = stats.get(t.id), d = t.lentAt ? daysSince(t.lentAt) : 0, due = dueOf(t), over = !!due && Date.parse(due) < Date.now();
     const lent = t.holder ? t.lentAt : t.lastLentAt, firstAt = t.holder ? t.firstDoneAt : t.lastFirstAt;
     const retAt = t.holder || t.awayPoolAt ? '' : (t.completedAt && (!t.returnedAt || t.completedAt >= t.returnedAt) ? t.completedAt : '');
@@ -11715,7 +11769,7 @@ function renderAdmin() {
         ${isSpecial(t) ? `<button class="btn small" data-spedit="${t.id}">条件を変える</button>` : ''}
         ${t.holder && (userById(t.holder) || {}).group ? `<label class="check"><input type="checkbox" data-grp="${t.id}"${t.group ? ' checked' : ''}>${esc(userById(t.holder).group)}グループの区域にする</label>` : ''}
       </div></article>`;
-  }).join('');
+  }
 }
 /* 区域の削除（区域係のみ）。家を残すか、まとめて消すかを選ぶ */
 function openDeleteTerr(tid) {
@@ -14608,7 +14662,7 @@ init();
 <script src="apt-wizard.js"></script>
 <script src="naoshi.js"></script><!-- まちがえた記録の直し方・二世帯住宅 -->
 <script src="kyohi.js"></script><!-- 係の画面の「拒否」：一覧・エクセル／マイマップの取り込み・地図でえらぶ -->
-<script src="chui.js"></script><!-- 注意（！）の印：地図の！・記録の画面の注意・家の編集の「この家の印」・係の一覧 -->
+<script src="chui.js"></script><script src="kml-koushin.js"></script><!-- 注意（！）の印：地図の！・記録の画面の注意・家の編集の「この家の印」・係の一覧 -->
 <script src="help.js"></script><!-- 区域係の設定の「？」の説明（文はこのファイルだけで直せます） -->
 <script src="douga.js"></script><!-- 使い方の動画（動画の一覧と文はこのファイルだけで直せます） -->
 </body>
