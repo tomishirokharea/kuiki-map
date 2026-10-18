@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.18"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.19"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -1562,7 +1562,7 @@ body.renshu #btnUpd{display:none!important}
         <div class="seg adsub" id="adTerrSub" role="group" aria-label="区域の見かた" hidden>
           <button type="button" data-ap="terr" aria-pressed="true">一覧</button>
           <button type="button" data-ap="status" aria-pressed="false">状況</button>
-          <button type="button" data-ap="dnc" aria-pressed="false">拒否</button>
+          <button type="button" data-ap="dnc" aria-pressed="false">拒否・！</button>
           <button type="button" data-admap>期限の地図</button>
         </div>
         <div id="adTopBar"></div>
@@ -1969,7 +1969,7 @@ const BIG_SAVE_GAP_MS = 10 * 60000; // 家・記録（大きい部分）を端�
 const FAILED_KEY = 'kuiki_failed'; // 何度送っても受け付けられなかった変更（捨てずに取っておく）
 const metaSigOf = j => JSON.stringify([j.users || null, j.settings || null, j.currentUser || null]);
 const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'schedules', 'users', 's13', 'agedata'];
-const MAP_COLS = ['dnc', 'follows', 'released'];
+const MAP_COLS = ['dnc', 'follows', 'released', 'caution']; // caution＝注意（！）の印（chui.js）
 const RES_NAME = { m: 'met', a: 'away', r: 'refused' };
 const clone = o => JSON.parse(JSON.stringify(o));
 /* 保存場所の名札：テスト用のページ（config.js に ns: 'test' があるか、URLに「test」が入っている）は、
@@ -2168,7 +2168,7 @@ const Store = {
   },
   migrate() {
     const d = this.data;
-    d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {};
+    d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {}; d.caution = d.caution || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
     d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3 }, d.settings || {});
@@ -4343,15 +4343,17 @@ function houseIcon(h, ff, locked) {
     }
     const left = aptTodo(h, since);
     const rj = targets(h).some(u => D().dnc[K(h.id, u)]) ? '<b class="rj">拒</b>' : '';
+    const cau = !locked && window.chuiHas && window.chuiHas(h) ? '<b class="cau" title="注意">！</b>' : ''; // 注意（chui.js）
     const ak = aptKind(h);
     const nameTag = ''; // 名前は、renderHouses で別の札として出す（小さな点のときも出せるように）
-    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${locked ? '' : kindBadge(ak) + lockBadge(h) + banBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
+    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${cau}${locked ? '' : kindBadge(ak) + lockBadge(h) + banBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
   }
   const k = K(h.id, ''), s = pinState(k, since), fo = '';
   // 選んでいないときも、今回訪ねた家（会えた・留守）は薄く＋緑のチェックにする
   const st = locked ? null : ff ? ff(k) : (s === 'met' || s === 'away') ? (otherDone(h, k, since) ? 'prev' : 'done') : (s === 'plain' && recentMet(k) ? 'prev' : null);
   const hk = kindOf(h);
-  return L.divIcon({ className: '', html: `<div class="pin st-${s}${h.prov ? ' prov' : ''}${hk !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">${PIN_CHAR[s]}${fo}${doneMark(st)}${nb}${locked ? '' : kindBadge(hk)}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
+  const cau = !locked && s !== 'dnc' && window.chuiHas && window.chuiHas(h) ? '<b class="cau" title="注意">！</b>' : ''; // 注意（chui.js）
+  return L.divIcon({ className: '', html: `<div class="pin st-${s}${h.prov ? ' prov' : ''}${hk !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">${PIN_CHAR[s]}${fo}${doneMark(st)}${nb}${cau}${locked ? '' : kindBadge(hk)}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
 }
 /* ---------- 一緒に回る人（グループ） ----------
    区域の担当者が、今日の終わりまで仲間を加える。データは区域の helpers に入れる：
@@ -4665,6 +4667,7 @@ function renderHouses() {
   if (!map) return;
   houseLayer.clearLayers();
   if (window.renderDncPins) window.renderDncPins(); // 場所だけの拒否の印（kyohi.js）
+  if (window.renderChuiPins) window.renderChuiPins(); // 場所だけの注意の印（chui.js）
   const fkeys = followMap ? new Set(myFollowKeys()) : null;
   const ff = fkeys ? (k => (fkeys.has(k) ? 'hl' : 'dim')) : focusFn();
   renderCardBar();
@@ -5159,6 +5162,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (fromBuilding) b += `<button class="btn small" id="backBld">← 建物の編集にもどる</button>`;
     if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() && dnc.a ? `<br><small>住所：<span data-notr>${esc(dnc.a)}</span>${dnc.auto ? '（住所から自動でつないだ家です）' : ''}</small>` : ''}${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
     if (h.ban) b += banNotice(h);
+    if (window.chuiNotice) b += window.chuiNotice(h, unit); // 注意（！）
     if (!dnc && other) b += `<div class="notice warn"><b>ほかの人が再訪問している${unit ? '部屋' : '家'}です。</b>${recentMet(k) ? '最近会えているので、訪問は控えてください。' : 'しばらく会えていないので、訪ねてもかまいません。'}${blocked ? '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
 
 
@@ -5205,7 +5209,8 @@ function openTarget(hid, unit, fromBuilding, review) {
 
     b += navLink(h);
     if (unit) {
-      b += `<details class="more"${st.editOpen ? ' open' : ''}><summary>この部屋の編集</summary>
+      b += `<details class="more"${st.editOpen || (st.mk && st.mk.kind) ? ' open' : ''}><summary>この部屋の編集</summary>
+        ${window.chuiMark ? window.chuiMark.html(k, st.mk || (st.mk = {})) + '<button class="btn block" id="mkSave">この部屋の印を保存する</button>' : ''}
         <p class="q">種別</p>${kindChips(unitKind(h, unit))}
         <p class="q">部屋の名前</p><button class="btn block" id="fRename">部屋の名前を直す（101→A-1 など）</button></details>`;
     }
@@ -5265,6 +5270,16 @@ function openTarget(hid, unit, fromBuilding, review) {
       st.editOpen = true; paint();
     });
     on('fRename', () => openUnitNames(hid, () => openTarget(hid, unit, fromBuilding))); // まちがえたら、下の「取り消す」でもどせる
+    if (unit && window.chuiMark) { // この部屋の印（なし・！注意・拒否。chui.js）
+      window.chuiMark.bind(S, st.mk || (st.mk = {}), () => paint());
+      on('mkSave', () => {
+        window.chuiMark.keep(st.mk);
+        const mk = st.mk;
+        if (!window.chuiMark.changed(k, mk)) { toast('変わったところはありません'); return; }
+        commit(window.chuiMark.msg(mk), () => { const h2 = houseById(hid); if (h2) window.chuiMark.apply(h2, unit, mk); });
+        st.mk = {}; paint();
+      });
+    }
     $$('[data-vdel]', S).forEach(x => x.onclick = async () => {
       const v = D().visits.find(y => y.id === x.dataset.vdel);
       if (!v) return;
@@ -6420,7 +6435,7 @@ function openBuilding(hid, startSel) {
   // かんたんな表示では編集しない。部屋があれば入力の画面へ
   if (isSimple()) {
     if (h0.units.length) { openAptSeq(hid); return; }
-    setSheet(headHtml(terrById(h0.terrId), esc(h0.label || '集合住宅'), '') + `${banNotice(h0)}
+    setSheet(headHtml(terrById(h0.terrId), esc(h0.label || '集合住宅'), '') + `${banNotice(h0)}${window.chuiNotice ? window.chuiNotice(h0, '') : ''}
       <p class="notice">部屋がまだ登録されていません。</p><button class="btn primary block" data-close>閉じる</button>`);
     return;
   }
@@ -6466,7 +6481,7 @@ function openBuilding(hid, startSel) {
     }
 
     setSheet(headHtml(t, esc(h.label || '集合住宅') + 'の編集', `区域${t ? esc(t.no) : '-'}　${fl ? fl + '階建て・' : ''}${h.units.filter(u => !B_FRAME.test(u)).length}部屋`) + `
-      ${banNotice(h)}
+      ${banNotice(h)}${window.chuiNotice ? window.chuiNotice(h, '') : ''}
       ${h.units.length ? '<button class="btn block bback" id="seqStart">← 続けて入力にもどる</button>' : ''}
       ${frames || !h.units.length ? `<button class="btn primary block" data-aptedit="${esc(h.id)}">部屋番号を入れる（階ごとにまとめて）</button>` : ''}
       <div class="bgrid">${grid || '<p class="muted">部屋がまだありません。</p>'}</div>
@@ -6664,6 +6679,7 @@ function openAptSeq(hid, startUnit) {
       return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}へ">${kindBadge(uk)}${esc(uName(h, u))}</button>`;
     }).join('')}</div>`;
     b += banNotice(h);
+    if (window.chuiNotice) b += window.chuiNotice(h, st.finished ? '' : h.units[idx]); // 注意（！）
     if (st.finished) {
       b += `<div class="okmsg"><b>${cnt === need ? 'すべての部屋に緑のチェックがつきました。' : '最後の部屋まで進みました。'}</b>部屋番号をタップすると、その部屋を入力できます。</div>
         <button class="btn primary block" data-close>閉じる</button>
@@ -7005,12 +7021,13 @@ function openAddForm(ll, tid, editId) {
   if (editId && !eh) return;
   if (eh) { ll = { lat: eh.lat, lng: eh.lng }; tid = eh.terrId; }
   const t = tid ? terrById(tid) : null;
-  const f = { type: 'apt', label: '', n: Object.assign(newNaming(), { rooms: [2, 4] }), kind: 'home', lock: false, cand: null, ban: '' };
+  const f = { type: 'apt', label: '', n: Object.assign(newNaming(), { rooms: [2, 4] }), kind: 'home', lock: false, cand: null, ban: '', mk: {} };
   if (mode === 'draw' && drawTap === 'house') f.type = 'house';
   if (eh) { f.type = eh.type; f.label = eh.label || ''; f.kind = kindOf(eh); f.lock = !!eh.lock; }
   const recN = eh ? visitsOf(K(eh.id, '')).length : 0;
   const nrm = x => String(x || '').replace(/[\s　]/g, '').toLowerCase();
   const keep = () => {
+    if (window.chuiMark) window.chuiMark.keep(f.mk); // この家の印（chui.js）
     const l = $('#fLabel'); if (l) f.label = l.value;
     const lk2 = $('#fLock'); if (lk2) f.lock = lk2.checked;
     namingKeep(f.n);
@@ -7058,6 +7075,7 @@ function openAddForm(ll, tid, editId) {
       ${apt ? '<p class="hint">部屋ごとの種別は、あとから部屋の画面で変えられます。</p>' : ''}
       ${apt ? namingHtml(f.n) : ''}
       ${eh && apt && recN ? `<div class="notice warn">この家の記録 ${recN}件は、建物ぜんたいの記録として残り、部屋ごとの記録には入りません。</div>` : ''}
+      ${eh && window.chuiMark ? window.chuiMark.html(K(eh.id, ''), f.mk, { noDnc: apt }) : ''}
       <button class="btn primary block" id="fSave">${eh ? '保存する' : 'この場所に追加する'}</button>
       <button class="btn block" data-close>やめる</button>
       ${eh ? `<div class="aw-sep">${isAdmin() ? '<button class="btn block" id="fMove">この家の場所を直す</button>' : ''}
@@ -7069,6 +7087,7 @@ function openAddForm(ll, tid, editId) {
     if ($('#fLock')) $('#fLock').onchange = e => { f.lock = e.target.checked; };
     if (f.type === 'apt') { const l = $('#fLabel'), lk = $('#fLock'); bindNaming(f.n, () => { if (l) f.label = l.value; if (lk) f.lock = lk.checked; namingKeep(f.n); paint(); }); }
     bindCands();
+    if (eh && window.chuiMark) window.chuiMark.bind(S, f.mk, () => { keep(); paint(); });
     if ($('#fCandOff')) $('#fCandOff').onclick = () => { keep(); f.cand = null; f.ban = ''; paint(); };
     if ($('#fMove')) $('#fMove').onclick = () => startMoveHouse(editId);
     if ($('#fDel')) $('#fDel').onclick = async () => {
@@ -7086,6 +7105,7 @@ function openAddForm(ll, tid, editId) {
       if (eh) {
         commit(f.type === 'apt' ? `${label || '建物'}をアパート・マンションにしました（${us.length}部屋）` : '保存しました', () => {
           const h = houseById(editId); if (!h) return;
+          if (window.chuiMark) window.chuiMark.apply(h, '', f.mk); // この家の印（なし・！注意・拒否）
           h.label = label;
           if (f.kind !== 'home') h.kind = f.kind; else delete h.kind;
           if (f.type === 'apt') {
@@ -14588,6 +14608,7 @@ init();
 <script src="apt-wizard.js"></script>
 <script src="naoshi.js"></script><!-- まちがえた記録の直し方・二世帯住宅 -->
 <script src="kyohi.js"></script><!-- 係の画面の「拒否」：一覧・エクセル／マイマップの取り込み・地図でえらぶ -->
+<script src="chui.js"></script><!-- 注意（！）の印：地図の！・記録の画面の注意・家の編集の「この家の印」・係の一覧 -->
 <script src="help.js"></script><!-- 区域係の設定の「？」の説明（文はこのファイルだけで直せます） -->
 <script src="douga.js"></script><!-- 使い方の動画（動画の一覧と文はこのファイルだけで直せます） -->
 </body>

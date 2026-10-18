@@ -365,6 +365,7 @@
         b += `<p class="muted">${last ? `前回：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}` : 'はじめて訪ねる世帯'}</p>`;
         b += fixLineHtml(k);
         b += recentOtherHtml(k);
+        if (window.chuiNotice) b += window.chuiNotice(h, u); // 注意（！）
         if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の世帯です。</b>訪問しないでください。${h.units.length > 1 ? 'ほかの世帯は訪ねられます。' : ''}</div>`;
         else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="duOverride">それでも記録する</button></span></div>`;
         else b += st.step === 'result' ? resultChoicesHtml('') : seqStepsHtml(st, k);

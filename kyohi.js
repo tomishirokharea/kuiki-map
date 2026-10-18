@@ -146,7 +146,7 @@
 
   const SRC = { xl: 'エクセル', kml: 'マイマップ', adm: '係が追加' };
   const now = () => new Date().toISOString();
-  const ui = { q: '', filter: 'all', open: new Set() };
+  const ui = { q: '', filter: 'all', open: new Set(), mode: 'dnc' };
 
   /* =========================================================
      一覧のもとになるデータ
@@ -221,6 +221,12 @@
   function renderDncAdmin() {
     const box = $('#adDnc');
     if (!box || !isAdmin()) return;
+    // 上の切りかえ：拒否／注意（！）（chui.js）
+    const seg = window.renderChuiAdmin ? `<div class="ch-seg" role="group" aria-label="拒否と注意の切りかえ">
+        <button type="button" data-dncmode="dnc" aria-pressed="${ui.mode !== 'warn'}"><i class="pin st-dnc">拒</i>拒否 ${Object.keys(D().dnc).length}</button>
+        <button type="button" data-dncmode="warn" aria-pressed="${ui.mode === 'warn'}"><i class="pin st-cau">！</i>注意 ${window.chuiCount()}</button></div>` : '';
+    const bindSeg = () => $$('[data-dncmode]', box).forEach(b => b.onclick = () => { ui.mode = b.dataset.dncmode; renderDncAdmin(); });
+    if (ui.mode === 'warn' && window.renderChuiAdmin) { box.innerHTML = seg; bindSeg(); window.renderChuiAdmin(box); return; }
     const all = allEntries(), nCheck = all.filter(isCheck).length;
     if (ui.filter === 'check' && !nCheck) ui.filter = 'all';
     const q = ui.q.trim().normalize('NFKC').toLowerCase();
@@ -236,7 +242,7 @@
     }
     const autoOpen = !!q || ui.filter === 'check' || shown.length === 1;
     const keepFocus = document.activeElement && document.activeElement.id === 'dncQ';
-    box.innerHTML = `
+    box.innerHTML = seg + `
       <h2 class="sec">拒否の家</h2>
       <div class="dnc-sum" role="group" aria-label="しぼりこみ">
         <button type="button" data-dncf="all" aria-pressed="${ui.filter === 'all'}"><b>${all.length}</b><span>すべて</span></button>
@@ -264,6 +270,7 @@
         : shown.map(g => groupHtml(g, autoOpen || ui.open.has(g.key))).join('')}</div>`;
     if (keepFocus) { const i = $('#dncQ'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
     bindAdmin(box);
+    bindSeg();
   }
   function groupHtml(g, open) {
     const ck = g.es.filter(isCheck).length;
@@ -1281,6 +1288,7 @@
     if (ref) ref.after(sp); else lg.appendChild(sp);
   }
 
+  window.kyohiApi = { houseGrid, placeOne, unitMatch: (h, u) => unitMatch(h, u), looksAddr: t => looksAddr(xlNorm(t)) }; // kml-koushin.js で使う
   window.chibanSrc = () => cbSrc(); // apt-import.js の出典の表示に使う
   /* 建物の画面に出す「拒否の部屋」（備考から取り込んだ、部屋ごとの拒否）。index.html の banNotice から呼ぶ */
   function dncRoomNote(h) {

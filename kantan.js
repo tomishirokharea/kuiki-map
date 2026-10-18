@@ -307,6 +307,7 @@
       } else if (other) {
         b += `<div class="notice warn"><b>ほかの人が再訪問している${what}です。</b>${blocked ? '訪問は控えてください。<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
       }
+      if (window.chuiNotice) b += window.chuiNotice(h, unit); // 注意（！）
       if (!blocked && st.step === 'result') b += recentOtherHtml(k);
       if (!dnc && recentMet(k)) {
         const m = sum(k).met;
