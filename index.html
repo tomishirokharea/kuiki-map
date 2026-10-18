@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.19"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.20"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3071,6 +3071,23 @@ function paintAsg() {
    あとの変更が前の変更を上書きする順番は、そのまま守る */
 const SEND_BATCH = 50; // 1回に送る件数の目安（GASの処理時間が長くなりすぎないように）
 const changeCount = ch => Object.keys(ch).reduce((n, c) => n + (c === 'settings' ? 1 : (ch[c].up.length + ch[c].del.length)), 0);
+/* 1回の送信の大きさの上限（サーバーは 800KB をこえると受け付けない）。大きい変更は、この大きさまでに分けて送る */
+const SEND_MAX_BYTES = 450000;
+const SPLIT_ORDER = ['territories', 'agedata', 'houses', 'visits', 'dnc', 'caution', 'follows', 'released', 'requests', 'awayCards', 'schedules', 's13', 'returns'];
+function splitChange(ch) {
+  const cols = SPLIT_ORDER.filter(c => ch[c]).concat(Object.keys(ch).filter(c => c !== 'settings' && !SPLIT_ORDER.includes(c)));
+  const out = [];
+  let cur = {}, size = 2;
+  const push = () => { if (Object.keys(cur).length) out.push(cur); cur = {}; size = 2; };
+  const slot = c => cur[c] || (cur[c] = { up: [], del: [] });
+  cols.forEach(c => { // サーバーが受け付ける順（区域 → 家 → 記録 → 拒否…）に分ける
+    ch[c].del.forEach(id => { const n = String(id).length + 4; if (size + n > SEND_MAX_BYTES) push(); slot(c).del.push(id); size += n + 30; });
+    ch[c].up.forEach(x => { const n = JSON.stringify(x).length + 2; if (size + n > SEND_MAX_BYTES) push(); slot(c).up.push(x); size += n + 30; });
+  });
+  if (ch.settings !== undefined) cur.settings = ch.settings;
+  push();
+  return out.length ? out : [ch];
+}
 function mergeChanges(list) {
   const acc = {}, out = {};
   let settings;
@@ -3112,6 +3129,10 @@ async function flush(force) {
   try {
     while (Store.queue.length && !Store.inactive) {
       take = 1;
+      if (JSON.stringify(Store.queue[0]).length > SEND_MAX_BYTES) { // 大きすぎる変更（区域をまとめて新しくしたときなど）は分けて送る
+        const parts = splitChange(Store.queue[0]);
+        if (parts.length > 1) { Store.queue.splice(0, 1, ...parts); Store.persistQueue(); }
+      }
       let n = changeCount(Store.queue[0]);
       if (headFail < 2) { // 失敗が続くときは、1件ずつ送って原因の変更を見つける
         while (take < Store.queue.length && n + changeCount(Store.queue[take]) <= SEND_BATCH) n += changeCount(Store.queue[take++]);
@@ -3158,6 +3179,7 @@ async function flush(force) {
     if (!fixed) Store.needFull = true;
   }
   applyInbox();
+  if (!Store.queue.length && window.kmlAfterFlush) window.kmlAfterFlush(); // 区域をまとめて新しくしたあと：家の区域をサーバーで決め直す（kml-koushin.js）
   if (Store.needFull && !Store.queue.length) reloadAll(true).catch(() => {});
 }
 /* 最新の変更を取りに行く */

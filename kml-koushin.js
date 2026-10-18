@@ -380,16 +380,18 @@
     const { specs } = st.tp, at = now();
     const res = { nNew: 0, nKeep: 0, nGone: 0, dnc: 0, cau: 0, pinOnly: 0 };
     closeSheet();
+    const before = new Map(D().houses.map(h => [h.id, h.terrId || null]));
     commit('区域と拒否・注意を新しくしました', () => {
       // 1) 区域
       const byNo = new Map();
       D().territories.forEach(t => { if (!t.dummy && !isSpecial(t)) byNo.set(normNo(t.no), t); });
       const used = new Set();
+      const ppDone = new Set(); // 親の線は、親ごとに1つの枝番にだけ持たせる（送る大きさを小さくする）
       specs.forEach(s => {
         const old = byNo.get(s.no);
         const set = t => {
           t.polygon = s.poly; t.name = `区域${s.no}`;
-          if (s.pno) { t.pno = s.pno; t.pp = s.pp; } else { delete t.pno; delete t.pp; }
+          if (s.pno) { t.pno = s.pno; if (s.pp && !ppDone.has(s.pno)) { t.pp = s.pp; ppDone.add(s.pno); } else delete t.pp; } else { delete t.pno; delete t.pp; }
           if (s.pnm) t.pnm = s.pnm; else delete t.pnm;
           delete t.rest;
         };
@@ -398,6 +400,8 @@
       });
       D().territories.filter(t => !t.dummy && !isSpecial(t) && !used.has(t.id)).map(t => t.id).forEach(id => { deleteTerrData(id, false); res.nGone++; });
       reassign();
+      // 家の区域は、画面からは送らない（3万件になることがあるので）。サーバーが同じ決め方で決め直す（下の kmlAfterFlush）
+      if (LIVE && Store.fp && Store.fp.houses) D().houses.forEach(h => { if ((h.terrId || null) !== before.get(h.id)) Store.fp.houses.set(h.id, JSON.stringify(h)); });
       // 2) 拒否・注意（今あるものを消す）
       if (st.replaceDnc) { D().dnc = {}; }
       const cm = C();
@@ -436,6 +440,8 @@
         else { D().dnc['pin:' + uid()] = o; res.dnc++; }
       });
     });
+    toast('区域と拒否・注意を新しくしました（取り消すときは、控えのファイルから係に相談してください）'); // 3万件の家をもどす「取り消す」は出さない
+    if (LIVE) { lsSet(NEED_KEY, '1'); flush(true); }
     // 4) 終わりの画面
     const gaps = [...st.fit.gaps.entries()].sort((a, b) => cmpNo(a[0], b[0]));
     infoSheet('区域と拒否・注意を新しくしました', `
@@ -464,6 +470,19 @@
   `;
   document.head.appendChild(css);
 
+  /* 区域を送り終えたら、サーバーに家の区域を決め直してもらう（送れないまま閉じても、次に送り終えたときに行う） */
+  const NEED_KEY = 'kuiki_kml_reassign';
+  let reassigning = false;
+  window.kmlAfterFlush = async () => {
+    if (reassigning || !LIVE || lsGet(NEED_KEY) !== '1' || !isAdmin() || Store.queue.length) return;
+    reassigning = true;
+    try {
+      const r = await api('reassign', {}, { timeout: 300000 });
+      lsDel(NEED_KEY);
+      toast(`家 ${r.changed || 0}件の区域を、サーバーで新しい線に合わせました`);
+      Store.needFull = true; reloadAll(true).catch(() => {});
+    } catch (e) { /* 次に送り終えたときに、もう一度ためす */ } finally { reassigning = false; }
+  };
   window.kmlKoushinStart = start;
   document.addEventListener('change', e => {
     if (e.target && e.target.id === 'adKmlAll') { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) start(fs); }
