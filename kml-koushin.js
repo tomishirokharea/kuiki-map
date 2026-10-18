@@ -46,6 +46,11 @@
   const SENS_W = /病|認知|障害|障がい|亡|死|入院|宗教|学会|離婚|生活保護|借金|暴力|警察|ＤＶ|DV|妊|手術|薬|精神|うつ|介護|施設に入/;
   const BLD = /[ァ-ヶー]{2,}|荘|ハイツ|団地|棟|マンション|アパート|コーポ|レジデンス|ハウス|ビル/;
   const looksAddr = c => !!c && /\d/.test(c) && /[一-鿿]/.test(c) && c.length <= 120;
+  /* 名前を区域番号の形にそろえる（「01-①」→「1-1」・「１２」→「12」）。区域番号の形でなければ '' */
+  const noKey = name => {
+    const t = String(name || '').trim().replace(/^(区域|No\.?|№|#)\s*/i, '').normalize('NFKC').replace(/\s+/g, '').replace(/[-－ー―‐−–—]/g, '-');
+    return /^\d{1,3}(-\d{1,2})?$/.test(t) ? t.split('-').map(x => String(Number(x))).join('-') : '';
+  };
   const circN = c => (CIRC.indexOf(c) >= 0 ? CIRC.indexOf(c) + 1 : Number(c));
 
   function kids(el, name) { return [...el.children].filter(c => c.localName === name); }
@@ -137,7 +142,7 @@
   }
 
   /* 外へ */
-  root.KmlKoushin = { parseKmlText, splitPin, mergeParsed, RE_PARENT, RE_KID };
+  root.KmlKoushin = { parseKmlText, splitPin, mergeParsed, noKey, RE_PARENT, RE_KID };
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof document === 'undefined') return;
 
   /* =========================================================
@@ -260,7 +265,13 @@
     const items = [];
     m.pins.forEach(p => splitPin(p).forEach(it => items.push(it)));
     const tno = terrOfSpecs(tp.specs);
-    items.forEach((it, i) => { it.i = i; it.tno = tno(it.lat, it.lng); it.use = true; });
+    // ピンの名前が区域番号と同じもの（例：「1-1」「01-①」「12」）は、枝番などの目印の可能性が高いので、はじめは「入れない」にする
+    const nos = new Set(tp.specs.map(s => s.no).concat(tp.specs.filter(s => s.pno).map(s => s.pno)));
+    items.forEach((it, i) => {
+      it.i = i; it.tno = tno(it.lat, it.lng);
+      it.sameNo = !it.room && nos.has(noKey(it.src));
+      it.use = !it.sameNo;
+    });
     const fit = houseFit(tp.specs);
     const st = { files: texts.length, bad, m, tp, items, fit, replaceDnc: true };
     preview(st);
@@ -287,7 +298,8 @@
       <button type="button" class="kk-kind" data-cyc="${it.i}" aria-label="種類を切りかえる（拒否→注意→入れない）">${icon}<small>${k === 'dnc' ? '拒否' : k === 'warn' ? '注意' : '入れない'}</small></button>
       <div class="tx"><b data-notr>${esc(itemPlace(it))}</b>
         ${k === 'warn' ? `<input type="text" class="kk-note" data-note="${it.i}" maxlength="80" value="${esc(it.note || '')}" placeholder="注意の内容（例：犬がいます）">` : ''}
-        ${it.part ? '<small class="kk-part">住所が番地だけです（取り込んだあと「要確認」で家を確かめてください）</small>' : ''}
+        ${it.sameNo ? '<small class="kk-part">名前が区域番号と同じなので、目印とみなして入れません（拒否なら左の印を押してください）</small>' : ''}
+        ${it.part && !it.sameNo ? '<small class="kk-part">住所が番地だけです（取り込んだあと「要確認」で家を確かめてください）</small>' : ''}
         ${it.sens && k === 'warn' ? '<small class="kk-sens">病気・家庭の事情など、個人のことが書かれていないか確かめてください</small>' : ''}
         <small>ピン：<span data-notr>${esc(String(it.src || '').slice(0, 60))}</span>${it.black ? '（黒いピン）' : ''}</small></div></div>`;
   }
@@ -334,7 +346,8 @@
         ${tGroups.map(([no, its]) => `<details class="dncg kk-g" data-kg="${esc(no)}"${ui.open.has(no) ? ' open' : ''}><summary><span class="stamp sm${noCls(no)}">${esc(no)}</span><span class="nm">${no === '？' ? '新しい区域の線の外' : '区域' + esc(no)}</span>
           <span class="cnt">拒 ${its.filter(i => i.use && i.kind === 'dnc').length}・！ ${its.filter(i => i.use && i.kind === 'warn').length}</span></summary>
           ${ui.open.has(no) ? its.map(itemRow).join('') : ''}</details>`).join('')}
-        ${st.m.marks ? `<p class="hint">枝番の目印のピン（「ポイント ①」など）${st.m.marks}本は入れません。</p>` : ''}`}
+        ${st.m.marks ? `<p class="hint">枝番の目印のピン（「ポイント ①」など）${st.m.marks}本は入れません。</p>` : ''}
+        ${items.some(i => i.sameNo) ? `<p class="hint">名前が区域番号と同じピン ${items.filter(i => i.sameNo).length}本は、目印とみなして「入れない」にしています（各区域の一覧で確かめられます）。</p>` : ''}`}
       </div>
       <div class="dx-foot">
         <label class="check"><input type="checkbox" id="kkRep"${st.replaceDnc ? ' checked' : ''}>今ある拒否 ${dc.all}件をすべて消して入れなおす<small>（訪問で記録 ${dc.visit}・取り込み ${dc.imp}・アパートの部屋 ${dc.room}）</small></label>
