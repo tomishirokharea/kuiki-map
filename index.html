@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.16"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.17"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -1389,6 +1389,7 @@ body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
     <section class="view" id="view-home" hidden>
       <div class="wrap">
         <div id="homeHello"></div>
+        <div id="homeDouga"></div><!-- はじめての方へ（使い方の動画のカード・douga.js） -->
         <div class="homegrid"><div class="homeside">
         <div id="homeTimer"></div>
         <div id="homeGoal"></div>
@@ -4477,7 +4478,7 @@ let zoomHintTimer = null, zoomHintShown = false;
 const FIRST_KEY = 'kuiki_first_use';
 if (!lsGet(FIRST_KEY)) lsSet(FIRST_KEY, String(Date.now()));
 function beginner() {
-  const v = typeof UI !== 'undefined' ? uiEff().guide : 'auto';
+  const v = typeof UI !== 'undefined' ? (UI.guide || 'auto') : 'auto'; // かんたんモードの人の設定も、そのまま使う
   if (v === 'on') return true;
   if (v === 'off') return false;
   return Date.now() - Number(lsGet(FIRST_KEY) || Date.now()) < 5 * DAY;
@@ -10392,7 +10393,7 @@ function openUiSheet() {
         <button class="choice${det ? ' on' : ''}" data-ui="mode" data-v="detail" aria-pressed="${det}">くわしく<small>色・文字・地図など</small></button>
       </div>`;
     if (!det) {
-      S_VIEW += S_TEXT + `<p class="hint">「くわしく」にすると、テーマの色・文字の種類・地図の印の大きさなども、自分の好みに変えられます。</p>`;
+      S_VIEW += S_TEXT + `<p class="q">はじめの案内（使い方の動画のお知らせなど）</p>${seg('guide', [['auto', '最初の数日だけ'], ['on', 'いつも出す'], ['off', '出さない']], UI.guide || 'auto')}<p class="hint">「くわしく」にすると、テーマの色・文字の種類・地図の印の大きさなども、自分の好みに変えられます。</p>`;
     } else {
       const cm = String(UI.custom || '').match(/^(\d+),(\d+)$/), ch = cm ? +cm[1] : 200, cs = cm ? +cm[2] : 70;
       const S_COLOR = `<h3 class="sub">テーマの色</h3>
@@ -10417,7 +10418,7 @@ function openUiSheet() {
         <p class="q">起動のあいさつ（「さぁ、奉仕に行こう！」）</p>${seg('splash', [['on', '出す'], ['off', '出さない']])}
         ${UI.splash !== 'off' ? `<div class="zoomrow"><input type="range" id="uiSplash" min="1" max="5" step="0.5" value="${UI.splashSec || 1.8}" aria-label="あいさつを出す時間（秒）"><output id="uiSplashOut">${UI.splashSec || 1.8}秒</output></div>
           <div class="row"><button type="button" class="btn small" id="uiSplashTry">ためしに見る</button></div>` : ''}
-        <p class="q">はじめの案内（「拡大すると家の印が出ます」など）</p>${seg('guide', [['auto', '最初の5日だけ'], ['on', 'いつも出す'], ['off', '出さない']])}
+        <p class="q">はじめの案内（使い方の動画のお知らせ・「拡大すると家の印が出ます」など）</p>${seg('guide', [['auto', '最初の数日だけ'], ['on', 'いつも出す'], ['off', '出さない']])}
         <p class="q">ボタンの間隔</p>${seg('density', [['normal', 'ゆったり'], ['compact', 'コンパクト']])}
         <p class="q">説明の文</p>${seg('hints', [['show', '表示する'], ['hide', 'かくす']])}
         <p class="q">開いたときの画面</p>${seg('start', [['home', 'ホーム'], ['cards', '区域カード'], ['map', '地図']].concat(recoOn() ? [['reco', 'おすすめ']] : []))}`;
@@ -10430,7 +10431,7 @@ function openUiSheet() {
     // ①の対応：説明文つきの通常の見出し（headHtml）ではなく、タイトルだけのコンパクトな見出しにして画面を広く使う。
     // 閉じる✕ボタンはこれまでと同じ場所・同じ動きのまま（スクロールしても上に固定）。
     // 帯（見出しの行）はなし。下にスワイプすると、設定を残して閉じる（小さな「×」と、いちばん下の「閉じる」でも閉じられる）
-    let b = `<h2 id="sheetTitle" class="vh">設定</h2>` + (window.KI ? KI.picker(false) : '') + S_BASE + S_VIEW + S_FEAT;
+    let b = `<h2 id="sheetTitle" class="vh">設定</h2>` + (window.dougaSettingsRow ? dougaSettingsRow() : '') + (window.KI ? KI.picker(false) : '') + S_BASE + S_VIEW + S_FEAT;
     b += `<button class="btn block" id="uiReset">見え方を最初にもどす</button><button class="btn primary block" data-close>閉じる</button>`;
     b = `<div class="grabrow"><span class="grab" aria-hidden="true"></span><button type="button" class="xmini" data-close aria-label="閉じる">×</button></div><p class="grabhint">下にスワイプすると、設定を残して閉じます</p>` + b;
     setSheet(b);
@@ -12954,6 +12955,7 @@ function renderHome() {
   // ②の対応：グループ監督の「グループ」タブをなくしたので、そこにあった月の予定印刷（掲示板用）をホームに置く
   $('#homeSchedTools').innerHTML = (isAdmin() || isOverseer())
     ? printMonthPicker('homeScPrint') : '';
+  if (window.dougaHomeCard) dougaHomeCard(); // はじめての方へ（使い方の動画のカード）
 }
 /* スワイプの動き（指でもマウスでも）：左に半分以上ずらすと開き、ほかをさわると閉じる */
 const SWIPE_W = 176;
@@ -14543,5 +14545,6 @@ init();
 <script src="naoshi.js"></script><!-- まちがえた記録の直し方・二世帯住宅 -->
 <script src="kyohi.js"></script><!-- 係の画面の「拒否」：一覧・エクセル／マイマップの取り込み・地図でえらぶ -->
 <script src="help.js"></script><!-- 区域係の設定の「？」の説明（文はこのファイルだけで直せます） -->
+<script src="douga.js"></script><!-- 使い方の動画（動画の一覧と文はこのファイルだけで直せます） -->
 </body>
 </html>

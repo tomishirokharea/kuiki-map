@@ -13,7 +13,7 @@
    ・サーバー（GAS）とのやりとり・版の確認には、手を出さない
    ・招待コード（?t=）の入ったURLは保存しない（URLの ? から後ろを消して保存する）
    ========================================================= */
-const APP_CACHE = 'kuiki-app-v17'; // v17：2026.13.16（拒否のCSV取り込みで行をえらぶ・お知らせの直し）
+const APP_CACHE = 'kuiki-app-v18'; // v18：2026.13.17（使い方の動画）
 const LIB_CACHE = 'kuiki-lib-v2'; // v2：地図の部品を CDN から vendor に移した（古い CDN の控えは消える）
 const TILE_CACHE = 'kuiki-tiles-v1';   // 地図の画像（画面側の kangaeru.js・chizu.js も同じ入れ物に入れる。名前を変えるときは両方）
 const AREA_CACHE = 'kuiki-tilearea-v1'; // 保存してよい場所（四角）
@@ -23,7 +23,7 @@ const AREA_KEY = 'https://kuiki.invalid/area';
 let AREA = undefined; // [南, 西, 北, 東]。undefined＝まだ読んでいない、null＝区域がない
 const NET_WAIT_MS = 6000;
 // 圏外用に控える、アプリのファイル（新しくファイルを足したら、ここに名前を足す）
-const APP_FILES = /\/(config|schedule|kantan|tsuzuki|kangaeru|chizu|apt-import|apt-wizard|naoshi|kyohi|help|i18n|i18n-es|i18n-es-chizu)\.js$/;
+const APP_FILES = /\/(config|schedule|kantan|tsuzuki|kangaeru|chizu|apt-import|apt-wizard|naoshi|kyohi|help|douga|i18n|i18n-es|i18n-es-chizu)\.js$/;
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -68,6 +68,7 @@ self.addEventListener('fetch', e => {
 
   if (u.origin === self.location.origin) {
     if (u.searchParams.has('vcheck')) return; // 新しい版があるかの確認は、そのまま通す
+    if (u.pathname.includes('/douga/')) return; // 使い方の動画と表紙は保存しない（圏外の端末に何十MBもためないため）
     if (u.pathname.includes('/vendor/')) { // 地図の部品など：一度取ったら保存したものを使う（圏外でも地図が出る）
       e.respondWith((async () => {
         const cache = await caches.open(LIB_CACHE);
