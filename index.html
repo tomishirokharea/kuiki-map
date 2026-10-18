@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.17"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.18"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -1373,6 +1373,14 @@ body.big #hello .hreco .btn{width:100%}
 .wpfoot .shortc{color:var(--draw);font-weight:700}
 .wpfoot .btn{min-width:110px}
 body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
+/* 練習モード（?renshu=1）：本番とまちがえないように、いつも帯を出す */
+#renshuBar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;min-height:48px;padding:6px 14px;background:#C2410C;color:#fff;font-size:18px;line-height:1.4;font-weight:700;zoom:var(--z,1)}
+#renshuBar[hidden]{display:none}
+#renshuBar button{min-height:40px;padding:4px 14px;border:2px solid #fff;border-radius:10px;background:transparent;color:#fff;font:inherit;font-size:16px;cursor:pointer}
+#renshuBar button:active{background:#fff3;}
+#renshuMapNote{display:none;position:absolute;left:8px;bottom:8px;z-index:650;max-width:70%;padding:4px 10px;border-radius:8px;background:#fffffff0;color:#7C2D12;border:2px solid #C2410C;font-size:13px;line-height:1.4;font-weight:700;pointer-events:none}
+body.renshu #renshuMapNote{display:block}
+body.renshu #btnUpd{display:none!important}
 </style>
 </head>
 <body>
@@ -1383,6 +1391,7 @@ body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
     <button type="button" class="updbtn" id="btnUpd" hidden aria-label="新しい版があります。押すと更新します"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
     <button type="button" class="gearbtn" id="btnUi" aria-label="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </header>
+  <div id="renshuBar" hidden role="status"><span>練習中です。本番の記録には入りません。</span><button type="button" id="renshuExit">練習をやめる</button></div>
 
   <main>
     <!-- ホーム -->
@@ -1438,6 +1447,7 @@ body.wheel-open #toast{top:calc(8px + env(safe-area-inset-top));bottom:auto}
     <section class="view" id="view-map" hidden>
       <img id="overlayImg" alt="" hidden>
       <div id="map"></div>
+      <div id="renshuMapNote">練習用の地図です（家の印は実在の家ではありません）</div>
       <div class="maptools" id="mapTools">
         <select id="terrJump" aria-label="区域をえらぶ"></select>
         <button class="btn primary adv" id="btnAdd" aria-label="家を追加" title="家を追加">＋ 家</button>
@@ -1941,7 +1951,10 @@ function makeDemo() {
    ・最初の1回だけ全部を受け取り、以後は「前回から変わった分」だけをやりとりする
    ・受け取ったデータは端末（IndexedDB）に残し、圏外でも使える
    ・送れなかった変更は端末にためて、つながったときに送る */
+/* 練習モード（URL に ?renshu=1）：サーバーには一切送らず、本番とは別の保存場所（名札 renshu）で、ダミーの区域を使って記録を試せる */
+const RENSHU = /[?&]renshu=1(&|$)/.test(location.search);
 const API_URL = (function () {
+  if (RENSHU) return ''; // 練習モードは、サーバーにつながない（＝試作モードと同じ動き）
   const u = window.KUIKI_CONFIG && window.KUIKI_CONFIG.apiUrl;
   return typeof u === 'string' && /^https:\/\/script\.google\.com\//.test(u.trim()) ? u.trim() : '';
 })(); // GAS の「ウェブアプリのURL」は config.js に書く
@@ -1963,6 +1976,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
    本番とは別の場所に保存する。同じ github.io の中では、本番とテストの保存場所がまざってしまうため
    （まざると、本番の登録や、まだ送っていない記録が、テスト用のサーバーに送られてしまう） */
 const NS = (function () {
+  if (RENSHU) return 'renshu'; // 練習モードは、本番・テスト版とは別の保存場所
   const c = window.KUIKI_CONFIG && window.KUIKI_CONFIG.ns;
   if (typeof c === 'string' && c.trim()) return c.replace(/[^\w-]/g, '').slice(0, 20);
   return /test/i.test(location.pathname) ? 'test' : '';
@@ -1971,6 +1985,12 @@ const nsKey = k => (NS ? NS + '::' + k : k);
 const lsGet = k => { try { return localStorage.getItem(nsKey(k)); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(nsKey(k), v); return true; } catch (e) { return false; } };
 const lsDel = k => { try { localStorage.removeItem(nsKey(k)); } catch (e) { /* 何もしない */ } };
+/* 練習モードの保存場所（名札 renshu）を空にする：開くたびに最初から練習できる。本番の保存場所には触らない */
+function renshuClear() {
+  try { Object.keys(localStorage).filter(k => k.indexOf('renshu::') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) { /* 何もしない */ }
+  try { if (window.indexedDB) indexedDB.deleteDatabase('kuiki-map-renshu'); } catch (e) { /* 何もしない */ }
+}
+if (RENSHU) { renshuClear(); lsSet('kuiki_splash_off', '1'); } // 練習のときは、起動のあいさつを出さない
 
 /* 自分が詳細を見られる範囲（担当している区域・受け持っている再訪問） */
 function permSig() {
@@ -8673,7 +8693,7 @@ function renderInbox() {
         <p class="muted">${esc(uname(t.holder))}さん　${fmtDay(t.selfTakenAt)}に受け取り（今 ${heldCount(t.holder)}枚）</p>
       </div><button class="btn small" data-takenseen="${t.id}">確認した</button></article>`).join('');
   }
-  if (!LIVE) html = `<div class="notice warn"><b>この画面は「試作版」です。</b>この端末の中だけのデータで動いていて、ほかの人の申し込みは届きません。<br>
+  if (!LIVE && !RENSHU) html = `<div class="notice warn"><b>この画面は「試作版」です。</b>この端末の中だけのデータで動いていて、ほかの人の申し込みは届きません。<br>
     本番で使うときは、区域係から配られたリンク（GitHub Pagesのアドレス）を開いてください。</div>` + html;
   if (LIVE) html = `<div class="setrow"><span>最後に確認した時刻：<b>${Store.syncAt ? fmtTime(new Date(Store.syncAt)) : 'まだ'}</b>${Store.queue.length ? `<br><span class="tag-warn">未送信 ${Store.queue.length}件</span>` : ''}</span>
     <button type="button" class="btn small primary" id="adSync">今すぐ確認する</button></div>` + html;
@@ -14425,6 +14445,25 @@ function keepStorage() {
   } catch (e) { /* 何もしない */ }
 }
 
+/* 練習モード：モードと文字の大きさは、本番で使っている設定をURLで引きつぐ（m=simple|detail、z=大きさ、p=％） */
+function renshuUi() {
+  const q = new URLSearchParams(location.search);
+  UI.mode = q.get('m') === 'detail' ? 'detail' : 'simple';
+  const z = q.get('z'); if (z && SIZES[z]) UI.size = z;
+  const p = Number(q.get('p')); if (p >= 80 && p <= 160) UI.pct = Math.round(p);
+  UI.splash = 'off'; UI.hello = 'off';
+  uiSave();
+}
+function renshuShow() {
+  document.body.classList.add('renshu');
+  const pill = $('#modePill'); pill.hidden = false; pill.textContent = '練習中'; pill.style.background = '#C2410C'; pill.style.color = '#fff';
+  document.title = '【練習】' + document.title;
+  $('#whoSel').hidden = true; $('#whoLabel').hidden = true;
+  $('#whoName').hidden = false; $('#whoName').textContent = `${me().name}さん`;
+  $('#renshuBar').hidden = false;
+  $('#renshuExit').onclick = renshuExit;
+}
+function renshuExit() { renshuClear(); location.href = location.pathname; } // 練習の保存場所を消して、本番にもどる
 async function init() {
   if (!window.L) {
     document.body.innerHTML = '<p style="padding:24px;font-size:20px">地図の部品を読み込めませんでした。インターネットにつながっているか確認して、もう一度開いてください。</p>';
@@ -14460,8 +14499,12 @@ async function init() {
     hideBlocking();
   } else {
     Store.load();
+    if (RENSHU) { // 使う人は伝道者A（係の画面に入れないように）。「使う人」の選びは出さない
+      const ru = Store.data.users.find(x => x.id === 'u1') || Store.data.users[0];
+      if (ru) Store.data.currentUser = ru.id;
+    }
   }
-  uiLoad(); applyUi();
+  uiLoad(); if (RENSHU) renshuUi(); applyUi();
   dropOldGpins(); // 外した「自分のGoogleマップのピン」のデータが残っていたら消す
   initMap();
   bindStatic();
@@ -14477,6 +14520,7 @@ async function init() {
     splashAt = Date.now(); hideSplash();
     queueHello(UI.splash !== 'off' && !lsGet(SPLASH_OFF) ? (Number(uiEff().splashSec) || 1.8) * 1000 + 700 : 400);
   });
+  if (RENSHU) renshuShow();
   if (LIVE) {
     $('#modePill').hidden = !NS; // テスト用のページは「テスト版」と出す（本番とまちがえないように）
     if (NS) { $('#modePill').textContent = 'テスト版'; $('#modePill').style.background = '#C2410C'; $('#modePill').style.color = '#fff'; document.title = '【テスト】' + document.title; }
