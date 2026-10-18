@@ -33,12 +33,13 @@
   const DASH = '[-－ー―‐−–—]';
   const RE_PARENT = /^\s*([A-Za-zＡ-Ｚａ-ｚ])\s*0*(\d{1,3})\s*$/;
   const RE_KID = new RegExp('^\\s*0*(\\d{1,3})\\s*' + DASH + '\\s*([' + CIRC + ']|\\d{1,2})\\s*$');
-  /* 枝番の目印のピン：「ポイント ①」「ポイント 1」「ポイント11」「①」など（名前が目印の言葉と番号だけ）。
-     赤いピン（DB4436）で、住所の形でない名前のものも目印とみなす */
-  const isMark = (name, desc, style) => {
-    const n = String(name || '').normalize('NFKC').replace(/ポイント|ﾎﾟｲﾝﾄ|point|スタート|start/gi, '').replace(/[\s\-ー・.。]/g, '');
-    if (/^\d{0,3}$/.test(n) && !String(desc || '').trim()) return true;
-    return /-DB4436(?:-|$)/i.test(style || '') && !looksAddr(String(name || '').normalize('NFKC'));
+  /* 枝番の目印のピン：名前が「ポイント ①」「ポイント 1」「ポイント11」「①」だけのもの（説明なし）。
+     番地だけの名前（例：305-2）は目印にしない（拒否として入れ、要確認にする） */
+  const isMark = (name, desc) => {
+    if (String(desc || '').trim()) return false;
+    const raw = String(name || '').trim();
+    if (new RegExp('^[' + CIRC + ']$').test(raw)) return true;
+    return /^(ポイント|ﾎﾟｲﾝﾄ|point|スタート|start)\s*\d{1,3}$/i.test(raw.normalize('NFKC'));
   };
   const REF_W = /拒|断わ|断り|断る|お断|NG|ＮＧ|来ないで|訪問(しない|不可|禁止|お断)|もう来/;
   const WARN_W = /犬|猫|控え|注意|午前|午後|夜勤|夜|朝|昼|時|曜|ノック|インターホン|チャイム|ベル|鳴らさ|留守|吠|危|工事|休み|寝|赤ちゃん|乳児|裏|玄関|門/;
@@ -78,7 +79,7 @@
       if (!pt) continue;
       const c = coordsOf(pt)[0];
       if (!c) continue;
-      if (isMark(name, desc, style)) { out.marks++; continue; } // 「ポイント ①」「ポイント 1」など、枝番の目印
+      if (isMark(name, desc)) { out.marks++; continue; } // 「ポイント ①」「ポイント 1」など、枝番の目印
       out.pins.push({ name, desc, style, lat: c[0], lng: c[1], file: fileName || '' });
     }
     return out;
@@ -98,8 +99,10 @@
       const m = nm.match(/[\s゠-ヿ一-鿿]\s*(\d{3,4})(?:号室?)?$/);
       if (m) { rooms.push({ room: m[1], note: '' }); nm = nm.slice(0, m.index + 1).trim(); }
     }
-    const a = looksAddr(nm) ? nm.slice(0, 120) : '';
-    const base = { lat: p.lat, lng: p.lng, a, src: p.name, file: p.file, black };
+    // 番地だけの名前（例：305-2）も、場所の手がかりとして残す（人の名前には数字が入らないので、数字のある名前だけ）
+    const part = !looksAddr(nm) && /\d/.test(nm) && nm.length <= 40;
+    const a = looksAddr(nm) || part ? nm.slice(0, 120) : '';
+    const base = { lat: p.lat, lng: p.lng, a, src: p.name, file: p.file, black, part };
     const items = [];
     if (rooms.length) {
       rooms.forEach(r => {
@@ -284,6 +287,7 @@
       <button type="button" class="kk-kind" data-cyc="${it.i}" aria-label="種類を切りかえる（拒否→注意→入れない）">${icon}<small>${k === 'dnc' ? '拒否' : k === 'warn' ? '注意' : '入れない'}</small></button>
       <div class="tx"><b data-notr>${esc(itemPlace(it))}</b>
         ${k === 'warn' ? `<input type="text" class="kk-note" data-note="${it.i}" maxlength="80" value="${esc(it.note || '')}" placeholder="注意の内容（例：犬がいます）">` : ''}
+        ${it.part ? '<small class="kk-part">住所が番地だけです（取り込んだあと「要確認」で家を確かめてください）</small>' : ''}
         ${it.sens && k === 'warn' ? '<small class="kk-sens">病気・家庭の事情など、個人のことが書かれていないか確かめてください</small>' : ''}
         <small>ピン：<span data-notr>${esc(String(it.src || '').slice(0, 60))}</span>${it.black ? '（黒いピン）' : ''}</small></div></div>`;
   }
@@ -472,6 +476,7 @@
   .kk-kind .pin{width:26px;height:26px;font-size:13px;border-width:2px}
   .kk-kind small{font-size:12px;font-weight:700}
   .kk-note{width:100%;min-height:44px;font-size:16px;border:2px solid #CA8A04;border-radius:10px;padding:0 8px;margin:4px 0;background:#FEF9C3}
+  .kk-part{display:inline-block;background:#FFF4D6;color:#6B4200;border-radius:6px;padding:0 6px;font-weight:700}
   .kk-sens{display:inline-block;background:#FDECEC;color:#8B1A1A;border-radius:6px;padding:0 6px;font-weight:700}
   `;
   document.head.appendChild(css);
