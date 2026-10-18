@@ -33,7 +33,13 @@
   const DASH = '[-－ー―‐−–—]';
   const RE_PARENT = /^\s*([A-Za-zＡ-Ｚａ-ｚ])\s*0*(\d{1,3})\s*$/;
   const RE_KID = new RegExp('^\\s*0*(\\d{1,3})\\s*' + DASH + '\\s*([' + CIRC + ']|\\d{1,2})\\s*$');
-  const RE_MARK = /^\s*(ポイント|ﾎﾟｲﾝﾄ|point|スタート|start)?\s*[①-⑳]?\s*$/i;
+  /* 枝番の目印のピン：「ポイント ①」「ポイント 1」「ポイント11」「①」など（名前が目印の言葉と番号だけ）。
+     赤いピン（DB4436）で、住所の形でない名前のものも目印とみなす */
+  const isMark = (name, desc, style) => {
+    const n = String(name || '').normalize('NFKC').replace(/ポイント|ﾎﾟｲﾝﾄ|point|スタート|start/gi, '').replace(/[\s\-ー・.。]/g, '');
+    if (/^\d{0,3}$/.test(n) && !String(desc || '').trim()) return true;
+    return /-DB4436(?:-|$)/i.test(style || '') && !looksAddr(String(name || '').normalize('NFKC'));
+  };
   const REF_W = /拒|断わ|断り|断る|お断|NG|ＮＧ|来ないで|訪問(しない|不可|禁止|お断)|もう来/;
   const WARN_W = /犬|猫|控え|注意|午前|午後|夜勤|夜|朝|昼|時|曜|ノック|インターホン|チャイム|ベル|鳴らさ|留守|吠|危|工事|休み|寝|赤ちゃん|乳児|裏|玄関|門/;
   const SENS_W = /病|認知|障害|障がい|亡|死|入院|宗教|学会|離婚|生活保護|借金|暴力|警察|ＤＶ|DV|妊|手術|薬|精神|うつ|介護|施設に入/;
@@ -72,7 +78,7 @@
       if (!pt) continue;
       const c = coordsOf(pt)[0];
       if (!c) continue;
-      if (RE_MARK.test(name) && !desc.trim()) { out.marks++; continue; } // 「ポイント ①」など、枝番の目印
+      if (isMark(name, desc, style)) { out.marks++; continue; } // 「ポイント ①」「ポイント 1」など、枝番の目印
       out.pins.push({ name, desc, style, lat: c[0], lng: c[1], file: fileName || '' });
     }
     return out;
@@ -85,7 +91,7 @@
       .replace(new RegExp('[' + CIRC + '](?:\\s*[、,，]\\s*[' + CIRC + '])*', 'g'), ' ');
     d = d.normalize('NFKC');
     const rooms = [];
-    d = d.replace(/(\d{1,2}\s*-\s*\d{3,4}|\d{3,4})(?![\d年月日時:/])(?:号室?)?\s*(?:\(([^)]*)\))?/g, (m0, r, n) => { rooms.push({ room: r.replace(/\s/g, ''), note: (n || '').trim() }); return ' '; });
+    d = d.replace(/(?<![\d.．/])(\d{1,2}\s*-\s*\d{3,4}|\d{3,4})(?![\d年月日時:/.．])(?:号室?)?\s*(?:\(([^)]*)\))?/g, (m0, r, n) => { rooms.push({ room: r.replace(/\s/g, ''), note: (n || '').trim() }); return ' '; });
     const left = d.replace(/[、,，。・/／\s]+/g, ' ').trim();
     let nm = String(p.name || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
     if (!rooms.length && BLD.test(nm)) { // 名前の終わりの部屋番号（例：コーポ白菊302・メゾンオオタ 302）
