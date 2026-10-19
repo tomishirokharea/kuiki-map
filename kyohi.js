@@ -405,19 +405,22 @@
     if (mode === 'draw' && typeof drawTap !== 'undefined' && drawTap === 'line') return;
     if (map.getZoom() < 14) return;
     const b = map.getBounds().pad(0.2), cur = pick && pick.cur;
-    /* 見やすさ（2026.13.26）：
-       ・区域が画面に入るくらいまで近づくまでは、拒否はぜんぶ小さな赤い点（家につながったものも、つながっていないものも）
-       ・区域が画面いっぱいくらいに近づいたら「拒」の印（大きくしすぎない）。アパートの部屋の拒否は、建物の「集」の横の小さな拒で出す */
-    const fade = typeof iconFade === 'function' ? iconFade() : (map.getZoom() >= 17 ? 1 : 0);
-    if (fade < 0.999 && !pick) {
+    /* 見やすさ（2026.13.29）：拒否は区域を回るときに要るものなので、
+       ・区域がたくさん入る遠い表示では出さない（区域の数が DNC_FAR より多いとき）
+       ・1つの区域が画面に入る少し手前（区域 DNC_FAR〜DNC_NEAR 個ぶん）は、小さな赤い点
+       ・1つの区域が画面に収まるくらい（DNC_NEAR 個ぶん以下）からは、小さめの「拒」の印。アパートの部屋の拒否は建物の「集」の横の小さな拒 */
+    const DNC_NEAR = 3, DNC_FAR = 8;
+    const n = pick ? 0 : typeof terrsOnScreen === 'function' ? terrsOnScreen() : (map.getZoom() >= 17 ? 0 : map.getZoom() >= 16 ? 5 : 99);
+    if (n > DNC_FAR) return;
+    if (n > DNC_NEAR) {
       const rd = (typeof dotRenderer !== 'undefined' && dotRenderer) || L.canvas({ padding: 0.3 });
       const seen = new Set();
       const dot = (lat, lng, id) => {
         if (lat == null || !isFinite(lat) || !b.contains([lat, lng]) || seen.has(id)) return;
         seen.add(id);
-        L.circleMarker([lat, lng], { renderer: rd, interactive: false, radius: 4, weight: 1.5, color: '#fff', fillColor: '#B91C1C', fillOpacity: 1, opacity: 1 }).addTo(pinLayer);
+        L.circleMarker([lat, lng], { renderer: rd, interactive: false, radius: 3.5, weight: 1, color: '#fff', fillColor: '#B91C1C', fillOpacity: 0.9, opacity: 0.9 }).addTo(pinLayer);
       };
-      const housesShown = fade > 0.05; // 家の印が出ているときは、家につながった拒否は家の印で分かる
+      const housesShown = typeof iconFade === 'function' && iconFade() > 0.05; // 家の印が出ているときは、家につながった拒否は家の印で分かる
       for (const k in D().dnc) {
         const v = D().dnc[k];
         if (isPinKey(k)) {

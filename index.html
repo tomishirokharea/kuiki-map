@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.28"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.29"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -4715,6 +4715,19 @@ function terrScreenArea(t) {
 /* 画面に何区域分入っているかで、印の濃さを決める（2〜3区域まで近づくと、だんだん現れる） */
 const FADE_FULL = 3, FADE_NONE = 12;          // 区域をえらんでいないとき
 const FADE_FULL_SEL = 6, FADE_NONE_SEL = 24; // えらんだ区域があるとき（少し早めに出す）
+/* 画面に区域が何個ぶん入っているかの目安（拒否の印を出すかどうかにも使う。2026.13.29） */
+function terrsOnScreen() {
+  const size = map.getSize(), b = map.getBounds();
+  const sel = selTerrId(), st = sel && terrById(sel);
+  let ref;
+  if (st) ref = terrScreenArea(st);
+  else {
+    const areas = polyTerrs().filter(t => b.intersects(L.latLngBounds(t.polygon))).map(terrScreenArea).filter(a => a > 0);
+    if (!areas.length) return Infinity;
+    ref = areas.reduce((x, y) => x + y, 0) / areas.length;
+  }
+  return ref ? (size.x * size.y) / ref : Infinity;
+}
 function iconFade() {
   const size = map.getSize(), b = map.getBounds();
   const sel = selTerrId(), st = sel && terrById(sel);
