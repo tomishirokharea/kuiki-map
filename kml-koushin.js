@@ -117,7 +117,9 @@
     // 番地だけの名前（例：305-2）も、場所の手がかりとして残す（人の名前には数字が入らないので、数字のある名前だけ）
     const part = !looksAddr(nm) && /\d/.test(nm) && nm.length <= 40;
     const a = looksAddr(nm) || part ? nm.slice(0, 120) : '';
-    const base = { lat: p.lat, lng: p.lng, a, src: p.name, file: p.file, black, part };
+    // ピンの元の文（名前／説明）をそのまま残す。部屋番号などを、あとで区域係が確かめられるように
+    const orig = [String(p.name || '').trim(), String(p.desc || '').replace(/\s+/g, ' ').trim()].filter(Boolean).join(' ／ ').slice(0, 300);
+    const base = { lat: p.lat, lng: p.lng, a, src: p.name, file: p.file, black, part, o: orig };
     const items = [];
     if (rooms.length) {
       rooms.forEach(r => {
@@ -126,7 +128,7 @@
         else if (black) { kind = 'warn'; note = left; }
         else if (left && kindOf(left) === 'warn') { kind = 'warn'; note = left; }
         else { kind = 'dnc'; note = left; }
-        items.push(Object.assign({}, base, { room: r.room, kind, note: kind === 'warn' ? note.slice(0, 80) : '', m: kind === 'dnc' ? note.slice(0, 80) : '' }));
+        items.push(Object.assign({}, base, { room: r.room, kind, note: kind === 'warn' ? note.slice(0, 80) : '', m: kind === 'dnc' ? note.slice(0, 200) : '' }));
       });
     } else {
       let kind = 'dnc', note = '';
@@ -135,7 +137,7 @@
       else if (!left && !a && kindOf(nm) === 'warn') { kind = 'warn'; note = nm; }
       // 拒否のときも、ピンのメモ（説明欄）は区域係が見られるように残す（m）。注意に切りかえたら、注意の文の下書きにする
       const m = kind === 'dnc' ? (left || (!a && !looksAddr(nm) && REF_W.test(nm) ? nm : '')) : '';
-      items.push(Object.assign({}, base, { room: '', kind, note: note.slice(0, 80), m: m.slice(0, 80) }));
+      items.push(Object.assign({}, base, { room: '', kind, note: note.slice(0, 80), m: m.slice(0, 200) }));
     }
     items.forEach(it => { it.sens = SENS_W.test((it.note || '') + ' ' + (it.m || '')); });
     return items;
@@ -171,6 +173,11 @@
     CHANGELOG.unshift({ v: '2026.13.26', items: [
       ['！', 'マイマップの取り込みで、「夕方は訪問しない」のような時間・曜日つきのピンは、拒否ではなく注意（！）になるようにしました'],
       ['拒', '区域係の画面の拒否の家に、マイマップのメモが出るようになり、「注意（！）に変える」ボタンを付けました']] });
+  }
+  if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.27')) {
+    CHANGELOG.unshift({ v: '2026.13.27', items: [
+      ['拒', '地図の拒否は、遠くから見ると小さな赤い点、区域が画面に入るくらい近づくと小さめの「拒」になりました'],
+      ['拒', '拒否の家に部屋番号が出るようになりました。区域係の画面では、マイマップのピンの元の文も確かめられます']] });
   }
   LIB.pclip = 'vendor/polygon-clipping-0.15.7/polygon-clipping.umd.min.js';
   const r6 = x => Math.round(Number(x) * 1e6) / 1e6;
@@ -320,7 +327,7 @@
         ${it.sameNo ? '<small class="kk-part">名前が区域番号と同じなので、目印とみなして入れません（拒否なら左の印を押してください）</small>' : ''}
         ${it.part && !it.sameNo ? '<small class="kk-part">住所が番地だけです（取り込んだあと「要確認」で家を確かめてください）</small>' : ''}
         ${it.sens && k !== 'skip' ? '<small class="kk-sens">病気・家庭の事情など、個人のことが書かれていないか確かめてください</small>' : ''}
-        <small>ピン：<span data-notr>${esc(String(it.src || '').slice(0, 60))}</span>${it.black ? '（黒いピン）' : ''}</small></div></div>`;
+        <small>ピン：<span data-notr>${esc(it.o || String(it.src || ''))}</span>${it.black ? '（黒いピン）' : ''}</small></div></div>`;
   }
   function preview(st) {
     const { tp, items, fit } = st;
@@ -455,6 +462,7 @@
         const base = { s: 'kml', at };
         if (it.a) base.a = it.a;
         if (it.kind === 'dnc' && it.m) base.m = it.m; // ピンのメモ（区域係だけが見る）
+        if (it.kind === 'dnc' && it.o) base.o = it.o; // ピンの元の文（区域係だけが見る）
         const pos = { lat: it.lat, lng: it.lng, good: true };
         if (it.room) { // アパートの部屋：建物のそばの、場所だけの印に部屋番号を付ける
           const apt = near(it.lat, it.lng, 30).find(([h]) => h.type === 'apt');

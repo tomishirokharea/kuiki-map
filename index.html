@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.26"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.27"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -4399,7 +4399,8 @@ function houseIcon(h, ff, locked) {
   const st = locked ? null : ff ? ff(k) : (s === 'met' || s === 'away') ? (otherDone(h, k, since) ? 'prev' : 'done') : (s === 'plain' && recentMet(k) ? 'prev' : null);
   const hk = kindOf(h);
   const cau = !locked && s !== 'dnc' && window.chuiHas && window.chuiHas(h) ? '<b class="cau" title="注意">！</b>' : ''; // 注意（chui.js）
-  return L.divIcon({ className: '', html: `<div class="pin st-${s}${h.prov ? ' prov' : ''}${hk !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">${PIN_CHAR[s]}${fo}${doneMark(st)}${nb}${cau}${locked ? '' : kindBadge(hk)}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
+  const sm = s === 'dnc' ? ' sm' : '', px = s === 'dnc' ? 26 : 34; // 拒否の家は、大きくしすぎない（2026.13.26）
+  return L.divIcon({ className: '', html: `<div class="pin st-${s}${sm}${h.prov ? ' prov' : ''}${hk !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">${PIN_CHAR[s]}${fo}${doneMark(st)}${nb}${cau}${locked ? '' : kindBadge(hk)}</div>`, iconSize: [px, px], iconAnchor: [px / 2, px / 2] });
 }
 /* ---------- 一緒に回る人（グループ） ----------
    区域の担当者が、今日の終わりまで仲間を加える。データは区域の helpers に入れる：

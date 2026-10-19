@@ -98,6 +98,7 @@
   .dtag.pin{background:#FFF1E8;color:var(--draw)}
   .dtag.nopos{background:#FDECEC;color:#8B1A1A}
   .dnc-none{text-align:center;color:var(--ink2);padding:24px 8px}
+  .pin.st-dnc.sm{width:26px;height:26px;font-size:13px;border-width:2px;box-shadow:0 0 0 1.5px var(--ref),0 1px 2px #0005}
   .pin.dncpin{border-style:dashed;border-color:#fff;box-shadow:0 0 0 2px var(--ref),0 1px 3px #0006}
   .pin.dncpin.appx{opacity:.85}
   .pin.dncpin.cur{box-shadow:0 0 0 4px var(--draw),0 1px 3px #0006}
@@ -184,7 +185,8 @@
     if (h.type === 'apt') return `${h.label || (h.units.length > 1 ? '集合住宅' : '建物')}　${e.unit ? unitTitle(h, e.unit) : ''}`.trim();
     return h.label || '一戸建て';
   }
-  const titleOf = e => e.v.a || placeName(e) || '（住所の記録なし）';
+  const roomLab = r => (/\d$/.test(r) ? r + '号室' : r);
+  const titleOf = e => (e.v.a || placeName(e) || '（住所の記録なし）') + (e.v.room ? '　' + roomLab(String(e.v.room)) : ''); // 部屋番号も出す
   function srcText(e) {
     const s = SRC[e.v.s] || '訪問で記録';
     return e.at ? `${s}・${fmtDay(e.at)}` : s;
@@ -333,7 +335,8 @@
       <div class="dnchead"><i class="pin st-dnc${isPinKey(k) ? ' dncpin' : ''}">拒</i><div><b data-notr>${esc(titleOf(e))}</b>${e.v.a && e.h ? `<small data-notr>${esc(placeName(e))}</small>` : ''}</div></div>
       ${note}
       <p class="dncmeta">登録：${esc(srcText(e))}</p>
-      ${e.v.m ? `<div class="notice dncmemo"><b>マイマップのメモ</b><p data-notr>${esc(e.v.m)}</p>
+      ${e.v.o || e.v.m ? `<div class="notice dncmemo"><b>マイマップのピン（元の文）</b><p data-notr>${esc(e.v.o || e.v.m)}</p>
+        ${e.v.room ? `<small>この印の部屋：<b data-notr>${esc(roomLab(String(e.v.room)))}</b>（元の文と合っているか確かめてください）</small><br>` : ''}
         <small>時間や曜日だけ控える家（例：夕方は訪問しない）なら、下の「注意（！）に変える」を押してください。</small></div>` : ''}
       <label class="field"><span>住所（メモ）</span><input type="text" id="ddA" maxlength="120" value="${esc(e.v.a || '')}" placeholder="例：豊見城市字高安123"></label>
       <button type="button" class="btn block" id="ddSaveA" hidden>住所を保存する</button>
@@ -400,12 +403,40 @@
     if (!pinLayer) pinLayer = L.layerGroup().addTo(map);
     pinLayer.clearLayers();
     if (mode === 'draw' && typeof drawTap !== 'undefined' && drawTap === 'line') return;
-    if (map.getZoom() < 15) return;
+    if (map.getZoom() < 14) return;
     const b = map.getBounds().pad(0.2), cur = pick && pick.cur;
+    /* 見やすさ（2026.13.26）：
+       ・区域が画面に入るくらいまで近づくまでは、拒否はぜんぶ小さな赤い点（家につながったものも、つながっていないものも）
+       ・区域が画面いっぱいくらいに近づいたら「拒」の印（大きくしすぎない）。アパートの部屋の拒否は、建物の「集」の横の小さな拒で出す */
+    const fade = typeof iconFade === 'function' ? iconFade() : (map.getZoom() >= 17 ? 1 : 0);
+    if (fade < 0.999 && !pick) {
+      const rd = (typeof dotRenderer !== 'undefined' && dotRenderer) || L.canvas({ padding: 0.3 });
+      const seen = new Set();
+      const dot = (lat, lng, id) => {
+        if (lat == null || !isFinite(lat) || !b.contains([lat, lng]) || seen.has(id)) return;
+        seen.add(id);
+        L.circleMarker([lat, lng], { renderer: rd, interactive: false, radius: 4, weight: 1.5, color: '#fff', fillColor: '#B91C1C', fillOpacity: 1, opacity: 1 }).addTo(pinLayer);
+      };
+      const housesShown = fade > 0.05; // 家の印が出ているときは、家につながった拒否は家の印で分かる
+      for (const k in D().dnc) {
+        const v = D().dnc[k];
+        if (isPinKey(k)) {
+          if (!v || typeof v !== 'object') continue;
+          const h = v.h ? houseById(v.h) : null;
+          if (h) { if (!housesShown) dot(h.lat, h.lng, h.id); continue; }
+          dot(v.lat, v.lng, k);
+        } else if (!housesShown) {
+          const h = houseById(parseKey(k)[0]);
+          if (h) dot(h.lat, h.lng, h.id);
+        }
+      }
+      return;
+    }
     dncPins().forEach(([k, v]) => {
       if (!b.contains([v.lat, v.lng])) return;
+      if (v.room && v.h && cur !== k && houseById(v.h)) return; // 建物の印（集）に小さな拒が出ている
       const m = L.marker([v.lat, v.lng], {
-        icon: L.divIcon({ className: '', html: `<div class="pin st-dnc dncpin${v.appx ? ' appx' : ''}${cur === k ? ' cur' : ''}">拒</div>`, iconSize: [34, 34], iconAnchor: [17, 17] }),
+        icon: L.divIcon({ className: '', html: `<div class="pin st-dnc dncpin sm${v.appx ? ' appx' : ''}${cur === k ? ' cur' : ''}">拒</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
         title: '拒否', zIndexOffset: 500, keyboard: false
       });
       m.on('click', () => pinTap(k));
@@ -423,6 +454,7 @@
     setSheet(headHtml(t, '拒否の家', '') + `
       <div class="notice refnote"><b>このあたりに、訪問を断られた家があります。</b><br>訪問しないでください。</div>
       ${v.a ? `<p>住所：<b data-notr>${esc(v.a)}</b></p>` : ''}
+      ${v.room ? `<p>部屋：<b data-notr>${esc(roomLab(String(v.room)))}</b></p>` : ''}
       <p class="hint">${v.appx ? '住所から調べた、だいたいの場所に印を出しています。' : '地図の家の印とまだつながっていないため、この印で知らせています。'}</p>
       <button type="button" class="btn primary block" data-close>わかりました</button>`);
   }
