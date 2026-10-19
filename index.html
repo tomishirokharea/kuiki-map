@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.31"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.32"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -4171,8 +4171,12 @@ function bindRotate() {
   const el = map.getContainer(), pts = new Map();
   let g = null;
   const ang = () => { const [a, b] = [...pts.values()]; return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI; };
+  // 指をはなした合図（pointerup）は、さわった家の印などが描き直されて画面から外れると届かないことがある。
+  // そのままだと「はなした指」が残り、次に1本の指でさわると2本目と数えて回ってしまう。
+  // → 1本目の指（isPrimary：ほかに画面にふれている指がない）でさわったら、残っていた指を全部わすれる
   el.addEventListener('pointerdown', e => {
     if (e.pointerType === 'mouse') return;
+    if (e.isPrimary) { pts.clear(); g = null; }
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     g = pts.size === 2 && rotAllowed() ? { a0: ang(), d0: mapDeg, on: false, base: 0 } : null;
   }, true);
@@ -4205,6 +4209,10 @@ function bindRotate() {
   };
   document.addEventListener('pointerup', up, true);
   document.addEventListener('pointercancel', up, true);
+  // アプリを切りかえた・画面が消えたときも、指の記録を消す
+  const reset = () => { pts.clear(); g = null; };
+  window.addEventListener('blur', reset);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) reset(); });
   // 回した直後に指をはなしたときの「タップ」で、家の記録の画面が出ないように
   el.addEventListener('click', e => { if (Date.now() - rotEndAt < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
   map.on('resize', () => { if (mapDeg) setMapDeg(mapDeg); });
