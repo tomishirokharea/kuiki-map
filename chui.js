@@ -173,7 +173,7 @@
     if (!layer) layer = L.layerGroup().addTo(map);
     layer.clearLayers();
     if (map.getZoom() < 16) return;
-    if (typeof mode !== 'undefined' && mode === 'draw') return;
+    if (typeof mode !== 'undefined' && (mode === 'draw' || mode === 'sen')) return;
     const b = map.getBounds().pad(0.2), m = C();
     for (const k in m) {
       const v = m[k];

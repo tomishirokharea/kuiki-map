@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.32"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.33"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="config.js"></script><!-- GASのURLと、会衆ごとの設定はこのファイルに書きます（無ければ試作モード） -->
-<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><!-- スペイン語の辞書 / Diccionario español -->
+<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><!-- スペイン語の辞書 / Diccionario español -->
 <script src="i18n.js"></script><!-- 言語の切りかえ / Cambio de idioma -->
 <script>
 /* iPhoneのホーム画面アプリで、下のタブの下に空白が出ることがある（iOSが画面の高さを、上の時刻の帯の分だけ短く伝えるため）。
@@ -1552,6 +1552,7 @@ body.renshu #btnUpd{display:none!important}
             <label class="btn small">古いカード（写真・PDF）を重ねる<input type="file" accept="image/*,application/pdf,.pdf" id="ovFile" hidden></label>
             <label class="check"><input type="checkbox" id="drawHouses">家の印を表示</label>
             <label class="check"><input type="checkbox" id="drawSnap" checked>隣の区域の点・線にくっつける</label>
+            <label class="check"><input type="checkbox" id="drawNbMove" checked>隣の区域と共有している点は、隣も一緒に動かす</label>
             <button class="btn small" id="drawRestart" hidden>最初から引き直す</button>
           </div>
           <div id="ovCtl" hidden>
@@ -4258,6 +4259,7 @@ function initMap() {
     if (mode === 'draw') { if (drawTap === 'line') drawClick(e.latlng); else addAt(e.latlng, true); }
     else if (mode === 'add') addAt(e.latlng, false);
     else if (mode === 'part') partTap(e.latlng);
+    else if (mode === 'sen' && window.kyoukai) window.kyoukai.click(e.latlng);
   });
   map.on('moveend', renderHouses);
   bindLongPress(); // 長押し（パソコンは右クリック）した場所への道順を、Googleマップで開けるようにする
@@ -4806,7 +4808,7 @@ function renderHouses() {
   const fkeys = followMap ? new Set(myFollowKeys()) : null;
   const ff = fkeys ? (k => (fkeys.has(k) ? 'hl' : 'dim')) : focusFn();
   renderCardBar();
-  if (mode === 'draw' && drawTap === 'line' && !drawShowHouses) { setZoomHint(false); return; } // 線引き中は写真が見えるように家の印を隠す
+  if ((mode === 'draw' && drawTap === 'line' && !drawShowHouses) || mode === 'sen') { setZoomHint(false); return; } // 線引き中は写真が見えるように家の印を隠す
   const fade = fkeys ? 1 : iconFade();
   const b = map.getBounds().pad(0.2), vis = rotVisTest(0.2); // vis：地図を回しているときの、画面に入っているかの確かめ
   const sel = mode === 'normal' ? selTerrId() : null; // 区域をえらんでいるときは、その区域の家だけ
@@ -5032,6 +5034,7 @@ async function onHouseTap(id) {
     if (partDraw && partDraw.tool !== 'pen') partTap(L.latLng(h.lat, h.lng));
     return;
   }
+  if (mode === 'sen') { if (window.kyoukai) window.kyoukai.click(L.latLng(h.lat, h.lng)); return; }
   if (mode === 'draw' && drawTap === 'line') { drawClick(L.latLng(h.lat, h.lng)); return; }
   if (mode === 'draw') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
   if (mode === 'add') {
@@ -5081,6 +5084,7 @@ function setMode(m) {
   if (m === 'add') setAddFold(false); else clearTimeout(addFoldTimer);
   $('#partBar').hidden = m !== 'part';
   $('#drawBar').hidden = m !== 'draw';
+  if (window.kyoukai) window.kyoukai.onMode(m); // 区域の線を直す（kyoukai.js）
   $('#mapTools').hidden = m !== 'normal';
   $('#map').classList.toggle('crosshair', m !== 'normal');
   $('#map').classList.toggle('drawing', m === 'draw');
@@ -5089,7 +5093,7 @@ function setMode(m) {
   if (m === 'normal' && LIVE && Store.inbox.length) setTimeout(applyInbox, 0);
   document.body.classList.toggle('focusmode', m !== 'normal'); // 作業中は上下の帯を隠して地図を広く
   toggleLegend(false);
-  $('#legendBtn').hidden = m === 'draw';
+  $('#legendBtn').hidden = m === 'draw' || m === 'sen';
   $('#btnLocate').hidden = m !== 'normal';
   if (map) {
     if (m === 'normal') zoomCtl.remove(); else zoomCtl.addTo(map); // ふだんは指で拡大・縮小。作業中だけ＋−を出す
@@ -7305,8 +7309,8 @@ function openAddForm(ll, tid, editId) {
    ・隣の区域の点・線の近くをタップすると、そこにくっつく
    ・隣の区域の点から点へつなぐと、その間の点もたどって入れる */
 const SNAP_PX = 22, EDGE_PX = 16;
-let drawSnapOn = true;
-function startDraw(targetId) {
+let drawSnapOn = true, drawNbMove = true; // drawNbMove：隣の区域と共有している点を動かしたら、隣の同じ点も一緒に動かす
+function startDraw(targetId, opt) {
   showView('map');
   focusCard = null; roundTerr = null;
   drawShowHouses = false; $('#drawHouses').checked = false;
@@ -7318,15 +7322,19 @@ function startDraw(targetId) {
     points: tp ? tp.map(p => [p[0], p[1]]) : [],
     snaps: tp ? tp.map(v => sharedSnap(v, t.id)) : [],
     origs: tp ? tp.map(v => v.slice()) : [], // 直す前の位置（隣の区域の同じ点も動かすため）
-    edit: !!tp, targetId, sel: -1, hist: [],
+    edit: !!tp, targetId, sel: -1, hist: [], fromSen: !!(opt && opt.fromSen), // fromSen：「区域の線を直す」（kyoukai.js）から来た。終わったらそこへもどる
     line: L.polyline([], { color: '#C2410C', weight: 4, dashArray: '8 6', interactive: false }).addTo(map),
     hints: L.layerGroup().addTo(map),
     handles: L.layerGroup().addTo(map)
   };
   setMode('draw');
   setDrawTap('line');
-  $('#drawTitle').textContent = t ? `区域${t.no}の線を直す` : '新しい区域の線を引く';
+  $('#drawTitle').textContent = t ? `区域${t.no}の形を直す` : '新しい区域の線を引く';
   $('#drawSnap').checked = drawSnapOn;
+  $('#drawNbMove').checked = drawNbMove;
+  // 今ある区域の形を直すときは、家の追加のボタンを出さず、上の案内も小さくして地図を広くする（「ひらく」で案内が出る）
+  $('#drawBar .seg').hidden = !!t;
+  if (t) setDrawFold(true);
   if (t) setTimeout(() => fitTerr(targetId), 60);
   drawHints();
   redrawDraw();
@@ -7452,42 +7460,80 @@ function redrawDraw() {
   const p = draw.points, n = p.length;
   draw.line.setLatLngs(n > 2 ? [...p, p[0]] : p);
   draw.handles.clearLayers();
+  const setLine = () => draw.line.setLatLngs(draw.points.length > 2 ? [...draw.points, draw.points[0]] : draw.points);
   p.forEach((pt, i) => {
-    const m = L.marker(pt, { icon: vertexIcon(i, i === draw.sel, !!draw.snaps[i]), draggable: true, zIndexOffset: 2000, keyboard: false });
-    m.on('click', () => { draw.sel = draw.sel === i ? -1 : i; redrawDraw(); });
-    m.on('dragstart', () => { pushHist(); draw.sel = -1; });
-    m.on('drag', e => { draw.points[i] = [e.latlng.lat, e.latlng.lng]; draw.line.setLatLngs(draw.points.length > 2 ? [...draw.points, draw.points[0]] : draw.points); });
-    m.on('dragend', () => {
-      const s = snapPoint(m.getLatLng());
-      draw.snaps[i] = s;
-      if (s) draw.points[i] = s.ll;
-      redrawDraw();
-    });
+    const m = L.marker(pt, { icon: vertexIcon(i, i === draw.sel, !!draw.snaps[i]), zIndexOffset: 2000, keyboard: false });
     m.addTo(draw.handles);
+    liftDrag(m, {
+      tap: () => { draw.sel = draw.sel === i ? -1 : i; redrawDraw(); },
+      start: () => { pushHist(); draw.sel = -1; },
+      move: ll => { draw.points[i] = [ll.lat, ll.lng]; setLine(); },
+      end: ll => {
+        const s = snapPoint(ll);
+        draw.snaps[i] = s;
+        if (s) draw.points[i] = s.ll;
+        redrawDraw();
+      }
+    });
   });
   // 線の途中の○：タップかドラッグで点を増やす
   const segs = n >= 3 ? n : n - 1;
   for (let i = 0; i < segs; i++) {
     const a = p[i], b = p[(i + 1) % n];
     const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-    const m = L.marker(mid, { icon: midIcon, draggable: true, zIndexOffset: 1500, keyboard: false });
+    const m = L.marker(mid, { icon: midIcon, zIndexOffset: 1500, keyboard: false });
+    m.addTo(draw.handles);
     let inserted = false;
     const insert = () => { if (inserted) return; inserted = true; pushHist(); draw.points.splice(i + 1, 0, mid.slice()); draw.snaps.splice(i + 1, 0, null); draw.origs.splice(i + 1, 0, null); draw.sel = -1; };
-    m.on('click', () => { insert(); redrawDraw(); });
-    m.on('dragstart', insert);
-    m.on('drag', e => { draw.points[i + 1] = [e.latlng.lat, e.latlng.lng]; draw.line.setLatLngs([...draw.points, draw.points[0]]); });
-    m.on('dragend', () => {
-      const s = snapPoint(m.getLatLng());
-      draw.snaps[i + 1] = s;
-      if (s) draw.points[i + 1] = s.ll;
-      redrawDraw();
+    liftDrag(m, {
+      tap: () => { insert(); redrawDraw(); },
+      start: insert,
+      move: ll => { draw.points[i + 1] = [ll.lat, ll.lng]; setLine(); },
+      end: ll => {
+        const s = snapPoint(ll);
+        draw.snaps[i + 1] = s;
+        if (s) draw.points[i + 1] = s.ll;
+        redrawDraw();
+      }
     });
-    m.addTo(draw.handles);
   }
   $('#drawCount').textContent = n;
   $('#drawDelPt').hidden = draw.sel < 0;
   $('#drawRestart').hidden = !n;
   $('#drawHelp').textContent = drawTap === 'line' ? (draw.edit ? DRAW_HELP.edit : DRAW_HELP.line) : DRAW_HELP[drawTap];
+}
+/* 線の点を指で動かす：動かしている点は、指の少し上に出す（指にかくれず、どこに置くかが見える）
+   h：{ tap()：動かさずにはなした, start()：動かし始め, move(latlng), end(latlng) } */
+const LIFT_PX = 64;
+function liftDrag(m, h) {
+  const el = m.getElement(); if (!el) return;
+  el.style.touchAction = 'none';
+  el.addEventListener('pointerdown', e => {
+    if ((e.button && e.button > 0) || !e.isPrimary) return;
+    e.stopPropagation(); e.preventDefault();
+    const x0 = e.clientX, y0 = e.clientY, mouse = e.pointerType === 'mouse';
+    let on = false, lift = 0;
+    const was = map.dragging.enabled(); map.dragging.disable();
+    try { el.setPointerCapture(e.pointerId); } catch (er) { /* 何もしない */ }
+    const pos = ev => map.containerPointToLatLng(map.mouseEventToContainerPoint({ clientX: ev.clientX, clientY: ev.clientY - lift }));
+    const mv = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      const d = Math.hypot(ev.clientX - x0, ev.clientY - y0);
+      if (!on) { if (d < 6) return; on = true; el.classList.add('lifting'); h.start(); }
+      ev.preventDefault();
+      lift = mouse ? 0 : Math.min(LIFT_PX, (d - 6) * 2); // 動かし始めると、点がすっと指の上に出る
+      const ll = pos(ev); m.setLatLng(ll); h.move(ll);
+    };
+    const up = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+      el.classList.remove('lifting');
+      if (was) map.dragging.enable();
+      if (on) h.end(m.getLatLng()); else if (ev.type === 'pointerup') h.tap();
+    };
+    el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  });
+  L.DomEvent.disableClickPropagation(el); // 点をさわったときに、地図のタップ（点を足す）にならないように
 }
 function deleteSelectedPoint() {
   if (!draw || draw.sel < 0) return;
@@ -7506,8 +7552,10 @@ async function restartDraw() {
   toast('線を消しました。角を順番にタップしてください', null, { label: '戻す', fn: () => { drawUndo(); draw.edit = !!draw.targetId && draw.points.length >= 3; redrawDraw(); } });
 }
 function endDraw() {
+  const back = draw && draw.fromSen ? draw.targetId : null;
   if (draw) { map.removeLayer(draw.line); map.removeLayer(draw.hints); map.removeLayer(draw.handles); }
   draw = null; setMode('normal');
+  if (back && window.kyoukai) setTimeout(() => window.kyoukai.back(back), 0); // 「区域の線を直す」にもどる（保存のあとで）
 }
 async function finishDraw() {
   if (!draw) return;
@@ -7529,13 +7577,11 @@ async function finishDraw() {
         });
       });
     });
-    let alsoMove = false;
-    if (affected.size) {
-      const names = [...affected.keys()].map(id => `区域${terrById(id).no}`).join('・');
-      alsoMove = await ask('', { title: '隣の区域の点も一緒に動かしますか？', body: `隣の区域（${names}）と共有している点を動かしました。\n一緒に動かすと、区域のあいだにすき間ができません。`, ok: '隣の区域も一緒に直す', cancel: 'この区域だけ直す', danger: false });
-    }
+    // 隣の区域と共有している点は、隣の同じ点も一緒に動かす（すき間ができないように。「ひらく」のチェックで、この区域だけにもできる）
+    const alsoMove = affected.size > 0 && drawNbMove;
+    const names = [...affected.keys()].map(id => `区域${terrById(id).no}`).join('・');
     endDraw();
-    commit(`区域${t.no}の線を直しました${alsoMove ? '（隣の区域も一緒に）' : ''}`, () => {
+    commit(`区域${t.no}の線を直しました${alsoMove ? `（隣の${names}も一緒に）` : ''}`, () => {
       t.polygon = pts;
       if (alsoMove) affected.forEach((list, id) => { const tt = terrById(id); list.forEach(([vi, p]) => { tt.polygon[vi] = p; }); });
       reassign();
@@ -7580,7 +7626,7 @@ let ovState = null; // { url, pinned, rot, center, refZoom, w, h, el, pdf }
 let drawShowHouses = false, drawTap = 'line';
 const DRAW_HELP = {
   line: '区域の角を順番にタップします。隣の区域の点（緑の○）の近くをタップすると、その点にくっつきます。点はドラッグで動かせ、タップで選ぶと消せます。',
-  edit: '点をドラッグして動かします。点をタップして選ぶと「選んだ点を消す」で消せます。線の途中の＋や、線の近くをタップすると点が増えます。',
+  edit: '点をドラッグして動かします（動かしている点は、指の少し上に出ます）。点をタップして選ぶと「選んだ点を消す」で消せます。線の途中の＋や、線の近くをタップすると点が増えます。隣の区域と共有している点は、隣も一緒に動きます。',
   house: '家の場所（屋根の真ん中）をタップすると、一戸建てが追加されます。まちがえたときは、お知らせの「取り消す」を押します。',
   apt: 'アパートの場所をタップすると、部屋の数を入れる画面が開きます。'
 };
@@ -14472,6 +14518,7 @@ function bindStatic() {
   $('#drawDelPt').onclick = deleteSelectedPoint;
   $('#drawRestart').onclick = restartDraw;
   $('#drawSnap').onchange = e => { drawSnapOn = e.target.checked; if (draw) drawHints(); };
+  $('#drawNbMove').onchange = e => { drawNbMove = e.target.checked; };
   $('#drawDone').onclick = finishDraw;
   $('#drawCancel').onclick = () => { closeSheet(); endDraw(); };
   $('#ovFile').onchange = e => {
@@ -14520,7 +14567,7 @@ function bindStatic() {
     let x;
     if ((x = q('[data-recok]'))) { const st = D().settings; st.recoKinds = (Number(st.recoKinds) || 0) ^ Number(x.dataset.recok); Store.save(); renderAll(); }
     else if ((x = q('[data-open]'))) openTerr(x.dataset.open);
-    else if ((x = q('[data-redraw]'))) startDraw(x.dataset.redraw);
+    else if ((x = q('[data-redraw]'))) { if (window.kyoukai) window.kyoukai.open(x.dataset.redraw); else startDraw(x.dataset.redraw); }
     else if ((x = q('[data-rename]'))) { const t = terrById(x.dataset.rename); if (t) openTerrForm({ terr: t }); else toast('この区域は、もうありません'); }
     else if ((x = q('[data-delterr]'))) openDeleteTerr(x.dataset.delterr);
     else if ((x = q('[data-dummy]'))) { const a = x.dataset.dummy; if (a === 'add') addDummy(); else if (a === 'del') delDummy(); else openDummyGuide(); }
@@ -14787,6 +14834,7 @@ init();
 <script src="kyohi.js"></script><!-- 係の画面の「拒否」：一覧・エクセル／マイマップの取り込み・地図でえらぶ -->
 <script src="chui.js"></script><script src="kml-koushin.js"></script><!-- 注意（！）の印：地図の！・記録の画面の注意・家の編集の「この家の印」・係の一覧 -->
 <script src="help.js"></script><!-- 区域係の設定の「？」の説明（文はこのファイルだけで直せます） -->
-<script src="douga.js"></script><!-- 使い方の動画（動画の一覧と文はこのファイルだけで直せます） -->
+<script src="douga.js"></script>
+<script src="kyoukai.js"></script><!-- 区域の線を直す（区域係だけ）：区域をえらんで、形を直す・となりに合わせる・分ける・1つにする・すき間と重なり --><!-- 使い方の動画（動画の一覧と文はこのファイルだけで直せます） -->
 </body>
 </html>

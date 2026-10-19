@@ -2152,7 +2152,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       closeSheet();
       commit(`区域${t.no}を正式に返却されたことにしました`, () => poolFinish(t, new Date().toISOString(), p.pct));
     });
-    on('[data-kredraw]', 'onclick', () => { closeSheet(); startDraw(t.id); });
+    on('[data-kredraw]', 'onclick', () => { closeSheet(); if (window.kyoukai) window.kyoukai.open(t.id); else startDraw(t.id); });
     on('[data-krename]', 'onclick', () => openTerrForm({ terr: t }));
     on('[data-kaza]', 'onclick', () => openAzaEdit(t.id));
     on('[data-kspec]', 'onclick', () => openSpecialSheet(t.id));

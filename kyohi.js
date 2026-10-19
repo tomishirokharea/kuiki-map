@@ -402,7 +402,7 @@
     if (typeof map === 'undefined' || !map) return;
     if (!pinLayer) pinLayer = L.layerGroup().addTo(map);
     pinLayer.clearLayers();
-    if (mode === 'draw' && typeof drawTap !== 'undefined' && drawTap === 'line') return;
+    if ((mode === 'draw' && typeof drawTap !== 'undefined' && drawTap === 'line') || mode === 'sen') return;
     if (map.getZoom() < 14) return;
     const b = map.getBounds().pad(0.2), cur = pick && pick.cur;
     /* 見やすさ（2026.13.29）：拒否は区域を回るときに要るものなので、
