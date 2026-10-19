@@ -174,6 +174,10 @@
       ['！', 'マイマップの取り込みで、「夕方は訪問しない」のような時間・曜日つきのピンは、拒否ではなく注意（！）になるようにしました'],
       ['拒', '区域係の画面の拒否の家に、マイマップのメモが出るようになり、「注意（！）に変える」ボタンを付けました']] });
   }
+  if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.28')) {
+    CHANGELOG.unshift({ v: '2026.13.28', items: [
+      ['！', '注意（！）の印を、見やすい朱色にしました。集合住宅では、部屋の数と重ならないよう建物の左に出します']] });
+  }
   if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.27')) {
     CHANGELOG.unshift({ v: '2026.13.27', items: [
       ['拒', '地図の拒否は、遠くから見ると小さな赤い点、区域が画面に入るくらい近づくと小さめの「拒」になりました'],
@@ -516,7 +520,7 @@
   .kk-kind{flex:none;width:64px;min-height:56px;border-radius:10px;border:2px solid var(--line);background:#fff;font:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
   .kk-kind .pin{width:26px;height:26px;font-size:13px;border-width:2px}
   .kk-kind small{font-size:12px;font-weight:700}
-  .kk-note{width:100%;min-height:44px;font-size:16px;border:2px solid #CA8A04;border-radius:10px;padding:0 8px;margin:4px 0;background:#FEF9C3}
+  .kk-note{width:100%;min-height:44px;font-size:16px;border:2px solid #E8590C;border-radius:10px;padding:0 8px;margin:4px 0;background:#FFF1E6}
   .kk-part{display:inline-block;background:#FFF4D6;color:#6B4200;border-radius:6px;padding:0 6px;font-weight:700}
   .kk-memo{display:inline-block;background:#F1F3F5;color:var(--ink);border-radius:6px;padding:0 6px}
   .kk-sens{display:inline-block;background:#FDECEC;color:#8B1A1A;border-radius:6px;padding:0 6px;font-weight:700}

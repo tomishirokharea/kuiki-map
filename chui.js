@@ -30,11 +30,14 @@
 
   const css = document.createElement('style');
   css.textContent = `
-  .pin b.cau{position:absolute;right:-9px;top:-9px;width:20px;height:20px;border-radius:99px;background:#FACC15;color:#1F2937;font-size:13px;font-weight:900;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 1px 3px #0006;line-height:1}
-  .pin.st-cau{background:#FACC15;color:#1F2937;font-weight:900;box-shadow:0 0 0 2px #fff,0 0 0 5px #CA8A04}
+  /* 注意（！）の色（2026.13.28）：黄色は地図の上で見えにくいので、拒否の濃い赤とは別の「朱色」にする */
+  .pin b.cau{position:absolute;right:-9px;top:-9px;width:20px;height:20px;border-radius:99px;background:#E8590C;color:#fff;font-size:13px;font-weight:900;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 1px 3px #0006;line-height:1}
+  /* 集合住宅：右上は残りの部屋の数・右は拒の印なので、！は左に出す */
+  .pin.apt b.cau{right:auto;left:-14px;top:50%;transform:translateY(-50%);width:19px;height:19px;font-size:12px}
+  .pin.st-cau{background:#E8590C;color:#fff;font-weight:900;box-shadow:0 0 0 2px #fff,0 0 0 4px #E8590C}
   .pin.st-cau.chpin{border-style:dashed;border-color:#fff}
-  .notice.chui{background:#FEF9C3;border:2px solid #CA8A04;color:#3F2D00}
-  .notice.chui .ci{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:99px;background:#FACC15;color:#1F2937;font-weight:900;margin-right:6px;vertical-align:-5px;border:2px solid #CA8A04}
+  .notice.chui{background:#FFF1E6;border:2px solid #E8590C;color:#5A1E00}
+  .notice.chui .ci{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:99px;background:#E8590C;color:#fff;font-weight:900;margin-right:6px;vertical-align:-5px;border:2px solid #fff;box-shadow:0 0 0 1px #E8590C}
   .notice.chui ul{margin:4px 0 0;padding-left:20px}
   .notice.chui li{margin:2px 0;font-size:17px;word-break:break-all}
   .mk-box{border:1px solid var(--line);border-radius:12px;background:#fff;padding:4px 12px 10px;margin:10px 0}
