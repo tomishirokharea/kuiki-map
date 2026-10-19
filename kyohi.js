@@ -106,6 +106,9 @@
   .dnchead b{font-size:19px;word-break:break-all;display:block}
   .dnchead small{color:var(--ink2)}
   .dncmeta{margin:6px 0 10px;color:var(--ink2);font-size:15px}
+  .dncmemo{background:#F1F3F5;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 12px}
+  .dncmemo p{margin:4px 0;font-size:18px;font-weight:700}
+  .dncmemo small{color:var(--ink2);font-size:14px}
   .dncbar p{margin:0;line-height:1.45}
   .dncbar .addr{font-size:17px;word-break:break-all}
   .dncbar .row .btn{flex:1 1 auto}
@@ -330,11 +333,14 @@
       <div class="dnchead"><i class="pin st-dnc${isPinKey(k) ? ' dncpin' : ''}">拒</i><div><b data-notr>${esc(titleOf(e))}</b>${e.v.a && e.h ? `<small data-notr>${esc(placeName(e))}</small>` : ''}</div></div>
       ${note}
       <p class="dncmeta">登録：${esc(srcText(e))}</p>
+      ${e.v.m ? `<div class="notice dncmemo"><b>マイマップのメモ</b><p data-notr>${esc(e.v.m)}</p>
+        <small>時間や曜日だけ控える家（例：夕方は訪問しない）なら、下の「注意（！）に変える」を押してください。</small></div>` : ''}
       <label class="field"><span>住所（メモ）</span><input type="text" id="ddA" maxlength="120" value="${esc(e.v.a || '')}" placeholder="例：豊見城市字高安123"></label>
       <button type="button" class="btn block" id="ddSaveA" hidden>住所を保存する</button>
       ${e.lat != null ? '<button type="button" class="btn block" id="ddMap">地図で見る</button>' : ''}
       ${e.state === 'room' ? '<p class="hint">アパートの部屋ごとの拒否です（部屋は階ごとに登録しているため、建物のそばに印を出しています）。建物の画面にも「拒否の部屋」として出ます。</p>' : ''}
       ${e.state === 'ok' ? '<button type="button" class="btn block" id="ddPick">ちがう家につなぎ直す</button>' : ''}
+      <button type="button" class="btn block" id="ddCau"><i class="pin st-cau" style="width:24px;height:24px;font-size:13px;display:inline-grid;vertical-align:-6px;margin-right:6px">！</i>注意（！）に変える</button>
       <button type="button" class="btn block danger" id="ddDel">拒否を外す</button>
       <button type="button" class="btn block" data-close>閉じる</button>`);
     const ai = $('#ddA'), sv = $('#ddSaveA');
@@ -353,6 +359,25 @@
     on('ddOk', () => { confirmAuto(k); closeSheet(); });
     on('ddPick', () => startReview([k], 0));
     on('ddMap', () => { closeSheet(); showOnMap(e); });
+    on('ddCau', async () => {
+      if (!await ask('注意（！）に変えますか？', { title: '注意（！）に変えますか？', body: '「拒」が「！」になり、訪ねてよい家になります。注意の文は、その家を訪ねる人みんなが見ます。次の画面で文を確かめてください。', ok: '注意に変える' })) return;
+      closeSheet();
+      let nk = k;
+      commit('注意（！）に変えました', () => {
+        const v = D().dnc[k]; if (v === undefined) return;
+        const o = typeof v === 'object' && v ? v : {};
+        const cm = D().caution || (D().caution = {});
+        delete D().dnc[k];
+        const c = { s: o.s === 'kml' ? 'kml' : 'adm', at: new Date().toISOString() };
+        if (o.m) c.n = String(o.m).slice(0, 80);
+        if (isPinKey(k)) { // 場所だけの拒否は、場所だけの注意にする
+          ['lat', 'lng', 't', 'room', 'h'].forEach(f => { if (o[f] != null && o[f] !== '') c[f] = o[f]; });
+          c.p = 1; nk = 'pin:' + uid();
+        }
+        cm[nk] = c;
+      });
+      if (window.openChuiDetail) window.openChuiDetail(nk); else renderDncAdmin();
+    });
     on('ddDel', async () => {
       if (!await ask('この家の拒否を外しますか？', { title: 'この家の拒否を外しますか？', body: '地図の拒否の印も消えます。訪問の記録は残ります。まちがえたときは、お知らせの「取り消す」でもどせます。', ok: '外す' })) return;
       closeSheet();

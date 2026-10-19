@@ -42,7 +42,17 @@
     return /^(ポイント|ﾎﾟｲﾝﾄ|point|スタート|start)\s*\d{1,3}$/i.test(raw.normalize('NFKC'));
   };
   const REF_W = /拒|断わ|断り|断る|お断|NG|ＮＧ|来ないで|訪問(しない|不可|禁止|お断)|もう来/;
-  const WARN_W = /犬|猫|控え|注意|午前|午後|夜勤|夜|朝|昼|時|曜|ノック|インターホン|チャイム|ベル|鳴らさ|留守|吠|危|工事|休み|寝|赤ちゃん|乳児|裏|玄関|門/;
+  const WARN_W = /犬|猫|控え|注意|午前|午後|夕|夜勤|夜|朝|昼|時|曜|ノック|インターホン|チャイム|ベル|鳴らさ|留守|吠|危|工事|休み|寝|赤ちゃん|乳児|裏|玄関|門/;
+  /* 時間・曜日の条件つきの「訪問しない」（例：夕方は訪問しない・午前中は来ないで・日曜は控える）は拒否ではなく注意（2026.13.26）。
+     「一切」「二度と」などがあれば、時間の言葉があっても拒否のまま */
+  const COND_W = /夕|午前|午後|夜|朝|昼|日中|平日|休日|週末|土日|[月火水木金土日]曜|祝|\d+\s*時|時間帯|食事/;
+  const ABS_W = /一切|二度と|絶対|すべて|全て|いつも|完全|永久/;
+  /* 文から種類を決める：'dnc'（拒否）・'warn'（注意）・''（決め手なし） */
+  const kindOf = t => {
+    t = String(t || '');
+    if (REF_W.test(t)) return COND_W.test(t) && !ABS_W.test(t) ? 'warn' : 'dnc';
+    return WARN_W.test(t) ? 'warn' : '';
+  };
   const SENS_W = /病|認知|障害|障がい|亡|死|入院|宗教|学会|離婚|生活保護|借金|暴力|警察|ＤＶ|DV|妊|手術|薬|精神|うつ|介護|施設に入/;
   const BLD = /[ァ-ヶー]{2,}|荘|ハイツ|団地|棟|マンション|アパート|コーポ|レジデンス|ハウス|ビル/;
   const looksAddr = c => !!c && /\d/.test(c) && /[一-鿿]/.test(c) && c.length <= 120;
@@ -112,19 +122,22 @@
     if (rooms.length) {
       rooms.forEach(r => {
         let kind, note;
-        if (r.note) { kind = REF_W.test(r.note) ? 'dnc' : 'warn'; note = r.note; }
+        if (r.note) { kind = kindOf(r.note) === 'dnc' ? 'dnc' : 'warn'; note = r.note; }
         else if (black) { kind = 'warn'; note = left; }
-        else { kind = 'dnc'; note = ''; }
-        items.push(Object.assign({}, base, { room: r.room, kind, note: kind === 'warn' ? note.slice(0, 80) : '' }));
+        else if (left && kindOf(left) === 'warn') { kind = 'warn'; note = left; }
+        else { kind = 'dnc'; note = left; }
+        items.push(Object.assign({}, base, { room: r.room, kind, note: kind === 'warn' ? note.slice(0, 80) : '', m: kind === 'dnc' ? note.slice(0, 80) : '' }));
       });
     } else {
       let kind = 'dnc', note = '';
       if (black) { kind = 'warn'; note = left || (!looksAddr(nm) ? nm : ''); }
-      else if (left && !REF_W.test(left) && WARN_W.test(left)) { kind = 'warn'; note = left; }
-      else if (!left && !a && WARN_W.test(nm) && !REF_W.test(nm)) { kind = 'warn'; note = nm; }
-      items.push(Object.assign({}, base, { room: '', kind, note: note.slice(0, 80) }));
+      else if (left && kindOf(left) === 'warn') { kind = 'warn'; note = left; }
+      else if (!left && !a && kindOf(nm) === 'warn') { kind = 'warn'; note = nm; }
+      // 拒否のときも、ピンのメモ（説明欄）は区域係が見られるように残す（m）。注意に切りかえたら、注意の文の下書きにする
+      const m = kind === 'dnc' ? (left || (!a && !looksAddr(nm) && REF_W.test(nm) ? nm : '')) : '';
+      items.push(Object.assign({}, base, { room: '', kind, note: note.slice(0, 80), m: m.slice(0, 80) }));
     }
-    items.forEach(it => { it.sens = SENS_W.test(it.note || ''); });
+    items.forEach(it => { it.sens = SENS_W.test((it.note || '') + ' ' + (it.m || '')); });
     return items;
   }
   /* 区域の線をまとめる（同じ親・同じ枝番が2つのファイルにあれば、あとのものは使わない） */
@@ -142,7 +155,7 @@
   }
 
   /* 外へ */
-  root.KmlKoushin = { parseKmlText, splitPin, mergeParsed, noKey, RE_PARENT, RE_KID };
+  root.KmlKoushin = { parseKmlText, splitPin, mergeParsed, noKey, kindOf, RE_PARENT, RE_KID };
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof document === 'undefined') return;
 
   /* =========================================================
@@ -153,6 +166,11 @@
     const it = [['区', '区域の線と番号が新しくなりました。枝番の区域（例：5-1）は、地図で親の区域（5）の太い線の中に出ます'],
       ['区', '区域係の画面から、マイマップ（KML）で区域と拒否・注意をまとめて新しくできるようになりました']];
     if (cl) cl.items.push(...it); else CHANGELOG.unshift({ v: '2026.13.19', items: it });
+  }
+  if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.26')) {
+    CHANGELOG.unshift({ v: '2026.13.26', items: [
+      ['！', 'マイマップの取り込みで、「夕方は訪問しない」のような時間・曜日つきのピンは、拒否ではなく注意（！）になるようにしました'],
+      ['拒', '区域係の画面の拒否の家に、マイマップのメモが出るようになり、「注意（！）に変える」ボタンを付けました']] });
   }
   LIB.pclip = 'vendor/polygon-clipping-0.15.7/polygon-clipping.umd.min.js';
   const r6 = x => Math.round(Number(x) * 1e6) / 1e6;
@@ -298,9 +316,10 @@
       <button type="button" class="kk-kind" data-cyc="${it.i}" aria-label="種類を切りかえる（拒否→注意→入れない）">${icon}<small>${k === 'dnc' ? '拒否' : k === 'warn' ? '注意' : '入れない'}</small></button>
       <div class="tx"><b data-notr>${esc(itemPlace(it))}</b>
         ${k === 'warn' ? `<input type="text" class="kk-note" data-note="${it.i}" maxlength="80" value="${esc(it.note || '')}" placeholder="注意の内容（例：犬がいます）">` : ''}
+        ${k === 'dnc' && it.m ? `<small class="kk-memo">メモ：<span data-notr>${esc(it.m)}</span></small>` : ''}
         ${it.sameNo ? '<small class="kk-part">名前が区域番号と同じなので、目印とみなして入れません（拒否なら左の印を押してください）</small>' : ''}
         ${it.part && !it.sameNo ? '<small class="kk-part">住所が番地だけです（取り込んだあと「要確認」で家を確かめてください）</small>' : ''}
-        ${it.sens && k === 'warn' ? '<small class="kk-sens">病気・家庭の事情など、個人のことが書かれていないか確かめてください</small>' : ''}
+        ${it.sens && k !== 'skip' ? '<small class="kk-sens">病気・家庭の事情など、個人のことが書かれていないか確かめてください</small>' : ''}
         <small>ピン：<span data-notr>${esc(String(it.src || '').slice(0, 60))}</span>${it.black ? '（黒いピン）' : ''}</small></div></div>`;
   }
   function preview(st) {
@@ -340,7 +359,7 @@
         ${tp.notes.length ? `<details class="dncfold"><summary>気づいたこと ${tp.notes.length}件</summary><ul>${tp.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>` : ''}`
       : `
         <h3 class="sub">拒否・注意</h3>
-        <p class="hint">左の印を押すと「拒否 → 注意 → 入れない」の順に切りかわります。黒いピンと、部屋番号のあとのカッコ書き（例：1002（夜勤））は「注意」にしています。<br>
+        <p class="hint">左の印を押すと「拒否 → 注意 → 入れない」の順に切りかわります。黒いピンと、部屋番号のあとのカッコ書き（例：1002（夜勤））、<b>時間や曜日つきの「訪問しない」（例：夕方は訪問しない）</b>は「注意」にしています。<br>
           注意の内容は、その家を訪ねる人みんなが見ます。<b>名前・病気・家庭の事情など、個人のことは書かない</b>でください。</p>
         ${items.some(i => i.sens) ? `<div class="notice warn">個人の事情が書かれているかもしれない注意が ${items.filter(i => i.sens).length}件あります（<span class="kk-sens">目印</span>のもの）。内容を確かめてください。</div>` : ''}
         ${tGroups.map(([no, its]) => `<details class="dncg kk-g" data-kg="${esc(no)}"${ui.open.has(no) ? ' open' : ''}><summary><span class="stamp sm${noCls(no)}">${esc(no)}</span><span class="nm">${no === '？' ? '新しい区域の線の外' : '区域' + esc(no)}</span>
@@ -367,7 +386,7 @@
     body.addEventListener('click', e => {
       const b = e.target.closest('[data-cyc]'); if (!b) return;
       const it = items[Number(b.dataset.cyc)];
-      if (!it.use) { it.use = true; it.kind = 'dnc'; } else if (it.kind === 'dnc') it.kind = 'warn'; else it.use = false;
+      if (!it.use) { it.use = true; it.kind = 'dnc'; } else if (it.kind === 'dnc') { it.kind = 'warn'; if (!it.note && it.m) it.note = it.m; } else it.use = false;
       const row = b.closest('.kk-it'); row.outerHTML = itemRow(it);
     });
     body.addEventListener('input', e => { const x = e.target; if (x.dataset && x.dataset.note != null) items[Number(x.dataset.note)].note = x.value.slice(0, 80); });
@@ -435,6 +454,7 @@
         if (!it.use) return;
         const base = { s: 'kml', at };
         if (it.a) base.a = it.a;
+        if (it.kind === 'dnc' && it.m) base.m = it.m; // ピンのメモ（区域係だけが見る）
         const pos = { lat: it.lat, lng: it.lng, good: true };
         if (it.room) { // アパートの部屋：建物のそばの、場所だけの印に部屋番号を付ける
           const apt = near(it.lat, it.lng, 30).find(([h]) => h.type === 'apt');
@@ -490,6 +510,7 @@
   .kk-kind small{font-size:12px;font-weight:700}
   .kk-note{width:100%;min-height:44px;font-size:16px;border:2px solid #CA8A04;border-radius:10px;padding:0 8px;margin:4px 0;background:#FEF9C3}
   .kk-part{display:inline-block;background:#FFF4D6;color:#6B4200;border-radius:6px;padding:0 6px;font-weight:700}
+  .kk-memo{display:inline-block;background:#F1F3F5;color:var(--ink);border-radius:6px;padding:0 6px}
   .kk-sens{display:inline-block;background:#FDECEC;color:#8B1A1A;border-radius:6px;padding:0 6px;font-weight:700}
   `;
   document.head.appendChild(css);
