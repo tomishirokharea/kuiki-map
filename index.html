@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.30"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.31"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -780,6 +780,14 @@ body.strong .pin.st-plain{border-width:4px}
 @media (hover:hover) and (pointer:fine){.topen:hover{background:var(--terr-soft)}}
 .part-label span{display:inline-block;transform:translate(-50%,-50%);background:#ffffffe6;border:2px solid var(--draw);color:var(--draw);font-weight:700;font-size:14px;border-radius:8px;padding:1px 8px;white-space:nowrap}
 .check.dimmed{opacity:.7}
+.partsum{margin:4px 0 10px;padding:10px 12px;border:1.5px solid var(--terr-soft);border-radius:12px;background:var(--terr-soft)}
+.partsum-h{font-size:15px;margin-bottom:4px}
+#partMsg{white-space:pre-line}
+.partsum ul{list-style:none;margin:0;padding:0}
+.partsum li{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px dashed rgba(0,0,0,.12);font-size:16px}
+.partsum li:first-child{border-top:0}
+.partsum li span{min-width:0;overflow-wrap:anywhere}
+.partsum li b{white-space:nowrap}
 #partBar .row{gap:8px}
 /* カレンダー：マスの大きさをそろえる */
 .calgrid{gap:5px;grid-template-columns:repeat(7,minmax(0,1fr))}
@@ -3572,6 +3580,39 @@ function partHouseCount(t, p) {
   housesOf(t.id).forEach(h => { if (inPoly(h.lat, h.lng, p.poly)) n += targets(h).length; });
   return n;
 }
+/* 範囲の中身（一戸建ての軒数と、アパート名ごとの部屋数）。keys があれば留守宅カードなどその家・部屋だけを数える */
+function partContents(t, poly, keys) {
+  const apts = new Map(); let houses = 0, total = 0;
+  const add = (h, n) => {
+    total += n;
+    if (h.type === 'apt') { const a = apts.get(h.id) || { name: h.label || '集合住宅', n: 0 }; a.n += n; apts.set(h.id, a); }
+    else houses += n;
+  };
+  if (keys) {
+    const cnt = new Map();
+    keys.forEach(k => { const hid = parseKey(k)[0]; cnt.set(hid, (cnt.get(hid) || 0) + 1); });
+    cnt.forEach((n, hid) => { const h = houseById(hid); if (h && inPoly(h.lat, h.lng, poly)) add(h, n); });
+  } else housesOf(t.id).forEach(h => { if (inPoly(h.lat, h.lng, poly)) add(h, targets(h).length); });
+  return { houses, apts: [...apts.values()].sort((a, b) => b.n - a.n), total };
+}
+function partContentsHtml(c, max) {
+  if (!c.total) return '<div class="partsum muted">この範囲には、家の印がありません</div>';
+  const lim = max || 6, rows = [];
+  if (c.houses) rows.push(`<li><span>一戸建てなど</span><b>${c.houses}軒</b></li>`);
+  c.apts.slice(0, lim).forEach(a => rows.push(`<li><span>${esc(a.name)}</span><b>${a.n}部屋</b></li>`));
+  if (c.apts.length > lim) {
+    const rest = c.apts.slice(lim);
+    rows.push(`<li class="muted"><span>ほかの集合住宅 ${rest.length}棟</span><b>${rest.reduce((x, a) => x + a.n, 0)}部屋</b></li>`);
+  }
+  return `<div class="partsum"><div class="partsum-h">この範囲の中　<b>合計 ${c.total}か所</b></div><ul>${rows.join('')}</ul></div>`;
+}
+function partContentsText(c) {
+  const a = [];
+  if (c.houses) a.push(`一戸建てなど${c.houses}軒`);
+  c.apts.slice(0, 3).forEach(x => a.push(`${x.name} ${x.n}部屋`));
+  if (c.apts.length > 3) a.push(`ほか${c.apts.length - 3}棟`);
+  return a.join('・');
+}
 /* ---------- 区域の判定 ---------- */
 function inPoly(lat, lng, poly) {
   let c = false;
@@ -5175,6 +5216,10 @@ function updatePartBar() {
     : n < 3 ? `あと${3 - n}か所タップすると、範囲になります（今 ${n}か所）`
       : `${n}か所で囲んでいます。「この範囲をわたす」を押してください`;
   const po = partDraw ? partObj(partDraw) : null;
+  if (po && n >= 3) { // 囲んだ中の件数をその場で出す（どれくらいの量か分かるように）
+    const t = terrById(partDraw.tid), c = t && partContents(t, partDraw.pts, partDraw.cid ? po.keys : null);
+    if (c) el.textContent += `\n囲んだ中：${c.total ? `${c.total}か所（${partContentsText(c)}）` : '家の印がありません'}`;
+  }
   const ps = po ? partsOf(po) : [];
   $('#partList').textContent = ps.length ? `今日わたした範囲：${ps.map(p => partName(p)).join(' ／ ')}` : '';
   const lb = $('#partListBtn'); if (lb) lb.hidden = !ps.length;
@@ -5189,9 +5234,9 @@ function openPartAssign() {
   const gm = po.group ? groupMembers(po.group).filter(u => u.id !== me().id) : [];
   const others = D().users.filter(u => !u.inactive && u.id !== me().id && !gm.some(g => g.id === u.id));
   const row = u => `<label class="check${taken.has(u.id) ? ' dimmed' : ''}" data-name="${esc(u.name)}"><input type="checkbox" data-pu="${u.id}">${esc(u.name)}${taken.has(u.id) ? '<span class="muted">（ほかの範囲に入っています）</span>' : ''}</label>`;
-  const n = partDraw.cid ? po.keys.filter(k => { const h = houseById(parseKey(k)[0]); return h && inPoly(h.lat, h.lng, poly); }).length
-    : housesOf(t.id).reduce((a, h) => a + (inPoly(h.lat, h.lng, poly) ? targets(h).length : 0), 0);
+  const pc = partContents(t, poly, partDraw.cid ? po.keys : null), n = pc.total;
   setSheet(headHtml(t, 'この範囲をわたす人', `家・部屋 ${n}か所　今日の終わりまで`) + `
+    ${partContentsHtml(pc)}
     <p class="hint">ふつうは2人1組です。えらんだ人の画面に、この範囲が今日だけ出ます。</p>
     <label class="field"><span>名前でさがす</span><input type="text" id="puQ" placeholder="名前の一部を入れる" autocomplete="off"></label>
     <div id="puList">
@@ -5231,7 +5276,7 @@ function openPartList(tid, cid) {
   const t0 = terrById(tid), t = cid ? D().awayCards.find(x => x.id === cid) : t0; if (!t0 || !t) return;
   const ps = partsOf(t);
   setSheet(headHtml(t0, '今日わたした範囲', `${ps.length}件　今日の終わりまで`) + `
-    ${ps.length ? ps.map(p => `<div class="setrow"><b>${esc(partName(p))}</b>
+    ${ps.length ? ps.map(p => `<div class="setrow"><div><b>${esc(partName(p))}</b><br><small class="muted">${esc(partContentsText(partContents(t0, p.poly, cid ? t.keys : null)) || '家の印なし')}</small></div>
       <button class="btn small danger" data-pdel="${p.id}">取り消す</button></div>`).join('')
       : '<div class="empty">まだありません。</div>'}
     <button class="btn primary block" id="plAdd">${partDraw && partDraw.tid === tid && partDraw.cid === cid ? '地図にもどって続けて分ける' : '＋ 地図で範囲を分ける'}</button>
