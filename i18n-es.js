@@ -1386,7 +1386,7 @@ window.KUIKI_I18N.es = {
 "暗号化して、同じ人のほかの端末とも同じになります": "cifrada y igual en sus otros dispositivos",
 "出さない": "No mostrar",
 "出す": "Mostrar",
-"「全体」にすると、区域をえらんでいるときも、ほかの区域の建物の名前が出ます": "Con «Todo», también se ven los nombres de construcciones de otros territorios aunque haya elegido uno",
+"「全体」にすると、区域をえらんでいるときも、ほかの区域の建物の名前が薄く出ます": "Con «Todo», también se ven, más tenues, los nombres de construcciones de otros territorios aunque haya elegido uno",
 "えらんだ区域だけ": "Solo el territorio elegido",
 "名前を出す範囲": "Dónde mostrar nombres",
 "地図に見えている全体": "Todo lo visible en el mapa",

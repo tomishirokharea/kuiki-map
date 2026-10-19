@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.29"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.30"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -823,6 +823,8 @@ body.strong .pin.st-plain{border-width:4px}
   background:#ffffffeb;border:1.5px solid var(--ink2);border-radius:7px;padding:0 6px;font-size:12px;font-weight:700;color:var(--ink);box-shadow:0 1px 2px #0003;font-family:"BIZ UDPGothic",sans-serif;line-height:1.5}
 .hname.dot span{top:9px}
 .hname span.fc{border-color:#6A1B9A;color:#4A148C}
+/* えらんだ区域の外の建物の名前：まわりの区域番号と同じくらい薄く、小さく */
+.hname.out span{opacity:.45;font-size:11px;font-weight:400;box-shadow:none;border-width:1px}
 .pin .lk{background:#5B2E8C}
 .pin .kb ~ .lk{bottom:14px}
 .pin b.ban{position:absolute;left:-11px;top:-10px;min-width:23px;height:23px;padding:0 2px;border-radius:7px;display:grid;place-items:center;border:2px solid #fff;background:#B3261E;color:#fff;font-size:12px;font-style:normal;font-weight:800;box-shadow:0 1px 3px #0006}
@@ -4829,9 +4831,13 @@ function houseNameLabels(list, dense) {
   if ((!apt && !fc) || mode !== 'normal') return;
   // 設定で「地図に見えている全体」をえらんだときは、えらんだ区域の外の建物の名前も出す
   const all = UI.nameScope === 'all' && !followMap;
+  // 区域をえらんでいるときの、ほかの区域の建物の名前は、まわりの区域番号と同じように薄く出す（現場で見る区域の名前を目立たせる）
+  let inSel = null;
   if (all) {
     const b = map.getBounds().pad(0.1), onMap = new Set((list || []).map(h => h.id));
+    if (selTerrId() && list) inSel = onMap;
     list = D().houses.filter(h => h.label && b.contains([h.lat, h.lng]));
+    if (inSel) list.sort((x, y) => (inSel.has(y.id) ? 1 : 0) - (inSel.has(x.id) ? 1 : 0)); // 300件の上限では、えらんだ区域の名前を先に
     dense = dense && list.some(h => onMap.has(h.id));
   }
   if (!list) return;
@@ -4842,9 +4848,11 @@ function houseNameLabels(list, dense) {
     const isFc = k !== 'home';
     if (h.type === 'apt' ? !(apt || (fc && isFc)) : !(fc && isFc)) continue; // 一戸建ての「目印」は出さない
     n++;
+    const out = !!inSel && !inSel.has(h.id); // えらんだ区域の外（家の印は出ていないので、点のときの位置に）
     L.marker([h.lat, h.lng], {
-      icon: L.divIcon({ className: 'hname' + (dense && !(roundNums && roundNums.has(h.id)) ? ' dot' : ''), html: `<span class="${isFc ? 'fc' : ''}">${esc(h.label)}</span>`, iconSize: [0, 0] }),
-      pane: 'labelPane', interactive: false, keyboard: false
+      icon: L.divIcon({ className: 'hname' + (out ? ' out dot' : dense && !(roundNums && roundNums.has(h.id)) ? ' dot' : ''), html: `<span class="${isFc ? 'fc' : ''}">${esc(h.label)}</span>`, iconSize: [0, 0] }),
+      pane: 'labelPane', interactive: false, keyboard: false,
+      zIndexOffset: out ? -1000 : 0 // 重なったときは、えらんだ区域の名前が上
     }).addTo(houseLayer);
   }
 }
@@ -10517,7 +10525,7 @@ function openUiSheet() {
         ${UI.aptName === 'on' ? nameZoomSlider('aptZoom') : ''}</div>
       <div class="featrow"><p><b>学校・役所・お店などの名前</b><small>家の種別をえらんで、名前を入れた建物です</small></p>${seg('fcName', [['off', '出さない'], ['on', '出す']])}
         ${UI.fcName === 'on' ? nameZoomSlider('fcZoom') : ''}</div>
-      ${UI.aptName === 'on' || UI.fcName === 'on' ? `<div class="featrow"><p><b>名前を出す範囲</b><small>「全体」にすると、区域をえらんでいるときも、ほかの区域の建物の名前が出ます</small></p>${seg('nameScope', [['sel', 'えらんだ区域だけ'], ['all', '地図に見えている全体']], UI.nameScope || 'sel')}</div>` : ''}
+      ${UI.aptName === 'on' || UI.fcName === 'on' ? `<div class="featrow"><p><b>名前を出す範囲</b><small>「全体」にすると、区域をえらんでいるときも、ほかの区域の建物の名前が薄く出ます</small></p>${seg('nameScope', [['sel', 'えらんだ区域だけ'], ['all', '地図に見えている全体']], UI.nameScope || 'sel')}</div>` : ''}
       <h3 class="sub">奉仕の予定</h3>
       <div class="featrow"><p><b>予定の一覧</b><small>ホームの「奉仕の予定」で、カレンダーの下の一覧に出す予定</small></p>${seg('calList', [['upcoming', '今日から'], ['all', 'その月すべて']], UI.calList || 'upcoming')}</div>
       <h3 class="sub">家の画面に出すもの</h3>
