@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.43"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.44"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3844,6 +3844,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.44', items: [
+    ['見', 'かんたんな表示の「区域をもらう」を見やすくしました（1つの区域は3行ほど。くわしい内容は「くわしく」の中、並べ方は1つのボタンに）']
+  ] },
   { v: '2026.13.43', items: [
     ['天', '毎日はじめのひと言が、ときどき天気に合わせた言葉になります（雨・冷える日・暑い日など）。そのときは今日の気温も出ます']
   ] },

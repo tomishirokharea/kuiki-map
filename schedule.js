@@ -541,10 +541,41 @@
 
   /* ---------- 「区域をもらう」一覧：おすすめ順を加える ---------- */
   reqSort = 'reco';
+  const SORT_NAME = { reco: 'おすすめ順', near: '近い順', long: '返却から長い順', young: '若い世代が多い順', many: '家が多い順' };
+  const KTYPE = { kids: '子育て世代が多い', work: '若い世代が多い' }; // 簡単モードの目印（地域のようすから。押すとくわしい説明）
+  const cssK = document.createElement('style');
+  cssK.textContent = `.pick.kpick{display:block;padding:14px 0 10px}
+.kp-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.kp-head>b{font-size:24px;line-height:1.3}
+.kp-nm{margin-left:.6em}
+.kp-n{margin-left:auto;font-size:18px;color:var(--ink2);white-space:nowrap}
+.kp-st{margin:4px 0 0;font-size:18px}
+.kp-dist{margin-left:12px;color:var(--ink2)}
+.ktags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.ktag{display:inline-flex;align-items:center;min-height:34px;background:var(--terr-soft);color:var(--terr);border:0;border-radius:8px;padding:2px 10px;font:inherit;font-size:16px;font-weight:700}
+button.ktag{cursor:pointer}
+.ktag.kurg{background:#B71C1C;color:#fff}
+.pick.kpick .pickbtns{display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-top:10px;grid-column:auto;width:100%}
+.pick.kpick .pickbtns .btn{width:100%;min-width:0;grid-column:auto;justify-self:stretch}
+.kp-more>summary{min-height:44px;display:flex;align-items:center;justify-content:flex-end;color:var(--ink2);font-size:16px;cursor:pointer;list-style:none}
+.kp-more>summary::-webkit-details-marker{display:none}
+.kp-more>summary::after{content:'›';margin-left:6px;font-size:20px}
+.kp-more[open]>summary::after{content:'⌃'}
+.kp-more[open]{background:#F6F8F7;border-radius:10px;padding:0 10px 8px}
+.ksort{margin:8px 0 4px}
+.ksort>summary{display:inline-flex;align-items:center;min-height:48px;padding:0 16px;border:2px solid var(--line);border-radius:10px;background:#fff;font-size:18px;font-weight:700;cursor:pointer;list-style:none}
+.ksort>summary::-webkit-details-marker{display:none}
+.ksort>summary::after{content:'▾';margin-left:8px}
+.ksort[open]>summary::after{content:'▴'}
+.ksort .sortchips{margin-top:10px}
+.krain{margin:6px 0 4px;font-size:17px;color:#1E3A8A}
+.krain small{margin-left:8px;font-size:14px;color:var(--ink2);white-space:nowrap}`;
+  document.head.appendChild(cssK);
   window.openRequestSheet = function (g) {
     if (g !== undefined) reqForGroup = !!g;
     if (!canGroupTerr()) reqForGroup = false;
     const G = reqForGroup, canTake = canTakeFree(G), free = freeTerrs();
+    const SIMPLE = typeof isSimple === 'function' && isSimple();
     if (reqSort === 'near' && !myPos) reqSort = 'reco';
     const sx = new Map(scoreList(free).map((x, i) => [x.t.id, Object.assign(x, { order: i })]));
     const list = free.map(t => ({ t, last: [t.completedAt, t.returnedAt].filter(Boolean).sort().pop() || '', n: terrStats(t, 0).n,
@@ -560,33 +591,72 @@
     // 今すぐ受け取れる区域と、係に頼む区域を分ける（並びは、それぞれの中で選んだ並べ方のまま）
     const canGet = x => isFree(x.t) && canTake;
     const askWhy = x => canGet(x) ? '' : `<p class="muted">${isFree(x.t) ? '持てる枚数に届いています' : '係が貸し出す区域です'}</p>`;
-    const rowHtml = x => { const { t, last, n, dist, yg } = x; return `<article class="pick">
-        <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
-        <div><b>${esc(t.name)}</b>${typeof evTag === 'function' ? evTag(t) : ''}
-          ${reqSort === 'reco' ? recoLine(x) : ''}
-          <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}${askWhy(x)}</div>
-        <div class="pickbtns">${canGet(x)
+    // くわしい表示の各行（簡単モードでは「くわしく」の中に入れる）
+    const infoHtml = x => { const { t, last, n, dist, yg } = x; return `${reqSort === 'reco' ? recoLine(x) : ''}
+          <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}`; };
+    const btnsHtml = x => { const t = x.t; return `<div class="pickbtns">${canGet(x)
           ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
           : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
-          ${window.nozoku ? `<button class="btn small" data-peek="${t.id}" aria-label="区域${esc(t.no)}の場所を地図で見る">地図</button>` : ''}</div>
+          ${window.nozoku ? `<button class="btn small" data-peek="${t.id}" aria-label="区域${esc(t.no)}の場所を地図で見る">地図</button>` : ''}</div>`; };
+    const rowHtml = x => { const t = x.t; return SIMPLE ? kRow(x) : `<article class="pick">
+        <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
+        <div><b>${esc(t.name)}</b>${typeof evTag === 'function' ? evTag(t) : ''}
+          ${infoHtml(x)}${askWhy(x)}</div>
+        ${btnsHtml(x)}
       </article>`; };
+    /* 簡単モード（2026-10-22）：1区域＝見出しと軒数・状態1行・目印2つまで・ボタン。数字や統計は「くわしく」の中 */
+    const kName = t => { const nm = String(t.name || '').trim(); return nm && nm !== '区域' + t.no && nm !== String(t.no) ? `区域${esc(t.no)}<span class="kp-nm">${esc(nm)}</span>` : `区域${esc(t.no)}`; };
+    const kState = x => {
+      const c = typeof window.tsuzukiFree === 'function' ? window.tsuzukiFree(x.t) : null; // 前の人が訪ねた家があるときだけ「続きから」
+      if (c && c.done > 0) return `続きから　あと${c.todo}軒`;
+      return x.last ? `前回の返却：${fmtDay(x.last)}` : 'まだ回ったことがない区域です';
+    };
+    const kTags = x => {
+      const t = x.t, out = [];
+      const ev = typeof evSummary === 'function' ? evSummary(t) : '';
+      if (ev) out.push(`<span class="ktag">${esc(ev)}</span>`);
+      else if (rainHit && aptCardRank(t) < 2) out.push(`<span class="ktag">${aptCardRank(t) === 0 ? '集合住宅・エレベーターあり' : '集合住宅が多い'}</span>`);
+      const ml = meetLabel(t); if (ml) out.push(`<span class="ktag">${esc(ml)}</span>`);
+      const p = prof(t);
+      if (p && KTYPE[p.type]) out.push(`<button type="button" class="ktag" data-prof="${t.id}" data-back="req">${KTYPE[p.type]} ›</button>`);
+      const tags = out.slice(0, 2);
+      if (x.sx && x.sx.pin) tags.unshift('<span class="ktag kurg">急ぎ</span>');
+      return tags.length ? `<p class="ktags">${tags.join('')}</p>` : '';
+    };
+    const kRow = x => `<article class="pick kpick">
+        <div class="kp-head"><b>${kName(x.t)}</b><span class="kp-n">${x.n}軒</span></div>
+        <p class="kp-st">${kState(x)}${x.dist != null ? `<span class="kp-dist">ここから約${fmtDist(x.dist)}</span>` : ''}</p>
+        ${kTags(x)}${askWhy(x)}
+        ${btnsHtml(x)}
+        <details class="kp-more"><summary>くわしく</summary>${infoHtml(x)}</details>
+      </article>`;
     const rowsCan = list.filter(canGet).map(rowHtml).join(''), rowsAsk = list.filter(x => !canGet(x)).map(rowHtml).join('');
     const both = !!rowsCan && !!rowsAsk;   // 両方あるときだけ、見出しで分ける
     const rows = (both ? '<p class="q">今すぐ受け取れる区域</p>' : '') + rowsCan + (both ? '<p class="q">係に頼む区域（係が決めて届けます）</p>' : '') + rowsAsk;
-    setSheet(headHtml(null, G ? `${esc(myGroup())}グループの区域をもらう` : (canGroupTerr() ? '個人の区域をもらう' : '区域カードをもう1枚'),
-        `持てるのは${holdMax(G)}枚まで（今 ${heldOf(G)}枚・申し込み中 ${pendingOf(G).length}件）`) + `
-      ${G ? `<div class="seg" role="group" aria-label="もらうカード"><button type="button" aria-pressed="true">区域カード</button><button type="button" data-gaway aria-pressed="false">留守宅カード</button></div>
-        <p class="hint">グループの区域は、奉仕の集まりで使います。受け取ったら「今日回る人をえらぶ」で、回る人を決められます。</p>` : ''}
-      <p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。</p>
-      ${!canTake && list.some(x => isFree(x.t)) ? `<div class="notice warn">この区域は自分では受け取れません（${G ? '' : `自分で受け取れるのは${D().settings.selfTakeMax}枚まで・`}上限に届いています）。係に頼むことはできます。</div>` : ''}
-      <p class="q">並べ方</p>
-      <div class="sortchips" role="group" aria-label="並べ方">
+    // 簡単モードの上の1行：「あと○枚もらえます」（申し込み中があるときだけ、その件数も）
+    const room = Math.max(0, holdMax(G) - heldOf(G) - pendingOf(G).length), pend = pendingOf(G).length;
+    const headSub = SIMPLE ? `${room ? `あと${room}枚もらえます` : `持てるのは${holdMax(G)}枚までです`}${pend ? `（申し込み中 ${pend}件）` : ''}`
+      : `持てるのは${holdMax(G)}枚まで（今 ${heldOf(G)}枚・申し込み中 ${pend}件）`;
+    const sortChips = `<div class="sortchips" role="group" aria-label="並べ方">
         <button type="button" class="chip" data-rsort="reco" aria-pressed="${reqSort === 'reco'}">おすすめ順</button>
         <button type="button" class="chip" data-rsort="near" aria-pressed="${reqSort === 'near'}">近い順</button>
         <button type="button" class="chip" data-rsort="long" aria-pressed="${reqSort === 'long'}">返却から長い順</button>
         <button type="button" class="chip" data-rsort="young" aria-pressed="${reqSort === 'young'}">若い世代が多い順</button>
-        <button type="button" class="chip" data-rsort="many" aria-pressed="${reqSort === 'many'}">家が多い順</button></div>
-      ${rain ? rainNote(rainHit) : ''}
+        <button type="button" class="chip" data-rsort="many" aria-pressed="${reqSort === 'many'}">家が多い順</button></div>`;
+    // 簡単モード：並べ方は1つのボタンにたたむ（押すと5つ出る）
+    const sortUi = SIMPLE ? `<details class="ksort"><summary>並べ方：${SORT_NAME[reqSort] || SORT_NAME.reco}</summary>${sortChips}</details>`
+      : `<p class="q">並べ方</p>${sortChips}`;
+    // 雨の案内：簡単モードは1行（天気の出典は消さずに小さく残す）
+    const rainUi = !rain ? '' : SIMPLE
+      ? `<p class="krain">${rainHit ? '雨のため、集合住宅を先に出しています' : '雨ですが、空いている区域に集合住宅の区域はありません'}<small>天気：Open-Meteo</small></p>`
+      : rainNote(rainHit);
+    setSheet(headHtml(null, G ? `${esc(myGroup())}グループの区域をもらう` : (canGroupTerr() ? '個人の区域をもらう' : '区域カードをもう1枚'), headSub) + `
+      ${G ? `<div class="seg" role="group" aria-label="もらうカード"><button type="button" aria-pressed="true">区域カード</button><button type="button" data-gaway aria-pressed="false">留守宅カード</button></div>
+        <p class="hint">グループの区域は、奉仕の集まりで使います。受け取ったら「今日回る人をえらぶ」で、回る人を決められます。</p>` : ''}
+      <p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。</p>
+      ${!canTake && list.some(x => isFree(x.t)) ? `<div class="notice warn">この区域は自分では受け取れません（${G ? '' : `自分で受け取れるのは${D().settings.selfTakeMax}枚まで・`}上限に届いています）。係に頼むことはできます。</div>` : ''}
+      ${sortUi}
+      ${rainUi}
       ${reqSort === 'reco' ? `<p class="hint">期限の近さ（いちばん重く見ます）・若い世代の多さ・前回会えなかった家の多さから並べています。期限まで${PIN_DAYS}日を切った区域は、いちばん上に出します。</p>` : ''}
       ${reqSort === 'near' ? '<div class="row"><button class="btn small" id="reqNear">現在地を更新する</button></div>' : ''}
       ${reqSort === 'young' ? `<p class="hint">${AGE_ON && ageMap() ? '市の年齢データ（字ごとの20〜49歳の割合）から出しています。字が決まっていない区域は、「会えた」記録の年代から出します。' : '市の年齢データが入っていないので、これまでに「会えた」と記録したときの年代から出した目安です。'}</p>` : ''}
@@ -729,8 +799,8 @@
       <p class="muted">これまでの記録もふくめた会える見込み：${best.map(([s, v]) => `${slotShort(s)} 約${pctTxt(v)}`).join('・')}</p>
       <p class="q">訪問の準備のヒント</p>
       <ul class="plist">${T.prep.map(x => `<li>${x}</li>`).join('')}</ul>
-      <p class="hint">字ごとの統計からの一般的な予想です。玄関の向こうの方は、一人ひとり違います。人数は、登録した家の数から割り出した目安です。</p>
-      <p class="hint">${srcText(p.muni)}</p>
+      <p class="hint hint-must">字ごとの統計からの一般的な予想です。玄関の向こうの方は、一人ひとり違います。人数は、登録した家の数から割り出した目安です。</p>
+      <p class="hint hint-must">${srcText(p.muni)}</p>
       <button class="btn block" id="profBack">${back ? 'もどる' : '閉じる'}</button>`);
     $('#profBack').onclick = () => {
       if (back === 'req') window.openRequestSheet();

@@ -106,6 +106,8 @@
       return { done: r.c.done + inc, total: r.c.todo + r.c.done + inc, todo: r.c.todo };
     } catch (e) { return null; } finally { t.holder = h0; t.lentAt = l0; }
   }
+  /* 「区域をもらう」の簡単モード（schedule.js）から使う：続きから回れる区域なら、前の人の数 */
+  window.tsuzukiFree = t => { try { return t && canCont(t) ? freeCounts(t) : null; } catch (e) { return null; } };
 
   /* ---------- 3 画面 ---------- */
   /* 区域カード：小さく「続きから」／「この回で訪ねた家」 */
@@ -129,7 +131,8 @@
       const m = /^区域(.+?)を受け取ります。よろしいですか？$/.exec(String(msg));
       if (m) {
         const t = D().territories.find(x => String(x.no) === m[1] && !x.holder);
-        if (t && canCont(t)) msg = `区域${m[1]}を受け取ります。この区域は、前の人の続きです。緑のチェックの家は、もう訪ねてあります。白い家から回ってください。よろしいですか？`;
+        const c0 = t && canCont(t) ? freeCounts(t) : null;   // 前の人が1軒も訪ねていないときは、ふつうの確認のまま
+        if (c0 && c0.done > 0) msg = `区域${m[1]}を受け取ります。この区域は、前の人の続きです。緑のチェックの家は、もう訪ねてあります。白い家から回ってください。よろしいですか？`;
       }
     } catch (e) { console.error(e); }
     return _ask.call(this, msg, o);
@@ -144,7 +147,7 @@
           html = html.replace(/<article class="pick">[\s\S]*?<\/article>/g, a => {
             const m = /data-(?:take|ask)="([^"]+)"/.exec(a), t = m ? terrById(m[1]) : null;
             if (!t || !canCont(t)) return a;
-            const c = freeCounts(t); if (!c) return a;
+            const c = freeCounts(t); if (!c || !c.done) return a;   // 前の人が1軒も訪ねていないときは「続きから」と出さない（「ほとんど回らずに返却」のまま）
             const txt = simple() ? `続きから　あと${c.todo}軒`
               : `続きから　前の人が ${c.done} / ${c.total}軒 回りました（${typeof fmtDay === 'function' ? fmtDay(t.returnedAt) : ''}に返却）`;
             const tag = `<span class="ptag">${txt}</span>`;

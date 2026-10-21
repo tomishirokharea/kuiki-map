@@ -354,5 +354,24 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "新しい版にしたとき、一部の画面だけ古いままになることがあったのを直しました": "Se corrigió que, al actualizar, parte de la app pudiera quedar en la versión anterior",
 /* ---- 予定の印刷 ---- */
 "この月の予定を印刷": "Imprimir el programa del mes",
-"掲示板用": "para el tablero"
+"掲示板用": "para el tablero",
+/* ---- 簡単モードの「区域をもらう」（2026.13.44） ---- */
+"あと{0}枚もらえます": "Puede recibir {0} más",
+"あと{0}枚もらえます（申し込み中 {1}件）": "Puede recibir {0} más (solicitudes: {1})",
+"持てるのは{0}枚までです": "Máximo {0} tarjetas",
+"持てるのは{0}枚までです（申し込み中 {1}件）": "Máximo {0} tarjetas (solicitudes: {1})",
+"並べ方：{0}": "Ordenar: {0}",
+"前回の返却：{0}": "Última devolución: {0}",
+"まだ回ったことがない区域です": "Nunca se ha recorrido",
+"続きから あと{0}軒": "Continuar · faltan {0} casas",
+"急ぎ": "Urgente",
+"夕方・土日向き": "Mejor tardes y fines de semana",
+"平日の昼も会いやすい": "También de día entre semana",
+"集合住宅が多い": "Muchos apartamentos",
+"集合住宅・エレベーターあり": "Apartamentos con ascensor",
+"子育て世代が多い ›": "Muchas familias con niños ›",
+"若い世代が多い ›": "Mucha gente joven ›",
+"雨のため、集合住宅を先に出しています": "Por la lluvia, primero los apartamentos",
+"雨ですが、空いている区域に集合住宅の区域はありません": "Llueve, pero no hay territorios libres de apartamentos",
+"かんたんな表示の「区域をもらう」を見やすくしました（1つの区域は3行ほど。くわしい内容は「くわしく」の中、並べ方は1つのボタンに）": "En el modo sencillo, «Pedir territorio» es más fácil de leer (unas 3 líneas por territorio; los detalles, en «Detallado»; el orden, en un solo botón)"
 });
