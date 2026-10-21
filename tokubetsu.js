@@ -19,10 +19,16 @@
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof setSheet !== 'function') return;
 
   const PAL = ['#C2410C', '#1D4ED8', '#047857', '#7C3AED', '#B45309', '#BE185D', '#0E7490', '#4D7C0F'];
-  /* 集合住宅（apt・ev）は部屋の数で分ける（建物ごとに部屋の数がちがうため）。ほかは家の件数（2026-10-22） */
-  const byRoom = sp => !!(sp && (sp.apt || sp.ev === 'y' || sp.ev === 'n'));
-  const sizeDef = sp => (byRoom(sp) ? 40 : sp.lock ? 12 : 10);
-  const MIN_SIZE = 3, MAX_SIZE = 60, MAX_ROOM = 150, ROOM_STEP = 5;
+  /* カードの分け方（sp.by）：'bld' 建物（家）の数・'room' 部屋の数。作る人がえらぶ（2026-10-22）
+     はじめは、集合住宅だけなら部屋の数（建物ごとに部屋の数がちがうため。1枚40部屋くらい）。
+     オートロックは住民への配慮から、1回に訪ねる建物を少なくしたいので建物の数（1枚4件まで）。ほかは建物の数（10件まで） */
+  const evOnly = sp => (sp.ev === 'y' || sp.ev === 'n') && !sp.apt && !sp.lock && !(sp.kinds || []).length;
+  const defBy = sp => ((sp.apt || evOnly(sp)) && !sp.lock ? 'room' : 'bld');
+  const byRoom = sp => !!sp && (sp.by ? sp.by === 'room' : defBy(sp) === 'room');
+  const sizeDef = sp => (byRoom(sp) ? 40 : sp.lock && !sp.apt && !(sp.kinds || []).length ? 4 : 10);
+  const MIN_SIZE = 1, MAX_SIZE = 60, MAX_ROOM = 150, ROOM_STEP = 5;
+  /* 分け方の切りかえ（集合住宅が入っているときだけ出す） */
+  const bySeg = (room, attr) => `<div class="seg tk-by" role="group" aria-label="カードの分け方"><button type="button" ${attr}="bld" aria-pressed="${!room}">建物の数で分ける</button><button type="button" ${attr}="room" aria-pressed="${room}">部屋の数で分ける</button></div>`;
   const sizeMax = sp => (byRoom(sp) ? MAX_ROOM : MAX_SIZE);
   const sizeStep = sp => (byRoom(sp) ? ROOM_STEP : 1);
   const unitWord = sp => (byRoom(sp) ? '部屋' : '件');
@@ -195,43 +201,49 @@
 
   /* ---------- 特別区域をつくる・直す（係の画面の「特別区域をつくる」と、区域の一覧の「条件を変える」） ---------- */
   const _openSpecialSheet = window.openSpecialSheet;
-  const F = { name: '', prefix: '', kinds: [], lock: false, unmet: false, apt: false, ev: '', excl: true, size: 10, sizeSet: false };
-  const spFromF = () => { const sp = { kinds: F.kinds.slice(), lock: F.lock, unmet: F.unmet }; if (F.apt) sp.apt = true; if (F.ev) sp.ev = F.ev; return sp; };
+  /* ほかの特別区域にも入っている家（例：集合住宅をえらぶと、オートロックの特別区域の建物も入る）。同じ家を2つのカードで訪ねないように */
+  const otherSp = () => D().territories.filter(t => isSpecial(t));
+  const overlapOf = hs => { const os = otherSp(); return os.length ? hs.filter(h => os.some(t => inSpecial(h, t))) : []; };
+  const F = { noDup: true, name: '', autoName: '', prefix: '', kinds: [], lock: false, unmet: false, apt: false, ev: '', by: '', excl: true, size: 10, sizeSet: false };
+  const spFromF = () => { const sp = spPickData(F); sp.by = F.by || defBy(sp); return sp; };
   function openCreate(reset) {
     if (!isAdmin()) return;
-    if (reset) Object.assign(F, { name: '', prefix: nextPrefix(), kinds: [], lock: false, unmet: false, apt: false, ev: '', excl: true, size: 10, sizeSet: false });
+    if (reset) Object.assign(F, { noDup: true, name: '', autoName: '', prefix: nextPrefix(), kinds: [], lock: false, unmet: false, apt: false, ev: '', by: '', excl: true, size: 10, sizeSet: false });
     const sp = spFromF();
-    const ok = F.kinds.length || F.lock || F.unmet || F.apt || F.ev;
+    const ok = spPickOk(F);
     if (!F.sizeSet) F.size = sizeDef(sp);
-    F.size = Math.min(F.size, sizeMax(sp));
-    const hs = ok ? matchHouses(sp) : [], nU = hs.reduce((a, h) => a + unitsOf(h, sp).length, 0);
-    const nC = hs.length ? Math.ceil((byRoom(sp) ? nU : hs.length) / F.size) : 0; // 部屋で分けるときは、およその枚数
-    const kinds = Object.keys(KINDS).filter(k => k !== 'home');
-    const flag = (k, label, sub) => `<button type="button" class="kchip wide" data-spf="${k}" aria-pressed="${!!F[k]}"><b>${label}</b><span>${sub}</span></button>`;
+    F.size = Math.max(MIN_SIZE, Math.min(F.size, sizeMax(sp)));
+    const all0 = ok ? matchHouses(sp) : [], dup = overlapOf(all0), dupIds = new Set(dup.map(h => h.id));
+    const hs = F.noDup && dup.length ? all0.filter(h => !dupIds.has(h.id)) : all0, nU = hs.reduce((a, h) => a + unitsOf(h, sp).length, 0);
+    const room = byRoom(sp), hasApt = hs.some(h => h.type === 'apt');
+    const nC = hs.length ? Math.ceil((room ? nU : hs.length) / F.size) : 0; // 部屋で分けるときは、およその枚数
     setSheet(headHtml(null, '特別区域をつくる', 'コンビニ・オートロックなどを集めたカード') + `
-      <p class="hint">条件に合う家だけを集めた区域です。全域から集めて、となり合う家を、決めた件数ずつのカードに分けます。分け方は、次の画面の地図で確かめられます。</p>
+      <p class="hint">えらんだ種別の家だけを全域から集めて、となり合う家を、決めた数ずつのカードに分けます。分け方は、次の画面の地図で確かめられます。</p>
       <label class="field">名前 <input type="text" id="spName" maxlength="20" value="${esc(F.name)}" placeholder="例：コンビニ・オートロック"></label>
       <label class="field">区域番号のはじめ <input type="text" id="spNo" maxlength="8" value="${esc(F.prefix)}" autocomplete="off"><small class="hint">カードの番号は「${esc(F.prefix || 'S1')}-1」「${esc(F.prefix || 'S1')}-2」…になります</small></label>
-      <p class="q">条件（えらんだ条件すべてに合う家を集めます）</p>
-      <div class="kindpick">${flag('apt', '集合住宅', 'アパート・マンションの住まいの部屋（立入禁止の建物はのぞく）')}${flag('lock', 'オートロック', 'オートロックの建物')}${flag('unmet', '一度も会えていない家', '留守の記録だけで、会えた記録がない家・部屋')}</div>
-      <p class="q">エレベーター（集合住宅のとき）</p>
-      <div class="seg" role="group" aria-label="エレベーター">${[['', 'どちらでも'], ['y', 'あり'], ['n', 'なし・未確認']].map(([v, l]) => `<button type="button" data-spev="${v}" aria-pressed="${F.ev === v}">${l}</button>`).join('')}</div>
-      ${F.apt || F.ev ? '<p class="hint">「あり」と「なし・未確認」で2つの特別区域をつくると、高齢の方は「エレベーターあり」のカードをえらべます。エレベーターがまだ確かめられていない建物は「なし・未確認」に入ります。</p>' : ''}
-      <p class="q">種別（えらばなければ、すべての種別）</p>
-      <div class="kindpick">${kinds.map(k => `<button type="button" class="kchip" data-spk="${k}" aria-pressed="${F.kinds.includes(k)}">${KINDS[k][1]}<span>${KINDS[k][0]}</span></button>`).join('')}</div>
-      <div class="tk-count">${ok ? `<b>${nU !== hs.length ? `条件に合う家：${hs.length}件（部屋をふくめ ${nU}）` : `条件に合う家：${hs.length}件`}</b>` : '条件か種別をえらぶと、合う家の数が出ます'}</div>
-      ${ok && hs.length ? `<div class="tk-size"><span>1枚あたり</span><div class="stepper"><button type="button" data-tksz="-1" aria-label="${unitWord(sp)}の数を減らす">−</button><output class="wide">${F.size}${unitWord(sp)}${byRoom(sp) ? 'くらい' : 'まで'}</output><button type="button" data-tksz="1" aria-label="${unitWord(sp)}の数を増やす">＋</button></div>
-        <b>→ ${byRoom(sp) ? '約' : ''}${nC}枚</b></div>` : ''}
+      ${spPickHtml(F)}
+      ${dup.length ? `<div class="notice warn">ほかの特別区域にも入っている家が ${dup.length}件あります。<label class="check"><input type="checkbox" id="spNoDup"${F.noDup ? ' checked' : ''}>その家は入れない（同じ家を2つのカードで訪ねないように）</label></div>` : ''}
+      <div class="tk-count">${ok ? `<b>${nU !== hs.length ? `合う家：${hs.length}件（部屋をふくめ ${nU}）` : `合う家：${hs.length}件`}</b>` : '種別をえらぶと、合う家の数が出ます'}</div>
+      ${ok && hs.length ? `${hasApt ? bySeg(room, 'data-tkby') + `<p class="hint">${room ? '部屋の数で分けると、部屋の多い建物は1枚に1棟だけになることがあります。' : '建物の数で分けると、1回に訪ねる建物の数をおさえられます（オートロックなど、住民への配慮が必要なとき）。'}</p>` : ''}
+        <div class="tk-size"><span>1枚あたり</span><div class="stepper"><button type="button" data-tksz="-1" aria-label="${unitWord(sp)}の数を減らす">−</button><output class="wide">${F.size}${unitWord(sp)}${room ? 'くらい' : 'まで'}</output><button type="button" data-tksz="1" aria-label="${unitWord(sp)}の数を増やす">＋</button></div>
+        <b>→ ${room ? '約' : ''}${nC}枚</b></div>` : ''}
       <label class="check"><input type="checkbox" id="spExcl"${F.excl && !F.unmet ? ' checked' : ''}${F.unmet ? ' disabled' : ''}>この家を、ふつうの区域カードから外す（2回訪ねないように）</label>
-      ${F.unmet ? '<p class="hint">「一度も会えていない家」の特別区域は、ふつうの区域カードからは外しません（会えると対象が変わるため）。</p>' : ''}
+      ${F.unmet ? '<p class="hint">「一度も会えていない家だけ」の特別区域は、ふつうの区域カードからは外しません（会えると対象が変わるため）。</p>' : ''}
       <button class="btn primary block" id="spGo"${ok && hs.length ? '' : ' disabled'}>地図で分け方を見る</button>
       <button class="btn block" id="spOne"${ok && hs.length ? '' : ' disabled'}>分けずに1枚のカードにする</button>
       <button class="btn block" data-close>やめる</button>`);
     const S = $('#sheet');
     const keep = () => { F.name = $('#spName').value.trim(); F.prefix = normNo($('#spNo').value); const ex = $('#spExcl'); if (ex && !ex.disabled) F.excl = ex.checked; };
-    $$('[data-spk]', S).forEach(b => b.onclick = () => { keep(); const k = b.dataset.spk; F.kinds = F.kinds.includes(k) ? F.kinds.filter(x => x !== k) : F.kinds.concat(k); if (!F.name && F.kinds.length === 1 && !F.lock) F.name = kindName(F.kinds[0]); sheetKeep = true; openCreate(); });
-    $$('[data-spf]', S).forEach(b => b.onclick = () => { keep(); const k = b.dataset.spf; const was = byRoom(spFromF()); F[k] = !F[k]; if (k === 'apt' && !F.apt) F.ev = ''; if (k === 'lock' && F.lock && !F.name) F.name = 'オートロック'; if (k === 'apt' && F.apt && !F.name) F.name = '集合住宅'; if (was !== byRoom(spFromF())) F.sizeSet = false; sheetKeep = true; openCreate(); });
-    $$('[data-spev]', S).forEach(b => b.onclick = () => { keep(); const was = byRoom(spFromF()); F.ev = b.dataset.spev; if (F.ev) F.apt = true; if (F.apt && (!F.name || /^集合住宅/.test(F.name))) F.name = F.ev === 'y' ? '集合住宅（エレベーターあり）' : F.ev === 'n' ? '集合住宅（エレベーターなし・未確認）' : '集合住宅'; if (was !== byRoom(spFromF())) F.sizeSet = false; sheetKeep = true; openCreate(); });
+    spPickBind(S, F, () => {
+      keep();
+      if (!F.apt && !F.lock) F.by = ''; // 集合住宅がなくなったら、分け方もはじめにもどす
+      if (!F.by) F.sizeSet = false;     // 分け方を自分でえらんでいなければ、種別に合う大きさにもどす
+      const auto = specialKindsText({ special: spPickData(F) });
+      if (!F.name || F.name === F.autoName) { F.name = auto.slice(0, 20); F.autoName = F.name; }
+      sheetKeep = true; openCreate();
+    });
+    if ($('#spNoDup', S)) $('#spNoDup', S).onchange = e => { keep(); F.noDup = e.target.checked; sheetKeep = true; openCreate(); };
+    $$('[data-tkby]', S).forEach(b => b.onclick = () => { keep(); if (F.by === b.dataset.tkby || (!F.by && defBy(spFromF()) === b.dataset.tkby)) return; F.by = b.dataset.tkby; F.sizeSet = false; sheetKeep = true; openCreate(); });
     $$('[data-tksz]', S).forEach(b => b.onclick = () => { keep(); const sp0 = spFromF(); F.size = Math.max(MIN_SIZE, Math.min(sizeMax(sp0), F.size + Number(b.dataset.tksz) * sizeStep(sp0))); F.sizeSet = true; sheetKeep = true; openCreate(); });
     const check = () => {
       keep();
@@ -242,7 +254,7 @@
     $('#spGo').onclick = () => {
       if (!check()) return;
       const sp2 = Object.assign(spFromF(), { excl: F.unmet ? false : F.excl });
-      startSplit({ sp: sp2, name: F.name || specialKindsText({ special: sp2 }), prefix: F.prefix, size: F.size, hs: matchHouses(sp2).map(h => h.id), back: () => openCreate() });
+      startSplit({ sp: sp2, name: F.name || specialKindsText({ special: sp2 }), prefix: F.prefix, size: F.size, hs: pickIds(sp2), back: () => openCreate() });
     };
     $('#spOne').onclick = () => {
       if (!check()) return;
@@ -251,10 +263,19 @@
       const pts = polyTerrs().flatMap(x => x.polygon.map(v => [v[0], v[1], 1]));
       const all = pts.length ? pts : D().houses.map(h => [h.lat, h.lng]);
       closeSheet();
+      // ほかの特別区域の家をのぞくときは、家を名指しした1枚のカードにする（線では分けられないため）
+      const ids = pickIds(sp2), hasDup = ids.length !== matchHouses(sp2).length;
       commit(`特別区域 ${no}（${name}）をつくりました`, () => {
-        D().territories.push({ id: 't' + uid(), no, name, polygon: xlHull(all, 120), special: sp2, holder: null, lentAt: null, lend: 'auto' });
+        if (hasDup) D().territories.push({ id: 't' + uid(), no, name, polygon: hullOf(ids), special: Object.assign({}, sp2, { ids }), holder: null, lentAt: null, lend: 'auto' });
+        else D().territories.push({ id: 't' + uid(), no, name, polygon: xlHull(all, 120), special: sp2, holder: null, lentAt: null, lend: 'auto' });
       });
     };
+    function pickIds(sp2) {
+      const all = matchHouses(sp2);
+      if (!F.noDup) return all.map(h => h.id);
+      const d = new Set(overlapOf(all).map(h => h.id));
+      return all.filter(h => !d.has(h.id)).map(h => h.id);
+    }
   }
 
   /* 組（または分けていない特別区域）の画面 */
@@ -263,9 +284,11 @@
     const g = grpOf(t0), cards = g ? cardsOfGrp(g) : [t0], sp = spOf(t0);
     const back = () => openGroup(tid);
     const inCards = new Set(cards.flatMap(t => (spIds(t) ? [...spIds(t)] : [])));
-    const orphan = g ? matchHouses(sp).filter(h => !inCards.has(h.id)) : [];
+    const own = new Set(cards.map(t => t.id)), others = otherSp().filter(t => !own.has(t.id));
+    const notOther = h => !others.some(t => inSpecial(h, t)); // ほかの特別区域の家は、この組に入れない
+    const orphan = g ? matchHouses(sp).filter(h => !inCards.has(h.id) && notOther(h)) : [];
     const excl = spExcludes(t0) || (sp.excl !== false && !sp.unmet);
-    setSheet(headHtml(null, `特別区域 ${esc(g ? prefixOf(cards) : t0.no)}：${esc(grpName(t0))}`, `${cards.length}枚・条件：${esc(specialKindsText(t0))}`) + `
+    setSheet(headHtml(null, `特別区域 ${esc(g ? prefixOf(cards) : t0.no)}：${esc(grpName(t0))}`, `${cards.length}枚・種別：${esc(specialKindsText(t0))}`) + `
       <p class="q">ふつうの区域カードから</p>
       ${sp.unmet ? '<p class="hint">「一度も会えていない家」の特別区域は、ふつうの区域カードから外しません。</p>' : `<div class="seg" role="group" aria-label="ふつうの区域カードから外すか">
         <button type="button" data-tgx="1" aria-pressed="${excl}">外す（2回訪ねない）</button><button type="button" data-tgx="0" aria-pressed="${!excl}">外さない</button></div>
@@ -288,7 +311,7 @@
     if ($('#tgCond')) $('#tgCond').onclick = () => _openSpecialSheet(tid);
     $('#tgSplit').onclick = () => {
       const lentIds = new Set(cards.filter(t => t.holder).flatMap(t => housesOf(t.id).map(h => h.id)));
-      const hs = matchHouses(sp).filter(h => !lentIds.has(h.id)).map(h => h.id);
+      const hs = matchHouses(sp).filter(h => !lentIds.has(h.id) && (inCards.has(h.id) || notOther(h))).map(h => h.id);
       if (!hs.length) { toast('分け直せる家がありません（貸出中のカードの家は動かせません）'); return; }
       const free = cards.filter(t => !t.holder);
       const room = byRoom(sp), tot = room ? hs.reduce((a, id) => { const h = HID.get(id); return a + (h ? unitsOf(h, sp).length : 0); }, 0) : hs.length;
@@ -351,7 +374,8 @@
   }
   function startSplit(o) {
     const hs = o.hs.map(id => HID.get(id)).filter(Boolean);
-    P = Object.assign({}, o, { groups: cluster(proj(hs, wfOf(o.sp)), o.size), sel: 0 });
+    if (!o.sp.by) o.sp.by = defBy(o.sp);
+    P = Object.assign({}, o, { groups: cluster(proj(hs, wfOf(o.sp)), o.size), sel: 0, hasApt: hs.some(h => h.type === 'apt') });
     closeSheet();
     ensureBar();
     try { firstMapShow = false; zoomHintShown = true; } catch (e) { /* 何もしない */ }
@@ -378,6 +402,7 @@
     $('#tokTitle').textContent = `特別区域：${P.name}`;
     $('#tokBody').innerHTML = `
       <div class="tkrow"><span class="tkstat">${n}${uw} → ${gs.length}枚</span><div class="stepper" role="group" aria-label="1枚あたりの${uw}の数"><button type="button" data-tok="size" data-d="-1" aria-label="1枚あたりの${uw}の数を減らす">−</button><output class="wide">${P.size}${uw}${byRoom(P.sp) ? 'くらい' : 'まで'}</output><button type="button" data-tok="size" data-d="1" aria-label="1枚あたりの${uw}の数を増やす">＋</button></div></div>
+      ${P.hasApt ? bySeg(byRoom(P.sp), 'data-tok="by" data-v') : ''}
       <div class="tkchips" role="group" aria-label="カード">${gs.map((g, i) => `<button type="button" class="tkchip" data-tok="sel" data-i="${i}" aria-pressed="${i === P.sel}" style="border-color:${PAL[i % PAL.length]}">${esc(P.prefix)}-${i + 1}（${gCount(g)}）</button>`).join('')}</div>
       <p class="senhint">印をタップすると ${esc(P.prefix)}-${P.sel + 1} に移します。カードを押すと、そこを見せます。（　）は${byRoom(P.sp) ? '部屋の数' : '件数'}です。</p>
       <div class="tkrow"><button type="button" class="btn small primary" data-tok="ok">この分け方でつくる</button><button type="button" class="btn small" data-tok="back">条件にもどる</button></div>`;
@@ -411,6 +436,7 @@
     toast(`${P.prefix}-${to + 1} に移しました（${P.prefix}-${to + 1}：${gCount(P.groups[to])}${uw}・${P.prefix}-${from + 1}：${gCount(P.groups[from])}${uw}）`);
   }
   function act(k, ds) {
+    if (k === 'by') { if (ds.v === P.sp.by) return; P.sp = Object.assign({}, P.sp, { by: ds.v }); P.size = sizeDef(P.sp); regroup(); return; }
     if (k === 'size') { P.size = Math.max(MIN_SIZE, Math.min(sizeMax(P.sp), P.size + Number(ds.d) * sizeStep(P.sp))); regroup(); return; }
     if (k === 'sel') {
       P.sel = Number(ds.i); paint();
