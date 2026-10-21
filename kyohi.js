@@ -262,11 +262,11 @@
         <div class="row">
           <label class="btn">エクセル・CSV（住所の一覧）<input type="file" id="dncXl" accept=".xlsx,.xls,.csv,.tsv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
           <!-- iPhoneでは accept に .kml を書くとファイルを選べないことがあるため、あえて指定しない -->
-          <label class="btn">マイマップ（ピン）<input type="file" id="dncKml" hidden></label>
+          <label class="btn">マイマップ（ピン）<input type="file" id="dncKml" multiple hidden></label>
         </div>
         <p class="hint">エクセル・CSVは、ファイルを選ぶと<b>取り込む行をえらぶ画面</b>が出ます。使うのは<b>住所の列と区域番号の列だけ</b>で、名前などほかの列は保存しません。<br>
-          マイマップは「KML/KMZにエクスポート」したファイルを選び、拒否のピンのレイヤーをえらびます。<br>
-          どちらも、すでに同じ拒否があるときに「上書きしない／上書きする」をえらべます。</p>
+          マイマップは「KML/KMZにエクスポート」したファイル（いくつでも）を選びます。ピンを拒否・注意に分けて、確かめてから入れます（区域の線は変えません）。<br>
+          今ある拒否を残して足すか、入れなおすかを、取り込む前にえらべます。</p>
       </details>
       ${all.length ? `<input type="search" class="dnc-q" id="dncQ" placeholder="住所・区域番号でさがす" value="${esc(ui.q)}" aria-label="住所・区域番号でさがす">` : ''}
       <div id="dncGroups">${!all.length
@@ -312,7 +312,11 @@
     on('dncAddAddr', openAddrSheet);
     on('dncReview', () => startReview(reviewList(), 0));
     const xl = $('#dncXl'); if (xl) xl.onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) readXl(f); };
-    const km = $('#dncKml'); if (km) km.onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) readKml(f); };
+    const km = $('#dncKml'); if (km) km.onchange = e => {
+      const fs = [...e.target.files]; e.target.value = '';
+      if (!fs.length) return;
+      if (window.kmlKoushinStart) window.kmlKoushinStart(fs, 'pins'); else readKml(fs[0]); // 拒否・注意だけ（kml-koushin.js）
+    };
   }
   function bindRows(root) { $$('[data-dk]', root).forEach(b => b.onclick = () => openDetail(b.dataset.dk)); }
 
@@ -402,7 +406,7 @@
     if (typeof map === 'undefined' || !map) return;
     if (!pinLayer) pinLayer = L.layerGroup().addTo(map);
     pinLayer.clearLayers();
-    if ((mode === 'draw' && typeof drawTap !== 'undefined' && drawTap === 'line') || mode === 'sen') return;
+    if ((mode === 'draw' && typeof drawTap !== 'undefined' && drawTap === 'line') || mode === 'sen' || mode === 'tok') return;
     if (map.getZoom() < 14) return;
     const b = map.getBounds().pad(0.2), cur = pick && pick.cur;
     /* 見やすさ（2026.13.29）：拒否は区域を回るときに要るものなので、
@@ -1348,7 +1352,7 @@
     if (ref) ref.after(sp); else lg.appendChild(sp);
   }
 
-  window.kyohiApi = { houseGrid, placeOne, unitMatch: (h, u) => unitMatch(h, u), looksAddr: t => looksAddr(xlNorm(t)) }; // kml-koushin.js で使う
+  window.kyohiApi = { houseGrid, placeOne, unitMatch: (h, u) => unitMatch(h, u), looksAddr: t => looksAddr(xlNorm(t)), readXl: f => readXl(f) }; // kml-koushin.js・torikomi.js で使う
   window.chibanSrc = () => cbSrc(); // apt-import.js の出典の表示に使う
   /* 建物の画面に出す「拒否の部屋」（備考から取り込んだ、部屋ごとの拒否）。index.html の banNotice から呼ぶ */
   function dncRoomNote(h) {

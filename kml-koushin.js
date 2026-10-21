@@ -95,7 +95,9 @@
       const c = coordsOf(pt)[0];
       if (!c) continue;
       if (isMark(name, desc)) { out.marks++; continue; } // 「ポイント ①」「ポイント 1」など、枝番の目印
-      out.pins.push({ name, desc, style, lat: c[0], lng: c[1], file: fileName || '' });
+      let fo = pm.parentElement, folder = '';
+      while (fo && !folder) { if (fo.localName === 'Folder') folder = textOf(fo, 'name'); fo = fo.parentElement; }
+      out.pins.push({ name, desc, style, lat: c[0], lng: c[1], file: fileName || '', folder });
     }
     return out;
   }
@@ -119,7 +121,7 @@
     const a = looksAddr(nm) || part ? nm.slice(0, 120) : '';
     // ピンの元の文（名前／説明）をそのまま残す。部屋番号などを、あとで区域係が確かめられるように
     const orig = [String(p.name || '').trim(), String(p.desc || '').replace(/\s+/g, ' ').trim()].filter(Boolean).join(' ／ ').slice(0, 300);
-    const base = { lat: p.lat, lng: p.lng, a, src: p.name, file: p.file, black, part, o: orig };
+    const base = { lat: p.lat, lng: p.lng, a, src: p.name, file: p.file, folder: p.folder || '', black, part, o: orig };
     const items = [];
     if (rooms.length) {
       rooms.forEach(r => {
@@ -262,12 +264,13 @@
     return { specs, notes, made };
   }
   /* 家がどの新しい区域に入るか（枝番の外に残る家を数える） */
-  function houseFit(specs) {
+  function houseFit(specs, scope) {
     const bx = specs.map(s => ({ s, b: bboxOf(s.poly) }));
     const pps = new Map();
     specs.forEach(s => { if (s.pno && s.pp && !pps.has(s.pno)) pps.set(s.pno, { pp: s.pp, b: bboxOf(s.pp) }); });
     const gaps = new Map(); let outside = 0;
     for (const h of D().houses) {
+      if (scope && h.terrId && !scope.has(h.terrId)) continue; // 新しくしない区域の家は見ない
       let hit = null;
       for (const x of bx) { const b = x.b; if (h.lat < b[0] || h.lat > b[1] || h.lng < b[2] || h.lng > b[3]) continue; if (inPoly(h.lat, h.lng, x.s.poly)) { hit = x.s; break; } }
       if (hit) continue;
@@ -283,38 +286,57 @@
   }
 
   /* ---------- 入口 ---------- */
-  async function start(files) {
+  /* mode：'all'＝区域の線と拒否・注意をまとめて新しくする（全部置きかえ）
+           'lines'＝区域の線だけ（はじめは、ファイルにある区域だけを新しくする。拒否・注意・家はそのまま）
+           'pins'＝拒否・注意だけ（区域の線は変えない。はじめは、今の拒否に足す。同じ家・同じ場所は足さない） */
+  async function start(files, mode) {
     if (!isAdmin()) return;
     if (!files || !files.length) return;
+    mode = mode === 'lines' || mode === 'pins' ? mode : 'all';
     toast('ファイルを読んでいます…');
     let texts;
     try { texts = await readFiles(files); } catch (e) { infoSheet('ファイルを読み込めませんでした', 'マイマップの「KML/KMZにエクスポート」で書き出したファイル（またはそれをまとめたZIP）を選んでください。'); return; }
     const parsed = [], bad = [];
     texts.forEach(t => { try { parsed.push(parseKmlText(t.text, t.name)); } catch (e) { bad.push(t.name); } });
     const m = mergeParsed(parsed);
-    if (!m.parents.size && !m.kids.size) { infoSheet('区域の線が見つかりませんでした', 'マイマップで書き出すときに「ネットワーク リンク」のチェックを外して、もう一度書き出してください。'); return; }
+    const hasLines = m.parents.size || m.kids.size || m.others.length;
+    if (mode !== 'pins' && !m.parents.size && !m.kids.size) { infoSheet('区域の線が見つかりませんでした', 'マイマップで書き出すときに「ネットワーク リンク」のチェックを外して、もう一度書き出してください。'); return; }
+    if (mode === 'pins' && !m.pins.length) { infoSheet('ピンが見つかりませんでした', 'このファイルには、ピン（地点）が入っていません。拒否・注意のピンがあるマイマップを書き出してください。'); return; }
     try { await loadScript(LIB.pclip); } catch (e) { /* なくても、抜けた枝番を作らないだけ */ }
-    const tp = planTerrs(m);
+    const tp = mode !== 'pins' || hasLines ? planTerrs(m) : { specs: [], notes: [], made: [] };
     const items = [];
-    m.pins.forEach(p => splitPin(p).forEach(it => items.push(it)));
-    const tno = terrOfSpecs(tp.specs);
+    if (mode !== 'lines') m.pins.forEach(p => splitPin(p).forEach(it => items.push(it)));
+    // ピンの区域：線も新しくするときは新しい線で、拒否・注意だけのときは今の区域の線で決める
+    const tno = mode === 'pins' ? ((la, ln) => { const id = terrOf(la, ln), t = id ? terrById(id) : null; return t ? normNo(t.no) : ''; }) : terrOfSpecs(tp.specs);
     // ピンの名前が区域番号と同じもの（例：「1-1」「01-①」「12」）は、枝番などの目印の可能性が高いので、はじめは「入れない」にする
     const nos = new Set(tp.specs.map(s => s.no).concat(tp.specs.filter(s => s.pno).map(s => s.pno)));
+    if (mode === 'pins') D().territories.forEach(t => { if (!isSpecial(t)) { nos.add(normNo(t.no)); if (t.pno) nos.add(String(t.pno)); } });
     items.forEach((it, i) => {
       it.i = i; it.tno = tno(it.lat, it.lng);
       it.sameNo = !it.room && nos.has(noKey(it.src));
       it.use = !it.sameNo;
     });
-    const fit = houseFit(tp.specs);
-    const st = { files: texts.length, bad, m, tp, items, fit, replaceDnc: true };
+    // ピンのレイヤー（マイマップのフォルダ）が2つ以上あるときは、レイヤーごとに入れる・入れないをえらべる
+    const folders = [...new Set(items.map(it => it.folder || ''))];
+    const st = { mode, files: texts.length, bad, m, tp, items, fit: mode === 'pins' ? { gaps: new Map(), outside: 0 } : null,
+      replaceDnc: mode === 'all', scope: mode === 'lines' ? 'files' : 'all', pinWay: 'add', folders, offFolders: new Set() };
+    if (mode !== 'pins') st.fit = houseFit(tp.specs, st.scope === 'files' ? scopeTids(tp.specs) : null);
+    ui.tab = mode === 'pins' ? 'pin' : 'terr';
     preview(st);
   }
+  /* 「ファイルにある区域だけ」新しくするときに、新しくする今の区域：番号が同じ区域と、同じ親の番号の区域（枝番が変わる・親を枝番に分ける） */
+  function scopeOld(specs) {
+    const nos = new Set(specs.map(s => s.no)), pars = new Set();
+    specs.forEach(s => { pars.add(s.pno || s.no); });
+    return D().territories.filter(t => !t.dummy && !isSpecial(t) && (nos.has(normNo(t.no)) || pars.has(String(t.pno || '')) || pars.has(normNo(t.no)) || pars.has(normNo(t.no).split('-')[0])));
+  }
+  const scopeTids = specs => new Set(scopeOld(specs).map(t => t.id));
 
   /* ---------- 確認の画面 ---------- */
   const ui = { open: new Set(), tab: 'terr' };
-  function oldInfo(specs) {
+  function oldInfo(specs, scope) {
     const nos = new Set(specs.map(s => s.no));
-    const olds = D().territories.filter(t => !t.dummy && !isSpecial(t));
+    const olds = scope === 'files' ? scopeOld(specs) : D().territories.filter(t => !t.dummy && !isSpecial(t));
     const keep = olds.filter(t => nos.has(normNo(t.no))), gone = olds.filter(t => !nos.has(normNo(t.no)));
     return { keep, gone, lentGone: gone.filter(t => t.holder), lentKeep: keep.filter(t => t.holder) };
   }
@@ -337,64 +359,93 @@
         ${it.sens && k !== 'skip' ? '<small class="kk-sens">病気・家庭の事情など、個人のことが書かれていないか確かめてください</small>' : ''}
         <small>ピン：<span data-notr>${esc(it.o || String(it.src || ''))}</span>${it.black ? '（黒いピン）' : ''}</small></div></div>`;
   }
+  const TITLE = { all: 'マイマップで区域と拒否を新しくする', lines: 'マイマップから区域の線だけを取り込む', pins: 'マイマップから拒否・注意だけを取り込む' };
+  /* 拒否・注意だけのとき：入れなおす区域（ピンがある区域）と、そこにある今の拒否・注意の数 */
+  function pinScope(st) {
+    const tids = new Set();
+    st.items.forEach(it => { if (it.use && !st.offFolders.has(it.folder || '')) { const id = terrOf(it.lat, it.lng); if (id) tids.add(id); } });
+    let dnc = 0, cau = 0;
+    for (const k in D().dnc) if (tids.has(dncTidOf(k, D().dnc[k]))) dnc++;
+    for (const k in C()) { const v = C()[k]; if (v && v.s === 'kml' && tids.has(dncTidOf(k, v))) cau++; }
+    return { tids, dnc, cau };
+  }
+  const dncTidOf = (k, v) => { if (isPinKey(k)) return dncTerrOf(v); const h = houseById(String(k).split('|')[0]); return h ? h.terrId : null; };
+  const live = (st, it) => it.use && !st.offFolders.has(it.folder || '');
   function preview(st) {
-    const { tp, items, fit } = st;
-    const oi = oldInfo(tp.specs), dc = dncCounts();
+    const { tp, items, fit, mode } = st;
+    const oi = mode === 'pins' ? null : oldInfo(tp.specs, st.scope), dc = dncCounts();
     const nKid = tp.specs.filter(s => s.pno).length, nPar = new Set(tp.specs.filter(s => s.pno).map(s => s.pno)).size, nSingle = tp.specs.filter(s => !s.pno).length;
-    const nD = items.filter(i => i.use && i.kind === 'dnc').length, nW = items.filter(i => i.use && i.kind === 'warn').length;
-    const gapList = [...fit.gaps.entries()].sort((a, b) => cmpNo(a[0], b[0]));
+    const nD = items.filter(i => live(st, i) && i.kind === 'dnc').length, nW = items.filter(i => live(st, i) && i.kind === 'warn').length;
+    const gapList = fit ? [...fit.gaps.entries()].sort((a, b) => cmpNo(a[0], b[0])) : [];
     const byT = new Map();
-    items.forEach(it => { const key = it.tno || '？'; (byT.get(key) || byT.set(key, []).get(key)).push(it); });
+    items.forEach(it => { if (st.offFolders.has(it.folder || '')) return; const key = it.tno || '？'; (byT.get(key) || byT.set(key, []).get(key)).push(it); });
     const tGroups = [...byT.entries()].sort((a, b) => (a[0] === '？') - (b[0] === '？') || cmpNo(a[0], b[0]));
     const nKmlCau = Object.values(C()).filter(v => v && v.s === 'kml').length;
-    setSheet(headHtml(null, 'マイマップで区域と拒否を新しくする', `ファイル ${st.files}件`) + `
+    const showTerr = mode !== 'pins', showPin = mode !== 'lines';
+    const tab = showTerr && showPin ? ui.tab : showTerr ? 'terr' : 'pin';
+    const ps = mode === 'pins' ? pinScope(st) : null;
+    setSheet(headHtml(null, TITLE[mode], `ファイル ${st.files}件`) + `
       <div class="tiles">
-        <div class="tile"><b>${nPar + nSingle}</b><span>区域（親）</span></div>
-        <div class="tile"><b>${nKid}</b><span>枝番の区域</span></div>
-        <div class="tile"><b>${nD}</b><span>拒否</span></div>
-        <div class="tile"><b>${nW}</b><span>注意（！）</span></div>
+        ${showTerr ? `<div class="tile"><b>${nPar + nSingle}</b><span>区域（親）</span></div>
+        <div class="tile"><b>${nKid}</b><span>枝番の区域</span></div>` : ''}
+        ${showPin ? `<div class="tile"><b>${nD}</b><span>拒否</span></div>
+        <div class="tile"><b>${nW}</b><span>注意（！）</span></div>` : ''}
       </div>
       ${st.bad.length ? `<div class="notice warn">読めなかったファイル：${st.bad.map(esc).join('、')}</div>` : ''}
-      <div class="seg kk-tabs" role="group">
-        <button type="button" data-kktab="terr" aria-pressed="${ui.tab === 'terr'}">区域の線</button>
-        <button type="button" data-kktab="pin" aria-pressed="${ui.tab === 'pin'}">拒否・注意（${nD + nW}）</button>
-      </div>
-      <div id="kkBody">${ui.tab === 'terr' ? `
+      ${showTerr && showPin ? `<div class="seg kk-tabs" role="group">
+        <button type="button" data-kktab="terr" aria-pressed="${tab === 'terr'}">区域の線</button>
+        <button type="button" data-kktab="pin" aria-pressed="${tab === 'pin'}">拒否・注意（${nD + nW}）</button>
+      </div>` : ''}
+      <div id="kkBody">${tab === 'terr' ? `
         <h3 class="sub">区域の線</h3>
         <ul class="kk-ul">
           <li>枝番のある区域 ${nPar}（枝番 ${nKid}）・枝番のない区域 ${nSingle}</li>
           ${tp.made.length ? `<li><b>抜けていた枝番を自動で作ります：</b>${tp.made.map(esc).join('、')}（ほかの枝番に囲まれた部分）</li>` : ''}
           <li>番号が同じ今の区域 ${oi.keep.length}：線と名前を新しくします（貸し出し・S-13の記録は引き継ぎます${oi.lentKeep.length ? `。貸し出し中 ${oi.lentKeep.length}` : ''}）</li>
-          <li>なくなる今の区域 ${oi.gone.length}：消します（家は残り、新しい線で区域を決め直します）</li>
+          <li>なくなる今の区域 ${oi.gone.length}${oi.gone.length ? `（${oi.gone.slice(0, 12).map(t => esc(t.no)).join('・')}${oi.gone.length > 12 ? ' ほか' : ''}）` : ''}：消します（家は残り、新しい線で区域を決め直します）</li>
+          ${mode === 'lines' && st.scope === 'files' ? `<li>ファイルにない区域（${Math.max(0, D().territories.filter(t => !t.dummy && !isSpecial(t)).length - oi.keep.length - oi.gone.length)}）は、そのままです</li>` : ''}
+          ${mode === 'lines' ? '<li>拒否・注意・家の印は変えません</li>' : ''}
           ${m0(st)}
         </ul>
         ${oi.lentGone.length ? `<div class="notice warn"><b>貸し出し中の区域で、番号がなくなるものがあります：</b>${oi.lentGone.map(t => `区域${esc(t.no)}（${esc(uname(t.holder))}さん）`).join('、')}<br>この区域の貸し出しは終わります。</div>` : ''}
-        ${gapList.length ? `<div class="notice warn"><b>枝番の線の外に残る家があります（どの区域にも入りません）：</b><br>${gapList.map(([p, n]) => `区域${esc(p)}：${n}軒`).join('、')}<br>新しくしたあと、区域の一覧の「線を直す」で、枝番の線を引き直してください。</div>` : ''}
-        ${fit.outside ? `<p class="hint">どの区域の線にも入らない家：${fit.outside}軒（区域の外の家として残ります）</p>` : ''}
+        ${gapList.length ? `<div class="notice warn"><b>枝番の線の外に残る家があります（どの区域にも入りません）：</b><br>${gapList.map(([p, n]) => `区域${esc(p)}：${n}軒`).join('、')}<br>新しくしたあと、「区域の線・取り込み」の「区域の線を直す」で、枝番の線を引き直してください。</div>` : ''}
+        ${fit && fit.outside ? `<p class="hint">どの区域の線にも入らない家：${fit.outside}軒（区域の外の家として残ります）</p>` : ''}
         ${tp.notes.length ? `<details class="dncfold"><summary>気づいたこと ${tp.notes.length}件</summary><ul>${tp.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>` : ''}`
       : `
         <h3 class="sub">拒否・注意</h3>
+        ${st.folders.length > 1 ? `<p class="q">入れるレイヤー（マイマップのフォルダ）</p><div class="kk-folders">${st.folders.map(f => `<label class="check"><input type="checkbox" data-kkfo="${esc(f)}"${st.offFolders.has(f) ? '' : ' checked'}>${esc(f || '（名前のないレイヤー）')}（${items.filter(i => (i.folder || '') === f).length}）</label>`).join('')}</div>` : ''}
         <p class="hint">左の印を押すと「拒否 → 注意 → 入れない」の順に切りかわります。黒いピンと、部屋番号のあとのカッコ書き（例：1002（夜勤））、<b>時間や曜日つきの「訪問しない」（例：夕方は訪問しない）</b>は「注意」にしています。<br>
           注意の内容は、その家を訪ねる人みんなが見ます。<b>名前・病気・家庭の事情など、個人のことは書かない</b>でください。</p>
         ${items.some(i => i.sens) ? `<div class="notice warn">個人の事情が書かれているかもしれない注意が ${items.filter(i => i.sens).length}件あります（<span class="kk-sens">目印</span>のもの）。内容を確かめてください。</div>` : ''}
-        ${tGroups.map(([no, its]) => `<details class="dncg kk-g" data-kg="${esc(no)}"${ui.open.has(no) ? ' open' : ''}><summary><span class="stamp sm${noCls(no)}">${esc(no)}</span><span class="nm">${no === '？' ? '新しい区域の線の外' : '区域' + esc(no)}</span>
+        ${tGroups.map(([no, its]) => `<details class="dncg kk-g" data-kg="${esc(no)}"${ui.open.has(no) ? ' open' : ''}><summary><span class="stamp sm${noCls(no)}">${esc(no)}</span><span class="nm">${no === '？' ? (mode === 'pins' ? '区域の線の外' : '新しい区域の線の外') : '区域' + esc(no)}</span>
           <span class="cnt">拒 ${its.filter(i => i.use && i.kind === 'dnc').length}・！ ${its.filter(i => i.use && i.kind === 'warn').length}</span></summary>
           ${ui.open.has(no) ? its.map(itemRow).join('') : ''}</details>`).join('')}
         ${st.m.marks ? `<p class="hint">枝番の目印のピン（「ポイント ①」など）${st.m.marks}本は入れません。</p>` : ''}
         ${items.some(i => i.sameNo) ? `<p class="hint">名前が区域番号と同じピン ${items.filter(i => i.sameNo).length}本は、目印とみなして「入れない」にしています（各区域の一覧で確かめられます）。</p>` : ''}`}
       </div>
       <div class="dx-foot">
-        <label class="check"><input type="checkbox" id="kkRep"${st.replaceDnc ? ' checked' : ''}>今ある拒否 ${dc.all}件をすべて消して入れなおす<small>（訪問で記録 ${dc.visit}・取り込み ${dc.imp}・アパートの部屋 ${dc.room}）</small></label>
-        ${nKmlCau ? `<p class="hint">以前にマイマップから入れた注意 ${nKmlCau}件は入れなおします（奉仕者・係が書いた注意は残します）。</p>` : ''}
-        <button type="button" class="btn primary block" id="kkGo">この内容で新しくする</button>
+        ${mode === 'all' ? `<label class="check"><input type="checkbox" id="kkRep"${st.replaceDnc ? ' checked' : ''}>今ある拒否 ${dc.all}件をすべて消して入れなおす<small>（訪問で記録 ${dc.visit}・取り込み ${dc.imp}・アパートの部屋 ${dc.room}）</small></label>
+        ${nKmlCau ? `<p class="hint">以前にマイマップから入れた注意 ${nKmlCau}件は入れなおします（奉仕者・係が書いた注意は残します）。</p>` : ''}` : ''}
+        ${mode === 'lines' ? `<p class="q">どこまで新しくしますか</p><div class="choices two kk-way">
+          <button type="button" class="choice" data-kkscope="files" aria-pressed="${st.scope === 'files'}">ファイルにある区域だけ<small>同じ番号・同じ親の区域だけを新しくします。ほかの区域はそのまま</small></button>
+          <button type="button" class="choice" data-kkscope="all" aria-pressed="${st.scope === 'all'}">全部置きかえる<small>ファイルにない区域は消します（家は残ります）。全区域のファイルをえらんだときに</small></button></div>` : ''}
+        ${mode === 'pins' ? `<p class="q">今ある拒否・注意は</p><div class="choices two kk-way">
+          <button type="button" class="choice" data-kkway="add" aria-pressed="${st.pinWay === 'add'}">残して、足す<small>同じ家・同じ場所の拒否は、もう一度入れません</small></button>
+          <button type="button" class="choice" data-kkway="replace" aria-pressed="${st.pinWay === 'replace'}">入れなおす<small>ピンのある区域（${ps.tids.size}）の拒否 ${ps.dnc}件と、マイマップから入れた注意 ${ps.cau}件を消してから入れます</small></button></div>` : ''}
+        <button type="button" class="btn primary block" id="kkGo">${mode === 'lines' ? 'この内容で区域の線を新しくする' : mode === 'pins' ? 'この内容で拒否・注意を入れる' : 'この内容で新しくする'}</button>
         <button type="button" class="btn block" data-close>やめる</button>
       </div>`);
     const S = $('#sheet');
     $$('[data-kktab]', S).forEach(b => b.onclick = () => { ui.tab = b.dataset.kktab; sheetKeep = true; preview(st); });
-    $('#kkRep').onchange = e => { st.replaceDnc = e.target.checked; };
+    if ($('#kkRep')) $('#kkRep').onchange = e => { st.replaceDnc = e.target.checked; };
+    $$('[data-kkscope]', S).forEach(b => b.onclick = () => {
+      st.scope = b.dataset.kkscope; st.fit = houseFit(tp.specs, st.scope === 'files' ? scopeTids(tp.specs) : null); sheetKeep = true; preview(st);
+    });
+    $$('[data-kkway]', S).forEach(b => b.onclick = () => { st.pinWay = b.dataset.kkway; sheetKeep = true; preview(st); });
+    $$('[data-kkfo]', S).forEach(b => b.onchange = () => { const f = b.dataset.kkfo; if (b.checked) st.offFolders.delete(f); else st.offFolders.add(f); sheetKeep = true; preview(st); });
     $$('.kk-g', S).forEach(d => d.addEventListener('toggle', () => {
       const no = d.dataset.kg;
-      if (d.open) { ui.open.add(no); if (!d.querySelector('.kk-it')) { d.insertAdjacentHTML('beforeend', items.filter(i => (i.tno || '？') === no).map(itemRow).join('')); } }
+      if (d.open) { ui.open.add(no); if (!d.querySelector('.kk-it')) { d.insertAdjacentHTML('beforeend', items.filter(i => (i.tno || '？') === no && !st.offFolders.has(i.folder || '')).map(itemRow).join('')); } }
       else ui.open.delete(no);
     }));
     const body = $('#kkBody'); // 描き直すたびに作り直される入れ物に付ける（同じ処理が2回動かないように）
@@ -410,11 +461,24 @@
   const m0 = st => (st.m.dup.length ? `<li>同じ枝番が2つあったもの：${st.m.dup.map(esc).join('、')}</li>` : '');
 
   async function confirmGo(st) {
-    const oi = oldInfo(st.tp.specs);
-    const ok = await ask('区域と拒否を新しくしますか？', {
-      title: '区域と拒否を新しくしますか？',
-      body: `区域の線をすべて新しくします（なくなる区域 ${oi.gone.length}）。${st.replaceDnc ? '今の拒否はすべて消して、' : ''}マイマップの拒否・注意を入れます。\n始める前に、今の区域・拒否・注意を、この端末にファイルで控えます。すぐあとなら、お知らせの「取り消す」でもどせます。`,
-      ok: '新しくする'
+    const mode = st.mode;
+    let body;
+    if (mode === 'pins') {
+      const ps = pinScope(st), n = st.items.filter(i => live(st, i)).length;
+      if (!n) { toast('入れる拒否・注意がありません'); return; }
+      body = st.pinWay === 'replace'
+        ? `ピンのある区域（${ps.tids.size}）の今の拒否 ${ps.dnc}件と、マイマップから入れた注意 ${ps.cau}件を消して、マイマップの拒否・注意（${n}件）を入れます。区域の線は変えません。`
+        : `今の拒否・注意は残して、マイマップの拒否・注意（${n}件）を足します。同じ家・同じ場所のものは足しません。区域の線は変えません。`;
+    } else {
+      const oi = oldInfo(st.tp.specs, st.scope);
+      body = mode === 'lines'
+        ? `${st.scope === 'files' ? 'ファイルにある区域' : 'すべての区域'}の線を新しくします（番号が同じ区域 ${oi.keep.length}・なくなる区域 ${oi.gone.length}）。拒否・注意・家の印は変えません。`
+        : `区域の線をすべて新しくします（なくなる区域 ${oi.gone.length}）。${st.replaceDnc ? '今の拒否はすべて消して、' : ''}マイマップの拒否・注意を入れます。`;
+    }
+    const ok = await ask(TITLE[mode].replace(/する$/, 'しますか？').replace(/取り込む$/, '取り込みますか？'), {
+      title: TITLE[mode].replace(/する$/, 'しますか？').replace(/取り込む$/, '取り込みますか？'),
+      body: body + '\n始める前に、今の区域・拒否・注意を、この端末にファイルで控えます。',
+      ok: mode === 'pins' ? '入れる' : '新しくする'
     });
     if (!ok) return;
     downloadBackup();
@@ -434,39 +498,58 @@
 
   /* ---------- 置きかえる ---------- */
   function apply(st) {
-    const { specs } = st.tp, at = now();
-    const res = { nNew: 0, nKeep: 0, nGone: 0, dnc: 0, cau: 0, pinOnly: 0 };
+    const { specs } = st.tp, at = now(), mode = st.mode;
+    const res = { nNew: 0, nKeep: 0, nGone: 0, dnc: 0, cau: 0, pinOnly: 0, skip: 0, delD: 0, delC: 0 };
     closeSheet();
     const before = new Map(D().houses.map(h => [h.id, h.terrId || null]));
-    commit('区域と拒否・注意を新しくしました', () => {
-      // 1) 区域
-      const byNo = new Map();
-      D().territories.forEach(t => { if (!t.dummy && !isSpecial(t)) byNo.set(normNo(t.no), t); });
-      const used = new Set();
-      const ppDone = new Set(); // 親の線は、親ごとに1つの枝番にだけ持たせる（送る大きさを小さくする）
-      specs.forEach(s => {
-        const old = byNo.get(s.no);
-        const set = t => {
-          t.polygon = s.poly; t.name = `区域${s.no}`;
-          if (s.pno) { t.pno = s.pno; if (s.pp && !ppDone.has(s.pno)) { t.pp = s.pp; ppDone.add(s.pno); } else delete t.pp; } else { delete t.pno; delete t.pp; }
-          if (s.pnm) t.pnm = s.pnm; else delete t.pnm;
-          delete t.rest;
-        };
-        if (old) { set(old); used.add(old.id); res.nKeep++; }
-        else { const t = { id: 't' + uid(), no: s.no, holder: null, lentAt: null }; set(t); D().territories.push(t); used.add(t.id); res.nNew++; }
-      });
-      D().territories.filter(t => !t.dummy && !isSpecial(t) && !used.has(t.id)).map(t => t.id).forEach(id => { deleteTerrData(id, false); res.nGone++; });
-      reassign();
-      // 家の区域は、画面からは送らない（3万件になることがあるので）。サーバーが同じ決め方で決め直す（下の kmlAfterFlush）
-      if (LIVE && Store.fp && Store.fp.houses) D().houses.forEach(h => { if ((h.terrId || null) !== before.get(h.id)) Store.fp.houses.set(h.id, JSON.stringify(h)); });
+    const msg = mode === 'lines' ? '区域の線を新しくしました' : mode === 'pins' ? '拒否・注意を取り込みました' : '区域と拒否・注意を新しくしました';
+    commit(msg, () => {
+      // 1) 区域（拒否・注意だけのときは、さわらない）
+      if (mode !== 'pins') {
+        const olds = mode === 'lines' && st.scope === 'files' ? scopeOld(specs) : D().territories.filter(t => !t.dummy && !isSpecial(t));
+        const byNo = new Map();
+        olds.forEach(t => byNo.set(normNo(t.no), t));
+        // ファイルにある区域だけのとき：ほかの区域と同じ番号の線は、その区域を新しくする（親の番号がちがっても、番号が同じなら同じ区域）
+        if (mode === 'lines' && st.scope === 'files') D().territories.forEach(t => { if (!t.dummy && !isSpecial(t) && !byNo.has(normNo(t.no)) && specs.some(x => x.no === normNo(t.no))) byNo.set(normNo(t.no), t); });
+        const used = new Set();
+        const ppDone = new Set(); // 親の線は、親ごとに1つの枝番にだけ持たせる（送る大きさを小さくする）
+        specs.forEach(s => {
+          const old = byNo.get(s.no);
+          const set = t => {
+            t.polygon = s.poly; t.name = `区域${s.no}`;
+            if (s.pno) { t.pno = s.pno; if (s.pp && !ppDone.has(s.pno)) { t.pp = s.pp; ppDone.add(s.pno); } else delete t.pp; } else { delete t.pno; delete t.pp; }
+            if (s.pnm) t.pnm = s.pnm; else delete t.pnm;
+            delete t.rest;
+          };
+          if (old) { set(old); used.add(old.id); res.nKeep++; }
+          else { const t = { id: 't' + uid(), no: s.no, holder: null, lentAt: null }; set(t); D().territories.push(t); used.add(t.id); res.nNew++; }
+        });
+        olds.filter(t => !used.has(t.id)).map(t => t.id).forEach(id => { deleteTerrData(id, false); res.nGone++; });
+        reassign();
+        // 家の区域は、画面からは送らない（3万件になることがあるので）。サーバーが同じ決め方で決め直す（下の kmlAfterFlush）
+        if (LIVE && Store.fp && Store.fp.houses) D().houses.forEach(h => { if ((h.terrId || null) !== before.get(h.id)) Store.fp.houses.set(h.id, JSON.stringify(h)); });
+      }
+      if (mode === 'lines') return;
       // 2) 拒否・注意（今あるものを消す）
-      if (st.replaceDnc) { D().dnc = {}; }
       const cm = C();
-      Object.keys(cm).forEach(k => { if (cm[k] && cm[k].s === 'kml') delete cm[k]; });
+      if (mode === 'all') {
+        if (st.replaceDnc) { D().dnc = {}; }
+        Object.keys(cm).forEach(k => { if (cm[k] && cm[k].s === 'kml') delete cm[k]; });
+      } else if (st.pinWay === 'replace') {
+        const tids = pinScope(st).tids;
+        Object.keys(D().dnc).forEach(k => { if (tids.has(dncTidOf(k, D().dnc[k]))) { delete D().dnc[k]; res.delD++; } });
+        Object.keys(cm).forEach(k => { if (cm[k] && cm[k].s === 'kml' && tids.has(dncTidOf(k, cm[k]))) { delete cm[k]; res.delC++; } });
+      }
+      // 足すときは、同じ家・同じ場所（3m以内・同じ部屋）の拒否・注意を、もう一度入れない
+      const addOnly = mode === 'pins' && st.pinWay === 'add';
+      const pinNear = (m, lat, lng, room) => Object.keys(m).some(k => {
+        const v = m[k]; if (!isPinKey(k) || !v || typeof v !== 'object' || !isFinite(v.lat)) return false;
+        return (v.room || '') === (room || '') && Math.abs(v.lat - lat) < 0.00003 && Math.abs(v.lng - lng) < 0.00003;
+      });
       // 3) 入れる
       const api = window.kyohiApi, near = api.houseGrid();
       st.items.forEach(it => {
-        if (!it.use) return;
+        if (!live(st, it)) return;
         const base = { s: 'kml', at };
         if (it.a) base.a = it.a;
         if (it.kind === 'dnc' && it.m) base.m = it.m; // ピンのメモ（区域係だけが見る）
@@ -477,6 +560,7 @@
           const o = Object.assign(base, { p: 1, room: it.room, lat: r6(apt ? apt[0].lat : it.lat), lng: r6(apt ? apt[0].lng : it.lng) });
           if (apt) o.h = apt[0].id;
           const tid = apt ? apt[0].terrId : terrOf(it.lat, it.lng); if (tid) o.t = tid;
+          if (addOnly && pinNear(it.kind === 'warn' ? cm : D().dnc, o.lat, o.lng, it.room)) { res.skip++; return; }
           if (it.kind === 'warn') { if (it.note) o.n = it.note; delete o.a; cm['pin:' + uid()] = o; res.cau++; }
           else { D().dnc['pin:' + uid()] = o; res.dnc++; }
           return;
@@ -484,30 +568,32 @@
         const pl = api.placeOne(near, pos, '', true);
         if (pl.kind === 'house') {
           const h = pl.h, k = K(h.id, '');
-          if (it.kind === 'warn') { cm[k] = { s: 'kml', at }; if (it.note) cm[k].n = it.note; res.cau++; }
-          else { D().dnc[k] = Object.assign(base, { lat: r6(h.lat), lng: r6(h.lng), auto: 1 }); delete D().follows[k]; delete D().released[k]; delete cm[k]; res.dnc++; }
+          if (it.kind === 'warn') { if (addOnly && cm[k]) { res.skip++; return; } cm[k] = { s: 'kml', at }; if (it.note) cm[k].n = it.note; res.cau++; }
+          else { if (addOnly && D().dnc[k]) { res.skip++; return; } D().dnc[k] = Object.assign(base, { lat: r6(h.lat), lng: r6(h.lng), auto: 1 }); delete D().follows[k]; delete D().released[k]; delete cm[k]; res.dnc++; }
           return;
         }
         if (it.kind === 'warn') { // 近くにアパートがあれば、建物ぜんたいの注意にする
           const apt = near(it.lat, it.lng, 15).find(([h]) => h.type === 'apt');
-          if (apt) { const k = K(apt[0].id, ''); cm[k] = { s: 'kml', at }; if (it.note) cm[k].n = it.note; res.cau++; return; }
+          if (apt) { const k = K(apt[0].id, ''); if (addOnly && cm[k]) { res.skip++; return; } cm[k] = { s: 'kml', at }; if (it.note) cm[k].n = it.note; res.cau++; return; }
         }
         const o = Object.assign(base, { p: 1, lat: r6(it.lat), lng: r6(it.lng) });
         const tid = terrOf(it.lat, it.lng); if (tid) o.t = tid;
+        if (addOnly && pinNear(it.kind === 'warn' ? cm : D().dnc, o.lat, o.lng, '')) { res.skip++; return; }
         res.pinOnly++;
         if (it.kind === 'warn') { if (it.note) o.n = it.note; delete o.a; cm['pin:' + uid()] = o; res.cau++; }
         else { D().dnc['pin:' + uid()] = o; res.dnc++; }
       });
     });
-    toast('区域と拒否・注意を新しくしました（取り消すときは、控えのファイルから係に相談してください）'); // 3万件の家をもどす「取り消す」は出さない
-    if (LIVE) { lsSet(NEED_KEY, '1'); flush(true); }
+    toast(msg + (mode === 'pins' ? '' : '（取り消すときは、控えのファイルから係に相談してください）')); // 3万件の家をもどす「取り消す」は出さない
+    if (LIVE) { if (mode !== 'pins') lsSet(NEED_KEY, '1'); flush(true); }
     // 4) 終わりの画面
-    const gaps = [...st.fit.gaps.entries()].sort((a, b) => cmpNo(a[0], b[0]));
-    infoSheet('区域と拒否・注意を新しくしました', `
-      <ul class="kk-ul"><li>区域：新しく ${res.nNew}・線を新しくした ${res.nKeep}・消した ${res.nGone}${st.tp.made.length ? `（自動で作った枝番：${st.tp.made.map(esc).join('、')}）` : ''}</li>
-      <li>拒否 ${res.dnc}件・注意（！）${res.cau}件${res.pinOnly ? `（うち家の印とつながっていないもの ${res.pinOnly}件は「拒否・！」の一覧の「要確認」から地図で家とつなげます）` : ''}</li></ul>
-      ${gaps.length ? `<div class="notice warn"><b>枝番の線の外に残った家：</b>${gaps.map(([p, n]) => `区域${esc(p)} ${n}軒`).join('、')}<br>区域の一覧の「線を直す」で、枝番の線を引き直してください。</div>` : ''}
-      <p class="hint">控えのファイル（区域を新しくする前の控え）が、この端末に保存されています。</p>`);
+    const gaps = st.fit ? [...st.fit.gaps.entries()].sort((a, b) => cmpNo(a[0], b[0])) : [];
+    const terrLine = `<li>区域：新しく ${res.nNew}・線を新しくした ${res.nKeep}・消した ${res.nGone}${st.tp.made.length ? `（自動で作った枝番：${st.tp.made.map(esc).join('、')}）` : ''}</li>`;
+    const pinLine = `<li>拒否 ${res.dnc}件・注意（！）${res.cau}件${res.skip ? `・同じものがあったので入れなかった ${res.skip}件` : ''}${res.delD || res.delC ? `（入れる前に消した拒否 ${res.delD}・注意 ${res.delC}）` : ''}${res.pinOnly ? `（うち家の印とつながっていないもの ${res.pinOnly}件は「拒否・！」の一覧の「要確認」から地図で家とつなげます）` : ''}</li>`;
+    infoSheet(msg, `
+      <ul class="kk-ul">${mode !== 'pins' ? terrLine : ''}${mode !== 'lines' ? pinLine : ''}</ul>
+      ${gaps.length ? `<div class="notice warn"><b>枝番の線の外に残った家：</b>${gaps.map(([p, n]) => `区域${esc(p)} ${n}軒`).join('、')}<br>「区域の線・取り込み」の「区域の線を直す」で、枝番の線を引き直してください。</div>` : ''}
+      <p class="hint">控えのファイル（${mode === 'pins' ? '取り込む前の区域・拒否・注意の控え' : '区域を新しくする前の控え'}）が、この端末に保存されています。</p>`);
     firstMapShow = false;
   }
 
@@ -528,6 +614,8 @@
   .kk-part{display:inline-block;background:#FFF4D6;color:#6B4200;border-radius:6px;padding:0 6px;font-weight:700}
   .kk-memo{display:inline-block;background:#F1F3F5;color:var(--ink);border-radius:6px;padding:0 6px}
   .kk-sens{display:inline-block;background:#FDECEC;color:#8B1A1A;border-radius:6px;padding:0 6px;font-weight:700}
+  .kk-way .choice[aria-pressed=true]{border-color:var(--brand);background:#DCE8F7;box-shadow:inset 0 0 0 1px var(--brand)}
+  .kk-folders{display:flex;flex-direction:column;gap:2px;margin:4px 0 10px}
   `;
   document.head.appendChild(css);
 
@@ -546,6 +634,6 @@
   };
   window.kmlKoushinStart = start;
   document.addEventListener('change', e => {
-    if (e.target && e.target.id === 'adKmlAll') { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) start(fs); }
+    if (e.target && e.target.id === 'adKmlAll') { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) start(fs, 'all'); }
   });
 })(typeof window !== 'undefined' ? window : globalThis);
