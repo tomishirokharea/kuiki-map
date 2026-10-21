@@ -697,6 +697,8 @@
         : `<button type="button" class="btn small primary" data-kgplan="${i}">予定に入れる</button>`) +
         (c.kind === 'group' ? `<button type="button" class="btn small" data-kgchain="${i}">回る順番</button>` : '');
     }
+    // 区域をもらう・留守宅カードは、受け取る前に地図で場所を見られる（nozoku.js）
+    if ((c.kind === 'terr' || c.kind === 'card') && window.nozoku) acts += simple ? `<button type="button" class="btn small kgplan" data-kgpeek="${i}">地図で場所を見る</button>` : `<button type="button" class="btn small" data-kgpeek="${i}">地図</button>`;
     return `<article class="kgc"><p class="kgct">${esc(c.title)}${c.mine ? '<span class="kgbadge">あなたの区域カード</span>' : ''}</p>
       <div class="kgcols${simple ? ' two' : ''}" role="group" aria-label="並べかえる欄">${cols}</div>
       <button type="button" class="kgwhy" data-kginfo="${i}">${esc(c.reason)}</button>
@@ -844,6 +846,11 @@
     else if (q('[data-kgmore]')) { VIEW.shown += isS() ? 3 : 10; paintList(); }
     else if (q('[data-kgloc]')) { locate(() => { RECO_CACHE = null; renderRecoView(); }); }
     else if ((x = q('[data-kggo]'))) { const c = it(x, 'kggo'); if (c) goPick(c); }
+    else if ((x = q('[data-kgpeek]'))) {
+      const c = it(x, 'kgpeek'); if (!c) return;
+      window.nozoku.peek(c.t.id, { title: c.title, sub: c.why || '', pts: c.kind === 'card' ? c.pts : null,
+        take: c.now ? () => goPick(c) : null, takeLabel: c.kind === 'terr' ? (c.take ? '受け取る' : '係に頼む') : '受け取る' });
+    }
     else if ((x = q('[data-kgplan]'))) { const c = it(x, 'kgplan'); if (c) openPlan(c); }
     else if ((x = q('[data-kgchain]'))) { const c = it(x, 'kgchain'); if (c) openChain(c); }
     else if ((x = q('[data-kginfo]'))) { const c = it(x, 'kginfo'); if (c) window.openTerrInfo(c.t.id, c.col, c.bi, c); }

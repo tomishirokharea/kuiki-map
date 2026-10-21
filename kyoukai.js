@@ -55,6 +55,10 @@
   @keyframes senBlink{50%{fill-opacity:.15;stroke-opacity:.4}}
   @media (prefers-reduced-motion: reduce){path.sen-blink{animation:none}}
   .sen-cut{width:18px;height:18px;border-radius:50%;background:#111;border:3px solid #fff;box-shadow:0 1px 3px #0007}
+  .sen-cut.drag{width:28px;height:28px;border-width:4px;cursor:grab;box-shadow:0 0 0 3px #11111133,0 1px 4px #0007}
+  .senbar .sencnt{margin:6px 0 0;font-size:15px;line-height:1.5}
+  .senbar .sencnt b{font-size:17px}
+  .senbar .sencnt .a{color:${COL_A}}.senbar .sencnt .b{color:${COL_B}}
   .lifting>.dv,.lifting>.dmid{transform:scale(1.3);box-shadow:0 0 0 3px #fff,0 0 0 6px var(--draw),0 2px 6px #0007}`;
   document.head.appendChild(css);
 
@@ -197,9 +201,20 @@
     while (nos.has(`${base}-${i}`)) i++;
     return `${base}-${i}`;
   }
-  function housesIn(tid, ring) {
-    return housesOf(tid).filter(h => inPoly(h.lat, h.lng, ring)).length;
+  /* 線の中の家・部屋の数（集合住宅は部屋ごと。特別区域で回る部屋は、ふつうの区域カードに入らないので数えない） */
+  function countIn(tid, ring) {
+    const t = terrById(tid), o = { n: 0, house: 0, apt: 0, units: 0 };
+    housesOf(tid).forEach(h => {
+      if (ring && !inPoly(h.lat, h.lng, ring)) return;
+      const us = typeof unitsIn === 'function' ? unitsIn(h, t) : targets(h);
+      if (!us.length) return;
+      o.n += us.length;
+      if (h.type === 'apt') { o.apt++; o.units += us.length; } else o.house++;
+    });
+    return o;
   }
+  const housesIn = (tid, ring) => countIn(tid, ring).n;
+  const cntText = c => `家・部屋 ${c.n}${c.apt ? `（一戸建てなど ${c.house}・集合住宅 ${c.apt}棟 ${c.units}部屋）` : ''}`;
 
   /* ---------- となりに合わせる ----------
      この区域の角を、近く（tol m 以内）の隣の点・線にそろえ、隣の点が線のすぐ近くにあれば、その点を足す */
@@ -378,8 +393,8 @@
       const sp = S.split;
       hint.textContent = !S.cut.length ? '区域を横切るように、切る線の始まりの場所をタップします。'
         : S.cut.length === 1 ? '線の終わりの場所をタップします。曲げたいときは、曲がる所も順番にタップします。'
-          : sp && sp.err ? sp.err : 'オレンジと青の2つに分かれます。よければ「これで分ける」を押します。';
-      body.innerHTML = `<div class="senrow">${S.cut.length ? btn('cutBack', '1つ戻す', 'small') : ''}
+          : sp && sp.err ? sp.err : '黒い点を指で動かすと、分かれ方と数がすぐ変わります。よければ「これで分ける」を押します。';
+      body.innerHTML = `<p class="sencnt" id="senCnt">${splitCntHtml()}</p><div class="senrow">${S.cut.length ? btn('cutBack', '1つ戻す', 'small') : ''}
         ${sp && sp.a ? btn('splitOk', 'これで分ける', 'small primary') : ''}${btn('cancel', 'やめる', 'small')}</div>`;
       return;
     }
@@ -429,14 +444,12 @@
   function paintMap() {
     if (!lay) return;
     lay.clearLayers();
+    if (shapeLay) shapeLay.clearLayers();
     const t = S.tid ? terrById(S.tid) : null;
     if (S.tool === 'check') { paintIssues(); return; }
     if (!t) return;
     if (S.tool === 'split' && S.split && S.split.a) {
-      L.polygon(S.split.a, { color: COL_A, weight: 4, fillColor: COL_A, fillOpacity: 0.28, interactive: false }).addTo(lay);
-      L.polygon(S.split.b, { color: COL_B, weight: 4, fillColor: COL_B, fillOpacity: 0.28, interactive: false }).addTo(lay);
-      lbl(center(S.split.a), `家 ${S.split.na}`, COL_A).addTo(lay);
-      lbl(center(S.split.b), `家 ${S.split.nb}`, COL_B).addTo(lay);
+      paintSplitShape();
     } else if (S.tool === 'fit' && S.fit) {
       L.polygon(t.polygon, { color: '#475569', weight: 3, dashArray: '6 6', fill: false, interactive: false }).addTo(lay);
       L.polygon(S.fit.ring, { color: COL_A, weight: 5, fillColor: COL_A, fillOpacity: 0.12, interactive: false }).addTo(lay);
@@ -447,9 +460,54 @@
       neighbors(t, 2).forEach(x => L.polygon(x.polygon, { color: COL_B, weight: 3, dashArray: '8 6', fillColor: COL_B, fillOpacity: 0.06, interactive: false }).addTo(lay));
     }
     if (S.tool === 'split' && S.cut.length) {
-      L.polyline(S.cut, { color: '#111', weight: 3, dashArray: '6 5', interactive: false }).addTo(lay);
-      S.cut.forEach(p => L.marker(p, { icon: L.divIcon({ className: '', html: '<div class="sen-cut"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), interactive: false, keyboard: false }).addTo(lay));
+      S.cutLine = L.polyline(S.cut, { color: '#111', weight: 3, dashArray: '6 5', interactive: false }).addTo(lay);
+      // 切る線の点は、指で動かせる（動かしている間も、分かれ方と数がすぐ変わる）
+      S.cut.forEach((p, i) => {
+        const m = L.marker(p, { icon: L.divIcon({ className: '', html: '<div class="sen-cut drag"></div>', iconSize: [28, 28], iconAnchor: [14, 14] }), draggable: true, keyboard: false, zIndexOffset: 2500 }).addTo(lay);
+        m.on('drag', e => { const ll = e.target.getLatLng(); S.cut[i] = [ll.lat, ll.lng]; if (S.cutLine) S.cutLine.setLatLngs(S.cut); liveSplit(); });
+        m.on('dragend', () => { recalcSplit(); });
+      });
     }
+  }
+  /* 分けた2つの形と、それぞれの数（地図の上） */
+  let shapeLay = null;
+  function paintSplitShape() {
+    if (!shapeLay) shapeLay = L.layerGroup().addTo(map);
+    shapeLay.clearLayers();
+    const sp = S.split;
+    if (!(S.tool === 'split' && sp && sp.a)) return;
+    L.polygon(sp.a, { color: COL_A, weight: 4, fillColor: COL_A, fillOpacity: 0.28, interactive: false }).addTo(shapeLay);
+    L.polygon(sp.b, { color: COL_B, weight: 4, fillColor: COL_B, fillOpacity: 0.28, interactive: false }).addTo(shapeLay);
+    lbl(center(sp.a), `${sp.na}`, COL_A).addTo(shapeLay);
+    lbl(center(sp.b), `${sp.nb}`, COL_B).addTo(shapeLay);
+  }
+  function splitCntHtml() {
+    const t = terrById(S.tid); if (!t) return '';
+    const all = S.allCnt || (S.allCnt = countIn(t.id, null));
+    const sp = S.split;
+    if (!(sp && sp.a)) return `区域${esc(t.no)}：<b>${cntText(all)}</b>`;
+    const pct = n => (all.n ? Math.round(n / all.n * 100) : 0);
+    return `区域${esc(t.no)}：${all.n}　→　<b class="a">■ オレンジ ${sp.na}</b>（${pct(sp.na)}%）　<b class="b">■ 青 ${sp.nb}</b>（${pct(sp.nb)}%）`;
+  }
+  /* 点を動かしている間：形と数だけを描き直す（点そのものは作り直さない） */
+  let liveRaf = 0;
+  function liveSplit() {
+    if (liveRaf) return;
+    liveRaf = requestAnimationFrame(() => {
+      liveRaf = 0;
+      const t = terrById(S.tid); if (!t || S.cut.length < 2) return;
+      const r = splitRing(t.polygon, S.cut);
+      if (r && r.a) {
+        const na = housesIn(t.id, r.a), nb = housesIn(t.id, r.b);
+        // ドラッグ中は、オレンジ（今の区域）と青を入れかえない（色がちらつかないように）。前と近いほうをオレンジにする
+        const prevA = S.split && S.split.a ? center(S.split.a) : null;
+        const keepA = prevA ? distM(prevA, center(r.a)) <= distM(prevA, center(r.b)) : (na > nb || (na === nb && area(r.a) >= area(r.b)));
+        S.split = keepA ? { a: r.a, b: r.b, na, nb } : { a: r.b, b: r.a, na: nb, nb: na };
+      } else S.split = r;
+      paintSplitShape();
+      const c = $('#senCnt'); if (c) c.innerHTML = splitCntHtml();
+      const h = $('#senHint'); if (h) h.textContent = S.split && S.split.err ? S.split.err : '黒い点を指で動かすと、分かれ方と数がすぐ変わります。よければ「これで分ける」を押します。';
+    });
   }
   function paintIssues() {
     S.issues.forEach((x, i) => {
@@ -506,6 +564,7 @@
     const bar = $('#senBar');
     if (bar) bar.hidden = m !== 'sen';
     if (m !== 'sen' && lay && typeof map !== 'undefined' && map) { lay.clearLayers(); lay.remove(); }
+    if (m !== 'sen' && shapeLay) shapeLay.clearLayers();
   }
   /* 「形を直す」から戻ってきたとき */
   function back(tid) {
@@ -521,7 +580,8 @@
 
   /* ---------- ボタン ---------- */
   function setTool(tool) {
-    S.tool = tool; S.cut = []; S.split = null; S.fit = null;
+    S.tool = tool; S.cut = []; S.split = null; S.fit = null; S.allCnt = null;
+    if (shapeLay) shapeLay.clearLayers();
     if (tool !== 'check') { S.issues = []; S.ii = -1; }
     paint();
   }
@@ -605,13 +665,14 @@
   /* ---------- 分ける ---------- */
   function recalcSplit() {
     const t = terrById(S.tid);
+    const prevA = S.split && S.split.a ? center(S.split.a) : null;
     S.split = null;
     if (t && S.cut.length >= 2) {
       const r = splitRing(t.polygon, S.cut);
       if (r && r.a) {
-        // 家の多いほう（同じなら広いほう）を、今の区域として残す
+        // 家の多いほう（同じなら広いほう）を、今の区域として残す。点を動かしたあとは、前のオレンジに近いほうをオレンジのままにする
         const na = housesIn(t.id, r.a), nb = housesIn(t.id, r.b);
-        const keepA = na > nb || (na === nb && area(r.a) >= area(r.b));
+        const keepA = prevA ? distM(prevA, center(r.a)) <= distM(prevA, center(r.b)) : (na > nb || (na === nb && area(r.a) >= area(r.b)));
         S.split = keepA ? { a: r.a, b: r.b, na, nb } : { a: r.b, b: r.a, na: nb, nb: na };
       } else S.split = r;
     }
@@ -624,9 +685,9 @@
     const sugB = nextKidNo(base);
     const paintSheet = () => {
       setSheet(headHtml(null, `区域${esc(t.no)}を分ける`, '') + `
-        <p><b style="color:${COL_A}">■ オレンジ</b>：今の区域のまま（家 ${sp.na}件）</p>
+        <p><b style="color:${COL_A}">■ オレンジ</b>：今の区域のまま（${cntText(countIn(t.id, sp.a))}）</p>
         <label class="field"><span>オレンジの区域番号</span><input type="text" id="sNoA" maxlength="10" autocomplete="off" value="${esc(t.no)}"></label>
-        <p><b style="color:${COL_B}">■ 青</b>：新しい区域（家 ${sp.nb}件）</p>
+        <p><b style="color:${COL_B}">■ 青</b>：新しい区域（${cntText(countIn(t.id, sp.b))}）</p>
         <label class="field"><span>青の区域番号</span><input type="text" id="sNoB" maxlength="10" autocomplete="off" value="${esc(sugB)}">
           <small class="hint">「5-4」のようにハイフンで枝番を付けます。</small></label>
         <button class="btn block" id="sSwap">オレンジと青を入れかえる</button>
