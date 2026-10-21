@@ -7,12 +7,20 @@
        親の区域  … 線の名前が「A05」「B18」「G62」（英字＝ブロック、数字＝区域番号）
        枝番の区域 … 線の名前が「5-①」「5-③」（丸数字か数字）→ 区域番号「5-1」「5-3」
                    枝番の線がない親（例：18）は、親の線をそのまま区域「18」にする
-       枝番の目印 … 「ポイント ①」などのピン → 取り込まない
+       枝番の目印 … 「ポイント ①」などのピン → 拒否・注意としては取り込まない。線のない枝番を作る手がかりに使う（下の「枝番の整理」）
        拒否のピン … 赤紫など。説明欄に「18-① 1-905、1-1001」のように部屋番号（「18-①」は枝番の参照なので読まない）
        注意のピン … 黒いピン（例：「5-③ 夜勤」）。部屋番号のあとのカッコ書き「1002（夜勤）」も注意
-   ・枝番の抜け：親の中で、枝番が1つだけ抜けていて（例：5-② がない）ほかの枝番に囲まれた部分があるときは、
-                その部分を抜けた番号の区域として自動で作る（2026-10-18 の取り決め）。
-                それ以外で枝番の線の外に残る家は、確認画面と終わりの画面で知らせ、係が線を引き直す
+   ・枝番の整理（2026-10-21）：親の線の中で、枝番が重なり・すき間なく、親とぴったり同じ形になるようにする（親ごと。planTerrs ＞ planKids）
+        ① 線を単純化して、となりの区域の角にそろえる（このあとは単純化しない）
+        ② 枝番の線を親の線で切る（はみ出した広さが OVER_NOTE_M2 以上なら、確認画面にお知らせ）
+        ③ 枝番どうしの重なりは、広さの小さいほうの枝番に入れる（大きいほうに穴ができたら、幅0の切れ込みで1本の輪にする）
+        ④ 親から枝番を引いた残りの塊に番号を付ける
+             1) 目印が中にある塊 → その番号の枝番（2) 目印が塊の外なら、MARK_NEAR_M 以内でいちばん近い塊）
+             3) 目印が1つもなく、枝番が1つだけ抜けているとき → 今までどおり、いちばん大きい塊（MIN_GEN_M2 以上）をその番号に
+             4) 小さい（SLIVER_M2 未満）・細長い（SLIVER_THIN 未満）塊 → 境界を接する長さがいちばん長い枝番に入れる
+             5) どれにも当たらない塊は、番号を付けない（そこの家は「枝番の線の外に残った家」。係が線を引き直す）
+        ⑤ 面積の合計が親の 99.5〜100.5% の外、または重なりが 1㎡ 以上残るときは、確認画面で知らせる（取り込みは止めない）
+        polygon-clipping が読めない・計算できないときは、直さずにそのまま入れる（お知らせを出す）
    ・置きかえ：区域…番号が同じ区域は、そのまま（貸し出し・S-13の記録を引き継ぐ）線と名前だけ新しく。
                      番号がなくなる区域は消す（家は残り、新しい線で区域を決め直す）。特別区域・検証用の区域はそのまま
               拒否…今ある拒否をすべて消して、KMLのピンで入れなおす（チェックを外すと、今の拒否も残す）
@@ -25,6 +33,15 @@
    ========================================================= */
 (function (root) {
   'use strict';
+
+  /* 枝番の整理（親の線で切る・重なりを直す・残りに番号を付ける）で使う数値 */
+  const MIN_GEN_M2 = 150;      // 抜けた枝番として作る部分の、いちばん小さい広さ（目印がないとき。これより小さいすき間は、線のずれとみなす）
+  const OVER_NOTE_M2 = 50;     // はみ出し・重なりをお知らせに出す広さ
+  const SLIVER_M2 = 300;       // これより小さい残りは、となりの枝番に入れる
+  const SLIVER_THIN = 0.1;     // 4πA/L² がこれより小さい（細長い）残りも、となりの枝番に入れる
+  const MARK_NEAR_M = 30;      // 目印が塊の外にあっても、この距離までは使う
+  const EDGE_NEAR_M = 2;       // 「接している」とみなす距離
+  const GAP_NOTE_M2 = 1;       // 確認画面の「すき間を入れます」に数えるすき間の、いちばん小さい広さ（これより小さいのは計算のずれ。入れるだけで数えない）
 
   /* =========================================================
      読みとり（画面がなくても動く部分。ためしに動かすときは root.KmlKoushin を使う）
@@ -62,6 +79,8 @@
     return /^\d{1,3}(-\d{1,2})?$/.test(t) ? t.split('-').map(x => String(Number(x))).join('-') : '';
   };
   const circN = c => (CIRC.indexOf(c) >= 0 ? CIRC.indexOf(c) + 1 : Number(c));
+  /* 目印のピンの番号：「ポイント 5」「ポイント ⑤」「⑤」→ 5（NFKC で丸数字も数字になる） */
+  const markNo = name => { const m = String(name || '').trim().normalize('NFKC').match(/(\d{1,3})\s*$/); return m ? Number(m[1]) : 0; };
 
   function kids(el, name) { return [...el.children].filter(c => c.localName === name); }
   function textOf(el, name) { const n = kids(el, name)[0]; return n ? n.textContent.trim() : ''; }
@@ -76,7 +95,7 @@
   function parseKmlText(text, fileName, DP) {
     const doc = new (DP || DOMParser)().parseFromString(text, 'application/xml');
     if (doc.getElementsByTagName('parsererror').length) throw new Error('xml');
-    const out = { file: fileName || '', parents: [], kids: [], others: [], pins: [], marks: 0 };
+    const out = { file: fileName || '', parents: [], kids: [], others: [], pins: [], marks: [] };
     for (const pm of doc.getElementsByTagNameNS('*', 'Placemark')) {
       const name = textOf(pm, 'name'), desc = textOf(pm, 'description').replace(/<[^>]*>/g, ' ');
       const style = textOf(pm, 'styleUrl');
@@ -94,7 +113,7 @@
       if (!pt) continue;
       const c = coordsOf(pt)[0];
       if (!c) continue;
-      if (isMark(name, desc)) { out.marks++; continue; } // 「ポイント ①」「ポイント 1」など、枝番の目印
+      if (isMark(name, desc)) { out.marks.push({ n: markNo(name), lat: c[0], lng: c[1], file: fileName || '' }); continue; } // 「ポイント ①」「ポイント 1」など、枝番の目印（拒否・注意には入れない。枝番の区域づくりに使う）
       let fo = pm.parentElement, folder = '';
       while (fo && !folder) { if (fo.localName === 'Folder') folder = textOf(fo, 'name'); fo = fo.parentElement; }
       out.pins.push({ name, desc, style, lat: c[0], lng: c[1], file: fileName || '', folder });
@@ -146,14 +165,13 @@
   }
   /* 区域の線をまとめる（同じ親・同じ枝番が2つのファイルにあれば、あとのものは使わない） */
   function mergeParsed(list) {
-    const parents = new Map(), kidm = new Map(), others = [], pins = [], dup = [];
-    let marks = 0;
+    const parents = new Map(), kidm = new Map(), others = [], pins = [], dup = [], marks = [];
     list.forEach(x => {
       x.parents.forEach(p => { if (!parents.has(p.pno)) parents.set(p.pno, p); });
       x.kids.forEach(k => { const no = k.pno + '-' + k.b; if (kidm.has(no)) dup.push(no); else kidm.set(no, Object.assign({ no }, k)); });
       x.others.forEach(o => others.push(o));
       pins.push(...x.pins);
-      marks += x.marks;
+      marks.push(...x.marks);
     });
     return { parents, kids: kidm, others, pins, marks, dup };
   }
@@ -161,6 +179,7 @@
   /* 外へ */
   root.KmlKoushin = { parseKmlText, splitPin, mergeParsed, noKey, kindOf, RE_PARENT, RE_KID };
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof document === 'undefined') return;
+  Object.assign(root.KmlKoushin, { planTerrs, houseFit, terrOfSpecs, gapHouses }); // ためしに動かすとき用（index.html の関数が使える環境で）
 
   /* =========================================================
      ここから画面
@@ -192,7 +211,6 @@
   LIB.pclip = 'vendor/polygon-clipping-0.15.7/polygon-clipping.umd.min.js';
   const r6 = x => Math.round(Number(x) * 1e6) / 1e6;
   const now = () => new Date().toISOString();
-  const MIN_GEN_M2 = 150;   // 抜けた枝番として作る部分の、いちばん小さい広さ（これより小さいすき間は、線のずれとみなす）
   const C = () => D().caution || (D().caution = {});
 
   /* ---------- ファイルを読む（KML・KMZ・ZIP。いくつでも） ---------- */
@@ -221,47 +239,244 @@
   const simp = ring => { const p = dropDup(ring); return p.length >= 3 ? simplifyRing(p, SIMPLIFY_M) : p; };
   const toPC = ring => [[...ring, ring[0]].map(p => [p[1], p[0]])]; // polygon-clipping は [x, y]（経度, 緯度）
   const fromPC = r => dropDup(r.map(p => [p[1], p[0]]));
-  function genMissing(m, notes) {
-    // 枝番が1つだけ抜けている親：親の線から、ほかの枝番の線を引いた残りの、いちばん大きい部分を、その番号の区域にする
-    const pc = window.polygonClipping, made = [];
-    m.parents.forEach((p, pno) => {
-      const ks = [...m.kids.values()].filter(k => k.pno === pno);
-      if (!ks.length) return;
-      const nums = ks.map(k => Number(k.b)), max = Math.max(...nums);
-      const miss = []; for (let i = 1; i <= max; i++) if (!nums.includes(i)) miss.push(i);
-      if (miss.length !== 1 || !pc) return;
-      let rest;
-      try { rest = pc.difference(toPC(p.ring), ...ks.map(k => toPC(k.ring))); } catch (e) { notes.push(`区域${pno}：抜けた枝番 ${pno}-${miss[0]} を作れませんでした（線が交差しています）`); return; }
-      const rings = rest.map(poly => fromPC(poly[0])).filter(r => r.length >= 3).map(r => ({ r, a: ringAreaM2(r) })).sort((a, b) => b.a - a.a);
-      if (!rings.length || rings[0].a < MIN_GEN_M2) return;
-      const no = pno + '-' + miss[0];
-      m.kids.set(no, { no, pno, b: String(miss[0]), raw: `（自動）${pno}-${CIRC[miss[0] - 1] || miss[0]}`, ring: rings[0].r, gen: true });
-      made.push(no);
-    });
-    return made;
+
+  /* ---------- 枝番の整理に使う、形の小道具（polygon-clipping の形：多角形＝輪の並び［外周, 穴…］、多角形の集まり＝多角形の並び） ---------- */
+  const fmtM2 = x => Math.round(x).toLocaleString('ja-JP');
+  const llOf = r => r.map(p => [p[1], p[0]]); // polygon-clipping の輪 → [緯度, 経度]
+  const polyArea = poly => ringAreaM2(llOf(poly[0])) - poly.slice(1).reduce((a, h) => a + ringAreaM2(llOf(h)), 0);
+  const mpArea = mp => (mp || []).reduce((a, poly) => a + polyArea(poly), 0);
+  const polyLen = poly => poly.reduce((a, r) => { for (let i = 1; i < r.length; i++) a += distM([r[i - 1][1], r[i - 1][0]], [r[i][1], r[i][0]]); return a; }, 0);
+  const largest = mp => (mp || []).map(poly => ({ poly, a: polyArea(poly) })).sort((x, y) => y.a - x.a)[0];
+  const bbPoly = poly => { let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity; poly[0].forEach(p => { if (p[1] < a) a = p[1]; if (p[1] > b) b = p[1]; if (p[0] < c) c = p[0]; if (p[0] > d) d = p[0]; }); return [a, b, c, d]; }; // [緯度の小, 大, 経度の小, 大]
+  const bbMP = mp => mp.map(bbPoly).reduce((q, x) => [Math.min(q[0], x[0]), Math.max(q[1], x[1]), Math.min(q[2], x[2]), Math.max(q[3], x[3])], [Infinity, -Infinity, Infinity, -Infinity]);
+  const bbHit = (a, b) => !(a[1] < b[0] || b[1] < a[0] || a[3] < b[2] || b[3] < a[2]);
+  const pcDo = (op, ...args) => { try { return window.polygonClipping[op](...args); } catch (e) { return null; } };
+  const inPC = (lat, lng, poly) => { let c = false; for (const r of poly) if (inPoly(lat, lng, llOf(r))) c = !c; return c; };
+  /* 点から、多角形の線までの距離（m） */
+  function distToPolys(lat, lng, polys) {
+    const cos = Math.cos(lat * Math.PI / 180), p = mXY([lat, lng], cos);
+    let best = Infinity;
+    for (const poly of polys) for (const r of poly) for (let i = 1; i < r.length; i++) {
+      const d = segDist(p, mXY([r[i - 1][1], r[i - 1][0]], cos), mXY([r[i][1], r[i][0]], cos));
+      if (d < best) best = d;
+    }
+    return best;
   }
+  /* 残りの塊 poly が、枝番 mp と接している長さ（m）：塊の辺のうち、真ん中の点が枝番の線から EDGE_NEAR_M 以内にある辺の長さの合計。
+     親の外周線の上にある辺（親 P の線から ON_EDGE_M 以内）は、外側との境目で、枝番とは接していないので数えない
+     （親で切った枝番の線は外周線に重なるため、細いすき間では、外周側の辺まで接していると数えてしまうので） */
+  const ON_EDGE_M = 0.05;
+  function sharedLen(poly, mp, P) {
+    let sum = 0;
+    for (const r of poly) for (let i = 1; i < r.length; i++) {
+      const a = r[i - 1], b = r[i], la = (a[1] + b[1]) / 2, ln = (a[0] + b[0]) / 2;
+      if (P && distToPolys(la, ln, P) <= ON_EDGE_M) continue;
+      if (distToPolys(la, ln, mp) <= EDGE_NEAR_M) sum += distM([a[1], a[0]], [b[1], b[0]]);
+    }
+    return sum;
+  }
+  /* 穴のある形を1本の輪にする：外周と穴を、いちばん近い2点で結ぶ「切れ込み」（幅0）でつなぐ。偶奇判定（inPoly）なので、穴の中は区域の外になる */
+  function bridgePoly(poly) {
+    let ring = fromPC(poly[0]);
+    for (const h of poly.slice(1)) {
+      const hole = fromPC(h);
+      if (hole.length < 3 || ring.length < 3) continue;
+      let bi = 0, bj = 0, bd = Infinity;
+      for (let i = 0; i < ring.length; i++) for (let j = 0; j < hole.length; j++) { const d = distM(ring[i], hole[j]); if (d < bd) { bd = d; bi = i; bj = j; } }
+      const hs = hole.slice(bj).concat(hole.slice(0, bj)); // 穴の輪を、つなぐ点から始める
+      ring = ring.slice(0, bi + 1).concat(hs, [hs[0]], ring.slice(bi)); // 外周の点 → 穴を1周 → 外周の同じ点（幅0の切れ込み）
+    }
+    return ring;
+  }
+
+  /* 親1つぶんの枝番を整える。
+     3-2 親の線で切る → 3-3 重なりを小さいほうの枝番に入れる → 3-4 親から枝番を引いた残りに番号を付ける（目印・今のルール・細いすき間は近くの枝番へ）
+     → 3-5 面積の確かめ。polygon-clipping が失敗したら例外を投げる（呼んだ側が「直さずに入れる」にもどす） */
+  function planKids(pno, v, ctx) {
+    const { marks, claimed, usedNos, anyParent } = ctx;
+    const { pp, ks } = v;
+    const out = { specs: [], madeMark: [], madeOld: [], absorbed: [], fixNotes: [], notes: [], checks: [], claimed: [] };
+    const P = [toPC(pp)];
+    const need = r => { if (!r) throw new Error('pc'); return r; };
+    // 3-2 親の線で切る
+    let kidsG = [];
+    const outsiders = [];
+    ks.forEach(k => {
+      const kp = [toPC(k.ring)];
+      const inter = need(pcDo('intersection', kp, P));
+      if (!inter.length || mpArea(inter) < 0.5) { outsiders.push(k); out.notes.push(`区域${k.no}の線が、親の線（区域${pno}）の外にあります（そのまま入れます）`); return; }
+      const over = mpArea(need(pcDo('difference', kp, P)));
+      if (over >= OVER_NOTE_M2) out.fixNotes.push(`区域${k.no}の線が親の外に約${fmtM2(over)}㎡出ていたので切りました`);
+      kidsG.push({ no: k.no, b: k.b, raw: k.raw, gen: false, g: inter });
+    });
+    // 3-3 重なりは、広さの小さいほうの枝番に入れる（大きいほうから、それより小さい枝番を引く）
+    kidsG.forEach(k => { k.a = mpArea(k.g); k.bb = bbMP(k.g); });
+    const asc = [...kidsG].sort((x, y) => x.a - y.a || Number(x.b) - Number(y.b));
+    const orig = new Map(asc.map(k => [k, k.g]));
+    asc.forEach((big, i) => {
+      const subs = [];
+      for (let j = 0; j < i; j++) {
+        const sm = asc[j];
+        if (!bbHit(big.bb, sm.bb)) continue;
+        const a = mpArea(need(pcDo('intersection', orig.get(big), orig.get(sm))));
+        if (a < 0.01) continue;
+        subs.push(orig.get(sm));
+        if (a >= OVER_NOTE_M2) out.fixNotes.push(`区域${big.no}と${sm.no}が約${fmtM2(a)}㎡重なっていたので、${sm.no}（小さいほう）に入れました`);
+      }
+      if (subs.length) big.g = need(pcDo('difference', orig.get(big), ...subs));
+    });
+    // 2つ以上に分かれたら、いちばん大きい部分をその枝番にする（ほかは、残りとして次に回る）
+    kidsG = kidsG.filter(k => {
+      const L = largest(k.g);
+      if (!L) { out.notes.push(`区域${k.no}の線は、ほかの枝番にすべて重なっていたので入れません`); return false; }
+      k.g = [L.poly];
+      return true;
+    });
+    // 3-4 親から枝番を引いた残りに番号を付ける
+    const rest = need(pcDo('difference', P, ...kidsG.map(k => k.g)));
+    const blobs = rest.map(poly => { const a = polyArea(poly), L = polyLen(poly); return { poly, a, thin: L > 0 ? 4 * Math.PI * a / (L * L) : 0, taken: false, hold: false }; }).filter(b => b.a > 0.01);
+    const have = n => usedNos.has(pno + '-' + n) || kidsG.some(k => Number(k.b) === n);
+    const mine = marks.filter(mk => inPoly(mk.lat, mk.lng, pp)); // 親の線の中にある目印（ファイル名ではなく、場所で決める）
+    // すでに線のある番号の目印が、残りの部分にある：作らずにお知らせ
+    mine.forEach(mk => {
+      if (!have(mk.n)) return;
+      if (blobs.some(b => inPC(mk.lat, mk.lng, b.poly))) out.notes.push(`区域${pno}-${mk.n}の目印が、枝番の線の外（線のない部分）にあります。線か目印の位置を確かめてください`);
+    });
+    const cand = marks.filter(mk => mk.n > 0 && !claimed.has(mk) && !have(mk.n) && (inPoly(mk.lat, mk.lng, pp) || !anyParent(mk)));
+    const nums = [...new Set(cand.map(mk => mk.n))].sort((x, y) => x - y);
+    const want = new Map(); // 番号 → 作る塊
+    const conf = new Set();
+    // 1) 目印が中にある塊（同じ番号の目印が2つの塊にあれば、広いほう）
+    nums.forEach(n => {
+      let best = null;
+      cand.filter(mk => mk.n === n).forEach(mk => blobs.forEach(b => { if (inPC(mk.lat, mk.lng, b.poly) && (!best || b.a > best.a)) best = b; }));
+      if (best) want.set(n, best);
+    });
+    const byBlob = new Map();
+    want.forEach((b, n) => (byBlob.get(b) || byBlob.set(b, []).get(b)).push(n));
+    byBlob.forEach((ns, b) => {
+      if (ns.length < 2) return;
+      b.hold = true; ns.forEach(n => { want.delete(n); conf.add(n); });
+      out.notes.push(`区域${pno}：枝番の線のない1つの部分（約${fmtM2(b.a)}㎡）に、${ns.map(n => pno + '-' + n).join('・')} の目印が両方あるので、作りません。線を引いてください`);
+    });
+    // 2) 目印が塊の外にある：まだ番号のない塊のうち、MARK_NEAR_M 以内でいちばん近い塊
+    nums.filter(n => !want.has(n) && !conf.has(n)).forEach(n => {
+      const used = new Set(want.values());
+      let best = null, bd = MARK_NEAR_M;
+      cand.filter(mk => mk.n === n).forEach(mk => blobs.forEach(b => {
+        if (b.taken || b.hold || used.has(b)) return;
+        const d = distToPolys(mk.lat, mk.lng, [b.poly]);
+        if (d <= bd) { bd = d; best = b; }
+      }));
+      if (best) want.set(n, best);
+      else out.notes.push(`区域${pno}-${n}の目印がありますが、作れる場所（枝番の線のない部分）が見つかりませんでした`);
+    });
+    const make = (n, b, how) => {
+      const no = pno + '-' + n;
+      kidsG.push({ no, b: String(n), raw: `（自動）${pno}-${CIRC[n - 1] || n}`, gen: true, g: [b.poly], a: b.a, bb: bbMP([b.poly]) });
+      b.taken = true;
+      (how === 'mark' ? out.madeMark : out.madeOld).push(no);
+    };
+    [...want.entries()].sort((x, y) => x[0] - y[0]).forEach(([n, b]) => { make(n, b, 'mark'); cand.filter(mk => mk.n === n).forEach(mk => out.claimed.push(mk)); });
+    // 3) 目印が1つもなく、枝番が1つだけ抜けている（今のルール）：いちばん大きい塊（MIN_GEN_M2 以上）をその番号にする
+    if (!mine.length && ks.length) {
+      const nn = ks.map(k => Number(k.b)), max = Math.max(...nn), miss = [];
+      for (let i = 1; i <= max; i++) if (!nn.includes(i) && !usedNos.has(pno + '-' + i)) miss.push(i);
+      if (miss.length === 1) {
+        const big = blobs.filter(b => !b.taken && !b.hold && b.a >= MIN_GEN_M2).sort((x, y) => y.a - x.a)[0];
+        if (big) make(miss[0], big, 'old');
+      }
+    }
+    // 4) 細いすき間・小さいすき間：境界を接する長さがいちばん長い枝番に入れる
+    //    接する長さは、すき間を入れる前の枝番の線で測る（入れる順番で、結果が変わらないように）
+    kidsG.forEach(k => { k.g0 = k.g; });
+    blobs.filter(b => !b.taken && !b.hold).sort((x, y) => y.a - x.a).forEach(b => {
+      if (!(b.a < SLIVER_M2 || b.thin < SLIVER_THIN)) return;
+      let best = null, bl = 0;
+      kidsG.forEach(k => { const l = sharedLen(b.poly, k.g0, P); if (l > bl) { bl = l; best = k; } });
+      if (!best) return;
+      const u = need(pcDo('union', best.g, b.poly)), L = largest(u);
+      if (!L) return;
+      best.g = [L.poly]; b.taken = true;
+      out.absorbed.push({ pno, to: best.no, a: b.a, poly: b.poly, bb: bbPoly(b.poly) });
+    });
+    // 5) どれにも当たらない塊は、番号を付けない（家は「枝番の線の外に残った家」として数え、係が線を引き直す）
+    kidsG.forEach(k => { k.ring = bridgePoly(largest(k.g).poly); });
+    kidsG.forEach(k => out.specs.push({ no: k.no, pno, pnm: v.p.pnm, pp, poly: k.ring, kind: k.gen ? 'gen' : 'kid', raw: k.raw }));
+    outsiders.forEach(k => out.specs.push({ no: k.no, pno, pnm: v.p.pnm, pp, poly: k.ring, kind: 'kid', raw: k.raw }));
+    // 3-5 確かめ（合わなくても取り込みは止めない）
+    const sum = kidsG.reduce((a, k) => a + ringAreaM2(k.ring), 0), parentA = ringAreaM2(pp), pct = 100 * sum / parentA;
+    if (kidsG.length && (pct < 99.5 || pct > 100.5)) out.checks.push(`区域${pno}：枝番の面積の合計が、親の線の ${pct.toFixed(1)}% です（${pct < 99.5 ? '枝番の線のない部分が残っています' : '枝番が重なっているか、はみ出しています'}）`);
+    for (let i = 0; i < kidsG.length; i++) for (let j = i + 1; j < kidsG.length; j++) {
+      if (!bbHit(bbMP(kidsG[i].g), bbMP(kidsG[j].g))) continue;
+      const a = mpArea(pcDo('intersection', kidsG[i].g, kidsG[j].g) || []);
+      if (a >= 1) out.checks.push(`区域${pno}：${kidsG[i].no}と${kidsG[j].no}が、約${fmtM2(a)}㎡重なったままです`);
+    }
+    return out;
+  }
+
   function planTerrs(m) {
     const notes = [], specs = [];
-    const made = genMissing(m, notes);
+    const info = { made: [], madeMark: [], madeOld: [], absorbed: [], fixNotes: [], checks: [] };
+    const pcOk = !!window.polygonClipping;
+    if (!pcOk) notes.push('枝番の線を整える部品を読めなかったので、枝番の線は直さずにそのまま入れます（親の線で切る・重なりを直す・すき間を埋める・目印から枝番を作る、は行いません）');
+    // 1) 線のある区域を、単純化して、となりの区域の角にそろえる（このあとの切る・引くの前に行う。あとで単純化すると、小さなすき間や重なりがまたできるため）
+    const lines = [], seen = new Set(), P = new Map(), allPP = [];
     m.parents.forEach((p, pno) => {
       const ks = [...m.kids.values()].filter(k => k.pno === pno).sort((a, b) => Number(a.b) - Number(b.b));
       const pp = simp(p.ring);
-      if (!ks.length) { specs.push({ no: pno, pno: '', pnm: p.pnm, poly: pp, kind: 'single' }); return; }
-      ks.forEach(k => specs.push({ no: k.no, pno, pnm: p.pnm, pp, poly: simp(k.ring), kind: k.gen ? 'gen' : 'kid', raw: k.raw }));
+      allPP.push(pp);
+      if (!ks.length) { lines.push({ no: pno, pno: '', pnm: p.pnm, ring: pp, kind: 'single' }); seen.add(pno); return; }
+      const v = { p, pp, ks: [] };
+      P.set(pno, v);
+      ks.forEach(k => { const o = { no: k.no, pno, pnm: p.pnm, raw: k.raw, b: k.b, kind: 'kid', ring: simp(k.ring) }; lines.push(o); v.ks.push(o); seen.add(k.no); });
     });
     // 親の線がない枝番（ファイルの書きまちがいなど）も、区域として入れる
-    m.kids.forEach(k => { if (!m.parents.has(k.pno)) { specs.push({ no: k.no, pno: k.pno, pnm: '', poly: simp(k.ring), kind: 'kid', raw: k.raw }); notes.push(`枝番 ${k.no} の親（区域${k.pno}）の線がありませんでした`); } });
+    m.kids.forEach(k => { if (!m.parents.has(k.pno)) { lines.push({ no: k.no, pno: k.pno, pnm: '', raw: k.raw, kind: 'kid', ring: simp(k.ring) }); seen.add(k.no); notes.push(`枝番 ${k.no} の親（区域${k.pno}）の線がありませんでした`); } });
     m.others.forEach(o => {
       const s = typeof splitName === 'function' ? splitName(o.raw) : { no: '' };
-      if (s.no && NO_RE.test(s.no) && !specs.some(x => x.no === s.no)) specs.push({ no: s.no, pno: '', pnm: o.raw, poly: simp(o.ring), kind: 'single' });
+      if (s.no && NO_RE.test(s.no) && !seen.has(s.no)) { lines.push({ no: s.no, pno: '', pnm: o.raw, ring: simp(o.ring), kind: 'single' }); seen.add(s.no); }
       else notes.push(`線「${o.raw || '名前なし'}」は、区域番号が分からないので入れません`);
     });
     m.dup.forEach(no => notes.push(`枝番 ${no} が2つのファイルにありました（はじめのものを使います）`));
-    specs.sort((a, b) => cmpNo(a.no, b.no));
-    // となりの区域と近い角（3m以内）を、同じ点にそろえる（あとで線を直すとき、となりと一緒に動かせる）
+    lines.sort((a, b) => cmpNo(a.no, b.no));
     const pool = [];
-    specs.forEach(s => { const q = dropDup(snapToPool(s.poly.map(p => p.slice()), pool)); if (q.length >= 3) s.poly = q; });
-    return { specs, notes, made };
+    lines.forEach(l => { const q = dropDup(snapToPool(l.ring.map(p => p.slice()), pool)); if (q.length >= 3) l.ring = q; });
+    // 2) 親ごとに、枝番を整える（3-2〜3-5）。できなければ、直さずに入れる
+    const marks = Array.isArray(m.marks) ? m.marks : [], claimed = new Set();
+    const anyParent = mk => allPP.some(pp => inPoly(mk.lat, mk.lng, pp));
+    const specOf = (l, pp) => { const s = { no: l.no, pno: l.pno, pnm: l.pnm, poly: l.ring, kind: l.kind, raw: l.raw }; if (pp) s.pp = pp; return s; };
+    lines.filter(l => !(l.pno && P.has(l.pno))).forEach(l => specs.push(specOf(l)));
+    [...P.entries()].sort((a, b) => cmpNo(a[0], b[0])).forEach(([pno, v]) => {
+      let r = null;
+      if (pcOk) {
+        try { r = planKids(pno, v, { marks, claimed, usedNos: seen, anyParent }); }
+        catch (e) { notes.push(`区域${pno}：枝番の線を整えられませんでした（線が交差しているかもしれません）。直さずに入れます`); }
+      }
+      if (!r) { v.ks.forEach(o => specs.push(specOf(o, v.pp))); return; }
+      specs.push(...r.specs);
+      r.claimed.forEach(mk => claimed.add(mk));
+      info.madeMark.push(...r.madeMark); info.madeOld.push(...r.madeOld);
+      info.absorbed.push(...r.absorbed); info.fixNotes.push(...r.fixNotes); info.checks.push(...r.checks);
+      notes.push(...r.notes);
+    });
+    info.made = info.madeMark.concat(info.madeOld);
+    specs.sort((a, b) => cmpNo(a.no, b.no));
+    return Object.assign({ specs, notes }, info);
+  }
+  /* すき間を近くの枝番に入れたとき、そのすき間にある家：枝番の番号 → 家のid（確認画面で、入る家を先に見せるため） */
+  function gapHouses(absorbed, scope) {
+    const by = new Map();
+    if (!absorbed || !absorbed.length) return by;
+    for (const h of D().houses) {
+      if (scope && h.terrId && !scope.has(h.terrId)) continue;
+      for (const g of absorbed) {
+        const b = g.bb;
+        if (h.lat < b[0] || h.lat > b[1] || h.lng < b[2] || h.lng > b[3]) continue;
+        if (inPC(h.lat, h.lng, g.poly)) { (by.get(g.to) || by.set(g.to, []).get(g.to)).push(h.id); break; }
+      }
+    }
+    return by;
   }
   /* 家がどの新しい区域に入るか（枝番の外に残る家を数える） */
   function houseFit(specs, scope) {
@@ -303,7 +518,7 @@
     if (mode !== 'pins' && !m.parents.size && !m.kids.size) { infoSheet('区域の線が見つかりませんでした', 'マイマップで書き出すときに「ネットワーク リンク」のチェックを外して、もう一度書き出してください。'); return; }
     if (mode === 'pins' && !m.pins.length) { infoSheet('ピンが見つかりませんでした', 'このファイルには、ピン（地点）が入っていません。拒否・注意のピンがあるマイマップを書き出してください。'); return; }
     try { await loadScript(LIB.pclip); } catch (e) { /* なくても、抜けた枝番を作らないだけ */ }
-    const tp = mode !== 'pins' || hasLines ? planTerrs(m) : { specs: [], notes: [], made: [] };
+    const tp = mode !== 'pins' || hasLines ? planTerrs(m) : { specs: [], notes: [], made: [], madeMark: [], madeOld: [], absorbed: [], fixNotes: [], checks: [] };
     const items = [];
     if (mode !== 'lines') m.pins.forEach(p => splitPin(p).forEach(it => items.push(it)));
     // ピンの区域：線も新しくするときは新しい線で、拒否・注意だけのときは今の区域の線で決める
@@ -318,11 +533,17 @@
     });
     // ピンのレイヤー（マイマップのフォルダ）が2つ以上あるときは、レイヤーごとに入れる・入れないをえらべる
     const folders = [...new Set(items.map(it => it.folder || ''))];
-    const st = { mode, files: texts.length, bad, m, tp, items, fit: mode === 'pins' ? { gaps: new Map(), outside: 0 } : null,
+    const st = { mode, files: texts.length, bad, m, tp, items, fit: mode === 'pins' ? { gaps: new Map(), outside: 0 } : null, mv: new Map(),
       replaceDnc: mode === 'all', scope: mode === 'lines' ? 'files' : 'all', pinWay: 'add', folders, offFolders: new Set() };
-    if (mode !== 'pins') st.fit = houseFit(tp.specs, st.scope === 'files' ? scopeTids(tp.specs) : null);
+    if (mode !== 'pins') refit(st);
     ui.tab = mode === 'pins' ? 'pin' : 'terr';
     preview(st);
+  }
+  /* 家の数えなおし：新しい線で、枝番の外に残る家・すき間から枝番に入る家（「どこまで新しくするか」を変えたときもやりなおす） */
+  function refit(st) {
+    const scope = st.scope === 'files' ? scopeTids(st.tp.specs) : null;
+    st.fit = houseFit(st.tp.specs, scope);
+    st.mv = gapHouses(st.tp.absorbed, scope);
   }
   /* 「ファイルにある区域だけ」新しくするときに、新しくする今の区域：番号が同じ区域と、同じ親の番号の区域（枝番が変わる・親を枝番に分ける） */
   function scopeOld(specs) {
@@ -377,6 +598,11 @@
     const nKid = tp.specs.filter(s => s.pno).length, nPar = new Set(tp.specs.filter(s => s.pno).map(s => s.pno)).size, nSingle = tp.specs.filter(s => !s.pno).length;
     const nD = items.filter(i => live(st, i) && i.kind === 'dnc').length, nW = items.filter(i => live(st, i) && i.kind === 'warn').length;
     const gapList = fit ? [...fit.gaps.entries()].sort((a, b) => cmpNo(a[0], b[0])) : [];
+    // すき間を近くの枝番に入れる：親ごとの数と広さ（1㎡未満は、計算のずれなので数えない）。すき間に家があれば、その家
+    const absBy = new Map();
+    tp.absorbed.filter(x => x.a >= GAP_NOTE_M2).forEach(x => { const v = absBy.get(x.pno) || { n: 0, a: 0 }; v.n++; v.a += x.a; absBy.set(x.pno, v); });
+    const absList = [...absBy.entries()].sort((a, b) => cmpNo(a[0], b[0]));
+    const mvList = [...(st.mv || new Map()).entries()].sort((a, b) => cmpNo(a[0], b[0]));
     const byT = new Map();
     items.forEach(it => { if (st.offFolders.has(it.folder || '')) return; const key = it.tno || '？'; (byT.get(key) || byT.set(key, []).get(key)).push(it); });
     const tGroups = [...byT.entries()].sort((a, b) => (a[0] === '？') - (b[0] === '？') || cmpNo(a[0], b[0]));
@@ -400,7 +626,10 @@
         <h3 class="sub">区域の線</h3>
         <ul class="kk-ul">
           <li>枝番のある区域 ${nPar}（枝番 ${nKid}）・枝番のない区域 ${nSingle}</li>
-          ${tp.made.length ? `<li><b>抜けていた枝番を自動で作ります：</b>${tp.made.map(esc).join('、')}（ほかの枝番に囲まれた部分）</li>` : ''}
+          ${tp.madeMark.length ? `<li><b>目印から作る枝番：</b>${tp.madeMark.map(esc).join('、')}（目印「ポイント ⑤」などの場所）</li>` : ''}
+          ${tp.madeOld.length ? `<li><b>抜けていた枝番を自動で作ります：</b>${tp.madeOld.map(esc).join('、')}（ほかの枝番に囲まれた部分）</li>` : ''}
+          ${absList.length ? `<li><b>線のすき間を近くの枝番に入れます：</b>${absList.map(([p, v]) => `区域${esc(p)} ${v.n}か所（合計 約${fmtM2(v.a)}㎡）`).join('、')}</li>` : ''}
+          ${mvList.length ? `<li><b>すき間にある家（近くの枝番に入ります）：</b><ul class="kk-mv">${mvList.map(([no, ids]) => `<li>区域${esc(no)}へ入れる家：${ids.length}軒 <button type="button" class="btn small" data-kkmap="${esc(ids[0])}">地図で見る</button></li>`).join('')}</ul></li>` : ''}
           <li>番号が同じ今の区域 ${oi.keep.length}：線と名前を新しくします（貸し出し・S-13の記録は引き継ぎます${oi.lentKeep.length ? `。貸し出し中 ${oi.lentKeep.length}` : ''}）</li>
           <li>なくなる今の区域 ${oi.gone.length}${oi.gone.length ? `（${oi.gone.slice(0, 12).map(t => esc(t.no)).join('・')}${oi.gone.length > 12 ? ' ほか' : ''}）` : ''}：消します（家は残り、新しい線で区域を決め直します）</li>
           ${mode === 'lines' && st.scope === 'files' ? `<li>ファイルにない区域（${Math.max(0, D().territories.filter(t => !t.dummy && !isSpecial(t)).length - oi.keep.length - oi.gone.length)}）は、そのままです</li>` : ''}
@@ -409,8 +638,10 @@
         </ul>
         ${oi.lentGone.length ? `<div class="notice warn"><b>貸し出し中の区域で、番号がなくなるものがあります：</b>${oi.lentGone.map(t => `区域${esc(t.no)}（${esc(uname(t.holder))}さん）`).join('、')}<br>この区域の貸し出しは終わります。</div>` : ''}
         ${gapList.length ? `<div class="notice warn"><b>枝番の線の外に残る家があります（どの区域にも入りません）：</b><br>${gapList.map(([p, n]) => `区域${esc(p)}：${n}軒`).join('、')}<br>新しくしたあと、「区域の線・取り込み」の「区域の線を直す」で、枝番の線を引き直してください。</div>` : ''}
+        ${tp.checks.length ? `<div class="notice warn"><b>枝番の面積が、親の線と合わない区域があります：</b><br>${tp.checks.map(esc).join('<br>')}<br>取り込みはできます。新しくしたあと、「区域の線を直す」で確かめてください。</div>` : ''}
         ${fit && fit.outside ? `<p class="hint">どの区域の線にも入らない家：${fit.outside}軒（区域の外の家として残ります）</p>` : ''}
-        ${tp.notes.length ? `<details class="dncfold"><summary>気づいたこと ${tp.notes.length}件</summary><ul>${tp.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>` : ''}`
+        ${tp.fixNotes.length ? `<details class="dncfold"><summary>直した重なり・はみ出し ${tp.fixNotes.length}件</summary><ul>${tp.fixNotes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>` : ''}
+        ${tp.notes.length ?`<details class="dncfold"><summary>気づいたこと ${tp.notes.length}件</summary><ul>${tp.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>` : ''}`
       : `
         <h3 class="sub">拒否・注意</h3>
         ${st.folders.length > 1 ? `<p class="q">入れるレイヤー（マイマップのフォルダ）</p><div class="kk-folders">${st.folders.map(f => `<label class="check"><input type="checkbox" data-kkfo="${esc(f)}"${st.offFolders.has(f) ? '' : ' checked'}>${esc(f || '（名前のないレイヤー）')}（${items.filter(i => (i.folder || '') === f).length}）</label>`).join('')}</div>` : ''}
@@ -420,7 +651,7 @@
         ${tGroups.map(([no, its]) => `<details class="dncg kk-g" data-kg="${esc(no)}"${ui.open.has(no) ? ' open' : ''}><summary><span class="stamp sm${noCls(no)}">${esc(no)}</span><span class="nm">${no === '？' ? (mode === 'pins' ? '区域の線の外' : '新しい区域の線の外') : '区域' + esc(no)}</span>
           <span class="cnt">拒 ${its.filter(i => i.use && i.kind === 'dnc').length}・！ ${its.filter(i => i.use && i.kind === 'warn').length}</span></summary>
           ${ui.open.has(no) ? its.map(itemRow).join('') : ''}</details>`).join('')}
-        ${st.m.marks ? `<p class="hint">枝番の目印のピン（「ポイント ①」など）${st.m.marks}本は入れません。</p>` : ''}
+        ${st.m.marks.length ? `<p class="hint">枝番の目印のピン（「ポイント ①」など）${st.m.marks.length}本は、拒否・注意としては入れません${mode === 'pins' ? '' : '（枝番の区域づくりに使います）'}。</p>` : ''}
         ${items.some(i => i.sameNo) ? `<p class="hint">名前が区域番号と同じピン ${items.filter(i => i.sameNo).length}本は、目印とみなして「入れない」にしています（各区域の一覧で確かめられます）。</p>` : ''}`}
       </div>
       <div class="dx-foot">
@@ -439,9 +670,14 @@
     $$('[data-kktab]', S).forEach(b => b.onclick = () => { ui.tab = b.dataset.kktab; sheetKeep = true; preview(st); });
     if ($('#kkRep')) $('#kkRep').onchange = e => { st.replaceDnc = e.target.checked; };
     $$('[data-kkscope]', S).forEach(b => b.onclick = () => {
-      st.scope = b.dataset.kkscope; st.fit = houseFit(tp.specs, st.scope === 'files' ? scopeTids(tp.specs) : null); sheetKeep = true; preview(st);
+      st.scope = b.dataset.kkscope; refit(st); sheetKeep = true; preview(st);
     });
     $$('[data-kkway]', S).forEach(b => b.onclick = () => { st.pinWay = b.dataset.kkway; sheetKeep = true; preview(st); });
+    // すき間にある家を地図で見る（確認画面を閉じて地図へ。あとで確認画面にもどれる）
+    $$('[data-kkmap]', S).forEach(b => b.onclick = () => {
+      closeSheet(); goTo(b.dataset.kkmap);
+      setTimeout(() => toast('取り込みの確認画面を、いったん閉じました', null, { label: '確認画面にもどる', fn: () => preview(st) }), 1600);
+    });
     $$('[data-kkfo]', S).forEach(b => b.onchange = () => { const f = b.dataset.kkfo; if (b.checked) st.offFolders.delete(f); else st.offFolders.add(f); sheetKeep = true; preview(st); });
     $$('.kk-g', S).forEach(d => d.addEventListener('toggle', () => {
       const no = d.dataset.kg;
