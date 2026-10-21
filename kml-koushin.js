@@ -357,7 +357,7 @@
     byBlob.forEach((ns, b) => {
       if (ns.length < 2) return;
       b.hold = true; ns.forEach(n => { want.delete(n); conf.add(n); });
-      out.notes.push(`区域${pno}：枝番の線のない1つの部分（約${fmtM2(b.a)}㎡）に、${ns.map(n => pno + '-' + n).join('・')} の目印が両方あるので、作りません。線を引いてください`);
+      out.notes.push(`区域${pno}：枝番の線のない1つの部分（約${fmtM2(b.a)}㎡）に、${ns.map(n => pno + '-' + n).join('・')} の目印があり、どの番号か決められないので作りません。線を引いてください`);
     });
     // 2) 目印が塊の外にある：まだ番号のない塊のうち、MARK_NEAR_M 以内でいちばん近い塊
     nums.filter(n => !want.has(n) && !conf.has(n)).forEach(n => {
