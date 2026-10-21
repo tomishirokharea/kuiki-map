@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.42"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.43"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -1389,6 +1389,8 @@ h2,h3,.q{text-wrap:pretty}
 #hello .hgoal .num{display:block;font-size:26px;font-weight:700;color:var(--brand);white-space:nowrap}
 #hello .hgoal small{display:block;color:var(--ink2);font-size:14px;line-height:1.5}
 #hello .hmeet{font-size:16px}
+#hello .hhead .hwx{margin:8px 0 0;font-size:14px;opacity:.95}
+#hello .hhead .hwx small{margin-left:8px;font-size:11px;opacity:.8}
 #hello .hsec{font-size:16px;font-weight:700;color:var(--ink2);margin-top:2px}
 #hello #helloReco{display:flex;flex-direction:column;gap:8px}
 #hello .hreco{display:flex;gap:10px;align-items:center;border:2px solid var(--line);border-radius:14px;padding:8px 10px}
@@ -2780,7 +2782,7 @@ async function api(action, extra, opt) {
   Store.syncAt = Date.now();
   lsSet(SYNC_KEY, String(Store.syncAt));
   if (j.mv && onMemoVer) onMemoVer(j.mv); // 再訪問メモが、ほかの端末で変わった合図
-  if (j.wx) WX = j.wx;                     // 雨の日（サーバーが調べた天気。weather.gs）
+  if (j.wx) { WX = j.wx; lsSet('kuiki_wx', JSON.stringify(j.wx)); } // 雨の日・ひと言の天気（サーバーが調べた天気。weather.gs）。次に開いたとき、届く前でも使えるように控える
   return j;
 }
 /* ---------- はじめての読み込みの記録（遅いときに、どこで時間がかかったかを調べるため） ----------
@@ -3842,6 +3844,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.43', items: [
+    ['天', '毎日はじめのひと言が、ときどき天気に合わせた言葉になります（雨・冷える日・暑い日など）。そのときは今日の気温も出ます']
+  ] },
   { v: '2026.13.42', items: [
     ['新', '新しい版にしたとき、一部の画面だけ古いままになることがあったのを直しました']
   ] },
@@ -4519,7 +4524,8 @@ function evSummary(t) {
 }
 /* 雨の日（2026-10-22）：サーバーが30分ごとに調べた天気（Open-Meteo）。端末からは天気のサービスに通信しない。
    雨なら「区域をもらう」のおすすめ順と「おすすめ」タブで、集合住宅のカード（エレベーターありが先）を先に出す。奉仕者の操作はいらない */
-let WX = null;
+let WX = (() => { try { return JSON.parse(lsGet('kuiki_wx') || 'null'); } catch (e) { return null; } })(); // 前に届いた天気（古いものは下の判定で使わない）
+const wxFresh = () => !!(WX && WX.at && !WX.off && !WX.err && Date.now() - Date.parse(WX.at) < 2 * 3600000 && Store.data && Number(D().settings.wxOn) !== 0);
 const isRainy = () => !!(WX && WX.r === 1 && Date.now() - Date.parse(WX.at) < 2 * 3600000 && Store.data && Number(D().settings.wxOn) !== 0);
 /* 集合住宅のカードの順位：0 エレベーターあり・1 ほかの集合住宅・2 それ以外
    ・特別区域の集合住宅・オートロックのカード
@@ -12937,16 +12943,43 @@ const HELLO_WORDS = [
 ];
 const helloKey = () => 'kuiki_hello_' + me().id;
 const helloDue = () => !!Store.data && UI.hello !== 'off' && lsGet(helloKey()) !== ymd(new Date());
-let helloTimer = null, helloTries = 0;
+let helloTimer = null, helloTries = 0, helloWxWait = 0;
 function queueHello(delay) {
-  clearTimeout(helloTimer); helloTries = 0;
+  clearTimeout(helloTimer); helloTries = 0; helloWxWait = 0;
   if (!helloDue()) { setTimeout(checkReport, Math.max(800, delay || 0)); return; }
   helloTimer = setTimeout(tryHello, delay == null ? 400 : delay);
 }
 function tryHello() {
   if (!helloDue()) return;
   if (document.hidden || overlayOpen()) { if (++helloTries < 120) helloTimer = setTimeout(tryHello, 1500); return; }
+  // 天気がまだ届いていないときは、少しだけ（3秒まで）待つ。届かなければ、ふだんの言葉で出す
+  if (LIVE && navigator.onLine !== false && !wxFresh() && Store.data && Number(D().settings.wxOn) !== 0 && helloWxWait < 3) {
+    helloWxWait++; helloTimer = setTimeout(tryHello, 1000); return;
+  }
   showHello();
+}
+/* 天気のひと言（2026-10-22）：サーバーが調べた天気（WX・Open-Meteo・区域の真ん中の地点）が新しいときだけ使う。
+   雨 → 冷える → 肌寒い → とても暑い → かさ の順に1つ。どれにも当たらない日は、ふだんの日替わりの言葉（だから「時々」）。
+   区域係が雨の日の機能を止めている（wxOn＝0）ときや、夜・調べられなかったときは使わない。端末の場所は使わない */
+const HELLO_WX = {
+  rain: ['雨の日は、エレベーターのある集合住宅から回ってみませんか。', '雨で足もとがすべりやすいです。ゆっくり回りましょう。'],
+  cold: ['今日はぐっと冷えています。上着を一枚持って出かけましょう。', '寒い日です。温かい飲み物で、ひと息つきながら回りましょう。'],
+  cool: ['今日は肌寒くなりそうです。暖かくして出かけましょう。', '少しひんやりする一日です。羽織るものがあると安心です。'],
+  hot: ['今日はとても暑くなりそうです。こまめに水分と休憩をとりましょう。', '日ざしの強い一日です。帽子と水分を忘れずに。'],
+  umb: ['このあと雨になるかもしれません。かさを忘れずに。', '空もようが変わりやすい日です。かさがあると安心です。']
+};
+const HELLO_COLD = 12, HELLO_COOL = 18, HELLO_HOT = 33, HELLO_UMB = 40; // ℃・℃（最高）・℃（最高）・%（2時間の降水確率）
+const numOr = v => (v === null || v === undefined || v === '' || !isFinite(Number(v))) ? null : Number(v);
+function helloWxKind() {
+  if (!wxFresh()) return '';
+  const t = numOr(WX.t), tx = numOr(WX.tx), tn = numOr(WX.tn), p = numOr(WX.p);
+  const low = Math.min(t === null ? 99 : t, tn === null ? 99 : tn);
+  if (WX.r === 1) return 'rain';
+  if (low <= HELLO_COLD) return 'cold';
+  if (tx !== null && tx <= HELLO_COOL) return 'cool';
+  if (tx !== null && tx >= HELLO_HOT) return 'hot';
+  if (p !== null && p >= HELLO_UMB) return 'umb';
+  return '';
 }
 function helloWord(o) {
   const now = new Date(), ym = ymOf(now);
@@ -12954,7 +12987,18 @@ function helloWord(o) {
   if (featTime() && o.goals[ym] && monthMin(o, ym) >= o.goals[ym]) return '今月の目標、達成です。すばらしいですね！';
   const day = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / DAY);
   let hsh = 0; String(me().id).split('').forEach(c => { hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0; });
+  const wk = helloWxKind();
+  if (wk) return HELLO_WX[wk][(day + hsh) % HELLO_WX[wk].length];
   return HELLO_WORDS[(day + hsh) % HELLO_WORDS.length];
+}
+/* 天気のひと言を出した日だけ、その下に今日の気温を小さく出す（出どころの表示も） */
+function helloWxLine() {
+  if (!helloWxKind()) return '';
+  const tx = numOr(WX.tx), tn = numOr(WX.tn), p = numOr(WX.p);
+  const parts = [];
+  if (tx !== null && tn !== null) parts.push(`最高 ${Math.round(tx)}℃・最低 ${Math.round(tn)}℃`);
+  if (p !== null && (WX.r === 1 || p >= HELLO_UMB)) parts.push(`2時間の降水確率 ${Math.round(p)}%`);
+  return `<p class="hwx">${parts.length ? `<span>${esc(parts.join('／'))}</span>` : ''}<small>天気：Open-Meteo</small></p>`;
 }
 function showHello() {
   if (!helloDue()) return;
@@ -12977,7 +13021,7 @@ function showHello() {
   const el = $('#hello');
   el.innerHTML = `<div class="hback" data-hclose></div>
     <div class="hcard" role="dialog" aria-modal="true" aria-labelledby="helloTitle">
-      <div class="hhead"><p>${esc(me().name)}さん、${hi}　${fmtYmd(today)}</p><h2 id="helloTitle">${esc(helloWord(o))}</h2></div>
+      <div class="hhead"><p>${esc(me().name)}さん、${hi}　${fmtYmd(today)}</p><h2 id="helloTitle">${esc(helloWord(o))}</h2>${helloWxLine()}</div>
       <div class="hbody">${goalPart}${meet}
         <p class="hsec">今（${esc(slotShort(slotOf(now)))}）のおすすめ</p><div id="helloReco"><p class="muted">さがしています…</p></div>
         <button type="button" class="btn primary block" data-hclose>閉じる</button>
