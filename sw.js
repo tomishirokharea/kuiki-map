@@ -13,7 +13,7 @@
    ・サーバー（GAS）とのやりとり・版の確認には、手を出さない
    ・招待コード（?t=）の入ったURLは保存しない（URLの ? から後ろを消して保存する）
    ========================================================= */
-const APP_CACHE = 'kuiki-app-v42'; // v42：2026.13.41（雨の日：集合住宅の多いふつうの区域も先に）
+const APP_CACHE = 'kuiki-app-v43'; // v43：2026.13.42（アプリのファイルは毎回サーバーに確かめる）
 const LIB_CACHE = 'kuiki-lib-v2'; // v2：地図の部品を CDN から vendor に移した（古い CDN の控えは消える）
 const TILE_CACHE = 'kuiki-tiles-v1';   // 地図の画像（画面側の kangaeru.js・chizu.js も同じ入れ物に入れる。名前を変えるときは両方）
 const AREA_CACHE = 'kuiki-tilearea-v1'; // 保存してよい場所（四角）
@@ -85,7 +85,10 @@ self.addEventListener('fetch', e => {
     const key = u.origin + u.pathname; // ? から後ろ（招待コードなど）は保存しない
     e.respondWith((async () => {
       const cache = await caches.open(APP_CACHE);
-      const net = fetch(req).then(res => {
+      // ブラウザの控え（GitHub Pages は10分ほど控える）を使わず、毎回サーバーに確かめる（変わっていなければ短い返事で済む）。
+      // 新しい index.html と古い schedule.js などがまざらないように（2026-10-22）
+      const fresh = req.mode === 'navigate' ? req : new Request(req, { cache: 'no-cache' });
+      const net = fetch(fresh).then(res => {
         if (res && res.ok && res.type === 'basic') cache.put(key, res.clone()).catch(() => {});
         return res;
       });

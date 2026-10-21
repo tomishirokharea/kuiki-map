@@ -351,6 +351,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "雨の日なので、集合住宅のカードです。空いている区域です。すぐ受け取れます": "Día de lluvia: tarjeta de apartamentos. Está libre; puede recibirla ya",
 "雨の日なので、集合住宅のカードです。空いている区域です。係に頼むと受け取れます": "Día de lluvia: tarjeta de apartamentos. Está libre; pídala al encargado",
 "雨の日は、全員の「区域をもらう」とおすすめで、集合住宅のカードが自動で先に出るようになりました（エレベーターありが先）。区域係の「おすすめ」の設定で止められます": "En días de lluvia, «Pedir territorio» y las recomendaciones muestran primero, automáticamente, las tarjetas de apartamentos (las de ascensor primero). El encargado puede desactivarlo en el ajuste de recomendaciones",
+"新しい版にしたとき、一部の画面だけ古いままになることがあったのを直しました": "Se corrigió que, al actualizar, parte de la app pudiera quedar en la versión anterior",
 /* ---- 予定の印刷 ---- */
 "この月の予定を印刷": "Imprimir el programa del mes",
 "掲示板用": "para el tablero"
