@@ -333,6 +333,17 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "消すのは、作り方をまちがえたときや、もう使わないときです。家と訪問の記録は消えません。": "Bórrelo solo si lo creó mal o ya no lo usará. Las casas y los registros de visitas no se borran.",
 "特別区域「{0}」を貸出中止にしました": "Territorio especial «{0}» pausado",
 "特別区域「{0}」の貸出を再開しました": "Se reanudó el territorio especial «{0}»",
+/* ---- 雨の日（2026-10-22） ---- */
+"雨のため、集合住宅のカードを先に出しています": "Por la lluvia, se muestran primero las tarjetas de apartamentos",
+"（エレベーターありが先）。": "(primero las que tienen ascensor).",
+"天気：Open-Meteo": "Tiempo: Open-Meteo",
+"雨の日は、集合住宅のカードを先に出す": "En días de lluvia, mostrar primero las tarjetas de apartamentos",
+"雨のとき、全員の「区域をもらう」（おすすめ順）と「おすすめ」タブで、集合住宅のカードを自動で先に出します。奉仕者の操作はいりません": "Si llueve, en «Pedir territorio» (orden recomendado) y en «Recomendaciones» se muestran primero, automáticamente, las tarjetas de apartamentos. Nadie tiene que hacer nada",
+"雨の日なので、集合住宅のカードです（エレベーターあり）。空いている区域です。すぐ受け取れます": "Día de lluvia: tarjeta de apartamentos (con ascensor). Está libre; puede recibirla ya",
+"雨の日なので、集合住宅のカードです（エレベーターあり）。空いている区域です。係に頼むと受け取れます": "Día de lluvia: tarjeta de apartamentos (con ascensor). Está libre; pídala al encargado",
+"雨の日なので、集合住宅のカードです。空いている区域です。すぐ受け取れます": "Día de lluvia: tarjeta de apartamentos. Está libre; puede recibirla ya",
+"雨の日なので、集合住宅のカードです。空いている区域です。係に頼むと受け取れます": "Día de lluvia: tarjeta de apartamentos. Está libre; pídala al encargado",
+"雨の日は、全員の「区域をもらう」とおすすめで、集合住宅のカードが自動で先に出るようになりました（エレベーターありが先）。区域係の「おすすめ」の設定で止められます": "En días de lluvia, «Pedir territorio» y las recomendaciones muestran primero, automáticamente, las tarjetas de apartamentos (las de ascensor primero). El encargado puede desactivarlo en el ajuste de recomendaciones",
 /* ---- 予定の印刷 ---- */
 "この月の予定を印刷": "Imprimir el programa del mes",
 "掲示板用": "para el tablero"

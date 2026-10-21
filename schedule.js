@@ -552,6 +552,9 @@
     const SORTS = { reco: (a, b) => a.sx.order - b.sx.order, near: (a, b) => a.dist - b.dist, long: byLongest, many: (a, b) => b.n - a.n,
       young: (a, b) => ((b.yg.pct == null ? -1 : b.yg.pct) - (a.yg.pct == null ? -1 : a.yg.pct)) || byLongest(a, b) };
     list.sort(SORTS[reqSort] || SORTS.reco);
+    // 雨の日は、おすすめ順のときだけ集合住宅のカードを先に（エレベーターありが先）。並びはそれぞれの中でおすすめ順のまま
+    const rain = reqSort === 'reco' && typeof isRainy === 'function' && isRainy() && list.some(x => aptCardRank(x.t) < 2);
+    if (rain) list.sort((a, b) => (aptCardRank(a.t) - aptCardRank(b.t)) || (a.sx.order - b.sx.order));
     const recoLine = x => `<p class="muted">${x.sx.pin ? '<span class="duepin">急ぎ</span>' : ''}${chip(x.sx.d.st)} ${leftTxt(x.sx.d)}${meetTag(x.t)}</p>`;
     // 今すぐ受け取れる区域と、係に頼む区域を分ける（並びは、それぞれの中で選んだ並べ方のまま）
     const canGet = x => isFree(x.t) && canTake;
@@ -582,6 +585,7 @@
         <button type="button" class="chip" data-rsort="long" aria-pressed="${reqSort === 'long'}">返却から長い順</button>
         <button type="button" class="chip" data-rsort="young" aria-pressed="${reqSort === 'young'}">若い世代が多い順</button>
         <button type="button" class="chip" data-rsort="many" aria-pressed="${reqSort === 'many'}">家が多い順</button></div>
+      ${rain ? rainNote() : ''}
       ${reqSort === 'reco' ? `<p class="hint">期限の近さ（いちばん重く見ます）・若い世代の多さ・前回会えなかった家の多さから並べています。期限まで${PIN_DAYS}日を切った区域は、いちばん上に出します。</p>` : ''}
       ${reqSort === 'near' ? '<div class="row"><button class="btn small" id="reqNear">現在地を更新する</button></div>' : ''}
       ${reqSort === 'young' ? `<p class="hint">${AGE_ON && ageMap() ? '市の年齢データ（字ごとの20〜49歳の割合）から出しています。字が決まっていない区域は、「会えた」記録の年代から出します。' : '市の年齢データが入っていないので、これまでに「会えた」と記録したときの年代から出した目安です。'}</p>` : ''}

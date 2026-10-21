@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.39"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.40"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -1026,6 +1026,7 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .kb.k-hall{background:#2E7D32}.kb.k-hospital{background:#C62828}.kb.k-conv{background:#EF6C00}.kb.k-care{background:#00838F}.kb.k-food{background:#AD1457}.kb.k-other{background:#546E7A}
 .kchip.wide{min-width:46%;text-align:left}.kchip.wide b{display:block}
 .spbadge{display:inline-block;background:#6A1B9A;color:#fff;border-radius:6px;padding:0 6px;font-size:.8em;margin-left:4px}
+.rainnote{background:#EAF2FB;border-left:5px solid #1D4ED8}.rainnote small{display:block;color:var(--ink2,#555);font-size:12px}
 .evtag{display:inline-block;border:1.5px solid #6A1B9A;color:#4A1270;background:#fff;border-radius:6px;padding:0 6px;font-size:.8em;font-weight:700;margin-left:4px}
 .lendtag{display:inline-block;border-radius:6px;padding:0 6px;font-size:.85em;font-weight:700}
 .lendtag.auto{background:#E3F2FD;color:#0D47A1}.lendtag.open{background:#E8F5E9;color:#1B5E20}.lendtag.stop{background:#FFEBEE;color:#B71C1C}.lendtag.adm{background:#F3F4F6;color:#374151}
@@ -2231,7 +2232,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {}; d.caution = d.caution || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, wxOn: 1, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3 }, d.settings || {});
     d.s13 = d.s13 || [];
     d.agedata = d.agedata || [];
   },
@@ -2779,6 +2780,7 @@ async function api(action, extra, opt) {
   Store.syncAt = Date.now();
   lsSet(SYNC_KEY, String(Store.syncAt));
   if (j.mv && onMemoVer) onMemoVer(j.mv); // 再訪問メモが、ほかの端末で変わった合図
+  if (j.wx) WX = j.wx;                     // 雨の日（サーバーが調べた天気。weather.gs）
   return j;
 }
 /* ---------- はじめての読み込みの記録（遅いときに、どこで時間がかかったかを調べるため） ----------
@@ -3840,6 +3842,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.40', items: [
+    ['雨', '雨の日は、全員の「区域をもらう」とおすすめで、集合住宅のカードが自動で先に出るようになりました（エレベーターありが先）。区域係の「おすすめ」の設定で止められます']
+  ] },
   { v: '2026.13.39', items: [
     ['特', '区域係：特別区域の「止める・消す」に「貸出中止にする（あとで再開できる）」を加えました。消すときの確認に、ふつうの区域カードやS-13への影響が出ます']
   ] },
@@ -4506,6 +4511,18 @@ function evSummary(t) {
   if (q === bs.length) return 'エレベーター 未確認';
   return y ? `エレベーターあり ${y}／${bs.length}棟` : 'エレベーターなし・未確認';
 }
+/* 雨の日（2026-10-22）：サーバーが30分ごとに調べた天気（Open-Meteo）。端末からは天気のサービスに通信しない。
+   雨なら「区域をもらう」のおすすめ順と「おすすめ」タブで、集合住宅のカード（エレベーターありが先）を先に出す。奉仕者の操作はいらない */
+let WX = null;
+const isRainy = () => !!(WX && WX.r === 1 && Date.now() - Date.parse(WX.at) < 2 * 3600000 && Store.data && Number(D().settings.wxOn) !== 0);
+/* 集合住宅のカードの順位：0 エレベーターあり・1 ほかの集合住宅・オートロック・2 それ以外 */
+function aptCardRank(t) {
+  if (!isSpecial(t)) return 2;
+  const sp = spOf(t);
+  if (!(sp.apt || sp.lock || sp.ev === 'y' || sp.ev === 'n')) return 2;
+  return sp.ev === 'y' || evSummary(t) === 'エレベーターあり' ? 0 : 1;
+}
+const rainNote = () => '<p class="notice rainnote"><b>雨のため、集合住宅のカードを先に出しています</b>（エレベーターありが先）。<small>天気：Open-Meteo</small></p>';
 const evTag = t => { const x = evSummary(t); return x ? `<span class="evtag">${esc(x)}</span>` : ''; };
 function bldMemoHtml(h) {
   if (!h || h.type !== 'apt' || (!h.bn && !h.ac)) return '';
@@ -13362,6 +13379,7 @@ function renderRecoAdmin() {
   box.innerHTML = `<h2 class="sec">おすすめ</h2>
     <p class="hint">カードを受け取らなくても、空いた時間に2〜3件回れる家を、全員の画面の下のタブ「おすすめ」に出します。</p>
     ${flag('recoOn', 'おすすめを出す', '出さないにすると、全員の画面から「おすすめ」のタブが消えます', '出す', '出さない')}
+    ${flag('wxOn', '雨の日は、集合住宅のカードを先に出す', '雨のとき、全員の「区域をもらう」（おすすめ順）と「おすすめ」タブで、集合住宅のカードを自動で先に出します。奉仕者の操作はいりません', '出す', '出さない')}
     ${on ? `<p class="q" data-hqk="recoKinds">出すおすすめの種類</p>
     <div class="chips">${RECO_KINDS2.map(r => `<button type="button" class="chip" data-recok="${r[1]}" aria-pressed="${!!(bits & r[1])}">${r[2]}</button>`).join('')}</div>
     <p class="hint">${RECO_KINDS2.map(r => `<b>${r[2]}</b>：${r[3]}`).join('<br>')}<br>えらんだ種類から、順番に1件ずつ出します。</p>

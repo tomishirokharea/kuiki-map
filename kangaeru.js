@@ -278,6 +278,7 @@
   const dayText = (col, bi) => `${SLC[col]}の${SLB[bi]}`;
   function reasonFor(it) {
     const t = it.t, col = it.col, bi = it.bi, c = bi * 3 + col, homes = homesOf(t);
+    if (it.wet) return it.wet; // 雨の日の集合住宅のカード
     const q = slotQ(t.id, 4), n = q.n[c], m = q.m[c];
     if (!n && homes >= MIN_HOMES) return `${dayText(col, bi)}は、この区域でまだ試していない時間です`;
     if (homes >= MIN_HOMES && n >= BEST) {
@@ -589,11 +590,16 @@
     // 3 新しくもらえる区域（「区域をもらう」のおすすめ順＝返却から長い順の上位3つ）
     if (hasRoom(false)) {
       const taken = new Set(out.map(c => c.t.id));
-      freeTerrs().filter(t => !taken.has(t.id)).map(t => ({ t, last: [t.completedAt, t.returnedAt].filter(Boolean).sort().pop() || '' }))
-        .sort(byLongest).slice(0, 3).forEach(({ t }) => {
+      // 雨の日は、集合住宅のカード（エレベーターありが先）から選ぶ（index.html の isRainy・aptCardRank）
+      const rain = typeof isRainy === 'function' && isRainy();
+      const rk = t => (rain ? aptCardRank(t) : 0);
+      freeTerrs().filter(t => !taken.has(t.id)).map(t => ({ t, rk: rk(t), last: [t.completedAt, t.returnedAt].filter(Boolean).sort().pop() || '' }))
+        .sort((a, b) => (a.rk - b.rk) || byLongest(a, b)).slice(0, 3).forEach(({ t, rk: r }) => {
           const take = isFree(t) && canTakeFree(false);
+          const wet = rain && r < 2 ? `雨の日なので、集合住宅のカードです${r === 0 ? '（エレベーターあり）' : ''}。` : '';
           out.push({ kind: 'terr', t, take, unmet: unmetCount(t), col: col0, bi: bi0, now: true, mine: false, title: `区域${t.no}をもらう`,
-            why: take ? '空いている区域です。すぐ受け取れます' : '空いている区域です。係に頼むと受け取れます', pts: ptsOfTerr(t) });
+            why: wet + (take ? '空いている区域です。すぐ受け取れます' : '空いている区域です。係に頼むと受け取れます'), pts: ptsOfTerr(t),
+            wet: wet ? wet.replace(/。$/, '') : '' }); // 雨の日の理由を、時間帯の理由より先に出す（reasonFor）
         });
     }
     // 4 家のまとまり（computeHomeReco と同じ家。自分の区域・カードの家・もらえる区域の家は入れない）
