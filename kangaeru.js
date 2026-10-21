@@ -596,7 +596,7 @@
       freeTerrs().filter(t => !taken.has(t.id)).map(t => ({ t, rk: rk(t), last: [t.completedAt, t.returnedAt].filter(Boolean).sort().pop() || '' }))
         .sort((a, b) => (a.rk - b.rk) || byLongest(a, b)).slice(0, 3).forEach(({ t, rk: r }) => {
           const take = isFree(t) && canTakeFree(false);
-          const wet = rain && r < 2 ? `雨の日なので、集合住宅のカードです${r === 0 ? '（エレベーターあり）' : ''}。` : '';
+          const wet = rain && r < 2 ? `雨の日なので、集合住宅の多い区域です${r === 0 ? '（エレベーターあり）' : ''}。` : '';
           out.push({ kind: 'terr', t, take, unmet: unmetCount(t), col: col0, bi: bi0, now: true, mine: false, title: `区域${t.no}をもらう`,
             why: wet + (take ? '空いている区域です。すぐ受け取れます' : '空いている区域です。係に頼むと受け取れます'), pts: ptsOfTerr(t),
             wet: wet ? wet.replace(/。$/, '') : '' }); // 雨の日の理由を、時間帯の理由より先に出す（reasonFor）

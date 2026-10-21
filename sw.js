@@ -13,7 +13,7 @@
    ・サーバー（GAS）とのやりとり・版の確認には、手を出さない
    ・招待コード（?t=）の入ったURLは保存しない（URLの ? から後ろを消して保存する）
    ========================================================= */
-const APP_CACHE = 'kuiki-app-v41'; // v41：2026.13.40（雨の日は集合住宅のカードを先に）
+const APP_CACHE = 'kuiki-app-v42'; // v42：2026.13.41（雨の日：集合住宅の多いふつうの区域も先に）
 const LIB_CACHE = 'kuiki-lib-v2'; // v2：地図の部品を CDN から vendor に移した（古い CDN の控えは消える）
 const TILE_CACHE = 'kuiki-tiles-v1';   // 地図の画像（画面側の kangaeru.js・chizu.js も同じ入れ物に入れる。名前を変えるときは両方）
 const AREA_CACHE = 'kuiki-tilearea-v1'; // 保存してよい場所（四角）

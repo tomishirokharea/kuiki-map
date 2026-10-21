@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.40"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.41"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3842,6 +3842,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.41', items: [
+    ['雨', '雨の日は、団地など集合住宅の多い区域も先に出るようにしました（特別区域のカードだけでなく、ふつうの区域も）']
+  ] },
   { v: '2026.13.40', items: [
     ['雨', '雨の日は、全員の「区域をもらう」とおすすめで、集合住宅のカードが自動で先に出るようになりました（エレベーターありが先）。区域係の「おすすめ」の設定で止められます']
   ] },
@@ -4515,14 +4518,32 @@ function evSummary(t) {
    雨なら「区域をもらう」のおすすめ順と「おすすめ」タブで、集合住宅のカード（エレベーターありが先）を先に出す。奉仕者の操作はいらない */
 let WX = null;
 const isRainy = () => !!(WX && WX.r === 1 && Date.now() - Date.parse(WX.at) < 2 * 3600000 && Store.data && Number(D().settings.wxOn) !== 0);
-/* 集合住宅のカードの順位：0 エレベーターあり・1 ほかの集合住宅・オートロック・2 それ以外 */
+/* 集合住宅のカードの順位：0 エレベーターあり・1 ほかの集合住宅・2 それ以外
+   ・特別区域の集合住宅・オートロックのカード
+   ・ふつうの区域でも、訪ねる部屋の半分以上が集合住宅の部屋なら「集合住宅の区域」（団地など）。
+     そのうち半分以上がエレベーターのある建物の部屋なら 0（2026-10-22） */
+const APTR = new Map();
+let aptrAt = 0, aptrN = -1;
 function aptCardRank(t) {
-  if (!isSpecial(t)) return 2;
-  const sp = spOf(t);
-  if (!(sp.apt || sp.lock || sp.ev === 'y' || sp.ev === 'n')) return 2;
-  return sp.ev === 'y' || evSummary(t) === 'エレベーターあり' ? 0 : 1;
+  if (!t) return 2;
+  if (isSpecial(t)) {
+    const sp = spOf(t);
+    if (sp.apt || sp.lock || sp.ev === 'y' || sp.ev === 'n') return sp.ev === 'y' || evSummary(t) === 'エレベーターあり' ? 0 : 1;
+    // 種別だけの特別区域（コンビニなど）は、ふつうの区域と同じに数える
+  }
+  if (Date.now() - aptrAt > 60000 || aptrN !== D().houses.length) { APTR.clear(); aptrAt = Date.now(); aptrN = D().houses.length; }
+  if (APTR.has(t.id)) return APTR.get(t.id);
+  let all = 0, apt = 0, ev = 0;
+  for (const h of housesOf(t.id)) {
+    const n = unitsIn(h, t).length;
+    all += n;
+    if (h.type === 'apt' && h.ban !== 'no') { apt += n; if (h.ac === 'ev') ev += n; }
+  }
+  const r = all && apt * 2 >= all ? (ev * 2 >= apt ? 0 : 1) : 2;
+  APTR.set(t.id, r);
+  return r;
 }
-const rainNote = () => '<p class="notice rainnote"><b>雨のため、集合住宅のカードを先に出しています</b>（エレベーターありが先）。<small>天気：Open-Meteo</small></p>';
+const rainNote = hit => `<p class="notice rainnote"><b>雨のため、${hit ? '集合住宅の多い区域を先に出しています' : '集合住宅の多い区域をさがしましたが、空いている区域にはありませんでした'}</b>${hit ? '（エレベーターありが先）' : ''}。<small>天気：Open-Meteo</small></p>`;
 const evTag = t => { const x = evSummary(t); return x ? `<span class="evtag">${esc(x)}</span>` : ''; };
 function bldMemoHtml(h) {
   if (!h || h.type !== 'apt' || (!h.bn && !h.ac)) return '';
@@ -13379,7 +13400,8 @@ function renderRecoAdmin() {
   box.innerHTML = `<h2 class="sec">おすすめ</h2>
     <p class="hint">カードを受け取らなくても、空いた時間に2〜3件回れる家を、全員の画面の下のタブ「おすすめ」に出します。</p>
     ${flag('recoOn', 'おすすめを出す', '出さないにすると、全員の画面から「おすすめ」のタブが消えます', '出す', '出さない')}
-    ${flag('wxOn', '雨の日は、集合住宅のカードを先に出す', '雨のとき、全員の「区域をもらう」（おすすめ順）と「おすすめ」タブで、集合住宅のカードを自動で先に出します。奉仕者の操作はいりません', '出す', '出さない')}
+    ${flag('wxOn', '雨の日は、集合住宅の多い区域を先に出す', '雨のとき、全員の「区域をもらう」（おすすめ順）と「おすすめ」タブで、集合住宅の多い区域（団地・特別区域の集合住宅のカード）を自動で先に出します。奉仕者の操作はいりません', '出す', '出さない')}
+    ${on || Number(st.wxOn) !== 0 ? `<p class="hint">今の天気の判定：${!LIVE ? '試作モードでは調べません' : !WX ? 'まだ届いていません（数分後にもう一度開いてください）' : WX.off ? '夜は調べません' : WX.err ? '調べられませんでした（ふだんの並びで動いています）' : (WX.r === 1 ? '<b>雨</b>' : '雨ではない') + `（${fmtTime(new Date(WX.at))}に確認${WX.p != null ? `・2時間の降水確率 ${WX.p}%` : ''}）`}</p>` : ''}
     ${on ? `<p class="q" data-hqk="recoKinds">出すおすすめの種類</p>
     <div class="chips">${RECO_KINDS2.map(r => `<button type="button" class="chip" data-recok="${r[1]}" aria-pressed="${!!(bits & r[1])}">${r[2]}</button>`).join('')}</div>
     <p class="hint">${RECO_KINDS2.map(r => `<b>${r[2]}</b>：${r[3]}`).join('<br>')}<br>えらんだ種類から、順番に1件ずつ出します。</p>
