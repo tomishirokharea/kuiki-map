@@ -558,7 +558,7 @@
     const askWhy = x => canGet(x) ? '' : `<p class="muted">${isFree(x.t) ? '持てる枚数に届いています' : '係が貸し出す区域です'}</p>`;
     const rowHtml = x => { const { t, last, n, dist, yg } = x; return `<article class="pick">
         <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
-        <div><b>${esc(t.name)}</b>
+        <div><b>${esc(t.name)}</b>${typeof evTag === 'function' ? evTag(t) : ''}
           ${reqSort === 'reco' ? recoLine(x) : ''}
           <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}${askWhy(x)}</div>
         <div class="pickbtns">${canGet(x)

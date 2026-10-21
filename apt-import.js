@@ -177,7 +177,7 @@
       const ban = banV === 'no' || banV === 'letter' ? banV : /立入禁止|立ち入り禁止/.test(type) ? 'no' : /手紙/.test(type) ? 'letter' : '';
       const note = [g(r, C.note), g(r, C.memo)].filter(Boolean).join(' ');
       return {
-        ac: /エレベーター|エレベータ|ＥＶ|^EV$/i.test(type) ? 'ev' : /縦階段|たて階段/.test(type) ? 'st' : '',
+        ac: /縦階段|たて階段/.test(type) ? 'st' : /(エレベーター|エレベータ|ＥＶ|EV)\s*(なし|無)|階段のみ|階段だけ/i.test(type) ? 'no' : /エレベーター|エレベータ|ＥＶ|^EV$/i.test(type) ? 'ev' : '',
         note: noteTrim(note), noteRest: noteTrim(dropRefs(note)),
         ref: g(r, C.ref), terr: g(r, C.terr), name: g(r, C.name).slice(0, 40), addr: g(r, C.addr),
         floors: Math.max(0, Math.min(MAX_FLOORS, Math.floor(num(g(r, C.fl))))), floor1: noo(g(r, C.f1)) ? '0' : '1',

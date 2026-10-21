@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.36"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.37"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -1026,6 +1026,7 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .kb.k-hall{background:#2E7D32}.kb.k-hospital{background:#C62828}.kb.k-conv{background:#EF6C00}.kb.k-care{background:#00838F}.kb.k-food{background:#AD1457}
 .kchip.wide{min-width:46%;text-align:left}.kchip.wide b{display:block}
 .spbadge{display:inline-block;background:#6A1B9A;color:#fff;border-radius:6px;padding:0 6px;font-size:.8em;margin-left:4px}
+.evtag{display:inline-block;border:1.5px solid #6A1B9A;color:#4A1270;background:#fff;border-radius:6px;padding:0 6px;font-size:.8em;font-weight:700;margin-left:4px}
 .lendtag{display:inline-block;border-radius:6px;padding:0 6px;font-size:.85em;font-weight:700}
 .lendtag.auto{background:#E3F2FD;color:#0D47A1}.lendtag.open{background:#E8F5E9;color:#1B5E20}.lendtag.stop{background:#FFEBEE;color:#B71C1C}.lendtag.adm{background:#F3F4F6;color:#374151}
 .btn.wrap{white-space:normal;height:auto;line-height:1.4;padding-top:10px;padding-bottom:10px}
@@ -3688,11 +3689,13 @@ const polyTerrs = () => D().territories.filter(t => okPoly(t.polygon) && !isSpec
    線があれば、その線の中の家だけ。ふつうの区域カードからは、その家を外す（2回訪ねないように） */
 /* 特別区域の条件（すべてに合う家・部屋だけを集める）
    kinds：種別（コンビニなど。えらばなければ、すべての種別）／ lock：オートロックの建物／ unmet：一度も会えていない家（留守の記録だけ）
+   apt：集合住宅（アパート・マンションの住まいの部屋。種別をえらべば、その種別の部屋）／ ev：'y' エレベーターあり・'n' エレベーターなし（未確認をふくむ）
+   （apt・ev は立入禁止の建物をのぞく。サーバーの spCover_ と同じ決まり）
    excl：その家を、ふつうの区域カードから外す（はじめは外す。留守宅の区域では外さないのがふつう）
    ids：件数で分けたカード（tokubetsu.js）。この家だけを集める（線ではなく家で決める。となりのカードと重ならないように）
    grp：同じ条件から分けたカードの組の印。gn：組の名前 */
 const spOf = t => (t && t.special) || {};
-const isSpecial = t => { const sp = spOf(t); return !!(t && t.special && ((Array.isArray(sp.kinds) && sp.kinds.length) || sp.lock || sp.unmet)); };
+const isSpecial = t => { const sp = spOf(t); return !!(t && t.special && ((Array.isArray(sp.kinds) && sp.kinds.length) || sp.lock || sp.unmet || sp.apt || sp.ev === 'y' || sp.ev === 'n')); };
 const SPID = new WeakMap();
 function spIds(t) {
   const a = spOf(t).ids;
@@ -3717,6 +3720,12 @@ function spMatch(h, u, t) {
   const sp = spOf(t);
   if (Array.isArray(sp.kinds) && sp.kinds.length && !sp.kinds.includes(targetKind(h, u))) return false;
   if (sp.lock && !(h.type === 'apt' && h.lock)) return false;
+  if (sp.apt || sp.ev === 'y' || sp.ev === 'n') {
+    if (!(h.type === 'apt' && h.ban !== 'no')) return false;
+    if (sp.apt && !(Array.isArray(sp.kinds) && sp.kinds.length) && targetKind(h, u) !== 'home') return false;
+    if (sp.ev === 'y' && h.ac !== 'ev') return false;
+    if (sp.ev === 'n' && h.ac === 'ev') return false;
+  }
   // 受け取った人が回っている間は、受け取った日の時点で決める（会えた家が、とちゅうで消えないように）
   if (sp.unmet && !unmetAsOf(K(h.id, u), t.lentAt || '')) return false;
   return true;
@@ -3757,6 +3766,9 @@ const houseInTerr = (h, tid) => { const t = terrById(tid); return isSpecial(t) ?
 const specialKindsText = t => {
   if (!isSpecial(t)) return '';
   const sp = spOf(t), a = [];
+  if (sp.apt) a.push('集合住宅');
+  if (sp.ev === 'y') a.push('エレベーターあり');
+  if (sp.ev === 'n') a.push('エレベーターなし・未確認');
   if (sp.lock) a.push('オートロック');
   if (sp.unmet) a.push('一度も会えていない家');
   (sp.kinds || []).forEach(k => a.push(kindName(k)));
@@ -3791,6 +3803,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.37', items: [
+    ['集', 'アパートの建物の編集で「エレベーター：まだ確かめていない／あり／なし」を選べるようになりました。分かったら直してください'],
+    ['特', '区域係：特別区域の条件に「集合住宅」と「エレベーターあり／なし・未確認」を加えました。集合住宅は部屋の数（はじめは1枚40部屋くらい）でカードに分けます。カードには「エレベーターあり」と文字で出ます']
+  ] },
   { v: '2026.13.36', items: [
     ['線', '区域係：「区域の線を直す」で、すき間・重なりを調べたあと、「まとめて直す」で小さなすき間や細い重なりを一度に直せるようになりました（直す前に確認が出ます。残った所は、今までどおり1か所ずつ直せます）']
   ] },
@@ -4431,7 +4447,21 @@ const banNotice = h => (h && h.type === 'apt' && h.ban === 'no' ? '<div class="n
   : h && h.type === 'apt' && h.ban === 'letter' ? '<div class="notice warn"><b>手紙のみの建物です。</b>訪問はせず、手紙を入れてください。</div>' : '')
   + (window.dncRoomNote ? window.dncRoomNote(h) : ''); // 備考から取り込んだ、部屋ごとの拒否（kyohi.js）
 /* 建物のメモ（備考）と、エレベーター・縦階段（2026.13.25）。部屋を入力する画面の上に出す */
-const AC_NAME = { ev: 'エレベーターあり', st: '縦階段（階段ごとに上り下り）' };
+const AC_NAME = { ev: 'エレベーターあり', no: 'エレベーターなし（階段だけ）', st: 'エレベーターなし（縦階段：階段ごとに上り下り）' };
+/* カードのエレベーター（集合住宅の特別区域だけ）。高齢の方がカードをえらびやすいように、文字で出す（2026-10-22）
+   全部の建物にエレベーターがあれば「エレベーターあり」。まじっていれば「エレベーターあり 2／5棟」 */
+function evSummary(t) {
+  if (!isSpecial(t)) return '';
+  const bs = housesOf(t.id).filter(h => h.type === 'apt');
+  if (!bs.length) return '';
+  let y = 0, n = 0, q = 0;
+  bs.forEach(h => { if (h.ac === 'ev') y++; else if (h.ac === 'no' || h.ac === 'st') n++; else q++; });
+  if (y === bs.length) return 'エレベーターあり';
+  if (n === bs.length) return 'エレベーターなし';
+  if (q === bs.length) return 'エレベーター 未確認';
+  return y ? `エレベーターあり ${y}／${bs.length}棟` : 'エレベーターなし・未確認';
+}
+const evTag = t => { const x = evSummary(t); return x ? `<span class="evtag">${esc(x)}</span>` : ''; };
 function bldMemoHtml(h) {
   if (!h || h.type !== 'apt' || (!h.bn && !h.ac)) return '';
   return `<div class="notice bmemo">${h.ac ? `<span class="bmac">${AC_NAME[h.ac] || ''}</span>` : ''}${h.bn ? `<span class="bmtx"><b>建物のメモ</b>${esc(h.bn)}</span>` : ''}</div>`;
@@ -6733,8 +6763,9 @@ function openBuilding(hid, startSel) {
       <label class="field bname"><span>建物名</span><span class="inline"><input type="text" id="fLabel" maxlength="30" value="${esc(h.label)}" placeholder="例：〇〇ハイツ"><button class="btn small" id="fLabelSave">保存</button></span>
         <small class="hint">住んでいる人の名前は書かないでください。</small></label>
       <label class="check locrow"><input type="checkbox" id="fLock"${h.lock ? ' checked' : ''}>オートロックの建物</label>
-      <label class="field"><span>階段・エレベーター</span><select id="fAc" class="big" aria-label="階段・エレベーター">
-        <option value=""${!h.ac ? ' selected' : ''}>とくになし</option><option value="ev"${h.ac === 'ev' ? ' selected' : ''}>エレベーターあり</option><option value="st"${h.ac === 'st' ? ' selected' : ''}>縦階段（階段ごとに上り下り）</option></select></label>
+      <label class="field"><span>エレベーター</span><select id="fAc" class="big" aria-label="エレベーター">
+        <option value=""${!h.ac ? ' selected' : ''}>まだ確かめていない</option><option value="ev"${h.ac === 'ev' ? ' selected' : ''}>あり</option><option value="no"${h.ac === 'no' ? ' selected' : ''}>なし（階段だけ）</option><option value="st"${h.ac === 'st' ? ' selected' : ''}>なし（縦階段：階段ごとに上り下り）</option></select>
+        <small class="hint">分かったら直してください。高齢の方が回る建物をえらぶときに使います。</small></label>
       <label class="field bnote"><span>建物のメモ</span><textarea id="fNote" maxlength="200" rows="3" placeholder="例：1階は店、2階は駐車場。奥の階段からも入れる">${esc(h.bn || '')}</textarea></label>
       <p class="hint" style="margin-top:-6px">部屋を入力する画面の上に出ます。<b>住んでいる人の名前・国籍・年齢・病気などは書かないでください。</b></p>
       <button class="btn small" id="fNoteSave">メモを保存</button>
@@ -6820,7 +6851,7 @@ function openBuilding(hid, startSel) {
     on('seqStart', () => openAptSeq(hid));
     on('fRename', () => openUnitNames(hid, () => openBuilding(hid)));
     on('fLabelSave', () => { const v = $('#fLabel').value.trim().slice(0, 30); save('建物名を変えました', h => { h.label = v; }); });
-    if ($('#fAc')) $('#fAc').onchange = e => { const v = e.target.value; save(v ? `${AC_NAME[v]}にしました` : '階段・エレベーターを「とくになし」にしました', h => { if (v) h.ac = v; else delete h.ac; }); };
+    if ($('#fAc')) $('#fAc').onchange = e => { const v = e.target.value; save(v ? `${AC_NAME[v]}にしました` : 'エレベーターを「まだ確かめていない」にしました', h => { if (v) h.ac = v; else delete h.ac; }); };
     on('fNoteSave', async () => {
       const v = String($('#fNote').value || '').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 200);
       const h2 = houseById(hid); if (!h2 || v === (h2.bn || '')) { toast('変わったところはありません'); return; }
@@ -8562,7 +8593,9 @@ function openSpecialSheet(tid) {
     ${t ? '' : `<label class="field">区域番号 <input type="text" id="spNo" value="${nextNo}" maxlength="10"></label>
     <label class="field">名前 <input type="text" id="spName" maxlength="30" placeholder="例：オートロック・コンビニ"></label>`}
     <p class="q">条件（いくつでも。えらんだ条件すべてに合う家を集めます）</p>
-    <div class="kindpick">${flag('lock', 'オートロック', 'オートロックの建物')}${flag('unmet', '一度も会えていない家', '留守の記録だけで、会えた記録がない家・部屋')}</div>
+    <div class="kindpick">${flag('apt', '集合住宅', 'アパート・マンションの住まいの部屋（立入禁止の建物はのぞく）')}${flag('lock', 'オートロック', 'オートロックの建物')}${flag('unmet', '一度も会えていない家', '留守の記録だけで、会えた記録がない家・部屋')}</div>
+    <p class="q">エレベーター（集合住宅のとき）</p>
+    <div class="seg" role="group" aria-label="エレベーター">${[['', 'どちらでも'], ['y', 'あり'], ['n', 'なし・未確認']].map(([v, l]) => `<button type="button" data-spev="${v}" aria-pressed="${(sp.ev || '') === v}">${l}</button>`).join('')}</div>
     <p class="q">種別（えらばなければ、すべての種別）</p>
     <div class="kindpick">${kinds.map(k => `<button type="button" class="kchip" data-spk="${k}" aria-pressed="${cur.includes(k)}">${KINDS[k][1]}<span>${KINDS[k][0]}</span></button>`).join('')}</div>
     <label class="check"><input type="checkbox" id="spExcl"${sp.excl === false || (!t && false) ? '' : ' checked'}>この家を、ふつうの区域カードから外す（2回訪ねないように）</label>
@@ -8570,6 +8603,7 @@ function openSpecialSheet(tid) {
       回っている人の区域は、受け取った日の時点の家で決まります（とちゅうで会えた家が消えないように）。</p>
     <button class="btn primary block" id="spSave">${t ? '保存する' : 'つくる'}</button>
     <button class="btn block" data-close>やめる</button>`);
+  $$('[data-spev]', $('#sheet')).forEach(b => b.onclick = () => $$('[data-spev]', $('#sheet')).forEach(x => x.setAttribute('aria-pressed', x === b)));
   $$('[data-spk],[data-spf]', $('#sheet')).forEach(b => b.onclick = () => {
     b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true');
     if (b.dataset.spf === 'unmet' && b.getAttribute('aria-pressed') === 'true' && !t) $('#spExcl').checked = false; // 留守宅の区域は、ふつう外さない
@@ -8577,8 +8611,11 @@ function openSpecialSheet(tid) {
   $('#spSave').onclick = () => {
     const ks = $$('[data-spk]', $('#sheet')).filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.spk);
     const on = k => $(`[data-spf="${k}"]`, $('#sheet')).getAttribute('aria-pressed') === 'true';
+    const evb = $('[data-spev][aria-pressed="true"]', $('#sheet')), ev = evb ? evb.dataset.spev : '';
     const special = { kinds: ks, lock: on('lock'), unmet: on('unmet'), excl: $('#spExcl').checked };
-    if (!ks.length && !special.lock && !special.unmet) { toast('条件か種別を1つ以上えらんでください'); return; }
+    if (on('apt')) special.apt = true;
+    if (ev) special.ev = ev;
+    if (!ks.length && !special.lock && !special.unmet && !special.apt && !special.ev) { toast('条件か種別を1つ以上えらんでください'); return; }
     const label = specialKindsText({ special });
     if (t) { closeSheet(); commit(`特別区域 ${t.no} の条件を変えました`, () => { t.special = special; }); return; }
     const no = normNo($('#spNo').value), name = ($('#spName').value.trim() || label).slice(0, 30);
@@ -8619,7 +8656,7 @@ function cardHtml(t, own, helper) {
   const holder = t.holder ? userById(t.holder) : null;
   const hs = helpersOf(t), groupOk = D().settings.groupOn !== 0;
   const due = dueOf(t), over = due && Date.parse(due) < Date.now();
-  const who = own ? `受け取ってから ${daysSince(t.lentAt)}日・<span class="${over ? 'tag-warn' : ''}">返却の目安 ${fmtDay(due)}${over ? '（過ぎています）' : ''}</span>${t.firstDoneAt ? '・留守宅を回る段階' : ''}${isSpecial(t) ? `<span class="spbadge">${esc(specialKindsText(t))}</span>` : ''}`
+  const who = own ? `受け取ってから ${daysSince(t.lentAt)}日・<span class="${over ? 'tag-warn' : ''}">返却の目安 ${fmtDay(due)}${over ? '（過ぎています）' : ''}</span>${t.firstDoneAt ? '・留守宅を回る段階' : ''}${isSpecial(t) ? `<span class="spbadge">${esc(specialKindsText(t))}</span>${evTag(t)}` : ''}`
     : helper ? `${esc(uname(t.holder))}さんの区域を、一緒に回ります（今日まで）`
     : (holder ? `担当：${esc(holder.name)}さん` : '担当者なし');
   const extra = (UI.cProg === 'on'
@@ -12019,7 +12056,7 @@ function renderAdmin() {
     const retAt = t.holder || t.awayPoolAt ? '' : (t.completedAt && (!t.returnedAt || t.completedAt >= t.returnedAt) ? t.completedAt : '');
     const pool = poolInfo(t);
     return `<article class="trow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
-      <div><b>${esc(t.name)}</b>${t.group ? ` <span class="gbadge">${esc(t.group)}グループ</span>` : ''}${isSpecial(t) ? `<span class="spbadge">特別区域：${esc(specialKindsText(t))}</span>` : ''} ${lendTag(t)}<div class="meta">
+      <div><b>${esc(t.name)}</b>${t.group ? ` <span class="gbadge">${esc(t.group)}グループ</span>` : ''}${isSpecial(t) ? `<span class="spbadge">特別区域：${esc(specialKindsText(t))}</span>${evTag(t)}` : ''} ${lendTag(t)}<div class="meta">
         <span>貸し出した日 ${lent ? fmtDay(lent) : '—'}</span><span>1回目を回った日 ${firstAt ? fmtDay(firstAt) : '—'}</span><span>正式に返却した日 ${retAt ? fmtDay(retAt) : (t.holder ? '貸出中' : pool ? '留守宅カードで回っています' : '—')}${lowWaitNote(t)}</span>
         ${pool ? `<span>留守宅の訪ね直し ${pool.done} / ${pool.n}（${pool.pct}%・目安 ${awayRetPct()}%）</span><button class="btn small" data-poolfin="${t.id}">正式に返却したことにする</button>` : ''}
         ${t.holder ? `<span class="${over ? 'tag-warn' : ''}">返却の目安 ${fmtDay(due)}${over ? '（過ぎています）' : ''}</span>` : ''}
@@ -14280,7 +14317,7 @@ function s12BackHtml(c, S, fs) {
     const rows = !h.units.length ? '<p class="nr">部屋の登録がありません</p>'
       : groups.length > 1 ? groups.map(([g, us]) => `<div class="fl"><span class="fn">${esc(g || 'そのほか')}</span><span class="rs">${us.map(u => room(h, u)).join('')}</span></div>`).join('')
       : `<div class="fl one"><span class="rs">${h.units.map(u => room(h, u)).join('')}</span></div>`;
-    const info = [kindOf(h) !== 'home' ? kindName(kindOf(h)) : '', h.lock ? 'オートロック' : '', `${h.units.length}部屋`].filter(Boolean).join('・');
+    const info = [kindOf(h) !== 'home' ? kindName(kindOf(h)) : '', h.lock ? 'オートロック' : '', h.ac === 'ev' ? 'エレベーターあり' : h.ac === 'no' || h.ac === 'st' ? 'エレベーターなし' : '', `${h.units.length}部屋`].filter(Boolean).join('・');
     return `<div class="ab"><p class="an"><i>${i + 1}</i>${esc(h.label || '集合住宅')}<small>${info}</small>${dnc[K(h.id, '')] ? '<b class="rm x">建物ごと拒否</b>' : ''}</p>${rows}</div>`;
   }).join('');
   return `<div class="s12card back">
