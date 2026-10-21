@@ -179,7 +179,7 @@
   /* 外へ */
   root.KmlKoushin = { parseKmlText, splitPin, mergeParsed, noKey, kindOf, RE_PARENT, RE_KID };
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof document === 'undefined') return;
-  Object.assign(root.KmlKoushin, { planTerrs, houseFit, terrOfSpecs, gapHouses }); // ためしに動かすとき用（index.html の関数が使える環境で）
+  Object.assign(root.KmlKoushin, { planTerrs, houseFit, terrOfSpecs, gapHouses, sharedLen, SLIVER_M2, SLIVER_THIN }); // sharedLen・SLIVER_*：区域の線を直す（kyoukai.js）の「まとめて直す」も同じものを使う // ためしに動かすとき用（index.html の関数が使える環境で）
 
   /* =========================================================
      ここから画面

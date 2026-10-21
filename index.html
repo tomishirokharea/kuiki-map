@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.35"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.36"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3791,6 +3791,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.36', items: [
+    ['線', '区域係：「区域の線を直す」で、すき間・重なりを調べたあと、「まとめて直す」で小さなすき間や細い重なりを一度に直せるようになりました（直す前に確認が出ます。残った所は、今までどおり1か所ずつ直せます）']
+  ] },
   { v: '2026.13.35', items: [
     ['係', '区域係：マイマップで区域を取り込むとき、枝番の線のない部分も、目印（ポイント ⑤など）から自動で枝番の区域にします'],
     ['係', '区域係：枝番どうしの重なりや、線のずれでできた細いすき間を直して取り込みます（直した内容は確認画面に出ます）']

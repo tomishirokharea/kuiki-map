@@ -46,5 +46,11 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "区域{0}の形を直す": "Ajustar la forma del territorio {0}",
 "隣の区域と共有している点は、隣も一緒に動かす": "Mover también el punto compartido del territorio vecino",
 "1つにできません": "No se pueden unir",
-"となりに合わせられませんでした": "No se pudo alinear con el vecino"
+"となりに合わせられませんでした": "No se pudo alinear con el vecino",
+"まとめて直す（{0}か所）": "Corregir todo junto ({0})",
+"まとめて直しますか？": "¿Corregir todo junto?",
+"まとめて直す": "Corregir todo junto",
+"すき間 {0}か所・重なり {1}か所を自動で直します。家が別の区域に移る所：{2}軒。残り {3}か所は、1か所ずつ選んでください": "Se corregirán automáticamente {0} huecos y {1} superposiciones. Casas que pasan a otro territorio: {2}. Los {3} restantes, elíjalos uno por uno",
+"すき間 {0}か所・重なり {1}か所を、まとめて直しました": "Se corrigieron {0} huecos y {1} superposiciones",
+"うまく直せませんでした。1か所ずつ直してください": "No se pudo corregir. Corrija uno por uno"
 });

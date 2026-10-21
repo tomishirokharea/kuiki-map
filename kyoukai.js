@@ -422,6 +422,7 @@
     const gaps = is.filter(x => x.k === 'gap').length, ovs = n - gaps;
     const x = is[S.ii] || null;
     let head = `<p class="senstat">${gaps ? `すき間 ${gaps}か所` : ''}${gaps && ovs ? '・' : ''}${ovs ? `<span class="ov">重なり ${ovs}か所</span>` : ''}</p>`;
+    if (S.autoN) head += `<div class="senrow">${btn('fixAll', `まとめて直す（${S.autoN}か所）`, 'small primary')}</div>`;
     if (!x) {
       hint.textContent = '赤い所が、すき間と重なりです。赤い「！」をタップすると、直し方をえらべます。';
       body.innerHTML = head + `<div class="senrow">${btn('issue', '1か所目を見る', 'small primary', ' data-i="0"')}${btn('cancel', 'もどる', 'small')}</div>`;
@@ -593,13 +594,14 @@
       if (!pc() && !await ensurePc()) return;
       toast('調べています…');
       setTimeout(() => {
-        S.tool = 'check'; S.scope = k === 'check' ? S.tid : null; S.issues = findIssues(S.scope); S.ii = -1;
+        S.tool = 'check'; S.scope = k === 'check' ? S.tid : null; S.issues = findIssues(S.scope); markAuto(); S.ii = -1;
         paint();
         if (!S.issues.length) toast('すき間や重なりはありませんでした');
         else { toast(`すき間・重なりが ${S.issues.length}か所 見つかりました`); const b = L.latLngBounds(S.issues.flatMap(x => x.ring)); if (k === 'checkAll') map.fitBounds(b.pad(0.2)); }
       }, 30);
       return;
     }
+    if (k === 'fixAll') { fixAll(); return; }
     if (k === 'issue') { focusIssue(Number(ds.i)); return; }
     if (k === 'gapTo') { fixGap(S.issues[S.ii], ds.t); return; }
     if (k === 'ovTo') { fixOv(S.issues[S.ii], ds.t); return; }
@@ -762,19 +764,35 @@
 
   /* ---------- すき間・重なりを直す ---------- */
   function afterFix() {
-    S.issues = findIssues(S.scope);
+    S.issues = findIssues(S.scope); markAuto();
     S.ii = S.issues.length ? Math.min(S.ii, S.issues.length - 1) : -1;
     paint();
     if (S.ii >= 0) focusIssue(S.ii); else toast('すき間・重なりは、すべて直りました');
   }
+  /* すき間を区域 t に入れた新しい線（1か所ずつ・まとめて、同じ処理）。PO：区域の線を返す関数（まとめて直すときは、直したあとの線を返す） */
+  function gapRing(t, x, PO) {
+    let r;
+    try { r = pc().union(toPC(PO(t)), toPC(x.ring)); } catch (e) { r = null; }
+    if (!r || r.length !== 1) return null;
+    const ring = exactify(fromRing(r[0][0]), [PO(t), x.ring, ...neighbors(t, 3).map(PO)]);
+    return ring.length < 3 || selfCross(ring) ? null : ring;
+  }
+  /* 区域 lose から、重なり（区域 keep の線）を引いた形。大きい順（なければ null） */
+  function ovPieces(lose, keep, PO) {
+    let r;
+    try { r = pc().difference(toPC(PO(lose)), toPC(PO(keep))); } catch (e) { r = null; }
+    const pieces = (r || []).map(p => fromRing(p[0])).map(g => ({ g, a: area(g) })).filter(p => p.a >= 0.5).sort((p, q) => q.a - p.a);
+    return pieces.length ? pieces : null;
+  }
+  function ovRing(lose, keep, pieces, PO) {
+    const ring = exactify(pieces[0].g, [PO(lose), PO(keep), ...neighbors(lose, 3).map(PO)]);
+    return ring.length < 3 || selfCross(ring) ? null : ring;
+  }
+  const livePoly = t => t.polygon;
   function fixGap(x, tid) {
     const t = terrById(tid); if (!x || !t) return;
-    let r;
-    try { r = pc().union(toPC(t.polygon), toPC(x.ring)); } catch (e) { r = null; }
-    if (!r || r.length !== 1) { toast('うまく入れられませんでした。「形を直す」で直してください'); return; }
-    const src = [t.polygon, x.ring, ...neighbors(t, 3).map(n => n.polygon)];
-    const ring = exactify(fromRing(r[0][0]), src);
-    if (ring.length < 3 || selfCross(ring)) { toast('うまく入れられませんでした。「形を直す」で直してください'); return; }
+    const ring = gapRing(t, x, livePoly);
+    if (!ring) { toast('うまく入れられませんでした。「形を直す」で直してください'); return; }
     doCommit(`すき間を区域${t.no}に入れました`, () => { const y = terrById(tid); if (y) { y.polygon = ring; reassign(); } });
     afterFix();
   }
@@ -782,19 +800,96 @@
     if (!x) return;
     const loseId = keepId === x.a ? x.b : x.a, lose = terrById(loseId), keep = terrById(keepId);
     if (!lose || !keep) return;
-    let r;
-    try { r = pc().difference(toPC(lose.polygon), toPC(keep.polygon)); } catch (e) { r = null; }
-    const pieces = (r || []).map(p => fromRing(p[0])).map(g => ({ g, a: area(g) })).filter(p => p.a >= 0.5).sort((p, q) => q.a - p.a);
-    if (!pieces.length) { toast('うまく直せませんでした。「形を直す」で直してください'); return; }
+    const pieces = ovPieces(lose, keep, livePoly);
+    if (!pieces) { toast('うまく直せませんでした。「形を直す」で直してください'); return; }
     if (pieces.length > 1 && pieces[1].a > 5) {
       const ok = await ask('', { title: `区域${lose.no}が2つに分かれてしまいます`, body: `重なりを区域${keep.no}にすると、区域${lose.no}の小さいほう（${m2(pieces[1].a)}）は、どの区域にも入らなくなります。続けますか？`, ok: '続ける', danger: false });
       if (!ok) return;
     }
-    const src = [lose.polygon, keep.polygon, ...neighbors(lose, 3).map(n => n.polygon)];
-    const ring = exactify(pieces[0].g, src);
-    if (ring.length < 3 || selfCross(ring)) { toast('うまく直せませんでした。「形を直す」で直してください'); return; }
+    const ring = ovRing(lose, keep, pieces, livePoly);
+    if (!ring) { toast('うまく直せませんでした。「形を直す」で直してください'); return; }
     doCommit(`重なっていた所を区域${keep.no}にしました`, () => { const y = terrById(loseId); if (y) { y.polygon = ring; reassign(); } });
     afterFix();
+  }
+
+  /* ---------- まとめて直す ----------
+     となり合う区域の境目にできた、小さなすき間・細い重なりを、決まりに合う所だけ自動で直す（1回の commit。取り消す・↶ 戻す は1回で全部もどる）。
+     決まりに合わない所は、そのまま赤く残るので、1か所ずつ選ぶ。数値（SLIVER_M2・SLIVER_THIN）と「接する長さ」の計算は、kml-koushin.js と同じものを使う */
+  const NEAR_RATIO = 0.1;     // 接する長さの1位と2位の差がこれより小さく、中に家があれば、自動にしない
+  const OV_SPLIT_M2 = 5;      // 重なりを引いて、残りが2つに分かれたとき、小さいほうがこれより大きければ「分かれる」
+  const isLocked = t => !t || !!t.dummy || isSpecial(t);   // 特別区域・検証用の区域は、自動で直さない
+  const ringLen = ring => { let s = 0; for (let i = 0; i < ring.length; i++) s += distM(ring[i], ring[(i + 1) % ring.length]); return s; };
+  function housesInRing(ring) {
+    const b = bboxOf(ring), out = [];
+    for (const h of D().houses) { if (h.lat < b[0] || h.lat > b[1] || h.lng < b[2] || h.lng > b[3]) continue; if (inPoly(h.lat, h.lng, ring)) out.push(h); }
+    return out;
+  }
+  /* 1か所を自動で直せるか。直せる：{ to / keep, moved }　直せない：{ why } */
+  function planAuto(x) {
+    const K = window.KmlKoushin || {};
+    if (x.k === 'gap') {
+      if (!K.sharedLen) return { why: '部品' };
+      const thin = 4 * Math.PI * x.area / Math.pow(ringLen(x.ring), 2);
+      if (!(x.area < K.SLIVER_M2 || thin < K.SLIVER_THIN)) return { why: '広い' };
+      const adj = x.adj.map(terrById).filter(Boolean);
+      if (!adj.length || adj.some(isLocked)) return { why: '特別' };
+      const gp = toPC(x.ring);
+      const ls = adj.map(t => ({ t, l: K.sharedLen(gp, [toPC(t.polygon)], null) })).filter(o => o.l > 0).sort((p, q) => q.l - p.l);
+      if (!ls.length) return { why: '接していない' };
+      const hs = housesInRing(x.ring);
+      if (hs.length && ls.length > 1 && (ls[0].l - ls[1].l) / ls[0].l < NEAR_RATIO) return { why: '決められない' };
+      const moved = hs.filter(h => h.terrId !== ls[0].t.id).length;
+      if (moved && ls[0].t.holder) return { why: '貸出中' };
+      return { to: ls[0].t.id, moved };
+    }
+    const a = terrById(x.a), b = terrById(x.b);
+    if (isLocked(a) || isLocked(b)) return { why: '特別' };
+    const hs = housesInRing(x.ring);
+    if (hs.length) {
+      const ids = new Set(hs.map(h => h.terrId || ''));
+      if (ids.size !== 1) return { why: '家がばらばら' };
+      const id = [...ids][0];
+      return id === x.a || id === x.b ? { keep: id, moved: 0 } : { why: '家がほかの区域' };
+    }
+    const okSide = (lose, keep) => { const r = ovPieces(lose, keep, livePoly); return !!r && !(r.length > 1 && r[1].a > OV_SPLIT_M2); };
+    const aOk = okSide(a, b), bOk = okSide(b, a);   // aOk：aから引いてもよい（残す側は b）
+    if (!aOk && !bOk) return { why: '分かれる' };
+    if (aOk && bOk) return { keep: area(a.polygon) >= area(b.polygon) ? a.id : b.id, moved: 0 };
+    return { keep: aOk ? b.id : a.id, moved: 0 };
+  }
+  /* 見つけた所すべてに、自動で直せるかを付ける */
+  function markAuto() {
+    S.issues.forEach(x => { try { x.auto = planAuto(x); } catch (e) { x.auto = { why: 'エラー' }; } });
+    S.autoN = S.issues.filter(x => x.auto && !x.auto.why).length;
+  }
+  async function fixAll() {
+    const items = S.issues.filter(x => x.auto && !x.auto.why);
+    if (!items.length) return;
+    if (!pc() && !await ensurePc()) return;
+    const g = items.filter(x => x.k === 'gap').length, o = items.length - g, c = items.reduce((a, x) => a + x.auto.moved, 0), d = S.issues.length - items.length;
+    const ok = await ask('', { title: 'まとめて直しますか？', body: `すき間 ${g}か所・重なり ${o}か所を自動で直します。家が別の区域に移る所：${c}軒。残り ${d}か所は、1か所ずつ選んでください`, ok: 'まとめて直す', danger: false });
+    if (!ok) return;
+    // 直したあとの線を、先にまとめて計算する（前に直した所を、あとの計算に使う）
+    const over = new Map(), PO = t => over.get(t.id) || t.polygon;
+    let gg = 0, oo = 0;
+    for (const x of items) {
+      if (x.k === 'gap') {
+        const t = terrById(x.auto.to), ring = t && gapRing(t, x, PO);
+        if (ring) { over.set(t.id, ring); gg++; }
+      } else {
+        const keep = terrById(x.auto.keep), lose = keep && terrById(keep.id === x.a ? x.b : x.a), pieces = lose && ovPieces(lose, keep, PO);
+        if (!pieces || (pieces.length > 1 && pieces[1].a > OV_SPLIT_M2)) continue;
+        const ring = ovRing(lose, keep, pieces, PO);
+        if (ring) { over.set(lose.id, ring); oo++; }
+      }
+    }
+    if (!over.size) { toast('うまく直せませんでした。1か所ずつ直してください'); return; }
+    doCommit(`すき間 ${gg}か所・重なり ${oo}か所を、まとめて直しました`, () => {
+      over.forEach((ring, id) => { const y = terrById(id); if (y) y.polygon = ring; });
+      reassign();
+    });
+    S.issues = findIssues(S.scope); markAuto(); S.ii = -1;
+    paint();
   }
 
   /* ---------- 係の画面の「区域」に、入口のボタンを足す ---------- */
@@ -811,6 +906,7 @@
 
   window.kyoukai = {
     open, close, click, back, onMode,
+    _auto: { findIssues, planAuto, markAuto, fixAll, paint, state: S }, // ためしに動かすとき用
     active: () => typeof mode !== 'undefined' && mode === 'sen'
   };
 })();
