@@ -323,6 +323,16 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "例：〇〇（どれに当たるか迷う建物）": "Ej.: ○○ (edificio de tipo dudoso)",
 "区域係：特別区域をつくる画面の「条件」をなくし、集合住宅・オートロックも種別のボタンにまとめました。カードを「建物の数で分ける」か「部屋の数で分ける」かを選べます（オートロックは、はじめは1枚4件まで）": "Encargado: en «Crear territorio especial» se quitaron las «condiciones»; apartamentos y portero automático ahora son botones de tipo. Puede elegir dividir las tarjetas por edificios o por departamentos (portero automático: 4 edificios por tarjeta al inicio)",
 "種別に「その他」を加えました。どれに当たるか迷う、住居以外の建物に使います": "Se añadió el tipo «Otros», para edificios no residenciales de tipo dudoso",
+/* ---- 特別区域を止める・消す（2026-10-22） ---- */
+"止める・消す": "Pausar · borrar",
+"今は貸出中止です。家は、ふつうの区域カードで回っています。": "Ahora está pausado. Las casas se visitan con las tarjetas normales.",
+"貸出を再開する": "Reanudar la asignación",
+"しばらく使わないだけなら、消さずに「貸出中止」にしてください。": "Si solo no lo usará por un tiempo, no lo borre: páuselo.",
+"家はふつうの区域カードにもどり、カードとS-13の記録は残ります。あとで再開できます。": "Las casas vuelven a las tarjetas normales y se conservan las tarjetas y el S-13. Puede reanudarlo después.",
+"貸出中止にする（あとで再開できる）": "Pausar la asignación (se puede reanudar)",
+"消すのは、作り方をまちがえたときや、もう使わないときです。家と訪問の記録は消えません。": "Bórrelo solo si lo creó mal o ya no lo usará. Las casas y los registros de visitas no se borran.",
+"特別区域「{0}」を貸出中止にしました": "Territorio especial «{0}» pausado",
+"特別区域「{0}」の貸出を再開しました": "Se reanudó el territorio especial «{0}»",
 /* ---- 予定の印刷 ---- */
 "この月の予定を印刷": "Imprimir el programa del mes",
 "掲示板用": "para el tablero"

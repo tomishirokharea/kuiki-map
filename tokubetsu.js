@@ -288,6 +288,7 @@
     const notOther = h => !others.some(t => inSpecial(h, t)); // ほかの特別区域の家は、この組に入れない
     const orphan = g ? matchHouses(sp).filter(h => !inCards.has(h.id) && notOther(h)) : [];
     const excl = spExcludes(t0) || (sp.excl !== false && !sp.unmet);
+    const allStop = cards.every(t => lendMode(t) === 'stop');
     setSheet(headHtml(null, `特別区域 ${esc(g ? prefixOf(cards) : t0.no)}：${esc(grpName(t0))}`, `${cards.length}枚・種別：${esc(specialKindsText(t0))}`) + `
       <p class="q">ふつうの区域カードから</p>
       ${sp.unmet ? '<p class="hint">「一度も会えていない家」の特別区域は、ふつうの区域カードから外しません。</p>' : `<div class="seg" role="group" aria-label="ふつうの区域カードから外すか">
@@ -300,7 +301,10 @@
       ${orphan.length ? `<div class="notice warn">どのカードにも入っていない家が ${orphan.length}件あります（あとから登録した店など）。<div class="actions"><button type="button" class="btn small primary" id="tgOrphan">近いカードに入れる</button></div></div>` : ''}
       ${g ? `<button class="btn block primary" id="tgSplit">地図で分け直す（件数を変える・家を移す）</button>` : `<button class="btn block primary" id="tgSplit">件数で分ける（地図で分け方を見る）</button>`}
       ${g ? '' : '<button class="btn block" id="tgCond">条件を変える</button>'}
-      <details class="tk-more"><summary>消す</summary><p class="hint">特別区域のカードを消しても、家と訪問の記録は、ふつうの区域にそのまま残ります。</p>
+      <details class="tk-more"><summary>止める・消す</summary>
+        ${allStop ? `<p class="hint">今は貸出中止です。家は、ふつうの区域カードで回っています。</p><button class="btn block primary" id="tgLend" data-v="auto">貸出を再開する</button>`
+          : `<p class="hint"><b>しばらく使わないだけなら、消さずに「貸出中止」にしてください。</b>家はふつうの区域カードにもどり、カードとS-13の記録は残ります。あとで再開できます。</p><button class="btn block" id="tgLend" data-v="stop">貸出中止にする（あとで再開できる）</button>`}
+        <p class="hint">消すのは、作り方をまちがえたときや、もう使わないときです。家と訪問の記録は消えません。</p>
         <button class="btn danger block" id="tgDel">${g ? `この特別区域の${cards.length}枚を全部消す` : 'この特別区域を消す'}</button></details>
       <button class="btn block" data-close>閉じる</button>`);
     const S = $('#sheet');
@@ -318,12 +322,32 @@
       const size = g ? Math.max(MIN_SIZE, Math.min(sizeMax(sp), Math.round(tot / Math.max(1, free.length)))) : sizeDef(sp);
       startSplit({ sp: Object.assign({}, sp), name: grpName(t0), prefix: g ? prefixOf(cards) : t0.no, size, hs, edit: { g, cards, single: g ? null : t0 }, back });
     };
+    $('#tgLend').onclick = () => {
+      const v = $('#tgLend').dataset.v;
+      commit(v === 'stop' ? `特別区域「${grpName(t0)}」を貸出中止にしました` : `特別区域「${grpName(t0)}」の貸出を再開しました`,
+        () => cards.forEach(t => { const x = terrById(t.id); if (x) { x.lend = v; delete x.free; } }));
+      back();
+    };
     $('#tgDel').onclick = async () => {
       const lent = cards.filter(t => t.holder);
-      if (!await ask(`特別区域「${grpName(t0)}」の${cards.length}枚を消します。${lent.length ? `\n貸出中のカード（${lent.map(t => t.no).join('・')}）の貸し出しも終わります。` : ''}\n家と訪問の記録は、ふつうの区域に残ります。よろしいですか？`, { ok: '消す' })) return;
+      const msg = delImpact(cards);
+      if (!await ask(`特別区域「${grpName(t0)}」の${cards.length}枚を消します。しばらく使わないだけなら、消さずに「貸出中止にする」を使ってください。${lent.length ? `\n貸出中のカード（${lent.map(t => t.no).join('・')}）の貸し出しも終わります。` : ''}${msg}\n家と訪問の記録は消えません。よろしいですか？`, { ok: '消す' })) return;
       closeSheet();
       commit(`特別区域「${grpName(t0)}」を消しました`, () => cards.forEach(t => deleteTerrData(t.id, false)));
     };
+  }
+  /* 消したときの影響（確認画面に出す）：ふつうのカードにもどる家・貸出中のふつうのカード・S-13 */
+  function delImpact(cards) {
+    const a = [];
+    const back = cards.filter(t => spExcludes(t)), hs = new Set(back.flatMap(t => housesOf(t.id).map(h => h.id)));
+    if (hs.size) {
+      const lentNorm = new Set();
+      D().houses.forEach(h => { if (hs.has(h.id) && h.terrId) { const n = terrById(h.terrId); if (n && n.holder && !isSpecial(n)) lentNorm.add(n.no); } });
+      a.push(`\nこの家 ${hs.size}件は、すぐにふつうの区域カードで「訪ねる家」にもどります。`);
+      if (lentNorm.size) a.push(`\n貸出中のふつうのカード（${[...lentNorm].sort(cmpNo).slice(0, 8).join('・')}${lentNorm.size > 8 ? ' ほか' : ''}）で訪ねる家が増え、回った割合が下がります（返却のとき「途中の返却」になることがあります）。`);
+    }
+    a.push('\nこのカードの貸出の記録は、S-13の表から消えます（毎週ドライブに保存したPDFには残ります）。');
+    return a.join('');
   }
   function setExcl(cards, on, after) {
     commit(on ? '特別区域の家を、ふつうの区域カードから外しました' : '特別区域の家を、ふつうの区域カードでも回るようにしました', () => {
@@ -461,7 +485,7 @@
     if (e && e.g) {
       const free = e.cards.filter(t => !t.holder);
       const drop = free.slice(gs.length);
-      if (drop.length && !await ask(`カードが${free.length}枚から${gs.length}枚になります。使わなくなるカード（${drop.map(t => t.no).join('・')}）は消えます（家と記録は、ふつうの区域に残ります）。よろしいですか？`, { ok: '分け直す' })) return;
+      if (drop.length && !await ask(`カードが${free.length}枚から${gs.length}枚になります。使わなくなるカード（${drop.map(t => t.no).join('・')}）は消えます（家と記録は、ふつうの区域に残ります。そのカードのS-13の行は消えます）。よろしいですか？`, { ok: '分け直す' })) return;
     }
     const grp = e && e.g ? e.g : 'g' + uid();
     const used = new Set(D().territories.map(t => String(t.no)));

@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.38"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.39"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3840,6 +3840,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.39', items: [
+    ['特', '区域係：特別区域の「止める・消す」に「貸出中止にする（あとで再開できる）」を加えました。消すときの確認に、ふつうの区域カードやS-13への影響が出ます']
+  ] },
   { v: '2026.13.38', items: [
     ['他', '種別に「その他」を加えました。どれに当たるか迷う、住居以外の建物に使います'],
     ['特', '区域係：特別区域をつくる画面の「条件」をなくし、集合住宅・オートロックも種別のボタンにまとめました。カードを「建物の数で分ける」か「部屋の数で分ける」かを選べます（オートロックは、はじめは1枚4件まで）']
