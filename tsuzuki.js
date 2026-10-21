@@ -222,7 +222,8 @@
         const box = document.getElementById('adTakeSet');
         if (box && !box.querySelector('[data-range="contDays"]')) {
           const v = contDays();
-          box.insertAdjacentHTML('beforeend', `<div class="setrow">
+          const end = box.querySelector('[data-takeclose]'); // 「閉じる」ボタンの前に足す
+          (end || box).insertAdjacentHTML(end ? 'beforebegin' : 'beforeend', `<div class="setrow">
       <span>途中で返された区域を、次の人が続きから回る期間<br><small class="hint">途中で返却された区域を、この日数のあいだに受け取ると、前の人が訪ねた家は「済み」のまま続きから回れます。0にすると使いません</small></span>
       <div class="rng"><input type="range" min="0" max="365" step="5" value="${v}" data-range="contDays" data-unit="日" aria-label="日数"><output>${v}日</output></div></div>`);
         }

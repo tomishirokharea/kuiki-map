@@ -166,9 +166,10 @@
     const endM = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     const ds = ts.map(dueInfo);
     const need = ds.filter(d => !d.t.holder && !d.t.awayPoolAt && d.last && d.startBy <= endM).sort((a, b) => a.left - b.left);
-    const given = new Set();
-    ts.forEach(t => { if (t.lentAt && dstr(t.lentAt).startsWith(ym)) given.add(t.id + dstr(t.lentAt)); });
-    (D().returns || []).forEach(r => { if (r.lentAt && dstr(r.lentAt).startsWith(ym)) given.add(r.terrId + dstr(r.lentAt)); });
+    const given = new Set(), givenList = [];
+    const addG = (tid, at, by) => { const k = tid + dstr(at); if (given.has(k)) return; given.add(k); const t = TID.get(tid); if (t) givenList.push({ t, at, by }); };
+    ts.forEach(t => { if (t.lentAt && dstr(t.lentAt).startsWith(ym)) addG(t.id, t.lentAt, t.holder); });
+    (D().returns || []).forEach(r => { if (r.lentAt && dstr(r.lentAt).startsWith(ym)) addG(r.terrId, r.lentAt, r.by); });
     const months = [];
     for (let i = 0; i < 12; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
@@ -179,7 +180,7 @@
       const m = months.find(x => x.ym === d.deadline.slice(0, 7));
       if (m) m.list.push(d);
     });
-    return { ts, ds, need, given: given.size, avg: Math.ceil(ts.length / 12), months,
+    return { ts, ds, need, given: given.size, givenList, avg: Math.ceil(ts.length / 12), months,
       over: ds.filter(d => d.st === 'over'), warn: ds.filter(d => d.st === 'warn'), none: ds.filter(d => d.st === 'none') };
   }
 
@@ -337,12 +338,12 @@
         前回回り終えた日は、アプリの記録とS-13に転記した紙の記録のうち、新しいほうを使います。</p>
       ${setHtml()}
       <div class="tiles">
-        <div class="tile${m.over.length ? ' alert' : ''}"><b>${m.over.length}</b>1年の期限を過ぎた区域</div>
-        <div class="tile${m.warn.length ? ' alert' : ''}"><b>${m.warn.length}</b>期限まで${PIN_DAYS}日以内</div>
-        <div class="tile${m.need.length ? ' alert' : ''}"><b>${m.need.length}</b>今月中に出したい区域<br><small>出さないと期限に間に合わない</small></div>
-        <div class="tile"><b>${m.given}</b>今月出した区域<br><small>目安は毎月 約${m.avg}区域</small></div>
-        <div class="tile${paces.length ? ' alert' : ''}"><b>${paces.length}</b>声かけ候補（貸出中）</div>
-        ${m.none.length ? `<div class="tile"><b>${m.none.length}</b>前回の記録なし</div>` : ''}
+        ${dueTile('over', m.over.length, '1年の期限を過ぎた区域', '', m.over.length)}
+        ${dueTile('warn', m.warn.length, `期限まで${PIN_DAYS}日以内`, '', m.warn.length)}
+        ${dueTile('need', m.need.length, '今月中に出したい区域', '出さないと期限に間に合わない', m.need.length)}
+        ${dueTile('given', m.given, '今月出した区域', `目安は毎月 約${m.avg}区域`, false)}
+        ${dueTile('pace', paces.length, '声かけ候補（貸出中）', '', paces.length)}
+        ${m.none.length ? dueTile('none', m.none.length, '前回の記録なし', '', false) : ''}
       </div>
       ${m.need.length ? `<h3 class="sub">今月中に出したい区域</h3>
         <p class="hint">返却の目安（${ld}日）を考えると、今月中に貸し出さないと1年の期限に間に合わない区域です。急ぐ順です。</p>
@@ -374,6 +375,43 @@
       ${order.slice(0, SHOW).map(dueRow).join('')}
       ${order.length > SHOW ? `<details class="more"><summary>ほかの区域を見る（${order.length - SHOW}）</summary>${order.slice(SHOW).map(dueRow).join('')}</details>` : ''}`;
   }
+  /* 期限の見張りのタイル：押すと内訳（その区域の一覧）が下から出る。閉じると、元の画面のまま */
+  const dueTile = (k, n, label, small, alert) => `<button type="button" class="tile${alert ? ' alert' : ''}" data-duetl="${k}"><b>${n}</b>${label}${small ? `<br><small>${small}</small>` : ''}<span class="tmore">内訳 ›</span></button>`;
+  const dueLine = d => {
+    const t = d.t;
+    return `<div class="tlrow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span><div>
+      <p>${chip(d.st)} <b>${esc(t.name || '')}</b></p>
+      <p class="muted">前回回り終えた日 ${showDay(d.last)}・${leftTxt(d)}</p>
+      <p class="muted">${t.holder ? `貸出中：${esc(uname(t.holder))}さん` : t.awayPoolAt ? '留守宅カードで回っています' : '空いています'}</p></div>
+      <div class="btns"><button type="button" class="btn small" data-tlmap="${t.id}">地図</button><button type="button" class="btn small primary" data-tlkarte="${t.id}">カルテ</button></div></div>`;
+  };
+  function openDueList(key) {
+    if (!isAdmin()) return;
+    const m = monthStats(), back = () => openDueList(key);
+    const paces = m.ts.filter(t => t.holder).map(paceOf).filter(p => p && p.msg).sort((a, b) => b.el - a.el);
+    const ord = a => a.slice().sort((x, y) => (x.left == null ? 1 : y.left == null ? -1 : x.left - y.left) || cmpNo(x.t.no, y.t.no));
+    let title = '', hint = '', body = '';
+    if (key === 'over') { title = `1年の期限を過ぎた区域 ${m.over.length}`; hint = '前回回り終えた日から1年を過ぎています。期限を過ぎた日数の多い順です。'; body = ord(m.over).map(dueLine).join(''); }
+    else if (key === 'warn') { title = `期限まで${PIN_DAYS}日以内 ${m.warn.length}`; hint = '1年の期限が近い区域です。急ぐ順です。'; body = ord(m.warn).map(dueLine).join(''); }
+    else if (key === 'need') { title = `今月中に出したい区域 ${m.need.length}`; hint = `返却の目安（${lendDays()}日）を考えると、今月中に貸し出さないと1年の期限に間に合わない区域です。急ぐ順です。`; body = m.need.map(dueLine).join(''); }
+    else if (key === 'none') { title = `前回の記録なし ${m.none.length}`; hint = '前回回り終えた日が分からない区域です。S-13に紙の記録（前回完了した日付）を転記すると、期限が出ます。'; body = `<button type="button" class="btn block" data-tls13>S-13を開く</button>` + m.none.map(dueLine).join(''); }
+    else if (key === 'given') {
+      title = `今月出した区域 ${m.given}`; hint = `今月、貸し出した（受け取られた）区域です。目安は毎月 約${m.avg}区域です。`;
+      body = m.givenList.sort((a, b) => (a.at < b.at ? 1 : -1)).map(g => `<div class="tlrow"><span class="stamp sm${noCls(g.t.no)}">${esc(g.t.no)}</span><div>
+        <p><b>${esc(g.t.name || '')}</b></p><p class="muted">${showDay(dstr(g.at))}${g.by ? `・${esc(uname(g.by))}さん` : ''}${g.t.holder ? '' : '・返却ずみ'}</p></div>
+        <div class="btns"><button type="button" class="btn small" data-tlmap="${g.t.id}">地図</button><button type="button" class="btn small primary" data-tlkarte="${g.t.id}">カルテ</button></div></div>`).join('');
+    } else if (key === 'pace') {
+      title = `声かけ候補（貸出中） ${paces.length}`; hint = '受け取ってからの日数のわりに、進み具合が遅い区域です。本人に自動で知らせることはしません。必要なときは、区域係から声をかけてください。';
+      body = paces.map(p => `<div class="tlrow"><span class="stamp sm${noCls(p.t.no)}">${esc(p.t.no)}</span><div>
+        <p><b>${esc(p.t.name || '')}</b></p><p class="muted">${esc(uname(p.t.holder))}さん・受け取ってから${daysSince(p.t.lentAt)}日・進み具合 約${p.prog}%</p><p class="tag-warn">${p.msg}</p></div>
+        <div class="btns"><button type="button" class="btn small" data-tlmap="${p.t.id}">地図</button><button type="button" class="btn small primary" data-tlkarte="${p.t.id}">カルテ</button></div></div>`).join('');
+    } else return;
+    setSheet(headHtml(null, title, '期限の見張り') + `<p class="hint">${hint}</p>` + (body || '<div class="empty">ありません</div>') + '<button class="btn block" data-close>もどる</button>');
+    const S = $('#sheet');
+    $$('[data-tlmap]', S).forEach(b => b.onclick = () => { closeSheet(); openTerr(b.dataset.tlmap); });
+    $$('[data-tlkarte]', S).forEach(b => b.onclick = () => openKarte(b.dataset.tlkarte, back));
+    const s13 = $('[data-tls13]', S); if (s13) s13.onclick = () => { closeSheet(); openS13(); };
+  }
   /* 区域係の決め（おすすめ順・留守宅・訪問を控える日）。開いているかどうかを覚えておく */
   let setOpen = false;
   function setHtml() {
@@ -397,6 +435,7 @@
   function dueClick(e) {
     const q = s => e.target.closest(s);
     let x;
+    if ((x = q('[data-duetl]'))) { openDueList(x.dataset.duetl); return; }
     if (q('[data-dues13]')) openS13();
     else if ((x = q('[data-dueset]'))) saveSet(s => { s.awayTries = Math.max(2, Math.min(10, triesAll() + Number(x.dataset.d))); });
     else if ((x = q('[data-offdel]'))) { const v = x.dataset.offdel; saveSet(s => { s.offDays = offDays().filter(d => d !== v && d >= ymd(new Date())); }, '訪問を控える日を消しました'); }
@@ -522,9 +561,10 @@
         <div><b>${esc(t.name)}</b>
           ${reqSort === 'reco' ? recoLine(x) : ''}
           <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}${askWhy(x)}</div>
-        ${canGet(x)
+        <div class="pickbtns">${canGet(x)
           ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
           : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
+          ${window.nozoku ? `<button class="btn small" data-peek="${t.id}" aria-label="区域${esc(t.no)}の場所を地図で見る">地図</button>` : ''}</div>
       </article>`; };
     const rowsCan = list.filter(canGet).map(rowHtml).join(''), rowsAsk = list.filter(x => !canGet(x)).map(rowHtml).join('');
     const both = !!rowsCan && !!rowsAsk;   // 両方あるときだけ、見出しで分ける
@@ -558,6 +598,14 @@
     if ($('[data-gaway]', S)) $('[data-gaway]', S).onclick = () => openAwayPick(true);
     $$('[data-take]', S).forEach(x => x.onclick = () => takeTerr(x.dataset.take));
     $$('[data-ask]', S).forEach(x => x.onclick = () => askTerr(x.dataset.ask || null));
+    // 受け取る前に、地図で場所を見る（nozoku.js）。「一覧にもどる」で、この一覧にもどる
+    $$('[data-peek]', S).forEach(b => b.onclick = () => {
+      const x = list.find(y => y.t.id === b.dataset.peek); if (!x) return;
+      const can = canGet(x), G0 = G;
+      window.nozoku.peek(x.t.id, { back: () => window.openRequestSheet(G0), takeLabel: can ? '受け取る' : '係に頼む',
+        take: () => { reqForGroup = G0; if (can) takeTerr(x.t.id); else askTerr(x.t.id); },
+        sub: `${x.n}軒・部屋　${x.last ? `前回返却した日 ${fmtDay(x.last)}` : 'まだ回ったことがない区域'}` });
+    });
   };
 
   /* =========================================================
@@ -1311,12 +1359,14 @@
       ${karteOpsHtml(t)}
       <button class="btn block" data-close>閉じる</button>`;
   }
-  function openKarte(tid) {
+  /* back：内訳の一覧などから開いたとき、「もどる」でその一覧にもどる */
+  function openKarte(tid, back) {
     const t = terrById(tid);
     if (!t || !isAdmin() || lkLocked()) return;
     setSheet(karteHtml(t));
     const S = $('#sheet');
-    $$('[data-kper]', S).forEach(b => b.onclick = () => { karteState.period = Number(b.dataset.kper); sheetKeep = true; openKarte(tid); });
+    if (typeof back === 'function') $$('[data-close]', S).forEach(b => { b.removeAttribute('data-close'); b.textContent = 'もどる'; b.onclick = back; });
+    $$('[data-kper]', S).forEach(b => b.onclick = () => { karteState.period = Number(b.dataset.kper); sheetKeep = true; openKarte(tid, back); });
     const go = (sel, fn) => { const b = $(sel, S); if (b) b.onclick = fn; };
     go('[data-kmap]', () => { closeSheet(); openTerr(tid); });
     go('[data-ks12]', () => printS12([tid], s12Opt.size, s12Opt.back));
@@ -1928,8 +1978,8 @@ body.duemode .terr-label:not(.duelab){display:none}
 .tfind input{flex:1 1 14em;min-height:54px;font-size:19px;border:2px solid var(--ink);border-radius:12px;padding:0 12px;background:#fff}
 .tfind output{font-size:16px;color:var(--ink2)}
 .tfind button{min-height:54px}
-.adtop{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin:-4px 0 10px}
-.adtop .btn{min-height:44px}
+.adtop{display:flex;justify-content:flex-end;margin:-6px 0 2px}
+.adhelp{min-height:40px;border:0;background:none;color:var(--brand);font:inherit;font-size:15px;font-weight:700;padding:0 4px;text-decoration:underline;text-underline-offset:3px}
 .ahead{border:2px solid var(--line);background:#fff;border-radius:14px;padding:8px 12px;margin:-6px 0 14px;font-size:16px;line-height:1.6}
 .ahead p{margin:2px 0}.ahead b{font-size:18px}.ahead .hot{color:#B71C1C}
 .mfit{background:#fff;border:2px solid var(--line);border-left:10px solid #1565C0;border-radius:12px;padding:10px 12px;margin-bottom:8px}
@@ -1953,14 +2003,10 @@ body.duemode .terr-label:not(.duelab){display:none}
   const today6 = () => ymd(new Date());
   const N = s => String(s == null ? '' : s).normalize('NFKC').toLowerCase().replace(/[－ー―‐−–—]/g, '-').replace(/\s+/g, '');
 
-  /* ---------- （12）名前をかくす（この端末だけ。係の画面の中だけ。S-13 と印刷は、記録なのでそのまま） ---------- */
-  const HIDE_KEY = 'kuiki_hidenames';
-  const hideNames = () => lsGet(HIDE_KEY) === '1';
-  try {
-    unameMask = id => (hideNames() && typeof currentView !== 'undefined' && currentView === 'admin' && id ? '●●' : null);
-  } catch (e) { /* 古い index.html のときは使わない */ }
+  /* ---------- （12）名前をかくす：2026-10-21 に廃止（区域係の要望）。前に「かくす」にしていた端末の設定も消す ---------- */
+  try { lsDel('kuiki_hidenames'); } catch (e) { /* 何もしない */ }
 
-  /* ---------- （6）各画面の「この画面の使い方」と「名前をかくす」 ---------- */
+  /* ---------- （6）各画面の「この画面の使い方」 ---------- */
   const HELP = {
     inbox: ['「今日」でやること',
       ['いちばん上の色の帯で、1年で全区域を回れているかが分かります（緑の✓なら順調）。',
@@ -2012,17 +2058,10 @@ body.duemode .terr-label:not(.duelab){display:none}
     if (!bar) return;
     if (!bar.dataset.bound) {
       bar.dataset.bound = '1';
-      bar.addEventListener('click', e => {
-        if (e.target.closest('[data-adhelp]')) openHelp();
-        else if (e.target.closest('[data-hidename]')) {
-          lsSet(HIDE_KEY, hideNames() ? '0' : '1');
-          toast(hideNames() ? '係の画面で、名前をかくしました（この端末だけ）' : '名前を表示します');
-          renderAll();
-        }
-      });
+      bar.addEventListener('click', e => { if (e.target.closest('[data-adhelp]')) openHelp(); });
     }
-    bar.innerHTML = `<div class="adtop"><button type="button" class="btn small" data-adhelp>？ この画面の使い方</button>${isAdmin()
-      ? `<button type="button" class="btn small${hideNames() ? ' primary' : ''}" data-hidename aria-pressed="${hideNames()}">${hideNames() ? '名前をかくしています' : '名前をかくす'}</button>` : ''}</div>`;
+    // 小さな文字のボタン1つだけにして、一覧までの場所を取らないようにする（2026-10-21）
+    bar.innerHTML = `<div class="adtop"><button type="button" class="adhelp" data-adhelp>？ この画面の使い方</button></div>`;
   }
 
   /* ---------- （5）パソコンでは、カルテなどを右に出して、一覧と並べる ---------- */
@@ -2092,18 +2131,9 @@ body.duemode .terr-label:not(.duelab){display:none}
       act.appendChild(d);
     });
   }
-  /* 「区域」タブの上にある、貸し出しのきまり（たくさんの設定）を、ふだんはたたんでおく */
-  let takeOpen = false;
-  function foldTakeSet() {
-    const box = document.getElementById('adTakeSet');
-    if (!box || !box.firstElementChild || box.querySelector(':scope > details.takefold')) return;
-    const st = D().settings;
-    const d = document.createElement('details'); d.className = 'dueset takefold'; d.open = takeOpen;
-    d.innerHTML = `<summary>貸し出しのきまり（自動受け取り ${Number(st.autoFree) === 1 ? '使う' : '使わない'}・返却の目安 ${lendDays()}日・1人 ${st.holdMaxPersonal || 2}枚まで）</summary>`;
-    while (box.firstChild) d.appendChild(box.firstChild);
-    box.appendChild(d);
-    d.addEventListener('toggle', () => { takeOpen = d.open; });
-  }
+  /* 「区域」タブの上にある、貸し出しのきまり：開け閉めは index.html の「貸し出しのきまり」ボタン（paintTakeTgl）で行う（2026-10-21）。
+     以前はここで details に包んでいたが、描き直しの順番によって包まれず、たためなくなることがあった */
+  function foldTakeSet() { if (typeof paintTakeTgl === 'function') paintTakeTgl(); }
 
   /* ---------- （2）カルテ：区域の操作を集める ---------- */
   function karteOpsHtml(t) {

@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.33"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.34"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="config.js"></script><!-- GASのURLと、会衆ごとの設定はこのファイルに書きます（無ければ試作モード） -->
-<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><!-- スペイン語の辞書 / Diccionario español -->
+<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><!-- スペイン語の辞書 / Diccionario español -->
 <script src="i18n.js"></script><!-- 言語の切りかえ / Cambio de idioma -->
 <script>
 /* iPhoneのホーム画面アプリで、下のタブの下に空白が出ることがある（iOSが画面の高さを、上の時刻の帯の分だけ短く伝えるため）。
@@ -87,7 +87,7 @@ header.top h1{font-size:20px;margin:0;letter-spacing:.04em}
 .who{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:15px}
 .who select{min-height:42px;border-radius:10px;border:0;padding:0 8px;color:var(--ink);background:#fff;max-width:40vw}
 main{flex:1;min-height:0;position:relative}
-.view{position:absolute;inset:0;overflow:auto;padding:14px 16px 28px}
+.view{position:absolute;inset:0;overflow:auto;overflow-x:hidden;padding:14px 16px 28px} /* 横にはみ出す物があっても、画面ごと横に動かない（iPhone） */
 #view-map{padding:0;overflow:hidden;background:#fff}
 nav.tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--paper);border-top:2px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
 nav.tabs.three{grid-template-columns:repeat(3,1fr)}
@@ -234,6 +234,19 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .field>span{display:block;font-weight:700;margin-bottom:4px}
 .field input[type=text],.field input[type=number]{width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 12px;font-size:19px;background:#fff}
 .inline{display:flex;gap:8px}
+/* 予定の印刷：月と印刷ボタン。せまい画面（iPhone）でも横にはみ出さないよう、入りきらなければ2段にする */
+.tbar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.tbar .tbtn{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;text-align:left;min-height:60px;padding:6px 12px;line-height:1.25;white-space:normal;min-width:0}
+.tbar .tbtn span{font-weight:700;font-size:16px}
+.tbar .tbtn small{font-size:12.5px;font-weight:400;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tbar .tbtn[aria-expanded=true]{background:#DCE8F7;border-color:var(--brand)}
+.tbar .tbtn[aria-expanded=true] .tgl{display:inline-block;transform:rotate(180deg)}
+.takeset{border:2px solid var(--brand);border-radius:12px;padding:4px 12px 8px;margin:0 0 12px;background:#fff}
+.takeset .takeclose{margin-top:6px}
+.printpick{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;align-items:stretch}
+.printpick input[type=month]{flex:1 1 9em;min-width:0;max-width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:17px;background:#fff;color:var(--ink);-webkit-appearance:none;appearance:none}
+.printpick .btn{flex:1 1 11em;min-width:0;white-space:normal;line-height:1.25;flex-direction:column}
+.printpick .btn small{display:block;font-size:13px;font-weight:400}
 .inline input{flex:1}
 .stepper{display:flex;align-items:center;gap:12px}
 .stepper button{width:60px;height:54px;border-radius:12px;border:2px solid var(--ink);background:#fff;font-size:28px;font-weight:700}
@@ -260,6 +273,17 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .tile{background:#fff;border:2px solid var(--line);border-radius:12px;padding:10px 12px}
 .tile b{display:block;font-size:30px;line-height:1.2}
 .tile.alert{border-color:var(--away);background:var(--warn-bg)}
+/* 数字を押すと内訳が出るタイル（係の画面の状況）。右下の「内訳 ›」で押せることを知らせる */
+button.tile{font:inherit;color:inherit;text-align:left;cursor:pointer;display:block;width:100%;position:relative;padding-bottom:26px;min-height:96px}
+button.tile:active{transform:scale(.98)}
+button.tile .tmore{position:absolute;right:10px;bottom:6px;font-size:13px;font-weight:700;color:var(--brand)}
+button.tile:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.tlrow{display:flex;gap:10px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line)}
+.tlrow > div{flex:1;min-width:0}
+.tlrow p{margin:0;line-height:1.45}
+.tlrow .btns{display:flex;gap:6px;flex:none}
+.tlsum{display:grid;grid-template-columns:1fr auto;gap:4px 12px;margin:6px 0 10px;font-size:16px}
+.tlsum b{text-align:right}
 .slots{border-collapse:collapse;min-width:560px;width:100%;background:#fff}
 .slots th,.slots td{border:1px solid var(--line);padding:6px;text-align:center;font-size:15px}
 .slots td b{font-size:19px}
@@ -287,6 +311,8 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .stamp.away{border-color:var(--draw);color:var(--draw)}
 .pin.hl{box-shadow:0 0 0 4px var(--draw),0 1px 3px #0006}
 .pin.dim{opacity:.3}
+.pin.dim.sp{opacity:.55}
+.pin u.sp,.unit u.sp{background:#6A1B9A;font-size:11px}
 .pin.fade,.unit.fade{opacity:.45} /* 薄く：今の時間帯は試し済みの家・ほかの人が記録した家（緑のチェックはそのまま） */
 .pin.done,.unit.done,.uchip.donec,.pin.prev,.unit.prev{background-image:linear-gradient(rgba(255,255,255,.68),rgba(255,255,255,.68));color:#5E6E77;border-color:#E3E8E6;box-shadow:none}
 /* 訪ねた家は、印そのものを薄くして「終わった」ことがひと目でわかるように（チェックだけは濃いまま） */
@@ -635,7 +661,8 @@ body.strong .pin.st-plain{border-width:4px}
 #view-home table{width:100%;table-layout:fixed}
 #view-reco .kgsorts{touch-action:pan-x}
 /* カレンダーの日：文字が大きいと、正方形にこだわって横に広がるので、せまい画面では正方形をやめる */
-@media (max-width:420px){#view-home .cd{aspect-ratio:auto;min-height:56px;overflow:hidden}#view-home .cd .dn{font-size:clamp(13px,4.4vw,16px)}}
+@media (max-width:420px){#view-home .cd,#view-admin .cd{aspect-ratio:auto;min-height:56px;overflow:hidden}#view-home .cd .dn,#view-admin .cd .dn{font-size:clamp(13px,4.4vw,16px)}
+  .cd .cdsc i{display:block;text-align:center} /* 「+1」（ほかの集まり）は時刻の下に出して、はみ出さないように */}
 .ftools .seg{display:flex;width:100%;margin:0}
 .ftools .seg button{flex:1}
 .fsearch{display:flex;align-items:center;gap:8px;background:#fff;border:2px solid var(--ink2);border-radius:12px;padding:0 12px;min-height:52px}
@@ -698,12 +725,15 @@ body.strong .pin.st-plain{border-width:4px}
 .terr-label.grp span{border-color:#9C6BD1;color:#5B2E8C;background:#F7F2FCee}
 .tcard.grp{border-color:#C9B2E6}
 /* 係の画面の中のタブ */
-.atabs{display:grid!important;grid-template-columns:repeat(5,1fr);gap:0}
+.atabs{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:0}
+.atabs button{min-width:0;overflow:hidden;text-overflow:ellipsis}
+html[lang="es"] .atabs button{font-size:13px;white-space:normal;line-height:1.15;padding:0 2px!important} /* スペイン語はタブの字が長いので、2行にしてもよい */
 .atabs button{min-height:54px;font-size:17px;border-left:0!important;border-top:0;padding:0 4px!important;white-space:nowrap}
 .atabs button:not([hidden]) ~ button{border-left:2px solid var(--ink)!important}
-.adsub{display:flex;flex-wrap:wrap;margin:-4px 0 12px}
-.adsub button{flex:1 1 4em;min-height:50px;font-size:16px}
-.adsub [data-admap]{flex:0 1 auto}
+.adsub{display:flex;flex-wrap:nowrap;margin:-4px 0 8px}
+.adsub button{flex:1 1 auto;min-height:48px;font-size:16px;white-space:nowrap;padding:0 6px!important;min-width:0}
+.adsub [data-admap]{flex:1.3 1 auto}
+@media (max-width:380px){.adsub button{font-size:15px;padding:0 4px!important}}
 .atabs .cnt{position:static;display:inline-grid;margin-left:4px;vertical-align:middle}
 
 /* ===== 左にスワイプして編集・削除 ===== */
@@ -1204,7 +1234,7 @@ img,canvas,video{max-width:100%}
   .homegrid .homemain>.sec:first-child{margin-top:0}
   /* 係の「状況」のタイルを多めに並べる */
   .tiles{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
-  .atabs{grid-template-columns:repeat(5,1fr)}
+  .atabs{grid-template-columns:repeat(5,minmax(0,1fr))}
 }
 
 /* =========================================================
@@ -1611,19 +1641,22 @@ body.renshu #btnUpd{display:none!important}
         </div>
         <div class="apane" data-apane="terr" hidden>
         <h2 class="sec" data-hqk="terrList">区域の一覧</h2>
-        <div class="row"><button class="btn primary" id="adNewTerr">＋ 新しい区域の線を引く</button></div>
-        <details class="dueset"><summary>区域の取り込み・特別区域・アパートの登録</summary>
-        <div class="row">
-          <!-- iPhoneでは accept に .kml を書くとファイルを選べないことがあるため、あえて指定しない（中身で判定する） -->
-          <label class="btn primary">マイマップで区域と拒否を新しくする（全部置きかえ）<input type="file" id="adKmlAll" multiple hidden></label>
-          <label class="btn">マイマップから区域を取り込む<input type="file" id="adKml" hidden></label>
+        <!-- 一覧の上は2つのボタンだけにして、一覧まですぐ届くようにする（2026-10-21）。
+             「区域の線・取り込み」は下から出る画面（torikomi.js）、「貸し出しのきまり」はその場で開く -->
+        <div class="tbar" id="adTerrTools">
+          <button type="button" class="btn tbtn" id="adMake"><span>区域の線・取り込み</span><small>線を引く・直す・ファイル・特別区域</small></button>
+          <button type="button" class="btn tbtn" id="adTakeTgl" aria-expanded="false" aria-controls="adTakeSet"><span>貸し出しのきまり <i class="tgl" aria-hidden="true">▾</i></span><small id="adTakeSum"></small></button>
+        </div>
+        <div id="adTakeSet" class="takeset" hidden></div>
+        <!-- 下から出る画面のボタンが使う、元のボタンとファイルの入り口（画面には出さない） -->
+        <div id="adMakeSrc" hidden>
+          <button class="btn primary" id="adNewTerr">＋ 新しい区域の線を引く</button>
+          <input type="file" id="adKmlAll" multiple>
+          <input type="file" id="adKml">
           <button class="btn" id="adSpecial">＋ 特別区域（コンビニなど）をつくる</button>
           <button class="btn" id="adAptImp">アパートの登録（やり直し・取り込み）</button>
-          <label class="btn">エクセルから区域と家を取り込む<input type="file" id="adXlsx" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label></div>
-        <p class="hint"><b>全部置きかえ</b>：区域ごとのKMLを<b>まとめて</b>（またはフォルダのZIPを）選びます。親の区域（A05）・枝番（5-①）の線と、拒否・注意のピンで、今の区域と拒否を新しくします。選ぶと、置きかえる前に確認の画面が出ます。<br>
-          <b>取り込む</b>：Googleマイマップで「KML/KMZにエクスポート」したファイルを選びます。区域の線だけを取り込み、ピン（家の印）は取り込みません。</p>
-        </details>
-        <div id="adTakeSet"></div>
+          <input type="file" id="adXlsx" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        </div>
         <div id="adTerrs"></div>
         </div>
         <div class="apane" data-apane="dnc" hidden><div id="adDnc"></div></div>
@@ -3441,7 +3474,7 @@ function slotOfVisit(v) {
 let IDX_SRC = null, IDX_LEN = -1;
 function buildIndex(only) {
   AGE_CACHE = null; RATE_CACHE = null; SHARE_CACHE = null; CHANCE_CACHE = null; RECO_CACHE = null;
-  HBT = new Map(); HID = new Map(); TID = new Map(); SPEC_MEMO = new Map();
+  HBT = new Map(); HID = new Map(); TID = new Map(); SPEC_MEMO = new Map(); SPC = null;
   for (const t of D().territories) TID.set(t.id, t);
   for (const h of D().houses) {
     HID.set(h.id, h);
@@ -3503,7 +3536,9 @@ const housesOf = tid => {
   const key = D().houses.length + '|' + JSON.stringify(t.special) + '|' + JSON.stringify(t.polygon || []) + '|' + (t.lentAt || '') + '|' + (t.special.unmet ? D().visits.length : 0);
   const m = SPEC_MEMO.get(tid);
   if (m && m.key === key) return m.list;
-  const list = D().houses.filter(h => inSpecial(h, t));
+  // 家を名指しした特別区域（件数で分けたカード）は、その家だけを見る（3万件を全部調べない）
+  const ids = spIds(t);
+  const list = ids ? [...ids].map(id => HID.get(id)).filter(h => h && inSpecial(h, t)) : D().houses.filter(h => inSpecial(h, t));
   SPEC_MEMO.set(tid, { key, list });
   return list;
 };
@@ -3653,9 +3688,19 @@ const polyTerrs = () => D().territories.filter(t => okPoly(t.polygon) && !isSpec
    線があれば、その線の中の家だけ。ふつうの区域カードからは、その家を外す（2回訪ねないように） */
 /* 特別区域の条件（すべてに合う家・部屋だけを集める）
    kinds：種別（コンビニなど。えらばなければ、すべての種別）／ lock：オートロックの建物／ unmet：一度も会えていない家（留守の記録だけ）
-   excl：その家を、ふつうの区域カードから外す（はじめは外す。留守宅の区域では外さないのがふつう） */
+   excl：その家を、ふつうの区域カードから外す（はじめは外す。留守宅の区域では外さないのがふつう）
+   ids：件数で分けたカード（tokubetsu.js）。この家だけを集める（線ではなく家で決める。となりのカードと重ならないように）
+   grp：同じ条件から分けたカードの組の印。gn：組の名前 */
 const spOf = t => (t && t.special) || {};
 const isSpecial = t => { const sp = spOf(t); return !!(t && t.special && ((Array.isArray(sp.kinds) && sp.kinds.length) || sp.lock || sp.unmet)); };
+const SPID = new WeakMap();
+function spIds(t) {
+  const a = spOf(t).ids;
+  if (!Array.isArray(a) || !a.length) return null;
+  let m = SPID.get(a);
+  if (!m) { m = new Set(a.map(String)); SPID.set(a, m); }
+  return m;
+}
 const targetKind = (h, u) => (h.type === 'apt' ? unitKind(h, u) : kindOf(h));
 /* 一度も会えていない家：留守の記録はあるが、会えた・拒否の記録がない（at より前の記録だけで決める） */
 function unmetAsOf(k, at) {
@@ -3678,15 +3723,36 @@ function spMatch(h, u, t) {
 }
 function inSpecial(h, t) {
   if (!isSpecial(t)) return false;
-  if (okPoly(t.polygon) && !inPoly(h.lat, h.lng, t.polygon)) return false;
+  const ids = spIds(t);
+  if (ids) { if (!ids.has(h.id)) return false; }
+  else if (okPoly(t.polygon) && !inPoly(h.lat, h.lng, t.polygon)) return false;
   return targets(h).some(u => spMatch(h, u, t));
 }
 const specialTargets = (h, t) => targets(h).filter(u => spMatch(h, u, t));
-function coveredBySpecial(h, u) {
-  const ts = D().territories.filter(t => isSpecial(t) && spOf(t).excl !== false && lendMode(t) !== 'stop');
-  if (!ts.length) return false;
-  return ts.some(t => (!okPoly(t.polygon) || inPoly(h.lat, h.lng, t.polygon)) && spMatch(h, u, t));
+/* ふつうの区域カードから外す特別区域か：excl が false でない・貸出中止でない・「一度も会えていない家」の条件がない
+   （会えていない家は、会えると対象が変わるので、ふつうの区域からは外さない。サーバーの spCover_ と同じ決まり） */
+const spExcludes = t => isSpecial(t) && spOf(t).excl !== false && !spOf(t).unmet && lendMode(t) !== 'stop';
+/* 特別区域で回る家の索引（家id → その家を集める特別区域）。区域・家が変わったら作り直す（buildIndex でも消す） */
+let SPC = null;
+function spCoverIndex() {
+  const ts = D().territories, now = Date.now();
+  if (SPC && SPC.ts === ts && SPC.n === ts.length && SPC.hn === D().houses.length && now - SPC.at < 1500) return SPC.map;
+  const sps = ts.filter(spExcludes);
+  const sig = sps.map(t => t.id + ':' + (t.lend || '') + ':' + JSON.stringify(t.special) + ':' + (spIds(t) ? '' : JSON.stringify(t.polygon || []))).join('|');
+  if (SPC && SPC.sig === sig && SPC.hn === D().houses.length) { SPC.at = now; SPC.ts = ts; SPC.n = ts.length; return SPC.map; }
+  const map = new Map();
+  sps.forEach(t => housesOf(t.id).forEach(h => { let a = map.get(h.id); if (!a) map.set(h.id, a = []); a.push(t); }));
+  SPC = { ts, n: ts.length, hn: D().houses.length, at: now, sig, map };
+  return map;
 }
+function coveredBySpecial(h, u) {
+  const a = spCoverIndex().get(h.id);
+  return !!a && a.some(t => spMatch(h, u, t));
+}
+/* その家（部屋）を回る特別区域（家の画面の「特別区域で回る家です」に使う） */
+const coverOf = (h, u) => (spCoverIndex().get(h.id) || []).find(t => spMatch(h, u, t)) || null;
+/* 区域の「回る家・部屋」：特別区域はその条件に合う部屋、ふつうの区域は特別区域で回る部屋をのぞく */
+const unitsIn = (h, t) => (isSpecial(t) ? specialTargets(h, t) : targets(h).filter(u => !coveredBySpecial(h, u)));
 const houseInTerr = (h, tid) => { const t = terrById(tid); return isSpecial(t) ? inSpecial(h, t) : h.terrId === tid; };
 const specialKindsText = t => {
   if (!isSpecial(t)) return '';
@@ -3709,7 +3775,7 @@ const fmtDist = m => m < 1000 ? `${Math.round(m / 10) * 10}m` : `${(m / 1000).to
 function terrStats(t, sinceMs) {
   const now = Date.now(); let n = 0, visited = 0, met = 0, last = null;
   for (const h of housesOf(t.id)) {
-    for (const u of targets(h)) {
+    for (const u of unitsIn(h, t)) { // 特別区域で回る家は、ふつうの区域の数に入れない
       n++;
       const s = sum(K(h.id, u));
       if (s.last) {
@@ -3725,6 +3791,12 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.34', items: [
+    ['地', '「区域をもらう」と「おすすめ」で、受け取る前に「地図」を押すと、その区域の場所を地図で確かめられるようになりました'],
+    ['特', 'コンビニなどの特別区域で回る家は、ふつうの区域カードの地図に「特」の印で薄く出て、訪ねる家に数えないようにしました（2回訪ねないように）'],
+    ['係', '区域係：特別区域を、となり合う家を決めた件数ずつのカードに分けられるようになりました。「状況」の数字を押すと、内訳の区域が出ます'],
+    ['係', '区域係：区域の一覧の上をすっきりさせ、取り込みを「区域の線だけ」「拒否・注意だけ」などに分けました。区域を分けるときは、家・部屋の数を見ながら線を動かせます']
+  ] },
   { v: '2026.13.16', items: [
     ['直', 'アプリを開くたびに、同じアップデートのお知らせが出てしまうことがあったのを直しました'],
     ['拒', '区域係が拒否をエクセル・CSVから取り込むとき、必要な行だけをえらべるようになりました。同じ住所がすでにあるときに、上書きするかどうかもえらべます']
@@ -4260,6 +4332,7 @@ function initMap() {
     else if (mode === 'add') addAt(e.latlng, false);
     else if (mode === 'part') partTap(e.latlng);
     else if (mode === 'sen' && window.kyoukai) window.kyoukai.click(e.latlng);
+    else if (mode === 'tok' && window.tokubetsu) window.tokubetsu.click(e.latlng); // 特別区域の分け方（tokubetsu.js）
   });
   map.on('moveend', renderHouses);
   bindLongPress(); // 長押し（パソコンは右クリック）した場所への道順を、Googleマップで開けるようにする
@@ -4635,13 +4708,13 @@ function renderLegend() {
   if (!n.todo) {
     body = `<p class="okmsg"><b>すべての家に緑のチェックがつきました。</b>区域を回り終えました。</p>`;
   } else if (m === 'progress') {
-    body = `<p class="keys">${key('', '', `まだ ${n.todo}`)}${key(' done', '<u>✓</u>', `済み ${n.done - n.other}`)}${n.other ? key(' prev', '<u class="b">✓</u>', `ほかの人が会えた ${n.other}`) : ''}${n.recent ? key(' prev', '<u class="b">✓</u>', `最近会えた ${n.recent}`) : ''}</p>
+    body = `<p class="keys">${key('', '', `まだ ${n.todo}`)}${key(' done', '<u>✓</u>', `済み ${n.done - n.other}`)}${n.other ? key(' prev', '<u class="b">✓</u>', `ほかの人が会えた ${n.other}`) : ''}${n.recent ? key(' prev', '<u class="b">✓</u>', `最近会えた ${n.recent}`) : ''}${n.sp ? key(' dim sp', '<u class="sp">特</u>', `特別区域で回る ${n.sp}`) : ''}</p>
       <p class="muted">緑のチェックが全部の家につくと完了です。</p>`;
   } else {
     body = (first
         ? `<p class="next"><span class="numbadge">1</span> 次は <b>${stopLabel(first)}</b><br><span class="muted">${first.reasons.slice(0, 2).join('・')}</span></p>`
         : '<p class="muted">今の時間帯のおすすめはありません。「進み具合」で残りの家を確認してください。</p>') +
-      `<p class="keys"><span><span class="numbadge sm">1</span>おすすめ ${plan.length}か所</span>${key(' later', '', `ほかの家 ${n.todo - planUnits}`)}${key(' done', '<u>✓</u>', `済み ${n.done - n.other}`)}${n.other ? key(' prev', '<u class="b">✓</u>', `ほかの人が会えた ${n.other}`) : ''}${n.recent ? key(' prev', '<u class="b">✓</u>', `最近会えた ${n.recent}`) : ''}</p>`;
+      `<p class="keys"><span><span class="numbadge sm">1</span>おすすめ ${plan.length}か所</span>${key(' later', '', `ほかの家 ${n.todo - planUnits}`)}${key(' done', '<u>✓</u>', `済み ${n.done - n.other}`)}${n.other ? key(' prev', '<u class="b">✓</u>', `ほかの人が会えた ${n.other}`) : ''}${n.recent ? key(' prev', '<u class="b">✓</u>', `最近会えた ${n.recent}`) : ''}${n.sp ? key(' dim sp', '<u class="sp">特</u>', `特別区域で回る ${n.sp}`) : ''}</p>`;
   }
   if (n.todo && pct >= D().settings.donePct && own) {
     body = `<p class="okmsg"><b>ほぼ回り終えました（${pct}%）。</b>返却して完了にできます。残りの家は、次に回る人のおすすめに出ます。</p>` + body;
@@ -4808,7 +4881,7 @@ function renderHouses() {
   const fkeys = followMap ? new Set(myFollowKeys()) : null;
   const ff = fkeys ? (k => (fkeys.has(k) ? 'hl' : 'dim')) : focusFn();
   renderCardBar();
-  if ((mode === 'draw' && drawTap === 'line' && !drawShowHouses) || mode === 'sen') { setZoomHint(false); return; } // 線引き中は写真が見えるように家の印を隠す
+  if ((mode === 'draw' && drawTap === 'line' && !drawShowHouses) || mode === 'sen' || mode === 'tok') { setZoomHint(false); return; } // 線引き中は写真が見えるように家の印を隠す（特別区域の分け方では、分け方の印だけを出す）
   const fade = fkeys ? 1 : iconFade();
   const b = map.getBounds().pad(0.2), vis = rotVisTest(0.2); // vis：地図を回しているときの、画面に入っているかの確かめ
   const sel = mode === 'normal' ? selTerrId() : null; // 区域をえらんでいるときは、その区域の家だけ
@@ -5035,6 +5108,7 @@ async function onHouseTap(id) {
     return;
   }
   if (mode === 'sen') { if (window.kyoukai) window.kyoukai.click(L.latLng(h.lat, h.lng)); return; }
+  if (mode === 'tok') return; // 特別区域の分け方（tokubetsu.js）：家の印は出していない
   if (mode === 'draw' && drawTap === 'line') { drawClick(L.latLng(h.lat, h.lng)); return; }
   if (mode === 'draw') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
   if (mode === 'add') {
@@ -5085,6 +5159,7 @@ function setMode(m) {
   $('#partBar').hidden = m !== 'part';
   $('#drawBar').hidden = m !== 'draw';
   if (window.kyoukai) window.kyoukai.onMode(m); // 区域の線を直す（kyoukai.js）
+  if (window.tokubetsu) window.tokubetsu.onMode(m); // 特別区域の分け方（tokubetsu.js）
   $('#mapTools').hidden = m !== 'normal';
   $('#map').classList.toggle('crosshair', m !== 'normal');
   $('#map').classList.toggle('drawing', m === 'draw');
@@ -5093,7 +5168,7 @@ function setMode(m) {
   if (m === 'normal' && LIVE && Store.inbox.length) setTimeout(applyInbox, 0);
   document.body.classList.toggle('focusmode', m !== 'normal'); // 作業中は上下の帯を隠して地図を広く
   toggleLegend(false);
-  $('#legendBtn').hidden = m === 'draw' || m === 'sen';
+  $('#legendBtn').hidden = m === 'draw' || m === 'sen' || m === 'tok';
   $('#btnLocate').hidden = m !== 'normal';
   if (map) {
     if (m === 'normal') zoomCtl.remove(); else zoomCtl.addTo(map); // ふだんは指で拡大・縮小。作業中だけ＋−を出す
@@ -5321,7 +5396,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() && dnc.a ? `<br><small>住所：<span data-notr>${esc(dnc.a)}</span>${dnc.auto ? '（住所から自動でつないだ家です）' : ''}</small>` : ''}${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
     if (h.ban) b += banNotice(h);
     if (unit) b += bldMemoHtml(h);
-    if (window.chuiNotice) b += window.chuiNotice(h, unit); // 注意（！）
+    if (window.chuiNotice) b += window.chuiNotice(h, unit); // 注意（！）。特別区域で回る家のお知らせも、ここに続けて出す（tokubetsu.js）
     if (!dnc && other) b += `<div class="notice warn"><b>ほかの人が再訪問している${unit ? '部屋' : '家'}です。</b>${recentMet(k) ? '最近会えているので、訪問は控えてください。' : 'しばらく会えていないので、訪ねてもかまいません。'}${blocked ? '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
 
 
@@ -8944,6 +9019,7 @@ function renderInbox() {
   updateAdminBadge();
 
   const st = D().settings;
+  paintTakeTgl();
   $('#adTakeSet').innerHTML = `<div class="setrow">
     <span>「自由に受け取ってよい」区域を、1人が自分で受け取れる枚数<br><small class="hint">すでに持っているカードも数えます</small></span>
     <div class="stepper"><button type="button" data-takemax="-1" aria-label="枚数を減らす">−</button><output class="wide">${st.selfTakeMax}枚まで</output>
@@ -9028,7 +9104,8 @@ function renderInbox() {
       <span>「最近会えた家」を完了の数に入れる<br><small class="hint">入れると、回り終えた割合（％）に数えます</small></span>
       <div class="seg" role="group" aria-label="完了の数に入れる">
         <button type="button" data-sset="skipDone" data-v="1" aria-pressed="${st.skipDone !== 0}">入れる</button>
-        <button type="button" data-sset="skipDone" data-v="0" aria-pressed="${st.skipDone === 0}">入れない</button></div></div>`;
+        <button type="button" data-sset="skipDone" data-v="0" aria-pressed="${st.skipDone === 0}">入れない</button></div></div>
+    <button type="button" class="btn block takeclose" data-takeclose>貸し出しのきまりを閉じる</button>`;
 }
 function approveReq(id) {
   const r = D().requests.find(x => x.id === id); if (!r) return;
@@ -9527,6 +9604,7 @@ function unmetIndex(onlyTid, rlOv) {
     for (const u of targets(h)) {
       const k = K(h.id, u);
       if (D().dnc[k] || D().follows[k] || relOf(k)) continue;
+      if (coveredBySpecial(h, u)) continue; // 特別区域（コンビニなど）で回る家は、ふつうの区域の留守宅カードに入れない（2回訪ねないように）
       const s = sum(k);
       if (!s.n) continue; // 一度も訪ねていない家は、留守宅ではない
       let b = bm.get(h.terrId); if (!b) { b = roundBounds(h.terrId); bm.set(h.terrId, b); }
@@ -9664,7 +9742,7 @@ function openAwayCard(id) {
 }
 /* 地図の目立たせ方（留守宅カード／自分の区域カードを回るとき） */
 const visitedSince = (k, iso) => { const s = sum(k); return !!s.last && s.last.at >= iso; };
-const FOCUS_RANK = ['hl', 'hl fade', '', 'later', 'prev', 'done', 'done fade', 'dim', 'refuse']; // 'fade'＝薄く（試し済みの時間帯・ほかの人が記録した家）
+const FOCUS_RANK = ['hl', 'hl fade', '', 'later', 'prev', 'done', 'done fade', 'dim', 'dim sp', 'refuse']; // 'fade'＝薄く（試し済みの時間帯・ほかの人が記録した家）'dim sp'＝特別区域で回る家
 const todayIso = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); };
 /* 緑のチェックの基準：自分の区域なら受け取ってから、それ以外は今日 */
 function unitDoneSince(h) {
@@ -9672,7 +9750,7 @@ function unitDoneSince(h) {
   return myTerr(t) && t.lentAt ? t.lentAt : todayIso();
 }
 const focusCls = st => (st ? ' ' + st : '');
-const doneMark = st => (st === 'done' || st === 'done fade' ? '<u>✓</u>' : st === 'prev' ? '<u class="b">✓</u>' : ''); // 青いチェック＝今回より前に最近会えた家・カードを持っていない人が会えた家
+const doneMark = st => (st === 'done' || st === 'done fade' ? '<u>✓</u>' : st === 'prev' ? '<u class="b">✓</u>' : st === 'dim sp' ? '<u class="sp">特</u>' : ''); // 青いチェック＝今回より前に最近会えた家・カードを持っていない人が会えた家。特＝特別区域で回る家
 const PLAN_SIZE = 10;
 // 一緒に回る人は、同じおすすめ順で重ならないよう、はじめは「進み具合」で表示する
 const roundMode = () => {
@@ -9720,12 +9798,12 @@ function roundInfo(tid, anyHolder) {
   const t = terrById(tid);
   if (!t || !t.holder || (!anyHolder && !myTerr(t))) return null;
   const since = t.lentAt || '', first = t.firstDoneAt || '', cur = slotOf(new Date()), sp = isSpecial(t);
-  const map = new Map(), items = [], c = { todo: 0, done: 0, recent: 0, other: 0 };
+  const map = new Map(), items = [], c = { todo: 0, done: 0, recent: 0, other: 0, sp: 0 };
   const aw = { n: 0, done: 0, slots: 0 };
   const aw0 = { n: 0, done: 0 }; // 1回目の段階の留守宅（返却ボタンで「留守宅も回り終えたか」を決める。awayAgain）
   for (const h of housesOf(tid)) {
     for (const u of (sp ? specialTargets(h, t) : targets(h))) {
-      if (!sp && coveredBySpecial(h, u)) continue; // 特別区域（コンビニなど）で回る家は、ふつうの区域カードに入れない
+      if (!sp && coveredBySpecial(h, u)) { map.set(K(h.id, u), 'sp'); c.sp++; continue; } // 特別区域（コンビニなど）で回る家は、ふつうの区域カードに入れない（地図では薄く「特」）
       const k = K(h.id, u);
       let st;
       if (D().dnc[k]) st = 'refuse';
@@ -9928,17 +10006,17 @@ function focusFn() {
     return k => {
       const st = r.map.get(k);
       if (!inPart.has(k)) return 'dim';
-      return st === 'done' ? 'done' : st === 'todo' ? 'hl' : st === 'refuse' ? 'refuse' : (st === 'recent' || st === 'other') ? 'prev' : 'dim';
+      return st === 'done' ? 'done' : st === 'todo' ? 'hl' : st === 'refuse' ? 'refuse' : (st === 'recent' || st === 'other') ? 'prev' : st === 'sp' ? 'dim sp' : 'dim';
     };
   }
   if (roundMode() === 'progress') {
-    return k => { const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? '' : s === 'refuse' ? 'refuse' : (s === 'recent' || s === 'other') ? 'prev' : 'dim'; };
+    return k => { const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? '' : s === 'refuse' ? 'refuse' : (s === 'recent' || s === 'other') ? 'prev' : s === 'sp' ? 'dim sp' : 'dim'; };
   }
   const plan = roundPlan(r);
   roundNums = new Map(plan.map((s, i) => [s.h.id, i + 1]));
   const inPlan = new Set();
   plan.forEach(s => s.units.forEach(u => inPlan.add(K(s.h.id, u))));
-  return k => { const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? (inPlan.has(k) ? 'hl' : 'later') : s === 'refuse' ? 'refuse' : (s === 'recent' || s === 'other') ? 'prev' : 'dim'; };
+  return k => { const s = r.map.get(k); return s === 'done' ? 'done' : s === 'todo' ? (inPlan.has(k) ? 'hl' : 'later') : s === 'refuse' ? 'refuse' : (s === 'recent' || s === 'other') ? 'prev' : s === 'sp' ? 'dim sp' : 'dim'; };
 }
 function openPlanSheet() {
   const r = roundTerr ? roundInfo(roundTerr) : null; if (!r) return;
@@ -11845,6 +11923,20 @@ function renderDataSet() {
     row('syncGroupSec', '一緒に回っているとき、ほかの人の記録を取りに行く間隔', '秒', 1, '短いほど早く反映されますが、サーバーが混みます。80人が同時に使っても、7秒なら余裕があります') +
     row('syncNormalSec', '区域カード・地図を見ているとき、取りに行く間隔', '秒', 5, 'ふだんの間隔です。混むときは長くしてください');
 }
+/* 「区域」タブの「貸し出しのきまり」：ボタンで開け閉めする。開いているかどうかは takeOpen に覚え、描き直しても変わらない */
+let takeOpen = false;
+function paintTakeTgl() {
+  const b = $('#adTakeTgl'), box = $('#adTakeSet'); if (!b || !box) return;
+  const st = D().settings;
+  $('#adTakeSum').textContent = `自動受け取り ${Number(st.autoFree) === 1 ? '使う' : '使わない'}・目安 ${lendDays()}日・1人 ${st.holdMaxPersonal || 2}枚`;
+  b.setAttribute('aria-expanded', String(takeOpen));
+  box.hidden = !takeOpen;
+  if (!b.dataset.bound) {
+    b.dataset.bound = '1';
+    b.onclick = () => { takeOpen = !takeOpen; paintTakeTgl(); if (takeOpen) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+    box.addEventListener('click', e => { if (e.target.closest('[data-takeclose]')) { takeOpen = false; paintTakeTgl(); b.scrollIntoView({ block: 'nearest' }); } });
+  }
+}
 /* 係の画面：開いているタブの中身だけを作る（3万件のとき、全部のタブを毎回作ると重いため） */
 let poolSweepAt = 0;
 function renderAdmin() {
@@ -11864,18 +11956,25 @@ function renderAdmin() {
   const ts = D().territories.slice().sort(byNo);
   let targetsN = 0, met90 = 0;
   const stats = new Map();
-  ts.forEach(t => { const s = terrStats(t, now - 90 * DAY); stats.set(t.id, s); targetsN += s.n; met90 += s.met; });
+  ts.forEach(t => { const s = terrStats(t, now - 90 * DAY); stats.set(t.id, s); });
+  // 全体の数は家から直接数える（特別区域の家を2回数えないように。区域の外の家は別に出す）
+  for (const h of D().houses) {
+    if (!h.terrId) continue;
+    for (const u of targets(h)) { targetsN++; const sm = sum(K(h.id, u)); if (sm.met && now - Date.parse(sm.met.at) <= 90 * DAY) met90++; }
+  }
   const outside = D().houses.filter(h => !h.terrId).length;
   const lent = ts.filter(t => t.holder).length;
-  const over = ts.filter(t => t.holder && t.lentAt && daysSince(t.lentAt) > 120).length;
+  const over = ts.filter(t => t.holder && t.lentAt && daysSince(t.lentAt) > lendDays()).length;
   const dncN = Object.keys(D().dnc).length;
-  $('#adTiles').innerHTML = `
-    <div class="tile"><b>${ts.length}</b>区域（貸出中 ${lent}）</div>
-    <div class="tile${over ? ' alert' : ''}"><b>${over}</b>4か月をこえた貸出</div>
-    <div class="tile"><b>${targetsN}</b>家・部屋${outside ? `（区域外 ${outside}）` : ''}</div>
-    <div class="tile"><b>${targetsN ? Math.round(met90 / targetsN * 100) : 0}%</b>この90日で会えた家・部屋</div>
-    <div class="tile"><b>${dncN}</b>拒否の家・部屋</div>
-    ${D().houses.some(h => h.prov) ? `<div class="tile alert"><b>${D().houses.filter(h => h.prov).length}</b>まだ確かめていない仮の家</div>` : ''}`;
+  const provN = D().houses.filter(h => h.prov).length;
+  const tile = (k, cls, num, label) => `<button type="button" class="tile${cls}" data-tl="${k}"><b>${num}</b>${label}<span class="tmore">内訳 ›</span></button>`;
+  $('#adTiles').innerHTML = tile('terr', '', ts.length, `区域（貸出中 ${lent}）`) +
+    tile('over', over ? ' alert' : '', over, `返却の目安（${lendDays()}日）をこえた貸出`) +
+    tile('units', '', targetsN, `家・部屋${outside ? `（区域外 ${outside}）` : ''}`) +
+    tile('met', '', `${targetsN ? Math.round(met90 / targetsN * 100) : 0}%`, 'この90日で会えた家・部屋') +
+    tile('dnc', '', dncN, '拒否の家・部屋') +
+    (provN ? tile('prov', ' alert', provN, 'まだ確かめていない仮の家') : '');
+  if (!$('#adTiles').dataset.bound) { $('#adTiles').dataset.bound = '1'; $('#adTiles').addEventListener('click', e => { const b = e.target.closest('[data-tl]'); if (b) openStatList(b.dataset.tl); }); }
 
   // 時間帯ごとの会えた割合
   const cell = {}, cut180 = new Date(now - 180 * DAY).toISOString();
@@ -11940,9 +12039,93 @@ function renderAdmin() {
       </div></article>`;
   }
 }
+/* 係の画面「状況」の「全体の状況」：数字を押すと、その内訳を下から出す（閉じると元の画面のまま）
+   区域の行の「地図」「カルテ」から、その区域に進める。カルテから「もどる」で、この内訳にもどる */
+function statRow(t, sub, warn) {
+  return `<div class="tlrow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span><div><p><b>${esc(t.name || '')}</b></p>
+    <p class="muted${warn ? ' tag-warn' : ''}">${sub}</p></div>
+    <div class="btns"><button type="button" class="btn small" data-tlmap="${t.id}">地図</button>${window.KM && KM.openKarte ? `<button type="button" class="btn small primary" data-tlkarte="${t.id}">カルテ</button>` : ''}</div></div>`;
+}
+function openStatList(key) {
+  if (!isAdmin()) return;
+  const now = Date.now(), ts = D().territories.slice().sort(byNo), back = () => openStatList(key);
+  let title = '', hint = '', body = '';
+  if (key === 'terr') {
+    const lentT = ts.filter(t => t.holder), pool = ts.filter(t => !t.holder && t.awayPoolAt), stop = ts.filter(t => !t.holder && lendMode(t) === 'stop');
+    const freeT = ts.filter(t => !t.holder && !t.awayPoolAt && lendMode(t) !== 'stop');
+    title = `区域の数 ${ts.length}`;
+    body = `<div class="tlsum"><span>貸出中</span><b>${lentT.length}</b><span>留守宅カードで回っている</span><b>${pool.length}</b><span>空いている</span><b>${freeT.length}</b><span>貸出中止</span><b>${stop.length}</b>${ts.some(isSpecial) ? `<span>そのうち特別区域</span><b>${ts.filter(isSpecial).length}</b>` : ''}</div>
+      ${lentT.length ? `<h3 class="sub">貸出中（${lentT.length}）</h3>${lentT.sort((a, b) => (a.lentAt < b.lentAt ? -1 : 1)).map(t => statRow(t, `${esc(uname(t.holder))}さん・${daysSince(t.lentAt)}日目`, daysSince(t.lentAt) > lendDays())).join('')}` : ''}
+      ${pool.length ? `<h3 class="sub">留守宅カードで回っている（${pool.length}）</h3>${pool.map(t => { const p = poolInfo(t); return statRow(t, p ? `訪ね直し ${p.done}/${p.n}（${p.pct}%）` : ''); }).join('')}` : ''}
+      ${stop.length ? `<h3 class="sub">貸出中止（${stop.length}）</h3>${stop.map(t => statRow(t, '貸出中止')).join('')}` : ''}`;
+  } else if (key === 'over') {
+    const list = ts.filter(t => t.holder && t.lentAt && daysSince(t.lentAt) > lendDays()).sort((a, b) => (a.lentAt < b.lentAt ? -1 : 1));
+    title = `返却の目安をこえた貸出 ${list.length}`;
+    hint = `受け取ってから${lendDays()}日（返却の目安）をこえている区域です。古い順です。`;
+    body = list.length ? list.map(t => { const r = roundInfo(t.id, true); return statRow(t, `${esc(uname(t.holder))}さん・${daysSince(t.lentAt)}日目${r ? `・進み具合 約${r.pct}%${r.phase === 'away' ? '（留守宅を回る段階）' : ''}` : ''}`, true); }).join('') : '<div class="empty">ありません</div>';
+  } else if (key === 'units') {
+    let house = 0, aptB = 0, aptU = 0, biz = 0, cov = 0, prov = 0, outN = 0, outU = 0;
+    const per = new Map();
+    for (const h of D().houses) {
+      if (!h.terrId) { outN++; outU += targets(h).length; continue; }
+      if (h.prov) prov++;
+      if (h.type === 'apt') { aptB++; aptU += h.units.length; } else if (kindOf(h) !== 'home') biz++; else house++;
+      targets(h).forEach(u => { if (coveredBySpecial(h, u)) cov++; });
+      per.set(h.terrId, (per.get(h.terrId) || 0) + targets(h).length);
+    }
+    title = `家・部屋 ${house + biz + aptU}`;
+    hint = '区域の線の中にある家・部屋の数です。区域ごとの数は、多い順に並べています。';
+    const rows = ts.filter(t => !isSpecial(t)).map(t => [t, per.get(t.id) || 0]).sort((a, b) => b[1] - a[1]);
+    body = `<div class="tlsum"><span>一戸建て（住居）</span><b>${house}</b><span>住居以外（店・会社など）</span><b>${biz}</b><span>集合住宅</span><b>${aptB}棟・${aptU}部屋</b>
+      ${cov ? `<span>特別区域で回る家・部屋</span><b>${cov}</b>` : ''}${prov ? `<span>まだ確かめていない仮の家</span><b>${prov}</b>` : ''}${outN ? `<span>区域の外（どの区域にも入っていない）</span><b>${outN}件（${outU}）</b>` : ''}</div>
+      <h3 class="sub">区域ごと</h3>${rows.map(([t, n]) => statRow(t, `家・部屋 ${n}`)).join('')}`;
+  } else if (key === 'met') {
+    const rows = ts.filter(t => !isSpecial(t)).map(t => {
+      let n = 0, m = 0;
+      housesOf(t.id).forEach(h => targets(h).forEach(u => { n++; const sm = sum(K(h.id, u)); if (sm.met && now - Date.parse(sm.met.at) <= 90 * DAY) m++; }));
+      return [t, n, m, n ? Math.round(m / n * 100) : 0];
+    }).filter(x => x[1]).sort((a, b) => a[3] - b[3]);
+    title = 'この90日で会えた家・部屋（区域ごと）';
+    hint = '割合の低い区域から並べています。低い区域は、時間帯を変えて訪ねると会えることがあります。';
+    body = rows.map(([t, n, m, p]) => statRow(t, `${p}%（${n}のうち${m}）`)).join('') || '<div class="empty">記録がありません</div>';
+  } else if (key === 'dnc') {
+    const per = new Map(); let pin = 0;
+    for (const k in D().dnc) {
+      const v = D().dnc[k];
+      let tid = null;
+      if (isPinKey(k)) { tid = dncTerrOf(v); pin++; }
+      else { const h = houseById(k.split('|')[0]); tid = h ? h.terrId : null; }
+      per.set(tid || '', (per.get(tid || '') || 0) + 1);
+    }
+    title = `拒否の家・部屋 ${Object.keys(D().dnc).length}`;
+    hint = '区域ごとの数です。くわしい一覧（住所・地図で確かめる）は「拒否・！」タブにあります。';
+    const rows = ts.filter(t => per.get(t.id)).map(t => statRow(t, `拒否 ${per.get(t.id)}`));
+    body = `<button type="button" class="btn block" data-tldnc>「拒否・！」の一覧を開く</button>${rows.join('')}${per.get('') ? `<p class="muted">区域の外：${per.get('')}</p>` : ''}`;
+  } else if (key === 'prov') {
+    const per = new Map();
+    D().houses.forEach(h => { if (h.prov) per.set(h.terrId || '', (per.get(h.terrId || '') || 0) + 1); });
+    title = `まだ確かめていない仮の家 ${[...per.values()].reduce((a, b) => a + b, 0)}`;
+    hint = '地図データから入れた仮の家です。奉仕しながら、家でない印を消したり直したりします。区域ごとの数です。';
+    body = ts.filter(t => per.get(t.id)).sort((a, b) => per.get(b.id) - per.get(a.id)).map(t => statRow(t, `仮の家 ${per.get(t.id)}`)).join('') + (per.get('') ? `<p class="muted">区域の外：${per.get('')}</p>` : '');
+  } else return;
+  setSheet(headHtml(null, title, '') + (hint ? `<p class="hint">${hint}</p>` : '') + body + '<button class="btn block" data-close>もどる</button>');
+  const S = $('#sheet');
+  $$('[data-tlmap]', S).forEach(b => b.onclick = () => { closeSheet(); openTerr(b.dataset.tlmap); });
+  $$('[data-tlkarte]', S).forEach(b => b.onclick = () => KM.openKarte(b.dataset.tlkarte, back));
+  const d = $('[data-tldnc]', S); if (d) d.onclick = () => { closeSheet(); setAdPane('dnc'); renderAdmin(); $('#view-admin').scrollTop = 0; };
+}
 /* 区域の削除（区域係のみ）。家を残すか、まとめて消すかを選ぶ */
 function openDeleteTerr(tid) {
   const t = terrById(tid); if (!t || !isAdmin()) return;
+  if (isSpecial(t)) { // 特別区域は、家を集めて見せているだけ。消しても家・記録はふつうの区域に残る
+    setSheet(headHtml(t, `特別区域 ${esc(t.no)}を削除します`, esc(t.name)) + `
+      <p>この特別区域のカードだけを消します。<b>家と訪問の記録は、ふつうの区域にそのまま残ります。</b>${spExcludes(t) ? '<br>消すと、この家はまた、ふつうの区域カードで回る家にもどります。' : ''}</p>
+      ${t.holder ? `<div class="notice warn">今は${esc(uname(t.holder))}さんに貸し出し中です。消すと、その貸し出しは終わります。</div>` : ''}
+      <button class="btn danger block" id="spDel">この特別区域を削除する</button>
+      <button class="btn block" data-close>やめる</button>`);
+    $('#spDel').onclick = () => { closeSheet(); deleteTerr(tid, false); };
+    return;
+  }
   const hs = housesOf(tid);
   const targetsN = hs.reduce((a, h) => a + targets(h).length, 0);
   let visits = 0;
@@ -12998,6 +13181,7 @@ function computeHomeReco() {
       const k = K(h.id, u);
       if (D().dnc[k] || D().follows[k] || relOf(k) || recentMet(k)) continue;
       if (cardOut && othersCard.has(k)) continue;
+      if (coveredBySpecial(h, u)) continue; // 特別区域（コンビニなど）で回る家は、おすすめに出さない
       const s = sum(k);
       if (s.last && skipMs && now - Date.parse(s.last.at) < skipMs) continue;
       const metAgo = s.met ? now - Date.parse(s.met.at) : Infinity;
@@ -13938,13 +14122,15 @@ function s12Tile(url) {
 }
 /* 1区域ぶんの材料 */
 function s12Prep(t, S, byT) {
-  const hs = byT.get(t.id) || [];
+  // 特別区域は、その条件に合う家。ふつうの区域は、特別区域で回る家（全部の部屋が特別区域）を地図に出さない（2回訪ねないように）
+  let hs = isSpecial(t) ? housesOf(t.id) : (byT.get(t.id) || []), spOut = 0;
+  if (!isSpecial(t)) hs = hs.filter(h => { const all = targets(h).length && targets(h).every(u => coveredBySpecial(h, u)); if (all) spOut++; return !all; });
   const poly = okPoly(t.polygon) ? t.polygon : null;
   const pts = poly || hs.map(h => [h.lat, h.lng]);
   const v = pts.length ? s12View(pts, S.mapW, S.mapH, S.kMin) : null;
   const apts = hs.filter(h => h.type === 'apt').sort((a, b) => b.lat - a.lat || a.lng - b.lng); // 北から順に番号
   const latC = pts.length ? pts.reduce((s, p) => s + p[0], 0) / pts.length : 26;
-  return { t, hs, poly, v, apts, latC, tiles: v ? s12Tiles(v) : [] };
+  return { t, hs, poly, v, apts, latC, spOut, tiles: v ? s12Tiles(v) : [] };
 }
 const s12Dnc = () => D().dnc || {};
 /* 名前のある建物（「名前を出す範囲」が「地図に見えている全体」のとき、ほかの区域の建物の名前も出すため） */
@@ -14072,7 +14258,7 @@ function s12FrontHtml(c, tileUrl, stamp) {
     <div class="s12row"><span>場所</span><span class="ln">${esc(t.name || '')}</span><span>区域番号</span><span class="ln no">${esc(t.no)}</span></div>
     <div class="s12map">${s12MapSvg(c, tileUrl)}</div>
     <div class="s12ft"><span class="lg">${S12_ICO.line}区域の線 ${S12_ICO.house}家 ${S12_ICO.kind}住居以外 ${S12_ICO.apt}集合住宅（番号は裏面） ${S12_ICO.ref}拒否（訪問しない）</span>
-      <span class="dt">家${nH}・集合住宅${c.apts.length}・拒否${s12RefCount(c)}／${stamp}時点</span></div>
+      <span class="dt">家${nH}・集合住宅${c.apts.length}・拒否${s12RefCount(c)}${c.spOut ? `・特別区域で回る${c.spOut}（地図に出さない）` : ''}／${stamp}時点</span></div>
     <p class="s12note">封筒に入れて持ち歩き、汚さないようにしてください。回り終えたら区域係に知らせてください。</p>
   </div>`;
 }
@@ -14235,8 +14421,8 @@ function openS12() {
 /* 予定の印刷：月をえらぶ（はじめは来月） */
 function printMonthPicker(id) {
   const n = new Date(), d = new Date(n.getFullYear(), n.getMonth() + 1, 1), val = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
-  return `<div class="inline printpick"><input type="month" id="${id}M" value="${val}" aria-label="印刷する月" style="min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:17px;background:#fff">
-    <button class="btn" id="${id}">この月の予定を印刷する（掲示板用）</button></div>`;
+  return `<div class="printpick"><input type="month" id="${id}M" value="${val}" aria-label="印刷する月">
+    <button class="btn" id="${id}">この月の予定を印刷<small>掲示板用</small></button></div>`;
 }
 function printPickedMonth(id) {
   const m = /^(\d{4})-(\d{2})$/.exec(($(`#${id}M`) || {}).value || '');
@@ -14836,5 +15022,8 @@ init();
 <script src="help.js"></script><!-- 区域係の設定の「？」の説明（文はこのファイルだけで直せます） -->
 <script src="douga.js"></script>
 <script src="kyoukai.js"></script><!-- 区域の線を直す（区域係だけ）：区域をえらんで、形を直す・となりに合わせる・分ける・1つにする・すき間と重なり --><!-- 使い方の動画（動画の一覧と文はこのファイルだけで直せます） -->
+<script src="torikomi.js"></script><!-- 区域係の「区域の線・取り込み」：線を引く・直す・消す、えらんだものだけを取り込む（2026-10-21） -->
+<script src="tokubetsu.js"></script><!-- 特別区域を決めた件数ずつのカードに分ける・ふつうの区域カードから外す切りかえ（2026-10-21） -->
+<script src="nozoku.js"></script><!-- 受け取る前に、地図で場所を見る（2026-10-21） -->
 </body>
 </html>
