@@ -10,6 +10,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "全部の区域のすき間・重なりを調べる": "Buscar huecos y superposiciones en todos los territorios",
 "やりたいことをえらんでください。ほかの区域をタップすると切りかわります。": "Elija qué hacer. Toque otro territorio para cambiar.",
 "形を直す": "Ajustar forma",
+"前回完了した日付（S-13）を、旧S-13（2026年5月）から入れます。もうある日付は変えません": "La fecha de la última vez completado (S-13) se toma del S-13 anterior (mayo de 2026). Las fechas ya registradas no se cambian.",
 "となりに合わせる": "Alinear con el vecino",
 "分ける": "Dividir",
 "1つにする": "Unir",

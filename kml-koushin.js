@@ -863,6 +863,7 @@
           ${absList.length ? `<li><b>線のすき間を近くの枝番に入れます：</b>${absList.map(([p, v]) => `区域${esc(p)} ${v.n}か所（合計 約${fmtM2(v.a)}㎡）`).join('、')}</li>` : ''}
           ${mvList.length ? `<li><b>すき間にある家（近くの枝番に入ります）：</b><ul class="kk-mv">${mvList.map(([no, ids]) => `<li>区域${esc(no)}へ入れる家：${ids.length}軒 <button type="button" class="btn small" data-kkmap="${esc(ids[0])}">地図で見る</button></li>`).join('')}</ul></li>` : ''}
           <li>番号が同じ今の区域 ${oi.keep.length}：線と名前を新しくします（貸し出し・S-13の記録は引き継ぎます${oi.lentKeep.length ? `。貸し出し中 ${oi.lentKeep.length}` : ''}）</li>
+          <li>前回完了した日付（S-13）を、旧S-13（2026年5月）から入れます。もうある日付は変えません</li>
           <li>なくなる今の区域 ${oi.gone.length}${oi.gone.length ? `（${oi.gone.slice(0, 12).map(t => esc(t.no)).join('・')}${oi.gone.length > 12 ? ' ほか' : ''}）` : ''}：消します（家は残り、新しい線で区域を決め直します）</li>
           ${mode === 'lines' && st.scope === 'files' ? `<li>ファイルにない区域（${Math.max(0, D().territories.filter(t => !t.dummy && !isSpecial(t)).length - oi.keep.length - oi.gone.length)}）は、そのままです</li>` : ''}
           ${mode === 'lines' ? '<li>拒否・注意・家の印は変えません</li>' : ''}
@@ -964,10 +965,26 @@
     } catch (e) { /* 控えが作れなくても続ける（取り消すでもどせる） */ }
   }
 
+  /* 旧S-13の「前回完了した日付」を、新しい区域に入れる（枝番は親番号の日付）。もうある日付・もっと新しい完了日は変えない。入れた区域の数を返す */
+  function seedPrevDone(ids) {
+    const S = root.S13_PREV_SEED; if (!S || !S.dates) return 0;
+    const s13 = D().s13 = D().s13 || [], at = new Date().toISOString();
+    let n = 0;
+    D().territories.forEach(t => {
+      if (t.dummy || isSpecial(t) || !ids.has(t.id)) return;
+      const c = S.dates[String(t.pno || String(t.no).split('-')[0])]; if (!c) return;
+      if (s13.some(x => x && x.kind === 'p' && x.terrId === t.id && Number(x.year) === S.year)) return;
+      if (s13.some(x => x && x.terrId === t.id && x.c && String(x.c) >= c) || (t.completedAt && dstr(t.completedAt) >= c) || (t.paperDone && String(t.paperDone) >= c)) return;
+      s13.push({ id: 's' + uid(), kind: 'p', terrId: t.id, year: S.year, c, at, by: me().id });
+      n++;
+    });
+    return n;
+  }
+
   /* ---------- 置きかえる ---------- */
   function apply(st) {
     const { specs } = st.tp, at = now(), mode = st.mode;
-    const res = { nNew: 0, nKeep: 0, nGone: 0, dnc: 0, cau: 0, pinOnly: 0, skip: 0, delD: 0, delC: 0 };
+    const res = { nNew: 0, nKeep: 0, nGone: 0, dnc: 0, cau: 0, pinOnly: 0, skip: 0, delD: 0, delC: 0, prev: 0 };
     closeSheet();
     const before = new Map(D().houses.map(h => [h.id, h.terrId || null]));
     const msg = mode === 'lines' ? '区域の線を新しくしました' : mode === 'pins' ? '拒否・注意を取り込みました' : '区域と拒否・注意を新しくしました';
@@ -994,6 +1011,7 @@
         });
         olds.filter(t => !used.has(t.id)).map(t => t.id).forEach(id => { deleteTerrData(id, false); res.nGone++; });
         reassign();
+        res.prev = seedPrevDone(used);
         // 家の区域は、画面からは送らない（3万件になることがあるので）。サーバーが同じ決め方で決め直す（下の kmlAfterFlush）
         if (LIVE && Store.fp && Store.fp.houses) D().houses.forEach(h => { if ((h.terrId || null) !== before.get(h.id)) Store.fp.houses.set(h.id, JSON.stringify(h)); });
       }
@@ -1059,7 +1077,7 @@
     const terrLine = `<li>区域：新しく ${res.nNew}・線を新しくした ${res.nKeep}・消した ${res.nGone}${st.tp.made.length ? `（自動で作った枝番：${st.tp.made.map(esc).join('、')}）` : ''}</li>`;
     const pinLine = `<li>拒否 ${res.dnc}件・注意（！）${res.cau}件${res.skip ? `・同じものがあったので入れなかった ${res.skip}件` : ''}${res.delD || res.delC ? `（入れる前に消した拒否 ${res.delD}・注意 ${res.delC}）` : ''}${res.pinOnly ? `（うち家の印とつながっていないもの ${res.pinOnly}件は「拒否・！」の一覧の「要確認」から地図で家とつなげます）` : ''}</li>`;
     infoSheet(msg, `
-      <ul class="kk-ul">${mode !== 'pins' ? terrLine : ''}${mode !== 'lines' ? pinLine : ''}</ul>
+      <ul class="kk-ul">${mode !== 'pins' ? terrLine : ''}${mode !== 'pins' && res.prev ? `<li>前回完了した日付（S-13）：旧S-13から ${res.prev}区域に入れました</li>` : ''}${mode !== 'lines' ? pinLine : ''}</ul>
       ${gaps.length ? `<div class="notice warn"><b>枝番の線の外に残った家：</b>${gaps.map(([p, n]) => `区域${esc(p)} ${n}軒`).join('、')}<br>「区域の線・取り込み」の「区域の線を直す」で、枝番の線を引き直してください。</div>` : ''}
       <p class="hint">控えのファイル（${mode === 'pins' ? '取り込む前の区域・拒否・注意の控え' : '区域を新しくする前の控え'}）が、この端末に保存されています。</p>`);
     firstMapShow = false;

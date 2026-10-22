@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.46"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.47"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3893,6 +3893,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.47', items: [
+    ['特', '区域係：マイマップで区域を新しくするとき、旧S-13の「前回完了した日付」が、枝番にも親の区域の日付で自動で入ります']
+  ] },
   { v: '2026.13.46', items: [
     ['区', 'マイマップの取り込みで、枝番の線のずれや道のすき間がほかの枝番にまとわりつかないようにしました']
   ] },
@@ -15242,7 +15245,7 @@ init();
 <script src="apt-wizard.js"></script>
 <script src="naoshi.js"></script><!-- まちがえた記録の直し方・二世帯住宅 -->
 <script src="kyohi.js"></script><!-- 係の画面の「拒否」：一覧・エクセル／マイマップの取り込み・地図でえらぶ -->
-<script src="chui.js"></script><script src="kml-koushin.js"></script><!-- 注意（！）の印：地図の！・記録の画面の注意・家の編集の「この家の印」・係の一覧 -->
+<script src="chui.js"></script><script src="kml-koushin.js"></script><script src="s13-prev-seed.js"></script><!-- 注意（！）の印：地図の！・記録の画面の注意・家の編集の「この家の印」・係の一覧 -->
 <script src="help.js"></script><!-- 区域係の設定の「？」の説明（文はこのファイルだけで直せます） -->
 <script src="douga.js"></script>
 <script src="kyoukai.js"></script><!-- 区域の線を直す（区域係だけ）：区域をえらんで、形を直す・となりに合わせる・分ける・1つにする・すき間と重なり --><!-- 使い方の動画（動画の一覧と文はこのファイルだけで直せます） -->
