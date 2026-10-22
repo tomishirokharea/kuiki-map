@@ -593,7 +593,8 @@ button.ktag{cursor:pointer}
     // 雨の日は、おすすめ順のときだけ集合住宅のカードを先に（エレベーターありが先）。並びはそれぞれの中でおすすめ順のまま
     const rain = reqSort === 'reco' && typeof isRainy === 'function' && isRainy();
     const rainHit = rain && list.some(x => aptCardRank(x.t) < 2);
-    if (rainHit) list.sort((a, b) => (aptCardRank(a.t) - aptCardRank(b.t)) || (a.sx.order - b.sx.order));
+    // ただし、1年の期限が近い区域（急ぎ）は、雨の日も、いちばん上のまま（期限をいちばん重く見るため）
+    if (rainHit) list.sort((a, b) => ((b.sx.pin ? 1 : 0) - (a.sx.pin ? 1 : 0)) || (aptCardRank(a.t) - aptCardRank(b.t)) || (a.sx.order - b.sx.order));
     const recoLine = x => `<p class="muted">${x.sx.pin ? '<span class="duepin">急ぎ</span>' : ''}${chip(x.sx.d.st)} ${leftTxt(x.sx.d)}${meetTag(x.t)}</p>`;
     // 今すぐ受け取れる区域と、係に頼む区域を分ける（並びは、それぞれの中で選んだ並べ方のまま）
     const canGet = x => isFree(x.t) && canTake;
@@ -2738,7 +2739,7 @@ body.duemode .terr-label:not(.duelab){display:none}
   }
 
   /* ほかの部品（kangaeru.js）が同じ計算を使うための窓口。写さずに、ここの関数をそのまま使ってもらう */
-  window.KM = { coverInfo, lastDone, dueInfo, eligible, slotQuery, slotTableHtml, openKarte, SL_FEW, SL_BEST, memoClear: () => MEMO.clear() };
+  window.KM = { coverInfo, lastDone, dueInfo, eligible, PIN_DAYS, slotQuery, slotTableHtml, openKarte, SL_FEW, SL_BEST, memoClear: () => MEMO.clear() };
 
   /* 試作版などで、この部品より先に画面ができていたときは描き直す */
   if (Store.data && typeof map !== 'undefined' && map) { try { renderAll(); } catch (e) { console.error(e); } }

@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.49"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.50"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -4610,7 +4610,7 @@ function aptCardRank(t) {
   APTR.set(t.id, r);
   return r;
 }
-const rainNote = hit => `<p class="notice rainnote"><b>雨のため、${hit ? '集合住宅の多い区域を先に出しています' : '集合住宅の多い区域をさがしましたが、空いている区域にはありませんでした'}</b>${hit ? '（エレベーターありが先）' : ''}。<small>天気：Open-Meteo</small></p>`;
+const rainNote = hit => `<p class="notice rainnote"><b>雨のため、${hit ? '集合住宅の多い区域を先に出しています' : '集合住宅の多い区域をさがしましたが、空いている区域にはありませんでした'}</b>${hit ? '（エレベーターありが先）' : ''}。${hit ? '期限が近い区域は、雨の日もいちばん上に出します。' : ''}<small>天気：Open-Meteo</small></p>`;
 const evTag = t => { const x = evSummary(t); return x ? `<span class="evtag">${esc(x)}</span>` : ''; };
 function bldMemoHtml(h) {
   if (!h || h.type !== 'apt' || (!h.bn && !h.ac)) return '';

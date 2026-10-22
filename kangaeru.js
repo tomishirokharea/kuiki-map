@@ -607,8 +607,10 @@
       // 雨の日は、集合住宅のカード（エレベーターありが先）から選ぶ（index.html の isRainy・aptCardRank）
       const rain = typeof isRainy === 'function' && isRainy();
       const rk = t => (rain ? aptCardRank(t) : 0);
-      freeTerrs().filter(t => !taken.has(t.id)).map(t => ({ t, rk: rk(t), last: lastBackOf(t) }))
-        .sort((a, b) => (a.rk - b.rk) || byLongest(a, b)).slice(0, 3).forEach(({ t, rk: r }) => {
+      // 1年の期限が近い区域（急ぎ）は、雨の日も先に出す（期限をいちばん重く見るため）
+      const urg = t => { const d = KM.dueInfo(t); return d && d.left != null && d.left <= (KM.PIN_DAYS || 60) ? 1 : 0; };
+      freeTerrs().filter(t => !taken.has(t.id)).map(t => ({ t, rk: rk(t), u: urg(t), last: lastBackOf(t) }))
+        .sort((a, b) => (b.u - a.u) || (a.rk - b.rk) || byLongest(a, b)).slice(0, 3).forEach(({ t, rk: r }) => {
           const take = isFree(t) && canTakeFree(false);
           const wet = rain && r < 2 ? `雨の日なので、集合住宅の多い区域です${r === 0 ? '（エレベーターあり）' : ''}。` : '';
           out.push({ kind: 'terr', t, take, unmet: unmetCount(t), col: col0, bi: bi0, now: true, mine: false, title: `区域${t.no}をもらう`,

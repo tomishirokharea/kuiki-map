@@ -348,6 +348,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "雨の日なので、集合住宅の多い区域です（エレベーターあり）": "Día de lluvia: territorio con muchos apartamentos (con ascensor)",
 "雨の日なので、集合住宅の多い区域です": "Día de lluvia: territorio con muchos apartamentos",
 "（エレベーターありが先）。": "(primero las que tienen ascensor).",
+"期限が近い区域は、雨の日もいちばん上に出します。": "Los territorios con el plazo cerca siguen arriba aunque llueva.",
 "天気：Open-Meteo": "Tiempo: Open-Meteo",
 "雨の日は、集合住宅のカードを先に出す": "En días de lluvia, mostrar primero las tarjetas de apartamentos",
 "雨のとき、全員の「区域をもらう」（おすすめ順）と「おすすめ」タブで、集合住宅のカードを自動で先に出します。奉仕者の操作はいりません": "Si llueve, en «Pedir territorio» (orden recomendado) y en «Recomendaciones» se muestran primero, automáticamente, las tarjetas de apartamentos. Nadie tiene que hacer nada",
