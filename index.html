@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.55"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.56"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="config.js"></script><!-- GASのURLと、会衆ごとの設定はこのファイルに書きます（無ければ試作モード） -->
-<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><!-- スペイン語の辞書 / Diccionario español -->
+<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><script src="i18n-es-guruchu.js"></script><!-- スペイン語の辞書 / Diccionario español -->
 <script src="i18n.js"></script><!-- 言語の切りかえ / Cambio de idioma -->
 <script>
 /* iPhoneのホーム画面アプリで、下のタブの下に空白が出ることがある（iOSが画面の高さを、上の時刻の帯の分だけ短く伝えるため）。
@@ -3896,6 +3896,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.56', items: [
+    ['近', 'グループ奉仕の区域をもらうとき、「近い順」「おすすめ順」が、グループの中心（区域係が地図に置いた、グループの人がだいたい住んでいるあたり）からの近さを使うようになりました。期限の近い「急ぎ」の区域は、今までどおりいちばん上に出ます']
+  ] },
   { v: '2026.13.55', items: [
     ['集', '監督・司会者は、全体の集まり（金曜の晩・日曜の昼など）で使う区域も受け取れるようになりました。グループ奉仕の区域といっしょに「集まりで使う区域」に出ます。S-13には「全体の集まり（名前）」と出ます']
   ] },
@@ -4970,7 +4973,11 @@ function renderTerrs() {
       fillColor: col, fillOpacity: gray ? 0.12 : on ? 0.07 : 0.02,
       interactive: tapOk && !gray, bubblingMouseEvents: false
     }).addTo(terrLayer);
-    if (tapOk && !gray) poly.on('click', () => selectTerr(t.id === cur ? null : t.id, { toast: t.id !== cur }));
+    if (tapOk && !gray) poly.on('click', e => {
+      // 地図で場所をえらんでいるとき（集まりの場所・目印・グループの中心など）は、区域の中をタップしても、その場所をえらぶ
+      if (pickPlace) { const f = pickPlace; pickPlace = null; f(e.latlng); return; }
+      selectTerr(t.id === cur ? null : t.id, { toast: t.id !== cur });
+    });
     L.marker(labelPoint(t.polygon), {
       icon: L.divIcon({ className: `terr-label${dim ? ' faint' : ''}${gray ? ' gray' : ''}${t.group && !gray ? ' grp' : ''}${kidNo(t) ? ' kidl' : ''}`, html: terrLabelHtml(t), iconSize: [0, 0] }),
       interactive: false, keyboard: false, pane: 'labelPane'
@@ -15439,5 +15446,6 @@ init();
 <script src="torikomi.js"></script><!-- 区域係の「区域の線・取り込み」：線を引く・直す・消す、えらんだものだけを取り込む（2026-10-21） -->
 <script src="tokubetsu.js"></script><!-- 特別区域を決めた件数ずつのカードに分ける・ふつうの区域カードから外す切りかえ（2026-10-21） -->
 <script src="nozoku.js"></script><!-- 受け取る前に、地図で場所を見る（2026-10-21） -->
+<script src="guruchu.js"></script><!-- グループの中心：区域係が地図に置き、グループ奉仕の区域の近さに使う（2026-10-23） -->
 </body>
 </html>

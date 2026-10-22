@@ -1,0 +1,47 @@
+/* =========================================================
+   区域マップ：スペイン語の辞書の足し分（i18n-es-guruchu.js）／ Diccionario adicional (centro del grupo)
+   ・i18n-es.js の「あと」に読み込みます（index.html の辞書の行）。
+   ・グループの中心（guruchu.js）と、それを使う「区域をもらう」「集まりに合う区域」（schedule.js）の文
+   ========================================================= */
+window.KUIKI_I18N = window.KUIKI_I18N || {};
+window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
+"グループの中心": "Centro del grupo",
+"{0}グループの中心": "Centro del grupo {0}",
+"グループの人がだいたい住んでいるあたりを地図に置くと、グループ奉仕の区域を、そのグループに近い順に出せます。名前や住所は使いません。": "Si pone en el mapa la zona donde vive, más o menos, la gente de cada grupo, los territorios para la predicación en grupo se pueden ordenar por cercanía a ese grupo. No se usan nombres ni direcciones.",
+"グループがまだありません。下の一覧で、人にグループを決めてください。": "Aún no hay grupos. Asigne un grupo a cada persona en la lista de abajo.",
+"中心 {0}つ・近い区域 {1}枚（急ぎ {2}枚）": "{0} centro(s) · {1} territorios cercanos ({2} urgentes)",
+"中心 {0}つ・近い区域 {1}枚": "{0} centro(s) · {1} territorios cercanos",
+"中心 {0}つ": "{0} centro(s)",
+"まだ置いていません": "Aún no se ha puesto",
+"見る・直す": "Ver / corregir",
+"中心を置く": "Poner centro",
+"消す": "Borrar",
+"今はこのグループの人がいません（名前を変えたときなど）": "Ahora no hay nadie en este grupo (por ejemplo, si se cambió el nombre)",
+"どのグループの中心からも{0}以上はなれた区域：{1}枚（区域番号 {2}）。全体の集まりの「集まりに合う区域」で、少し先に出します。": "Territorios a {0} o más de todos los centros de grupo: {1} (n.º {2}). En «Territorios para la reunión» de la reunión general aparecen un poco antes.",
+"{0}人のグループ": "Grupo de {0} personas",
+"このグループの人が、だいたい住んでいるあたりです。グループ奉仕の区域を「近い順」「おすすめ順」で並べるときに使います。": "Es la zona donde vive, más o menos, la gente de este grupo. Se usa para ordenar los territorios de la predicación en grupo por «Más cercanos» y «Recomendados».",
+"中心": "Centro",
+"中心{0}": "Centro {0}",
+"動かす": "Mover",
+"地図で見る": "Ver en el mapa",
+"まだ中心を置いていません。置くまでは、このグループの「近い順」は今いる場所から計ります。": "Aún no se ha puesto el centro. Mientras tanto, «Más cercanos» de este grupo se mide desde el lugar donde está.",
+"いちばん近いのがこのグループの区域：{0}枚（そのうち急ぎ {1}枚）": "Territorios cuyo grupo más cercano es este: {0} ({1} urgentes)",
+"いちばん近いのがこのグループの区域：{0}枚": "Territorios cuyo grupo más cercano es este: {0}",
+"＋ 2つ目の中心を置く": "+ Poner un 2.º centro",
+"中心を地図に置く": "Poner el centro en el mapa",
+"グループの人の住まいが、2か所に分かれているときだけ置きます。区域は、近いほうの中心から計ります。": "Póngalo solo si la gente del grupo vive en dos zonas separadas. Cada territorio se mide desde el centro más cercano.",
+"{0}グループの人が、だいたい住んでいるあたりをタップしてください": "Toque la zona donde vive, más o menos, la gente del grupo {0}",
+"{0}グループの中心を置きました": "Se puso el centro del grupo {0}",
+"{0}グループの中心を動かしました": "Se movió el centro del grupo {0}",
+"{0}グループの中心を1つ消しました": "Se borró un centro del grupo {0}",
+"{0}グループの中心を消しました": "Se borró el centro del grupo {0}",
+"使われていないグループ「{0}」の中心を消しました": "Se borró el centro del grupo «{0}», que ya no se usa",
+"{0}グループの中心です（紫の印）。ほかのグループは灰色です": "Este es el centro del grupo {0} (marca morada). Los otros grupos están en gris",
+"グループの中心から約{0}": "A unos {0} del centro del grupo",
+"{0}グループの中心から約{1}": "A unos {1} del centro del grupo {0}",
+"{0}グループの中心（区域係が地図に置いた、グループの人がだいたい住んでいるあたり）から近い順です。": "Ordenados por cercanía al centro del grupo {0} (la zona donde vive más o menos la gente del grupo, puesta en el mapa por el encargado).",
+"どのグループの中心からも遠い区域です（全体の集まり向き）": "Territorio lejos de todos los grupos (bueno para la reunión general)",
+"どのグループの中心からも遠い区域は、少し先に出しています。": "Los territorios lejos de todos los grupos aparecen un poco antes.",
+"場所の位置が分からないため、{0}グループの中心（区域係が地図に置いた点）からの近さを使っています。": "Como no se sabe dónde es el lugar, se usa la cercanía al centro del grupo {0} (el punto que puso el encargado).",
+"近": "Cer"
+});

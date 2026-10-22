@@ -32,6 +32,12 @@
     },
 
     ja: {
+      /* ---- 人＞グループの中心（guruchu.js） ---- */
+      groupPts: { t: 'グループの中心',
+        what: 'グループの人が、だいたい住んでいるあたりの場所です。区域係が地図に置きます（1グループ2つまで）。人の名前や住所は使わず、「このあたり」という点だけを保存します。伝道者の地図には出ません。',
+        change: '置くと、グループ監督・司会者が「区域をもらう」でグループ奉仕の区域を見るとき、「近い順」がこの点からの近さで並び、「おすすめ順」にも近さが加わります。期限の近い「急ぎ」の区域は、近さに関係なく、いちばん上のままです。全体の集まりの「集まりに合う区域」では、どのグループの中心からも遠い区域を少し先に出します。置かなければ、今までどおり（今いる場所からの近さ）です。',
+        ex: 'Aグループの人が高安と豊崎に分かれて住んでいるなら、高安と豊崎に1つずつ置きます。区域は近いほうの中心から計るので、高安のそばの区域も、豊崎のそばの区域も「近い」と出ます。真ん中に1つだけ置くと、だれも住んでいない真ん中の区域が「近い」と出てしまいます。',
+        tip: 'ふだんは1つで十分です。2つ目は、住まいが2か所に分かれているときだけ置きます。数年に一度グループの組み分けが変わったら、下の一覧で人のグループを直してから、ここで中心を動かします。名前を変えたグループの古い中心は「消す」で消せます。どこに置くか迷うときは、グループ監督に「みなさんは、だいたいどのあたりに住んでいますか」と聞いて置きます。' },
       /* ---- 区域＞一覧（区域を貸し出すきまり） ---- */
       selfTakeMax: { t: '自分で受け取れる枚数', dt: '2枚',
         what: '「自由に受け取ってよい」区域を、伝道者が係を通さずに自分で受け取れる枚数です。すでに持っているカードも数えます。',
@@ -342,6 +348,11 @@
     },
 
     es: {
+      groupPts: { t: 'Centro del grupo',
+        what: 'Es la zona donde viven, más o menos, las personas del grupo. La pone el encargado en el mapa (hasta 2 por grupo). No se usan nombres ni direcciones: solo se guarda un punto «por aquí». No aparece en el mapa de los publicadores.',
+        change: 'Si se pone, cuando el superintendente o el conductor del grupo ve los territorios para la predicación en grupo en «Pedir territorio», «Más cercanos» se ordena por la distancia a este punto y «Recomendados» también tiene en cuenta la cercanía. Los territorios «urgentes» (fecha límite cercana) siguen arriba sin importar la distancia. En «Territorios para la reunión» de la reunión general, se muestran un poco antes los territorios lejos de todos los grupos. Si no se pone, todo sigue como antes (cercanía al lugar donde está).',
+        ex: 'Si el grupo A vive repartido entre Takayasu y Toyosaki, ponga un centro en cada lugar. Se mide desde el centro más cercano, así que los territorios junto a Takayasu y junto a Toyosaki salen como «cercanos». Con un solo punto en medio, saldría «cercano» un territorio donde no vive nadie del grupo.',
+        tip: 'Normalmente basta con uno. El segundo solo cuando el grupo vive en dos zonas separadas. Cuando cambien los grupos (cada pocos años), primero corrija el grupo de cada persona en la lista de abajo y luego mueva aquí los centros. El centro viejo de un grupo que cambió de nombre se borra con «Borrar». Si no sabe dónde ponerlo, pregunte al superintendente del grupo por dónde viven más o menos.' },
       selfTakeMax: { t: 'Tarjetas que uno puede tomar por sí mismo', dt: '2 tarjetas',
         what: 'Cuántos territorios «libres» puede tomar un publicador sin pasar por el encargado. Se cuentan también las tarjetas que ya tiene.',
         change: 'Si sube, quien predica mucho puede tomar varios seguidos. Si baja, alcanza para más personas, pero más gente tendrá que pedirlo al encargado.',

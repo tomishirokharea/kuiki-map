@@ -137,17 +137,27 @@
       return eve > day * 1.15 ? '夕方・土日向き' : day > eve * 1.15 ? '平日の昼も会いやすい' : '';
     });
   }
-  /* おすすめ順：期限の近さ60点＋若い世代の多さ25点＋会えなかった家の多さ15点。期限まで60日以内は最上部 */
-  function scoreList(ts) {
+  /* おすすめ順：期限の近さ60点＋若い世代の多さ25点＋会えなかった家の多さ15点。期限まで60日以内は最上部
+     grp（グループ奉仕の区域をもらうとき、そのグループの中心が置いてあるとき。guruchu.js）：
+     今の点数を (100−GC.W) 点分に縮め、グループの中心からの近さを GC.W 点（25点）加える。
+     急ぎはいちばん上のまま。急ぎ同士では、このグループがいちばん近い区域を先に、そのあと期限の近い順 */
+  function scoreList(ts, grp) {
+    const gc = grp && window.GC && GC.has(grp) ? grp : null;
     const info = ts.map(t => ({ t, d: dueInfo(t), y: youngPct(t), a: awayRate(t) }));
     const ys = info.map(x => x.y).filter(v => v != null);
     const rank = v => (v == null || !ys.length ? 0.5 : (ys.filter(x => x < v).length + ys.filter(x => x === v).length / 2) / ys.length);
     info.forEach(x => {
       const dueP = x.d.last ? Math.min(1, Math.max(0, daysFrom(x.d.last) / YEAR)) : 1;
-      x.sc = Math.round(dueP * W_DUE + rank(x.y) * wYoung() + x.a * W_AWAY);
+      const base = dueP * W_DUE + rank(x.y) * wYoung() + x.a * W_AWAY;
+      if (gc) {
+        x.gd = GC.dist(gc, x.t);
+        const nb = GC.nearest(x.t);
+        x.mine = !!nb && nb.g === gc;
+        x.sc = Math.round(base * (100 - GC.W) / 100 + GC.nearP(x.gd) * GC.W);
+      } else x.sc = Math.round(base);
       x.pin = x.d.left != null && x.d.left <= PIN_DAYS;
     });
-    return info.sort((p, q) => (q.pin - p.pin) || (p.pin ? p.d.left - q.d.left : 0) || (q.sc - p.sc) || cmpNo(p.t.no, q.t.no));
+    return info.sort((p, q) => (q.pin - p.pin) || (p.pin ? ((q.mine ? 1 : 0) - (p.mine ? 1 : 0)) || p.d.left - q.d.left : 0) || (q.sc - p.sc) || cmpNo(p.t.no, q.t.no));
   }
   /* 貸出中の区域の進み具合（返却の目安に対して） */
   function paceOf(t) {
@@ -583,11 +593,15 @@ button.ktag{cursor:pointer}
     if (!canGroupTerr()) reqForGroup = false;
     const G = reqForGroup, canTake = canTakeFree(G), free = freeTerrs();
     const SIMPLE = typeof isSimple === 'function' && isSimple();
-    if (reqSort === 'near' && !myPos) reqSort = 'reco';
-    const sx = new Map(scoreList(free).map((x, i) => [x.t.id, Object.assign(x, { order: i })]));
+    // グループ奉仕の区域をもらうとき、そのグループの中心（係が地図に置いた点。guruchu.js）があれば、近さはそこから計る
+    const GRP = G && reqUse !== 'all' && window.GC && GC.has(myGroup()) ? myGroup() : null;
+    if (reqSort === 'near' && !myPos && !GRP) reqSort = 'reco';
+    const sx = new Map(scoreList(free, GRP).map((x, i) => [x.t.id, Object.assign(x, { order: i })]));
     const list = free.map(t => ({ t, last: lastBackOf(t), n: terrStats(t, 0).n,
-      dist: myPos ? distM(myPos, center(t.polygon)) : null, yg: reqSort === 'young' ? youngShare(t) : null, sx: sx.get(t.id) }));
-    const SORTS = { reco: (a, b) => a.sx.order - b.sx.order, near: (a, b) => a.dist - b.dist, long: byLongest, many: (a, b) => b.n - a.n,
+      dist: GRP ? GC.dist(GRP, t) : myPos ? distM(myPos, center(t.polygon)) : null, yg: reqSort === 'young' ? youngShare(t) : null, sx: sx.get(t.id) }));
+    const near = (a, b) => (a.dist == null ? Infinity : a.dist) - (b.dist == null ? Infinity : b.dist);
+    const fromTxt = GRP ? 'グループの中心から約' : 'ここから約';
+    const SORTS = { reco: (a, b) => a.sx.order - b.sx.order, near, long: byLongest, many: (a, b) => b.n - a.n,
       young: (a, b) => ((b.yg.pct == null ? -1 : b.yg.pct) - (a.yg.pct == null ? -1 : a.yg.pct)) || byLongest(a, b) };
     list.sort(SORTS[reqSort] || SORTS.reco);
     // 雨の日は、おすすめ順のときだけ集合住宅のカードを先に（エレベーターありが先）。並びはそれぞれの中でおすすめ順のまま
@@ -601,7 +615,7 @@ button.ktag{cursor:pointer}
     const askWhy = x => canGet(x) ? '' : `<p class="muted">${isFree(x.t) ? '持てる枚数に届いています' : '係が貸し出す区域です'}</p>`;
     // くわしい表示の各行（簡単モードでは「くわしく」の中に入れる）
     const infoHtml = x => { const { t, last, n, dist, yg } = x; return `${reqSort === 'reco' ? recoLine(x) : ''}
-          <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}`; };
+          <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${dist != null ? `　${fromTxt}${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}`; };
     const btnsHtml = x => { const t = x.t; return `<div class="pickbtns">${canGet(x)
           ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
           : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
@@ -633,7 +647,7 @@ button.ktag{cursor:pointer}
     };
     const kRow = x => `<article class="pick kpick">
         <div class="kp-head"><b>${kName(x.t)}</b><span class="kp-n">${x.n}軒</span></div>
-        <p class="kp-st">${kState(x)}${x.dist != null ? `<span class="kp-dist">ここから約${fmtDist(x.dist)}</span>` : ''}</p>
+        <p class="kp-st">${kState(x)}${x.dist != null ? `<span class="kp-dist">${fromTxt}${fmtDist(x.dist)}</span>` : ''}</p>
         ${kTags(x)}${askWhy(x)}
         ${btnsHtml(x)}
         <details class="kp-more"><summary>くわしく</summary>${infoHtml(x)}</details>
@@ -668,8 +682,8 @@ button.ktag{cursor:pointer}
       ${!canTake && list.some(x => isFree(x.t)) ? `<div class="notice warn">この区域は自分では受け取れません（${G ? '' : `自分で受け取れるのは${D().settings.selfTakeMax}枚まで・`}上限に届いています）。係に頼むことはできます。</div>` : ''}
       ${sortUi}
       ${rainUi}
-      ${reqSort === 'reco' ? `<p class="hint">期限の近さ（いちばん重く見ます）・若い世代の多さ・前回会えなかった家の多さから並べています。期限まで${PIN_DAYS}日を切った区域は、いちばん上に出します。</p>` : ''}
-      ${reqSort === 'near' ? '<div class="row"><button class="btn small" id="reqNear">現在地を更新する</button></div>' : ''}
+      ${reqSort === 'reco' ? `<p class="hint">期限の近さ（いちばん重く見ます）・若い世代の多さ・前回会えなかった家の多さ${GRP ? `・${esc(GRP)}グループの中心からの近さ` : ''}から並べています。期限まで${PIN_DAYS}日を切った区域は、いちばん上に出します。</p>` : ''}
+      ${reqSort === 'near' ? (GRP ? `<p class="hint">${esc(GRP)}グループの中心（区域係が地図に置いた、グループの人がだいたい住んでいるあたり）から近い順です。</p>` : '<div class="row"><button class="btn small" id="reqNear">現在地を更新する</button></div>') : ''}
       ${reqSort === 'young' ? `<p class="hint">${AGE_ON && ageMap() ? '市の年齢データ（字ごとの20〜49歳の割合）から出しています。字が決まっていない区域は、「会えた」記録の年代から出します。' : '市の年齢データが入っていないので、これまでに「会えた」と記録したときの年代から出した目安です。'}</p>` : ''}
       ${rows || '<div class="empty">今、空いている区域はありません。</div>'}
       <button class="btn block primary" data-ask="">どこでもよいので係に頼む</button>
@@ -678,7 +692,7 @@ button.ktag{cursor:pointer}
     if ($('#reqNear')) $('#reqNear').onclick = () => locate(window.openRequestSheet);
     $$('[data-rsort]', S).forEach(x => x.onclick = () => {
       reqSort = x.dataset.rsort;
-      if (reqSort === 'near' && !myPos) { locate(window.openRequestSheet); return; }
+      if (reqSort === 'near' && !myPos && !GRP) { locate(window.openRequestSheet); return; }
       window.openRequestSheet();
     });
     if ($('[data-gaway]', S)) $('[data-gaway]', S).onclick = () => openAwayPick(true);
@@ -2518,19 +2532,24 @@ body.duemode .terr-label:not(.duelab){display:none}
     const mc = meetCell(s);
     if (!mc) return [];
     const org = placePos(s);
+    // 場所が分からないグループの集まりは、グループの中心（guruchu.js）から計る。全体の集まりは、どのグループの中心からも遠い区域を少し先に
+    const gc = !org && s.group && window.GC && GC.has(s.group) ? s.group : null;
+    const allMeet = !s.group && window.GC && GC.any();
     return freeTerrs().filter(t => !t.dummy && !isSpecial(t) && okPoly(t.polygon)).map(t => {
       const homes = karteHomes(t), q = slotQuery([t], 12), n = q.n[mc.c], m = q.m[mc.c];
       const few = homes < SL_AZA_MIN, untried = !n, rate = !few && n >= SL_FEW ? m / n : null;
       const di = dueInfo(t), urg = di.left == null ? 1 : Math.max(0, Math.min(1, 1 - di.left / YEAR));
-      const dist = org ? distM(org.pos, center(t.polygon)) : null;
-      const sc = (untried ? 0.6 : rate != null ? rate : 0.3) + urg * 0.8 - (dist != null ? Math.min(dist / 5000, 1) * 0.6 : 0);
+      const dist = org ? distM(org.pos, center(t.polygon)) : gc ? GC.dist(gc, t) : null;
+      const far = allMeet && GC.far(t);
+      const sc = (untried ? 0.6 : rate != null ? rate : 0.3) + urg * 0.8 - (dist != null ? Math.min(dist / 5000, 1) * 0.6 : 0) + (far ? 0.3 : 0);
       const why = [];
       if (few) why.push('家・部屋が少ない区域です');
       else if (untried) why.push(`${mc.label}は、まだ試していません`);
       else if (rate != null) why.push(`${mc.label}に会えた割合 ${Math.round(rate * 100)}%`);
       else why.push(`${mc.label}の記録は少なめです`);
       why.push(di.left == null ? '前回の記録なし' : di.left < 0 ? `1年の期限を${-di.left}日過ぎています` : `1年の期限まで あと${di.left}日`);
-      if (dist != null) why.push(`${esc(org.name)}から約${fmtDist(dist)}`);
+      if (dist != null) why.push(`${org ? esc(org.name) : `${esc(gc)}グループの中心`}から約${fmtDist(dist)}`);
+      if (far) why.push('どのグループの中心からも遠い区域です（全体の集まり向き）');
       return { t, sc, why, dist };
     }).sort((a, b) => b.sc - a.sc || cmpNo(a.t.no, b.t.no)).slice(0, 3);
   }
@@ -2544,7 +2563,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     const others = D().users.filter(u => !u.inactive && !pref.includes(u)).sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
     const opt = u => `<option value="${u.id}">${esc(u.name)}${u.overseer ? '（監督）' : u.leader ? '（司会者）' : ''}</option>`;
     setSheet(headHtml(null, '集まりに合う区域', `${fmtYmd(s.date)} ${esc(s.time || '')}　${esc(s.place || '')}　${esc(schedGroupName(s.group))}`) + `
-      <p class="hint">${mc ? `${esc(mc.label)}の集まりです。` : ''}空いている区域から、この時間帯に会えている区域・まだ試していない区域・期限の近い区域を、近い順に考えて3つまで出しています（記録と統計からの目安です）。${placePos(s) ? '' : '場所の位置が分からないため、近さは使っていません（地図の目印に同じ名前があると、近さも使います）。'}</p>
+      <p class="hint">${mc ? `${esc(mc.label)}の集まりです。` : ''}空いている区域から、この時間帯に会えている区域・まだ試していない区域・期限の近い区域を、近い順に考えて3つまで出しています（記録と統計からの目安です）。${placePos(s) ? '' : s.group && window.GC && GC.has(s.group) ? `場所の位置が分からないため、${esc(s.group)}グループの中心（区域係が地図に置いた点）からの近さを使っています。` : '場所の位置が分からないため、近さは使っていません（地図の目印に同じ名前があると、近さも使います）。'}${!s.group && window.GC && GC.any() ? 'どのグループの中心からも遠い区域は、少し先に出しています。' : ''}</p>
       ${list.length ? list.map(x => `<div class="mfit"><p><b>区域${esc(x.t.no)}</b>　${esc(x.t.name || '')}</p>${x.why.map(w => `<p class="muted">${w}</p>`).join('')}
         <div class="krow"><button type="button" class="btn small" data-mfmap="${x.t.id}">地図</button>${admin ? `<button type="button" class="btn small" data-mfkarte="${x.t.id}">カルテ</button>` : ''}</div>
         ${admin ? `<div class="klend"><select data-mfuser="${x.t.id}" aria-label="貸し出す人"><option value="">貸し出す人をえらぶ</option>${pref.length ? `<optgroup label="${s.group ? `${esc(s.group)}グループの監督・司会者` : '監督・司会者'}">${pref.map(opt).join('')}</optgroup>` : ''}<optgroup label="ほかの人">${others.map(opt).join('')}</optgroup></select>
