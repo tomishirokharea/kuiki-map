@@ -556,6 +556,39 @@
     return `<span class="ptag">！ ${p.none ? 'ほとんど回らずに返却' : `途中で返却（回ったのは約${p.pct}%）`}</span>`;
   };
 
+  /* ---------- 並べ方のボタンの説明（カーソルを置いたときだけ、ふわっと出す） ----------
+     ・パソコンなど、カーソルのある端末だけ。スマホ（タッチ）では出さない
+     ・説明の文はボタンの中の隠した .ctip（言語の切りかえで訳される）から取り、画面に固定した1つの吹き出しに出す（シートの端で切れないように） */
+  const tipOk = () => !!(window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches);
+  const cssTip = document.createElement('style');
+  cssTip.textContent = `#sortTip{position:fixed;z-index:3000;max-width:320px;background:#17324D;color:#fff;border-radius:10px;padding:8px 12px;font-size:15px;line-height:1.6;box-shadow:0 4px 14px #0004;pointer-events:none;opacity:0;transform:translateY(-4px);transition:opacity .18s ease,transform .18s ease}
+#sortTip.on{opacity:1;transform:none}`;
+  document.head.appendChild(cssTip);
+  let tipEl = null, tipTimer = 0;
+  function tipHide() { clearTimeout(tipTimer); if (tipEl) tipEl.classList.remove('on'); }
+  function tipShow(btn) {
+    const src = btn.querySelector('.ctip'); if (!src || !src.textContent.trim()) return;
+    if (!tipEl) { tipEl = document.createElement('div'); tipEl.id = 'sortTip'; tipEl.setAttribute('role', 'tooltip'); tipEl.setAttribute('data-notr', ''); document.body.appendChild(tipEl); }
+    tipEl.textContent = src.textContent;
+    const r = btn.getBoundingClientRect(), w = Math.min(320, innerWidth - 16);
+    tipEl.style.maxWidth = w + 'px';
+    tipEl.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+    tipEl.style.top = (r.bottom + 8) + 'px';
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => tipEl.classList.add('on'), 250); // 少し置いてから（通りすぎただけでは出さない）
+  }
+  function sortTip(root) {
+    tipHide();
+    if (!root || !tipOk()) return;
+    $$('[data-rsort]', root).forEach(b => {
+      b.addEventListener('mouseenter', () => tipShow(b));
+      b.addEventListener('mouseleave', tipHide);
+      b.addEventListener('click', tipHide);
+    });
+  }
+  window.sortTipHide = tipHide;
+  document.addEventListener('scroll', tipHide, true); // 一覧を動かしたら消す（吹き出しの位置がずれないように）
+
   /* ---------- 「区域をもらう」一覧：おすすめ順を加える ---------- */
   reqSort = 'reco';
   const SORT_NAME = { reco: 'おすすめ順', near: '近い順', long: '返却から長い順', young: '若い世代が多い順', many: '家が多い順' };
@@ -600,7 +633,8 @@ button.ktag{cursor:pointer}
     const list = free.map(t => ({ t, last: lastBackOf(t), n: terrStats(t, 0).n,
       dist: GRP ? GC.dist(GRP, t) : myPos ? distM(myPos, center(t.polygon)) : null, yg: reqSort === 'young' ? youngShare(t) : null, sx: sx.get(t.id) }));
     const near = (a, b) => (a.dist == null ? Infinity : a.dist) - (b.dist == null ? Infinity : b.dist);
-    const fromTxt = GRP ? 'グループの中心から約' : 'ここから約';
+    // グループの中心からの距離は、並べ方にだけ使い、数字は出さない（係の配慮で置いた点なので、監督・司会者の画面には見せない）
+    const showDist = x => x.dist != null && !GRP;
     const SORTS = { reco: (a, b) => a.sx.order - b.sx.order, near, long: byLongest, many: (a, b) => b.n - a.n,
       young: (a, b) => ((b.yg.pct == null ? -1 : b.yg.pct) - (a.yg.pct == null ? -1 : a.yg.pct)) || byLongest(a, b) };
     list.sort(SORTS[reqSort] || SORTS.reco);
@@ -615,7 +649,7 @@ button.ktag{cursor:pointer}
     const askWhy = x => canGet(x) ? '' : `<p class="muted">${isFree(x.t) ? '持てる枚数に届いています' : '係が貸し出す区域です'}</p>`;
     // くわしい表示の各行（簡単モードでは「くわしく」の中に入れる）
     const infoHtml = x => { const { t, last, n, dist, yg } = x; return `${reqSort === 'reco' ? recoLine(x) : ''}
-          <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${dist != null ? `　${fromTxt}${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}`; };
+          <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${showDist(x) ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}`; };
     const btnsHtml = x => { const t = x.t; return `<div class="pickbtns">${canGet(x)
           ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
           : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
@@ -647,7 +681,7 @@ button.ktag{cursor:pointer}
     };
     const kRow = x => `<article class="pick kpick">
         <div class="kp-head"><b>${kName(x.t)}</b><span class="kp-n">${x.n}軒</span></div>
-        <p class="kp-st">${kState(x)}${x.dist != null ? `<span class="kp-dist">${fromTxt}${fmtDist(x.dist)}</span>` : ''}</p>
+        <p class="kp-st">${kState(x)}${showDist(x) ? `<span class="kp-dist">ここから約${fmtDist(x.dist)}</span>` : ''}</p>
         ${kTags(x)}${askWhy(x)}
         ${btnsHtml(x)}
         <details class="kp-more"><summary>くわしく</summary>${infoHtml(x)}</details>
@@ -659,12 +693,21 @@ button.ktag{cursor:pointer}
     const room = Math.max(0, holdMax(G) - heldOf(G) - pendingOf(G).length), pend = pendingOf(G).length;
     const headSub = SIMPLE ? `${room ? `あと${room}枚もらえます` : `持てるのは${holdMax(G)}枚までです`}${pend ? `（申し込み中 ${pend}件）` : ''}`
       : `持てるのは${holdMax(G)}枚まで（今 ${heldOf(G)}枚・申し込み中 ${pend}件）`;
+    // 並べ方の説明は、ボタンにカーソルを置いたときだけ、ふわっと出す（パソコン。スマホでは出さない。sortTip）
+    const TIPS = {
+      reco: `期限の近さ（いちばん重く見ます）・若い世代の多さ・前回会えなかった家の多さ${GRP ? `・${esc(GRP)}グループの中心からの近さ` : ''}から並べます。期限まで${PIN_DAYS}日を切った区域は、いちばん上に出します。`,
+      near: GRP ? `${esc(GRP)}グループの中心（区域係が地図に置いた、グループの人がだいたい住んでいるあたり）から近い順です。` : '今いる場所から近い順です。',
+      long: '前回返却した日が古い区域から並べます。',
+      young: AGE_ON && ageMap() ? '市の年齢データ（字ごとの20〜49歳の割合）から出しています。字が決まっていない区域は、「会えた」記録の年代から出します。' : '市の年齢データが入っていないので、これまでに「会えた」と記録したときの年代から出した目安です。',
+      many: '家・部屋が多い区域から並べます。'
+    };
+    const chipHtml = (k, label) => `<button type="button" class="chip" data-rsort="${k}" aria-pressed="${reqSort === k}">${label}<span class="ctip" hidden>${TIPS[k]}</span></button>`;
     const sortChips = `<div class="sortchips" role="group" aria-label="並べ方">
-        <button type="button" class="chip" data-rsort="reco" aria-pressed="${reqSort === 'reco'}">おすすめ順</button>
-        <button type="button" class="chip" data-rsort="near" aria-pressed="${reqSort === 'near'}">近い順</button>
-        <button type="button" class="chip" data-rsort="long" aria-pressed="${reqSort === 'long'}">返却から長い順</button>
-        <button type="button" class="chip" data-rsort="young" aria-pressed="${reqSort === 'young'}">若い世代が多い順</button>
-        <button type="button" class="chip" data-rsort="many" aria-pressed="${reqSort === 'many'}">家が多い順</button></div>`;
+        ${chipHtml('reco', 'おすすめ順')}
+        ${chipHtml('near', '近い順')}
+        ${chipHtml('long', '返却から長い順')}
+        ${chipHtml('young', '若い世代が多い順')}
+        ${chipHtml('many', '家が多い順')}</div>`;
     // 簡単モード：並べ方は1つのボタンにたたむ（押すと5つ出る）
     const sortUi = SIMPLE ? `<details class="ksort"><summary>並べ方：${SORT_NAME[reqSort] || SORT_NAME.reco}</summary>${sortChips}</details>`
       : `<p class="q">並べ方</p>${sortChips}`;
@@ -682,13 +725,12 @@ button.ktag{cursor:pointer}
       ${!canTake && list.some(x => isFree(x.t)) ? `<div class="notice warn">この区域は自分では受け取れません（${G ? '' : `自分で受け取れるのは${D().settings.selfTakeMax}枚まで・`}上限に届いています）。係に頼むことはできます。</div>` : ''}
       ${sortUi}
       ${rainUi}
-      ${reqSort === 'reco' ? `<p class="hint">期限の近さ（いちばん重く見ます）・若い世代の多さ・前回会えなかった家の多さ${GRP ? `・${esc(GRP)}グループの中心からの近さ` : ''}から並べています。期限まで${PIN_DAYS}日を切った区域は、いちばん上に出します。</p>` : ''}
-      ${reqSort === 'near' ? (GRP ? `<p class="hint">${esc(GRP)}グループの中心（区域係が地図に置いた、グループの人がだいたい住んでいるあたり）から近い順です。</p>` : '<div class="row"><button class="btn small" id="reqNear">現在地を更新する</button></div>') : ''}
-      ${reqSort === 'young' ? `<p class="hint">${AGE_ON && ageMap() ? '市の年齢データ（字ごとの20〜49歳の割合）から出しています。字が決まっていない区域は、「会えた」記録の年代から出します。' : '市の年齢データが入っていないので、これまでに「会えた」と記録したときの年代から出した目安です。'}</p>` : ''}
+      ${reqSort === 'near' && !GRP ? '<div class="row"><button class="btn small" id="reqNear">現在地を更新する</button></div>' : ''}
       ${rows || '<div class="empty">今、空いている区域はありません。</div>'}
       <button class="btn block primary" data-ask="">どこでもよいので係に頼む</button>
       <button class="btn block" data-close>もどる</button>`);
     const S = $('#sheet');
+    sortTip(S);
     if ($('#reqNear')) $('#reqNear').onclick = () => locate(window.openRequestSheet);
     $$('[data-rsort]', S).forEach(x => x.onclick = () => {
       reqSort = x.dataset.rsort;
@@ -2548,7 +2590,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       else if (rate != null) why.push(`${mc.label}に会えた割合 ${Math.round(rate * 100)}%`);
       else why.push(`${mc.label}の記録は少なめです`);
       why.push(di.left == null ? '前回の記録なし' : di.left < 0 ? `1年の期限を${-di.left}日過ぎています` : `1年の期限まで あと${di.left}日`);
-      if (dist != null) why.push(`${org ? esc(org.name) : `${esc(gc)}グループの中心`}から約${fmtDist(dist)}`);
+      if (dist != null && (org || isAdmin())) why.push(`${org ? esc(org.name) : `${esc(gc)}グループの中心`}から約${fmtDist(dist)}`); // グループの中心からの距離は係だけに
       if (far) why.push('どのグループの中心からも遠い区域です（全体の集まり向き）');
       return { t, sc, why, dist };
     }).sort((a, b) => b.sc - a.sc || cmpNo(a.t.no, b.t.no)).slice(0, 3);
@@ -2563,7 +2605,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     const others = D().users.filter(u => !u.inactive && !pref.includes(u)).sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
     const opt = u => `<option value="${u.id}">${esc(u.name)}${u.overseer ? '（監督）' : u.leader ? '（司会者）' : ''}</option>`;
     setSheet(headHtml(null, '集まりに合う区域', `${fmtYmd(s.date)} ${esc(s.time || '')}　${esc(s.place || '')}　${esc(schedGroupName(s.group))}`) + `
-      <p class="hint">${mc ? `${esc(mc.label)}の集まりです。` : ''}空いている区域から、この時間帯に会えている区域・まだ試していない区域・期限の近い区域を、近い順に考えて3つまで出しています（記録と統計からの目安です）。${placePos(s) ? '' : s.group && window.GC && GC.has(s.group) ? `場所の位置が分からないため、${esc(s.group)}グループの中心（区域係が地図に置いた点）からの近さを使っています。` : '場所の位置が分からないため、近さは使っていません（地図の目印に同じ名前があると、近さも使います）。'}${!s.group && window.GC && GC.any() ? 'どのグループの中心からも遠い区域は、少し先に出しています。' : ''}</p>
+      <p class="hint">${mc ? `${esc(mc.label)}の集まりです。` : ''}空いている区域から、この時間帯に会えている区域・まだ試していない区域・期限の近い区域を、近い順に考えて3つまで出しています（記録と統計からの目安です）。${placePos(s) ? '' : s.group && window.GC && GC.has(s.group) ? (!admin ? '' : `場所の位置が分からないため、${esc(s.group)}グループの中心（区域係が地図に置いた点）からの近さを使っています。`) : '場所の位置が分からないため、近さは使っていません（地図の目印に同じ名前があると、近さも使います）。'}${!s.group && window.GC && GC.any() ? 'どのグループの中心からも遠い区域は、少し先に出しています。' : ''}</p>
       ${list.length ? list.map(x => `<div class="mfit"><p><b>区域${esc(x.t.no)}</b>　${esc(x.t.name || '')}</p>${x.why.map(w => `<p class="muted">${w}</p>`).join('')}
         <div class="krow"><button type="button" class="btn small" data-mfmap="${x.t.id}">地図</button>${admin ? `<button type="button" class="btn small" data-mfkarte="${x.t.id}">カルテ</button>` : ''}</div>
         ${admin ? `<div class="klend"><select data-mfuser="${x.t.id}" aria-label="貸し出す人"><option value="">貸し出す人をえらぶ</option>${pref.length ? `<optgroup label="${s.group ? `${esc(s.group)}グループの監督・司会者` : '監督・司会者'}">${pref.map(opt).join('')}</optgroup>` : ''}<optgroup label="ほかの人">${others.map(opt).join('')}</optgroup></select>

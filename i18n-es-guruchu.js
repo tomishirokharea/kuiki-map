@@ -43,5 +43,11 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "どのグループの中心からも遠い区域です（全体の集まり向き）": "Territorio lejos de todos los grupos (bueno para la reunión general)",
 "どのグループの中心からも遠い区域は、少し先に出しています。": "Los territorios lejos de todos los grupos aparecen un poco antes.",
 "場所の位置が分からないため、{0}グループの中心（区域係が地図に置いた点）からの近さを使っています。": "Como no se sabe dónde es el lugar, se usa la cercanía al centro del grupo {0} (el punto que puso el encargado).",
+"期限の近さ（いちばん重く見ます）・若い世代の多さ・前回会えなかった家の多さ・{0}グループの中心からの近さから並べます。期限まで{1}日を切った区域は、いちばん上に出します。": "Ordena por la fecha límite (lo que más pesa), la cantidad de gente joven, las casas donde no se encontró a nadie la vez anterior y la cercanía al centro del grupo {0}. Los territorios a menos de {1} días de la fecha límite aparecen arriba.",
+"期限の近さ（いちばん重く見ます）・若い世代の多さ・前回会えなかった家の多さから並べます。期限まで{0}日を切った区域は、いちばん上に出します。": "Ordena por la fecha límite (lo que más pesa), la cantidad de gente joven y las casas donde no se encontró a nadie la vez anterior. Los territorios a menos de {0} días de la fecha límite aparecen arriba.",
+"今いる場所から近い順です。": "Ordenados por cercanía al lugar donde está.",
+"前回返却した日が古い区域から並べます。": "Primero los territorios devueltos hace más tiempo.",
+"家・部屋が多い区域から並べます。": "Primero los territorios con más casas y departamentos.",
+"市の年齢データ（字ごとの20〜49歳の割合）から出しています。字が決まっていない区域は、「会えた」記録の年代から出します。": "Según los datos de edad del municipio (porcentaje de 20 a 49 años por barrio). Si el territorio no tiene barrio asignado, se usan las edades anotadas al encontrar a alguien.",
 "近": "Cer"
 });
