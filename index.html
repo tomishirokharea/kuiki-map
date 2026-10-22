@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.53"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.54"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -801,6 +801,7 @@ html[lang="es"] .atabs button{font-size:13px;white-space:normal;line-height:1.15
 .tgo{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:62px;min-height:60px;border:2px solid var(--terr);border-radius:14px;background:var(--terr-soft);color:var(--terr);font-weight:700;font-size:14px;line-height:1.2;white-space:nowrap}
 .tgo svg{width:26px;height:26px}
 .tcard.tc2 .stamp:not(.xs){width:58px;height:58px;font-size:27px}
+.tcard.tc2 .stamp.long:not(.xs){font-size:19px;white-space:nowrap}
 .tcard.away .tgo{border-color:var(--draw);color:var(--draw);background:#FFF1E8}
 .tcard.tc2 .tbody{margin-top:10px}
 .tcard.tc2 .actions{margin-top:12px}
@@ -1291,6 +1292,7 @@ body.big .who:has(#whoName:not([hidden])){display:none}
 /* 区域カードの見出し：大きい文字では「地図 ›」の印をやめて、区域の名前を広く（見出し全体を押すと地図がひらく） */
 body.big .tgo{display:none}
 body.big .tcard.tc2 .stamp:not(.xs){width:52px;height:52px;font-size:24px}
+body.big .tcard.tc2 .stamp.long:not(.xs){font-size:17px}
 /* 説明つきの2つのボタン（回り終えました／途中まで など）は、大きい文字では1つずつ縦に並べる */
 body.big .choices.two:has(small){grid-template-columns:1fr}
 body.big .choices.two:has(small) .choice{min-height:72px}
