@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.51"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.52"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -2392,6 +2392,7 @@ const Store = {
       if (metaSigOf(j) !== this.metaSig) this.dirty.meta = true;
       d.users = j.users; d.settings = j.settings; d.currentUser = j.currentUser;
       this.metaSig = metaSigOf(j);
+      if (USER_PENDING && USER_PENDING.size) applyUserPending(); // 保存中の人の変更は消さない
     }
     this.migrate();
     if (j.seq != null && j.seq !== this.seq) { this.seq = j.seq; this.dirty.meta = true; }
@@ -13877,22 +13878,52 @@ function openSchedDay(date) {
 }
 
 /* ---- 人とグループ（区域係は変更できる。監督は自分のグループの人を見るだけ） ---- */
-async function setUserGroup(u, group, overseer, leader, role, active) {
-  if (LIVE) {
-    const body = { id: u.id, group, overseer, leader };
-    if (role) body.role = role;
-    if (active === false) body.active = false;
-    try { await api('user_set', body); } catch (e) { toast('保存できませんでした。通信を確認してください'); return; }
-    u.group = group || undefined; u.overseer = !!overseer || undefined; u.leader = !!leader || undefined;
-    if (role) u.role = role;
-    if (active === false) u.inactive = true;
-    toast(`${u.name}さんのグループを保存しました`);
-    refresh(true).catch(() => {});
-  } else {
-    u.group = group || undefined; u.overseer = !!overseer || undefined; u.leader = !!leader || undefined;
-    if (role) u.role = role;
-    if (active === false) u.inactive = true;
+/* 保存中の変更（id → 変えた値）。返事を待つあいだに同期で名簿が届いても、画面が元にもどって見えないように上から重ねる */
+var USER_PENDING = new Map(); // var：同期の受け取り（上のほうで定義）から、読み込みの順に関係なく見られるように
+const userPatchOf = (group, overseer, leader, role, active) => {
+  const p = { group: group || undefined, overseer: !!overseer || undefined, leader: !!leader || undefined };
+  if (role) p.role = role;
+  if (active === false) p.inactive = true;
+  return p;
+};
+function applyUserPending() {
+  USER_PENDING.forEach((p, id) => { const u = userById(id); if (u) Object.assign(u, p); });
+}
+const USER_SAVING = new Map(); // id → 送っている保存（同じ人の保存は、順番に1つずつ送る。あとの変更が先に届いて古い値に戻らないように）
+function setUserGroup(u, group, overseer, leader, role, active) {
+  const patch = userPatchOf(group, overseer, leader, role, active);
+  if (!LIVE) {
+    Object.assign(u, patch);
     Store.save(); toast(`${u.name}さんの設定を保存しました`);
+    renderAll(); return Promise.resolve();
+  }
+  const id = u.id, name = u.name;
+  const before = { group: u.group, overseer: u.overseer, leader: u.leader, role: u.role, inactive: u.inactive };
+  const body = { id, group, overseer, leader };
+  if (role) body.role = role;
+  if (active === false) body.active = false;
+  // 先に画面に出す（保存中に画面を変えても、変えた値のまま見える）。描き直しは少しあとで（続けて押したチェックが消えないように）
+  USER_PENDING.set(id, patch);
+  Object.assign(u, patch);
+  setTimeout(renderAll, 350);
+  const run = () => saveUserNow(id, name, body, patch, before);
+  const p = (USER_SAVING.get(id) || Promise.resolve()).then(run, run);
+  USER_SAVING.set(id, p);
+  p.then(() => { if (USER_SAVING.get(id) === p) USER_SAVING.delete(id); });
+  return p;
+}
+async function saveUserNow(id, name, body, patch, before) {
+  try {
+    await api('user_set', body);
+  } catch (e) {
+    if (USER_PENDING.get(id) === patch) { USER_PENDING.delete(id); Object.assign(userById(id) || {}, before); }
+    toast(`${name}さんの設定を保存できませんでした。通信を確認して、もう一度変えてください`);
+    renderAll(); return;
+  }
+  toast(`${name}さんの設定を保存しました`);
+  if (USER_PENDING.get(id) === patch) { // このあとに、もう変更がないとき
+    try { await refresh(true); } catch (e) { /* 次の同期で取り直す */ }
+    if (USER_PENDING.get(id) === patch) { USER_PENDING.delete(id); Object.assign(userById(id) || {}, patch); } // 保存できた値を正とする
   }
   renderAll();
 }
@@ -14054,6 +14085,9 @@ async function approveDevice(d, extra, name, back) {
 }
 function renderPeople() {
   const box = $('#adPeople'); if (!box) return;
+  // グループ名を入力しているあいだは描き直さない（同期のたびに、入れかけの文字が消えないように）
+  const ae = document.activeElement;
+  if (ae && box.contains(ae) && ae.matches('input[type="text"]')) return;
   const admin = isAdmin(), groups = groupsAll();
   const users = D().users.filter(u => !u.inactive && (admin || u.group === myGroup())).slice()
     .sort((a, b) => (a.group || '～').localeCompare(b.group || '～', 'ja') || a.name.localeCompare(b.name, 'ja'));
@@ -14063,7 +14097,7 @@ function renderPeople() {
       <button class="btn" id="adJoinQr">共通リンクのQRを見せる</button></div>
       <p class="hint">集まりのときは「共通リンクのQR」を見せると、みんながその場で申し込めます。申し込みは「申請・承認」で承認します。</p>` : ''}
     ${noGroup ? `<div class="notice warn"><b>グループが決まっていない人が ${noGroup}人 います。</b>この人たちには、グループの集まりの予定は届きません（「全体」の予定だけが届きます）。</div>` : ''}
-    ${admin ? `<p class="hint">グループの名前（例：A、北）と、グループ監督・司会者かどうかを決めます。<br>監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>
+    ${admin ? `<p class="hint">グループの名前（例：A、北）と、グループ監督・司会者かどうかを決めます。変えると、すぐに保存されます。<br>監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>
       <datalist id="groupList">${groups.map(g => `<option value="${esc(g)}">`).join('')}</datalist>` : ''}
     ${users.map(u => `<article class="trow"><span class="stamp sm" style="font-size:16px">${esc(u.group || '—')}</span>
       <div><b>${esc(u.name)}</b>${u.role === 'admin' ? '（区域係）' : ''}${u.overseer ? ' <span class="gbadge">監督</span>' : ''}${u.leader ? ' <span class="gbadge">司会者</span>' : ''}</div>
@@ -14073,7 +14107,6 @@ function renderPeople() {
         <div class="seg small" role="group" aria-label="役割">
           <button type="button" data-urole="pub" data-id="${u.id}" aria-pressed="${u.role !== 'admin'}">伝道者</button>
           <button type="button" data-urole="admin" data-id="${u.id}" aria-pressed="${u.role === 'admin'}">区域係</button></div>
-        <button class="btn small" data-usave="${u.id}">保存</button>
         <button class="btn small" data-ulink="${u.id}">リンク・QR</button>
         ${u.id === me().id ? '' : `<button class="btn small danger" data-uoff="${u.id}">使うのをやめる</button>`}</div>` : ''}</article>`).join('')}`;
   if (admin) {
@@ -14093,10 +14126,20 @@ function renderPeople() {
       setUserGroup(u, u.group || '', !!u.overseer, !!u.leader, u.role, false);
     });
   }
-  if (admin) $$('[data-usave]', box).forEach(b => b.onclick = () => {
-    const u = userById(b.dataset.usave); if (!u) return;
-    setUserGroup(u, normGroup($(`[data-ugroup="${u.id}"]`).value), $(`[data-uover="${u.id}"]`).checked, $(`[data-ulead="${u.id}"]`).checked);
-  });
+  // グループ（入力が終わったとき＝ほかを押した・Enter）・監督・司会者は、変えたらすぐ保存する
+  const saveRow = id => {
+    const u = userById(id); if (!u) return;
+    const g = normGroup($(`[data-ugroup="${id}"]`, box).value), ov = $(`[data-uover="${id}"]`, box).checked, ld = $(`[data-ulead="${id}"]`, box).checked;
+    if ((u.group || '') === g && !!u.overseer === ov && !!u.leader === ld) return; // 変わっていない
+    setUserGroup(u, g, ov, ld);
+  };
+  if (admin) {
+    $$('[data-ugroup]', box).forEach(x => {
+      x.onchange = () => saveRow(x.dataset.ugroup);
+      x.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); x.blur(); } };
+    });
+    $$('[data-uover],[data-ulead]', box).forEach(x => x.onchange = () => saveRow(x.dataset.uover || x.dataset.ulead));
+  }
 }
 
 /* ---- 引き継ぎを待っている家（再訪問の一覧の下に出す） ---- */
