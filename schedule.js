@@ -2394,7 +2394,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     const old = D().territories.filter(t => {
       if (t.holder || t.awayPoolAt || !t.completedAt || t.completedPct == null || t.completedPct >= th) return false;
       const r = D().returns.find(x => x.terrId === t.id && x.completed && x.at === t.completedAt);
-      return !(r && (r.low || r.lowOk || r.pool)); // 留守宅カードの完了の割合は、留守宅の割合なので入れない
+      return !(r && (r.low || r.lowOk || r.pool || r.ph)); // 留守宅カードの完了の割合は、留守宅の割合なので入れない。ph＝紙の区域カードで回った
     }).sort((a, b) => (a.completedAt < b.completedAt ? 1 : -1));
     if (!wait.length && !auto.length && !old.length) return '';
     const rows = [];

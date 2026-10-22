@@ -236,6 +236,7 @@
       ${openHead(`data-open="${t.id}"`, `区域${esc(t.no)} ${esc(t.name)}`,
         `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${t.group ? 'グループ' : '区域'}</small>${esc(t.no)}</span>`, esc(t.name), sub)}
       <div class="tbody">${left != null ? `<p class="kleft">あと <b>${left}</b> 軒</p>` : ''}
+        ${own && typeof paperHandOf === 'function' && paperHandOf(t) ? '<p class="muted">紙のカードから引き継いだ区域です（紙で回った家は、数に入っていません）</p>' : ''}
         ${mp ? `<p class="hint-strong">今日のあなたの範囲があります（${esc(partMates(mp).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）</p>` : ''}</div>
       ${own ? `<div class="actions"><button class="btn primary" data-return="${t.id}">返す</button></div>` : ''}
       ${grpRow}

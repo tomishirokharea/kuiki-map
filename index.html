@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.50"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.51"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -8806,7 +8806,8 @@ function cardHtml(t, own, helper) {
     (!own && myPart(t) ? `<p class="hint-strong">今日のあなたの範囲があります（${esc(partMates(myPart(t)).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）。地図をひらくと、その範囲だけが目立ちます。</p>
       <p class="muted"><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=${center(myPart(t).poly)[0].toFixed(6)},${center(myPart(t).poly)[1].toFixed(6)}" target="_blank" rel="noopener">Googleマップでこの範囲へ</a></p>` : '') +
     (own && hs.length ? `<p class="muted"><b>${t.group ? '今日回る人' : '今日一緒に回る人'}（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : '') +
-    ((own || helper) && UI.cReco === 'on' ? roundHint(t) : '');
+    ((own || helper) && UI.cReco === 'on' ? roundHint(t) : '') +
+    (own && paperHandOf(t) ? '<p class="muted">紙の区域カード（S-13）から引き継いだ区域です。紙で回った家は、アプリの記録には入っていません。返却はこのアプリでしてください。</p>' : '');
   return `<article class="tcard tc2${t.group ? ' grp' : ''}">
     ${openHead(`data-open="${t.id}"`, `区域${esc(t.no)} ${esc(t.name)}`,
       `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${t.group ? 'グループ' : '区域'}</small>${esc(t.no)}</span>`,
@@ -8976,6 +8977,9 @@ function paperHoldOf(t) {
   return { a: String(t.paperLentAt), name: x ? String(x.name || '') : '' };
 }
 const isLent = t => !!(t && (t.holder || paperLent(t)));
+/* 紙の区域カード（S-13）から引き継いだ区域：係が S-13 で「グループ奉仕（名前）」を入れて、アプリに渡したもの。
+   t.paperHand＝紙で割り当てた日。担当が変わる（受け取った日が変わる）と自然に外れる（サーバーの paperHand_ と同じ） */
+const paperHandOf = t => !!(t && t.paperHand && t.holder && t.lentAt && dstr(t.lentAt) === String(t.paperHand));
 /* 前回返却した日（区域をもらう一覧の表示・「返却から長い順」）：アプリの返却・回り終えた日と、紙の記録（S-13）で完了した日の新しいほう */
 function lastBackOf(t) {
   const c = [t.completedAt, t.returnedAt].filter(Boolean).map(String);
@@ -9371,7 +9375,13 @@ function openReturnSheet(tid) {
       : `<p class="hint-strong">途中の返却になります。回った家が、目安（${th}%）に届いていません。</p>
          <p class="muted">${returnFreeText(t)}</p>
          <p class="hint">まだ回るときは「もどる」を押して、続けて回ってください。</p>`;
-  const self = plan.kind === 'pool' && r.phase === 'first' && !simple
+  // 紙の区域カード（S-13）から引き継いだ区域：紙で回った家はアプリにないので、本人に回り終えたかを聞く
+  const ph = paperHandOf(t) && plan.kind !== 'done';
+  const phPart = !ph ? '' : `<p class="hint-strong">紙の区域カード（S-13）から引き継いだ区域です。</p>
+    <p class="muted">紙のカードで回った家は、アプリの記録には入っていません。紙のカードで区域を回り終えたかどうかを、えらんでください。</p>
+    <button class="btn primary block wrap" data-phfin="1">回り終えたので返却する（今日が完了した日付）</button>
+    <button class="btn block wrap" data-phfin="0">まだ回っていない家がある（途中で返却する）</button>`;
+  const self = !ph && plan.kind === 'pool' && r.phase === 'first' && !simple
     ? `<button class="btn block wrap" data-first>返却しないで、自分で留守宅を回る（カードを持ったまま）</button>` : '';
   // 区域係の操作：目安に関係なく、今までどおりえらべる（記録の少ない返却の確かめも、今までどおり）
   const low = lowOnSet() && (r.phase === 'first' ? r.pct1 < th : (!t.firstLow && (lowP1(t, r) ?? 100) < th)) ? lowCheckHtml(th) : '';
@@ -9382,8 +9392,8 @@ function openReturnSheet(tid) {
       ${r.phase === 'first' ? '<button class="btn block wrap" data-afirst>1回目を終えたことにして、本人が留守宅を回る</button>' : ''}
       <button class="btn block wrap" data-fin="0">途中で返却する（回り終えた記録はつけません）</button></details>`;
   setSheet(headHtml(t, `区域${t.no}を返却します`, sub) + `
-    ${firstPart}${awayPart}${result}
-    <button class="btn primary block wrap" data-retgo>返却する</button>
+    ${ph ? phPart : `${firstPart}${awayPart}${result}
+    <button class="btn primary block wrap" data-retgo>返却する</button>`}
     ${self}
     <button class="btn block" data-close>もどる</button>
     ${admBox}`);
@@ -9394,6 +9404,7 @@ function openReturnSheet(tid) {
     else finishTerr(tid, false);
   });
   on('[data-first]', () => firstDone(tid));
+  $$('[data-phfin]', sh).forEach(x => x.onclick = () => finishTerr(tid, x.dataset.phfin === '1'));
   on('[data-afirst]', () => firstDone(tid, lowChecked()));
   on('[data-pool]', () => poolReturn(tid, lowChecked()));
   $$('[data-fin]', sh).forEach(x => x.onclick = () => finishTerr(tid, x.dataset.fin === '1', lowChecked()));
@@ -9419,11 +9430,17 @@ function finishTerr(tid, done, lowOk) {
   commit(`区域${t.no}を返却しました${done ? '（回り終えました）' : ''}`, () => {
     const now = new Date().toISOString();
     const rec = { id: 'x' + uid(), terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: done, pct };
+    if (t.group) rec.g = 1; // グループ奉仕の区域（S-13 に「グループ奉仕（名前）」と出す）
+    const ph = paperHandOf(t);
     D().returns.push(rec);
-    if (done) {
+    if (done && ph) {
+      rec.ph = 1; // 紙の区域カードで回った（記録の少ない返却の確かめ・まわり漏れの対象にしない）
+      t.completedAt = now; t.completedPct = null;
+    } else if (done) {
       lowMark(rec, t, lowP1(t, r), t.firstLow ? t.firstLow === 'ok' : lowOk); // 印は、t.completedAt を書きかえる前に付ける
       t.completedAt = now; t.completedPct = r && r.phase === 'away' ? r.pct1 : pct;
     }
+    delete t.paperHand;
     t.lastLentAt = t.lentAt; t.lastFirstAt = t.firstDoneAt || null;
     t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
   });
@@ -9447,7 +9464,8 @@ function lowMark(rec, t, p1, lowOk) {
 function recordHandover(t, now) {
   if (!t || !t.holder || !t.lentAt) return;
   const r = roundInfo(t.id, true);
-  D().returns.push({ id: 'x' + uid(), terrId: t.id, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: false, pct: r ? r.pct : null, ho: 1 });
+  D().returns.push(Object.assign({ id: 'x' + uid(), terrId: t.id, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: false, pct: r ? r.pct : null, ho: 1 }, t.group ? { g: 1 } : {}));
+  delete t.paperHand;
 }
 /* 1回目のあと、会えなかった家を「留守宅カード」（だれでも受け取れる）にして返す。
    決めた割合まで訪ね直された日が、正式な返却日（S-13 の完了した日付）になる（区域係のスマホが自動で記録する） */
@@ -9459,6 +9477,8 @@ function poolReturn(tid, lowOk) {
   commit(`区域${t.no}を、留守宅カードにして返しました`, () => {
     const now = new Date().toISOString(), rid = 'x' + uid(), first = t.firstDoneAt || now;
     const rec = { id: rid, terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: first, at: now, completed: false, pct: r ? r.pct1 : null, pool: 1 };
+    if (t.group) rec.g = 1;
+    delete t.paperHand;
     D().returns.push(rec);
     lowMark(rec, t, lowP1(t, r), t.firstLow ? t.firstLow === 'ok' : lowOk); // まだ正式返却ではない。あとで留守宅カードが完了したとき、この印がそのまま使われる
     t.lastLentAt = t.lentAt; t.lastFirstAt = first; t.awayPoolAt = now; t.poolRetId = rid;
@@ -9587,7 +9607,7 @@ function lowAdoptList() {
     if (t.returnedAt && t.returnedAt > t.completedAt) continue;   // すでに途中の返却（すぐ受け取れる）
     if (!(daysSince(t.completedAt) < lim)) continue;
     const r = D().returns.find(x => x.terrId === t.id && x.completed && x.at === t.completedAt) || null;
-    if (r && (r.low || r.lowOk || r.lowAuto || r.lowSkip)) continue;
+    if (r && (r.low || r.lowOk || r.lowAuto || r.lowSkip || r.ph)) continue; // ph＝紙の区域カードで回った（アプリに記録がない）
     const from = r ? lowFrom(r) : (t.lastLentAt || '');
     if (paperDoneIn(t, from, t.completedAt)) continue;
     const pct = coverAt(t, from, (r && r.firstAt) || (!r && t.lastFirstAt) || t.completedAt);
@@ -14150,13 +14170,27 @@ const svcYearOf = d => (d.getMonth() >= 8 ? d.getFullYear() + 1 : d.getFullYear(
 const dstr = v => { if (!v) return ''; if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v; const d = new Date(v); return isNaN(d) ? '' : ymd(d); };
 const s13Fmt = s => { if (!s) return ''; const [y, m, d] = s.split('-').map(Number); return `${y}/${m}/${d}`; };
 let s13Y = null;
+/* S-13 の名前：グループ奉仕の区域は「グループ奉仕（監督・司会者の名前）」（紙の S-13 と同じ書き方） */
+const s13Who = (uid, g) => (g ? `グループ奉仕（${uname(uid)}）` : uname(uid));
+/* 「グループ奉仕（名前）」と書いた名前から、その監督・司会者をさがす。null＝その書き方ではない／{ name } だけ＝渡せる人がいない */
+const s13Norm = v => String(v || '').replace(/[\s　]/g, '');
+function s13GroupOf(name) {
+  const m = String(name || '').trim().match(/^(?:グループ奉仕|Predicaci[oó]n en grupo)\s*[（(]\s*(.+?)\s*[）)]$/i);
+  if (!m) return null;
+  const key = s13Norm(m[1]);
+  const hit = D().users.filter(u => s13Norm(u.name) === key);
+  const u = hit.find(x => x.group && (x.overseer || x.leader));
+  return { name: m[1], user: u || null, found: hit.length > 0 };
+}
+/* 同じ親番号の枝番（自分もふくむ・番号順）。枝番でない区域は自分だけ */
+const s13Kin = t => (t.pno ? D().territories.filter(x => !x.dummy && !isSpecial(x) && x.pno === t.pno).sort(byNo) : [t]);
 function s13Rows(y) {
   const S = `${y - 1}-09-01`, E = `${y}-09-01`, today = ymd(new Date()), paper = D().s13 || [];
   return D().territories.filter(t => !t.dummy).slice().sort(byNo).map(t => {
     const list = [];
     D().returns.filter(r => r.terrId === t.id && r.lentAt).forEach(r =>
-      list.push({ name: uname(r.by), a: dstr(r.lentAt), c: r.completed ? dstr(r.at) : '', ret: dstr(r.at), lw: r.lowAuto ? 1 : 0, src: 'app' }));
-    if (t.holder && t.lentAt) list.push({ name: uname(t.holder), a: dstr(t.lentAt), c: '', ret: '', cur: true, src: 'app' });
+      list.push({ name: s13Who(r.by, r.g), a: dstr(r.lentAt), c: r.completed ? dstr(r.at) : '', ret: dstr(r.at), lw: r.lowAuto ? 1 : 0, src: 'app' }));
+    if (t.holder && t.lentAt) list.push({ name: s13Who(t.holder, t.group), a: dstr(t.lentAt), c: '', ret: '', cur: true, src: 'app' });
     paper.filter(x => x.kind === 'a' && x.terrId === t.id).forEach(x =>
       list.push({ name: x.name, a: x.a, c: x.c || '', ret: '', src: 'paper', id: x.id, cur: !x.c && paperLent(t) && x.a === t.paperLentAt }));
     // この年度に割り当てた記録と、前の年度から続いていた記録
@@ -14246,7 +14280,9 @@ function openS13Edit(tid, editId) {
   const pos = order.findIndex(x => x.id === tid);
   const man = (D().s13 || []).find(x => x.kind === 'p' && x.terrId === tid && Number(x.year) === y);
   const ed = editId ? (D().s13 || []).find(x => x.id === editId) : null;
-  const names = [...new Set(D().users.map(u => u.name).concat((D().s13 || []).filter(x => x.name).map(x => x.name)))];
+  const gUsers = D().users.filter(u => u.group && (u.overseer || u.leader));
+  const names = [...new Set(gUsers.map(u => `グループ奉仕（${u.name}）`).concat(D().users.map(u => u.name), (D().s13 || []).filter(x => x.name).map(x => x.name)))];
+  const kin = s13Kin(t);
   setSheet(headHtml(t, `区域${esc(t.no)}の記録`, `${y}奉仕年度（${y - 1}年9月〜${y}年8月）`) + `
     <h3 class="sub">この年度の割り当て</h3>
     ${r.rows.length ? r.rows.map(x => `<div class="setrow"><span><b>${esc(x.name)}</b>　${s13Fmt(x.a)} 〜 ${x.c ? s13Fmt(x.c) + ' 完了' : x.cur ? '貸出中' : x.ret ? '返却 ' + s13Fmt(x.ret) : '（完了日なし）'}
@@ -14256,8 +14292,10 @@ function openS13Edit(tid, editId) {
     <h3 class="sub">${ed ? '紙の記録を直す' : '紙の記録を転記する'}</h3>
     <label class="field"><span>伝道者の名前</span><input type="text" id="s13Name" list="s13Names" maxlength="30" value="${esc(ed ? ed.name : '')}" placeholder="例：山田 花子"></label>
     <datalist id="s13Names">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+    <p class="hint" id="s13Gp" aria-live="polite"></p>
     <label class="field"><span>割り当てた日付</span><input type="date" id="s13A" value="${esc(ed ? ed.a : '')}"></label>
     <label class="field"><span>完了した日付（まだ回り終えていなければ空）</span><input type="date" id="s13C" value="${esc(ed ? ed.c : '')}"></label>
+    ${kin.length > 1 ? `<label class="chk"><input type="checkbox" id="s13All" checked> 区域${esc(t.pno)}の枝番すべて（${kin.map(x => esc(x.no)).join('・')}）に入れる</label>` : ''}
     <button class="btn primary block" id="s13Add">${ed ? 'この内容に直す' : 'この記録を入れる'}</button>
     ${ed ? '<button class="btn block" id="s13EdCancel">直すのをやめる</button>' : ''}
     <h3 class="sub">前回完了した日付</h3>
@@ -14267,14 +14305,57 @@ function openS13Edit(tid, editId) {
     <div class="seqnav"><button class="btn" id="s13Prev"${pos <= 0 ? ' disabled' : ''}>← 前の区域</button><button class="btn" id="s13Next"${pos >= order.length - 1 ? ' disabled' : ''}>次の区域 →</button></div>
     <button class="btn block" id="s13Done">表にもどる</button>`);
   const again = () => { openS13(y); openS13Edit(tid); };
-  $('#s13Add').onclick = () => {
+  // 「グループ奉仕（名前）」と入れたら、その人に渡すことを、入れる前に知らせる
+  const gpHint = () => {
+    const g = $('#s13C').value ? null : s13GroupOf($('#s13Name').value);
+    $('#s13Gp').innerHTML = !g ? 'グループで回る区域は「グループ奉仕（監督か司会者の名前）」と入れると、完了した日付が空のとき、その人のアプリに「グループ奉仕の区域」として届きます。'
+      : g.user ? `<b>→ ${esc(g.user.name)}さん（${esc(g.user.group)}グループ）のアプリに、「グループ奉仕の区域」として渡します。</b>返却はアプリでしてもらい、返却するとこの表の完了した日付も入ります。`
+      : `<span class="tag-warn">「${esc(g.name)}」さんは、グループ監督・司会者としてアプリに登録されていません。紙の記録として入ります。</span>`;
+  };
+  $('#s13Name').oninput = gpHint; $('#s13C').oninput = gpHint; gpHint();
+  $('#s13Add').onclick = async () => {
     const name = $('#s13Name').value.trim(), a = $('#s13A').value, c = $('#s13C').value;
     if (!name) { toast('伝道者の名前を入れてください'); return; }
     if (!a) { toast('割り当てた日付を入れてください'); return; }
     if (c && c < a) { toast('完了した日付が、割り当てた日付より前になっています'); return; }
-    commit(ed ? '記録を直しました' : `区域${t.no}に${name}さんの記録を入れました`, () => {
-      if (ed) Object.assign(ed, { name, a, c, at: new Date().toISOString() });
-      else D().s13.push({ id: 's' + uid(), kind: 'a', terrId: tid, name, a, c, at: new Date().toISOString(), by: me().id });
+    const targets = kin.length > 1 && ($('#s13All') || {}).checked ? kin : [t];
+    const oldName = ed ? s13Norm(ed.name) : '', oldA = ed ? ed.a : '';
+    // この区域で置きかえる紙の記録（直している記録・同じ名前と日付の記録）
+    const same = (x, z) => z.kind === 'a' && z.terrId === x.id && ((ed && z.id === ed.id) || (oldName && s13Norm(z.name) === oldName && z.a === oldA));
+    const g = c ? null : s13GroupOf(name);
+    if (g && g.user) {
+      if (a > ymd(new Date())) { toast('割り当てた日付が、今日より後になっています'); return; }
+      const u = g.user, ok = [], skip = [];
+      targets.forEach(x => {
+        if (x.holder) { skip.push(`区域${x.no}（アプリで${uname(x.holder)}さんが持っています）`); return; }
+        const last = (D().s13 || []).filter(z => z.kind === 'a' && z.terrId === x.id).sort((p, q) => (p.a < q.a ? -1 : 1)).pop();
+        if (last && !last.c && !same(x, last) && s13Norm(last.name) !== s13Norm(name)) { skip.push(`区域${x.no}（紙の記録で${last.name}さんが持っています）`); return; }
+        ok.push(x);
+      });
+      if (!ok.length) { toast('渡せる区域がありません。' + skip.join('、')); return; }
+      if (!await ask(`区域${ok.map(x => x.no).join('・')}を、${u.name}さん（${u.group}グループ）の「グループ奉仕の区域」として、アプリに渡します。\n\n・${u.name}さんのアプリの区域カードに出ます\n・返却はアプリでしてもらいます。返却すると、この表の完了した日付も入ります` +
+        (skip.length ? `\n\nほかの人が持っているので、次の区域は渡しません：\n${skip.join('\n')}` : ''), { ok: '渡す', danger: false })) return;
+      const [yy, mm, dd] = a.split('-').map(Number), lent = new Date(yy, mm - 1, dd, 12).toISOString();
+      commit(`区域${ok.map(x => x.no).join('・')}を、${u.name}さんのグループ奉仕の区域にしました`, () => {
+        const ids = new Set(ok.map(x => x.id));
+        // 紙の記録は、アプリの記録（受け取った日・返却）に置きかわる（同じ行が2つ出ないように）
+        D().s13 = (D().s13 || []).filter(z => !(ids.has(z.terrId) && z.kind === 'a' && !z.c && (same(terrById(z.terrId), z) || s13Norm(z.name) === s13Norm(name))));
+        ok.forEach(x => {
+          x.holder = u.id; x.lentAt = lent; x.group = u.group; x.paperHand = a;
+          x.helpers = []; x.firstDoneAt = null; x.firstDonePct = null; delete x.firstLow; x.awayPoolAt = null; x.poolRetId = null;
+          delete x.paperLentAt; delete x.selfTakenAt;
+        });
+      });
+      again();
+      return;
+    }
+    if (g && !g.user && !await ask(`「${g.name}」さんは、グループ監督・司会者としてアプリに登録されていないので、紙の記録として入れます。\n登録したあとで、この記録を「直す」から保存し直すと、アプリに渡せます。`, { ok: '紙の記録として入れる', danger: false })) return;
+    commit(ed ? '記録を直しました' : `区域${targets.map(x => x.no).join('・')}に${name}さんの記録を入れました`, () => {
+      const at = new Date().toISOString();
+      targets.forEach(x => {
+        if (ed) (D().s13 || []).filter(z => same(x, z)).forEach(z => Object.assign(z, { name, a, c, at }));
+        else D().s13.push({ id: 's' + uid(), kind: 'a', terrId: x.id, name, a, c, at, by: me().id });
+      });
     });
     again();
   };
@@ -15026,7 +15107,7 @@ function bindStatic() {
       const lim = RECO_LIM[key] || (key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 180] : key === 'followSkipDays' ? [0, 365] : key === 'groupMax' ? [1, 10]
         : key === 'syncGroupSec' ? [5, 30] : key === 'syncNormalSec' ? [10, 120]
         : key === 'reqMaxPersonal' || key === 'reqMaxGroup' ? [1, 5]
-        : key === 'holdMaxPersonal' || key === 'holdMaxGroup' ? [1, 10]
+        : key === 'holdMaxPersonal' ? [1, 10] : key === 'holdMaxGroup' ? [1, 12] // グループ：フェーズ1の過渡期は枝番ごとに数えるので12まで
         : key === 'lowWait' ? [3, 30]
         : key === 'freeAfterDays' ? [0, 365] : [5, 60]);
       const cv = st[key] == null || st[key] === '' ? NaN : Number(st[key]);
