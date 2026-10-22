@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.54"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.55"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3896,6 +3896,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.55', items: [
+    ['集', '監督・司会者は、全体の集まり（金曜の晩・日曜の昼など）で使う区域も受け取れるようになりました。グループ奉仕の区域といっしょに「集まりで使う区域」に出ます。S-13には「全体の集まり（名前）」と出ます']
+  ] },
   { v: '2026.13.46', items: [
     ['区', 'マイマップの取り込みで、枝番の線のずれや道のすき間がほかの枝番にまとわりつかないようにしました']
   ] },
@@ -4764,11 +4767,12 @@ function openHelpers(tid, cid) {
   const obj = c || t, grp = c ? c.group : t.group, curOf = () => (c ? cardHelpers(c) : helpersOf(t));
   if (D().settings.groupOn === 0) { toast('今は「一緒に回る」は使えない設定です'); return; }
   const max = grp ? 40 : D().settings.groupMax, cur = curOf(), curIds = new Set(cur.map(h => h.uid));
-  const gm = grp ? groupMembers(grp).filter(u => u.id !== me().id && !curIds.has(u.id)) : [];
+  const allU = !c && isAllUse(t); // 全体の集まりは、グループで分けずに名前順だけで出す
+  const gm = grp && !allU ? groupMembers(grp).filter(u => u.id !== me().id && !curIds.has(u.id)) : [];
   const room = max - cur.length;
   const cand = D().users.filter(u => !u.inactive && u.id !== me().id && !curIds.has(u.id)).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
   const row = u => `<label class="check" data-name="${esc(u.name)}"><input type="checkbox" data-hadd="${u.id}"${grp && u.group === grp ? ' data-ing="1"' : ''}>${esc(u.name)}</label>`;
-  const others = grp ? cand.filter(u => u.group !== grp) : cand;
+  const others = grp && !allU ? cand.filter(u => u.group !== grp) : cand;
   setSheet(headHtml(t, c ? `今日回る人をえらぶ（留守宅カード・${slotShort(c.slot)}）` : grp ? '今日回る人をえらぶ' : '一緒に回る人', `${fmtDay(new Date().toISOString())}の終わりまで`) + `
     ${cur.length ? `<p class="q">${grp ? '今日回る人' : '今日一緒に回る人'}（${cur.length}人）</p>` + cur.map(h => `<div class="setrow"><b>${esc(uname(h.uid))}さん</b><button class="btn small danger" data-hdel="${h.uid}">外す</button></div>`).join('') : ''}
     ${room > 0 ? `<p class="q">加える人をえらぶ</p>
@@ -5508,7 +5512,9 @@ function openPartAssign() {
   const poly = partDraw.pts.slice();
   const taken = new Set();
   partsOf(po).forEach(p => (p.uids || []).forEach(u => taken.add(u)));
-  const gm = po.group ? groupMembers(po.group).filter(u => u.id !== me().id) : [];
+  const allU = isAllUse(po); // 全体の集まり：今日回る人を先に出す
+  const gm = allU ? helpersOf(po).map(h => userById(h.uid)).filter(u => u && !u.inactive && u.id !== me().id)
+    : po.group ? groupMembers(po.group).filter(u => u.id !== me().id) : [];
   const others = D().users.filter(u => !u.inactive && u.id !== me().id && !gm.some(g => g.id === u.id));
   const row = u => `<label class="check${taken.has(u.id) ? ' dimmed' : ''}" data-name="${esc(u.name)}"><input type="checkbox" data-pu="${u.id}">${esc(u.name)}${taken.has(u.id) ? '<span class="muted">（ほかの範囲に入っています）</span>' : ''}</label>`;
   const pc = partContents(t, poly, partDraw.cid ? po.keys : null), n = pc.total;
@@ -5517,7 +5523,7 @@ function openPartAssign() {
     <p class="hint">ふつうは2人1組です。えらんだ人の画面に、この範囲が今日だけ出ます。</p>
     <label class="field"><span>名前でさがす</span><input type="text" id="puQ" placeholder="名前の一部を入れる" autocomplete="off"></label>
     <div id="puList">
-      ${gm.length ? `<div class="hgrp"><b>${esc(po.group)}グループ</b></div>${gm.map(row).join('')}` : ''}
+      ${gm.length ? `<div class="hgrp"><b>${allU ? '今日回る人' : `${esc(po.group)}グループ`}</b></div>${gm.map(row).join('')}` : ''}
       ${others.length ? `<div class="hgrp"><b>ほかの人</b></div>${others.map(row).join('')}` : ''}
     </div>
     <button class="btn primary block" id="puSave">この範囲をわたす</button>
@@ -8813,8 +8819,8 @@ function cardHtml(t, own, helper) {
     (own && paperHandOf(t) ? '<p class="muted">紙の区域カード（S-13）から引き継いだ区域です。紙で回った家は、アプリの記録には入っていません。返却はこのアプリでしてください。</p>' : '');
   return `<article class="tcard tc2${t.group ? ' grp' : ''}">
     ${openHead(`data-open="${t.id}"`, `区域${esc(t.no)} ${esc(t.name)}`,
-      `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${t.group ? 'グループ' : '区域'}</small>${esc(t.no)}</span>`,
-      esc(t.name), (t.group ? `<span class="gbadge">${esc(t.group)}グループの区域</span> ` : '') + who)}
+      `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${!t.group ? '区域' : isAllUse(t) ? '全体' : 'グループ'}</small>${esc(t.no)}</span>`,
+      esc(t.name), (t.group ? `<span class="gbadge">${esc(useName(t))}の区域</span> ` : '') + who)}
     ${extra ? `<div class="tbody">${extra}</div>` : ''}
     <div class="actions">${own && groupOk ? `<button class="btn" data-helpers="${t.id}">${t.group ? '今日回る人をえらぶ' : '一緒に回る人'}</button>${t.group ? `<button class="btn primary" data-parts="${t.id}">回る範囲を分ける</button>` : ''}` : ''}${own ? `<button class="btn" data-return="${t.id}">返却する</button>` : ''}</div>
   </article>`;
@@ -8834,11 +8840,11 @@ function renderCards() {
   const mine = ts.filter(t => t.holder === me().id);
   const tap = '<p class="hint taphint">区域の番号か名前を押すと、地図がひらきます。</p>';
   if (canGroupTerr()) {
-    const gC = mine.filter(t => t.group), pC = mine.filter(t => !t.group);
+    const gC = mine.filter(t => t.group).sort((a, b) => (isAllUse(a) ? 1 : 0) - (isAllUse(b) ? 1 : 0) || byNo(a, b)), pC = mine.filter(t => !t.group); // グループ奉仕 → 全体の集まり
     const gA = activeCards().filter(c => c.by === me().id && c.group); // グループで回る留守宅カード
     $('#myCards').innerHTML = (mine.length ? tap : '') +
-      `<h2 class="sec gsec"><span class="gbadge">${esc(myGroup())}グループ</span> グループ奉仕の区域</h2>
-       <p class="hint">奉仕の集まりで使う区域です。「今日回る人」をえらぶと、その人たちも今日だけ記録できます。</p>` +
+      `<h2 class="sec gsec">集まりで使う区域</h2>
+       <p class="hint">グループ奉仕と全体の集まりで使う区域です。「今日回る人」をえらぶと、その人たちも今日だけ記録できます。</p>` +
       (gC.length || gA.length ? gC.map(t => cardHtml(t, true)).join('') + gA.map(c => awayCardHtml(c, 'gown')).join('') : '<p class="muted emptyline">まだありません。</p>') +
       reqBoxesHtml(true) + addBtnHtml(true) +
       `<h2 class="sec">個人の区域</h2>` +
@@ -9024,10 +9030,10 @@ const byLongest = (a, b) => ((a.last || '') < (b.last || '') ? -1 : 1); // 長�
 
 /* 「もう1枚」のボタン（上限に届いていたら、そのことを小さく出す） */
 function addBtnHtml(g) {
-  const label = g ? `＋ ${esc(myGroup())}グループの区域をもらう` : (canGroupTerr() ? '＋ 個人の区域をもらう' : '＋ 区域カードをもう1枚ほしい');
+  const label = g ? '＋ 集まりで使う区域をもらう' : (canGroupTerr() ? '＋ 個人の区域をもらう' : '＋ 区域カードをもう1枚ほしい');
   if (hasRoom(g) && canAsk(g)) return `<button class="btn block wideadd" data-reqopen="${g ? 'g' : 'p'}">${label}</button>`;
   const awayBtn = g && myAwayCount(true) < D().settings.awayMax ? `<button class="btn block wideadd" data-gawaypick>＋ グループで回る留守宅カードをもらう</button>` : '';
-  return `<p class="muted capnote">${g ? 'グループの区域' : '個人の区域'}は${holdMax(g)}枚までです（申し込み中もふくみます）。</p>` + awayBtn;
+  return `<p class="muted capnote">${g ? '集まりで使う区域' : '個人の区域'}は${holdMax(g)}枚までです（申し込み中もふくみます）。</p>` + awayBtn;
 }
 function reqBoxesHtml(g) {
   const sent = LIVE ? (Store.queue.length
@@ -9036,7 +9042,7 @@ function reqBoxesHtml(g) {
   return myPendings().filter(p => !!p.forGroup === !!g).sort((a, b) => (a.at < b.at ? -1 : 1)).map(p => {
     const t = p.terrId ? terrById(p.terrId) : null;
     return `<div class="reqbox">
-      <p><b>${p.forGroup ? `${esc(p.forGroup)}グループの区域を` : '区域カードを'}申し込み中です</b></p>
+      <p><b>${p.forGroup ? (p.use === 'all' ? '全体の集まりの区域を' : `${esc(p.forGroup)}グループの区域を`) : '区域カードを'}申し込み中です</b></p>
       <p class="muted">希望：${t ? `区域${t.no}` : 'どこでもよい'}　${fmtDay(p.at)}に申し込み</p>
       <p class="muted">係が決めると、ここに加わります。</p>${sent}
       <div class="actions"><button class="btn small" data-reqcancel="${p.id}">申し込みを取り消す</button></div></div>`;
@@ -9050,7 +9056,7 @@ function renderRequestArea() {
   const boxOf = p => {
     const t = p.terrId ? terrById(p.terrId) : null;
     return `<div class="reqbox">
-      <p><b>${p.forGroup ? `${esc(p.forGroup)}グループの区域を` : '区域カードを'}申し込み中です</b></p>
+      <p><b>${p.forGroup ? (p.use === 'all' ? '全体の集まりの区域を' : `${esc(p.forGroup)}グループの区域を`) : '区域カードを'}申し込み中です</b></p>
       <p class="muted">希望：${t ? `区域${t.no}` : 'どこでもよい'}　${fmtDay(p.at)}に申し込み</p>
       <p class="muted">係が決めると、上の区域カードの一覧に加わります。</p>${sent}
       <div class="actions"><button class="btn small" data-reqcancel="${p.id}">申し込みを取り消す</button></div></div>`;
@@ -9073,7 +9079,8 @@ function renderRequestArea() {
   }).join('');
 }
 
-let reqForGroup = false; // 監督・司会者が「グループ奉仕の区域」として申し込むとき
+let reqForGroup = false; // 監督・司会者が「集まりで使う区域」として申し込むとき
+let reqUse = 'grp';       // そのときの使い道：grp グループ奉仕・all 全体の集まり
 let reqSort = 'long';     // 区域をもらう一覧の並べ方：near 近い順・long 長く回っていない順・young 若い世代・many 家が多い順
 /* 区域の「若い世代」の割合：これまでに会えた記録のうち、年代が若い世代だった割合（記録が少ないときは出さない） */
 function youngShare(t) {
@@ -9148,6 +9155,7 @@ async function takeTerr(id) {
     const now = new Date().toISOString();
     t.holder = me().id; t.lentAt = now; t.selfTakenAt = now; t.selfSeen = false; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
     t.group = reqForGroup && canGroupTerr() ? myGroup() : null;
+    if (t.group && reqUse === 'all') t.use = 'all'; else delete t.use;
     D().requests = D().requests.filter(r => !(r.status === 'pending' && r.by === me().id && r.terrId === id));
   });
 }
@@ -9160,6 +9168,7 @@ function askTerr(id) {
   commit(t ? `区域${t.no}を係に申し込みました` : '区域カードを係に申し込みました', () => {
     const r = { id: 'r' + uid(), by: me().id, terrId: id || null, at: new Date().toISOString(), status: 'pending' };
     if (g) r.forGroup = myGroup();
+    if (g && reqUse === 'all') r.use = 'all';
     D().requests.push(r);
   });
 }
@@ -9199,7 +9208,7 @@ function renderInbox() {
       const opts = free.map(({ t, last }) =>
         `<option value="${t.id}"${t.id === def ? ' selected' : ''}>区域${t.no}（${last ? `前回 ${fmtDay(last)}` : '回り終えた記録なし'}）</option>`).join('');
       return `<article class="ritem k-new"><div>
-          <p class="rt">${esc(uname(r.by))}さん${r.forGroup ? ` <span class="gbadge">${esc(r.forGroup)}グループ用</span>` : ''}</p>
+          <p class="rt">${esc(uname(r.by))}さん${r.forGroup ? ` <span class="gbadge">${r.use === 'all' ? '全体の集まり用' : `${esc(r.forGroup)}グループ用`}</span>` : ''}</p>
           <p class="muted">希望：${want ? `区域${want.no}${wantFree ? '' : '（すでに貸出中）'}` : 'どこでもよい'}　${fmtDay(r.at)}</p>
           <p class="muted">今持っているカード ${held.length}枚${over ? `<span class="tag-warn">4か月超 ${over}枚</span>` : ''}</p>
         </div><span></span>
@@ -9259,7 +9268,7 @@ function renderInbox() {
         <output class="wide">${st.holdMaxPersonal || 2}枚まで</output>
         <button type="button" data-kset="holdMaxPersonal" data-d="1" aria-label="枚数を増やす">＋</button></div></div>
     <div class="setrow">
-      <span>監督・司会者が持てるグループ奉仕の区域<br><small class="hint">個人の区域とは別に数えます。申し込み中もふくみます。枝番は1つずつ数えます</small></span>
+      <span>監督・司会者が持てる集まりで使う区域<br><small class="hint">グループ奉仕と全体の集まりを合わせて数えます（個人の区域とは別）。申し込み中もふくみます。枝番は1つずつ数えます</small></span>
       <div class="rng"><input type="range" min="1" max="40" step="1" value="${Math.min(40, Number(st.holdMaxGroup) || 2)}" data-range="holdMaxGroup" data-unit="枚まで" aria-label="枚数"><output>${Math.min(40, Number(st.holdMaxGroup) || 2)}枚まで</output></div></div>
     <div class="setrow">
       <span>1人が同時に「係に頼める」申し込み（個人の区域）<br><small class="hint">係の返事を待っている申し込みの数です</small></span>
@@ -9329,6 +9338,7 @@ function approveReq(id) {
     const now = new Date().toISOString();
     t.holder = r.by; t.lentAt = now; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
     t.group = r.forGroup || null; // グループ用の申し込みなら、グループの区域にする
+    if (t.group && r.use === 'all') t.use = 'all'; else delete t.use;
     Object.assign(r, { status: 'approved', terrId: t.id, decidedAt: now, seen: false });
   });
 }
@@ -9432,6 +9442,7 @@ function finishTerr(tid, done, lowOk) {
     const now = new Date().toISOString();
     const rec = { id: 'x' + uid(), terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: done, pct };
     if (t.group) rec.g = 1; // グループ奉仕の区域（S-13 に「グループ奉仕（名前）」と出す）
+    if (isAllUse(t)) rec.ga = 1; // 全体の集まりの区域（S-13 に「全体の集まり（名前）」と出す）
     const ph = paperHandOf(t);
     D().returns.push(rec);
     if (done && ph) {
@@ -9443,7 +9454,7 @@ function finishTerr(tid, done, lowOk) {
     }
     delete t.paperHand;
     t.lastLentAt = t.lentAt; t.lastFirstAt = t.firstDoneAt || null;
-    t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
+    t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
   });
 }
 const returnTerr = (tid, completed) => finishTerr(tid, completed); // 以前の呼び方
@@ -9465,7 +9476,7 @@ function lowMark(rec, t, p1, lowOk) {
 function recordHandover(t, now) {
   if (!t || !t.holder || !t.lentAt) return;
   const r = roundInfo(t.id, true);
-  D().returns.push(Object.assign({ id: 'x' + uid(), terrId: t.id, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: false, pct: r ? r.pct : null, ho: 1 }, t.group ? { g: 1 } : {}));
+  D().returns.push(Object.assign({ id: 'x' + uid(), terrId: t.id, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: false, pct: r ? r.pct : null, ho: 1 }, t.group ? { g: 1 } : {}, isAllUse(t) ? { ga: 1 } : {}));
   delete t.paperHand;
 }
 /* 1回目のあと、会えなかった家を「留守宅カード」（だれでも受け取れる）にして返す。
@@ -9479,11 +9490,12 @@ function poolReturn(tid, lowOk) {
     const now = new Date().toISOString(), rid = 'x' + uid(), first = t.firstDoneAt || now;
     const rec = { id: rid, terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: first, at: now, completed: false, pct: r ? r.pct1 : null, pool: 1 };
     if (t.group) rec.g = 1;
+    if (isAllUse(t)) rec.ga = 1;
     delete t.paperHand;
     D().returns.push(rec);
     lowMark(rec, t, lowP1(t, r), t.firstLow ? t.firstLow === 'ok' : lowOk); // まだ正式返却ではない。あとで留守宅カードが完了したとき、この印がそのまま使われる
     t.lastLentAt = t.lentAt; t.lastFirstAt = first; t.awayPoolAt = now; t.poolRetId = rid;
-    t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
+    t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
   });
 }
 /* 留守宅カードで回っている区域：1回目に会えなかった家のうち、何軒が訪ね直されたか。決めた割合に届いた日 */
@@ -12243,7 +12255,7 @@ function renderAdmin() {
     const retAt = t.holder || ph || t.awayPoolAt ? '' : (t.completedAt && (!t.returnedAt || t.completedAt >= t.returnedAt) ? t.completedAt : '');
     const pool = poolInfo(t);
     return `<article class="trow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
-      <div><b>${esc(t.name)}</b>${t.group ? ` <span class="gbadge">${esc(t.group)}グループ</span>` : ''}${isSpecial(t) ? `<span class="spbadge">特別区域：${esc(specialKindsText(t))}</span>${evTag(t)}` : ''} ${lendTag(t)}<div class="meta">
+      <div><b>${esc(t.name)}</b>${t.group ? ` <span class="gbadge">${esc(useName(t))}</span>` : ''}${isSpecial(t) ? `<span class="spbadge">特別区域：${esc(specialKindsText(t))}</span>${evTag(t)}` : ''} ${lendTag(t)}<div class="meta">
         <span>貸し出した日 ${lent ? fmtDay(lent) : '—'}</span><span>1回目を回った日 ${firstAt ? fmtDay(firstAt) : '—'}</span><span>正式に返却した日 ${retAt ? fmtDay(retAt) : (t.holder ? '貸出中' : ph ? '貸出中（紙の記録）' : pool ? '留守宅カードで回っています' : '—')}${lowWaitNote(t)}</span>
         ${ph ? `<span>紙の記録で持っている：${esc(ph.name || '名前なし')}（貸出 ${daysSince(ph.a)}日）　返却したら、S-13で完了した日付を入れてください</span>` : ''}
         ${pool ? `<span>留守宅の訪ね直し ${pool.done} / ${pool.n}（${pool.pct}%・目安 ${awayRetPct()}%）</span><button class="btn small" data-poolfin="${t.id}">正式に返却したことにする</button>` : ''}
@@ -12267,7 +12279,7 @@ function renderAdmin() {
           <option value="open"${lendMode(t) === 'open' ? ' selected' : ''}>貸出可能にする</option>
           <option value="stop"${lendMode(t) === 'stop' ? ' selected' : ''}>貸出中止にする</option></select></label>
         ${isSpecial(t) ? `<button class="btn small" data-spedit="${t.id}">条件を変える</button>` : ''}
-        ${t.holder && (userById(t.holder) || {}).group ? `<label class="check"><input type="checkbox" data-grp="${t.id}"${t.group ? ' checked' : ''}>${esc(userById(t.holder).group)}グループの区域にする</label>` : ''}
+        ${useSelectHtml(t, 'data-grp')}
       </div></article>`;
   }
 }
@@ -12518,6 +12530,29 @@ const normGroup = g => String(g || '').normalize('NFKC').replace(/\s+/g, '').sli
 const isOverseer = () => !!me().overseer && !!me().group;
 /* グループ奉仕の区域を受け取れる人：グループ監督と司会者 */
 const canGroupTerr = () => !!me().group && (!!me().overseer || !!me().leader);
+const canGroupUser = u => !!u && !!u.group && (!!u.overseer || !!u.leader); // その人が集まりで使う区域を持てるか
+/* 集まりで使う区域の使い道（2026-10-22）：t.group があるのが「集まりで使う区域」。
+   t.use === 'all' は全体の集まり（金曜の晩・日曜の昼など、グループをこえた集まり）、なければグループ奉仕。
+   今日回る人・範囲分け・枚数の数え方は、どちらも同じ（枚数はグループ奉仕と合わせて数える） */
+const isAllUse = x => !!(x && x.group && x.use === 'all');
+const useName = x => (isAllUse(x) ? '全体の集まり' : `${x.group}グループ`);
+/* 区域係：使い道をえらぶ（担当が監督・司会者のときだけ出す。以前のチェックで、そうでない人の区域が集まりの区域になっているときも、個人にもどせるように出す） */
+function useSelectHtml(t, attr) {
+  const u = t.holder ? userById(t.holder) : null;
+  if (!u || !(canGroupUser(u) || t.group)) return '';
+  const cur = !t.group ? '' : isAllUse(t) ? 'all' : 'g', ok = canGroupUser(u);
+  const o = (v, l) => (ok || v === '' || v === cur) ? `<option value="${v}"${v === cur ? ' selected' : ''}>${l}</option>` : '';
+  return `<label>使い道 <select ${attr}="${t.id}" aria-label="区域${esc(t.no)}の使い道">${o('', '個人の区域')}${o('g', `${esc(u.group || t.group)}グループ奉仕`)}${o('all', '全体の集まり')}</select></label>`;
+}
+function setTerrUse(t, v) {
+  const u = t && userById(t.holder);
+  if (!t || !u) return;
+  if (v && !canGroupUser(u)) { toast('グループ監督・司会者の区域だけを、集まりで使う区域にできます'); renderAll(); return; }
+  commit(v === 'all' ? `区域${t.no}を全体の集まりの区域にしました` : v ? `区域${t.no}を${u.group}グループの区域にしました` : `区域${t.no}を個人の区域にしました`, () => {
+    t.group = v ? u.group : null;
+    if (v === 'all') t.use = 'all'; else delete t.use;
+  });
+}
 const myGroup = () => me().group || '';
 const groupsAll = () => [...new Set(D().users.filter(u => !u.inactive && u.group).map(u => u.group))].sort((a, b) => a.localeCompare(b, 'ja'));
 const groupMembers = g => D().users.filter(u => !u.inactive && u.group === g);
@@ -13628,7 +13663,7 @@ function todayTodoHtml(todays) {
   mine.slice(0, 3).forEach(t => {
     const r = roundInfo(t.id), total = r ? r.c.todo + r.c.done : 0;
     h += `<div class="todo terr"><span class="stamp sm${noCls(t.no)}${t.group ? ' grp' : ''}">${esc(t.no)}</span>
-      <div class="tbody2"><small>${t.group ? `${esc(t.group)}グループの区域カード` : 'あなたの区域カード'}</small><b>${esc(t.name)}</b>
+      <div class="tbody2"><small>${t.group ? `${esc(useName(t))}の区域カード` : 'あなたの区域カード'}</small><b>${esc(t.name)}</b>
         ${r ? `<small>訪ねた家 ${r.c.done} / ${total}</small>` : ''}</div>
       <button type="button" class="btn primary" data-openterr="${t.id}">地図 ›</button>
       ${r ? `<div class="progress" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${r.pct}%"></i></div>` : ''}</div>`;
@@ -14213,17 +14248,19 @@ const svcYearOf = d => (d.getMonth() >= 8 ? d.getFullYear() + 1 : d.getFullYear(
 const dstr = v => { if (!v) return ''; if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v; const d = new Date(v); return isNaN(d) ? '' : ymd(d); };
 const s13Fmt = s => { if (!s) return ''; const [y, m, d] = s.split('-').map(Number); return `${y}/${m}/${d}`; };
 let s13Y = null;
-/* S-13 の名前：グループ奉仕の区域は「グループ奉仕（監督・司会者の名前）」（紙の S-13 と同じ書き方） */
-const s13Who = (uid, g) => (g ? `グループ奉仕（${uname(uid)}）` : uname(uid));
+/* S-13 の名前：グループ奉仕の区域は「グループ奉仕（監督・司会者の名前）」（紙の S-13 と同じ書き方）、全体の集まりの区域は「全体の集まり（司会者の名前）」 */
+const s13Who = (uid, g, all) => (g && all ? `全体の集まり（${uname(uid)}）` : g ? `グループ奉仕（${uname(uid)}）` : uname(uid));
 /* 「グループ奉仕（名前）」と書いた名前から、その監督・司会者をさがす。null＝その書き方ではない／{ name } だけ＝渡せる人がいない */
 const s13Norm = v => String(v || '').replace(/[\s　]/g, '');
 function s13GroupOf(name) {
-  const m = String(name || '').trim().match(/^(?:グループ奉仕|Predicaci[oó]n en grupo)\s*[（(]\s*(.+?)\s*[）)]$/i);
+  const m = String(name || '').trim().match(/^(グループ奉仕|Predicaci[oó]n en grupo|全体の集まり|Reuni[oó]n general|Predicaci[oó]n general)\s*[（(]\s*(.+?)\s*[）)]$/i);
   if (!m) return null;
+  const all = !/^(グループ奉仕|Predicaci[oó]n en grupo)$/i.test(m[1]); // 全体の集まり
+  m.splice(1, 1);
   const key = s13Norm(m[1]);
   const hit = D().users.filter(u => s13Norm(u.name) === key);
   const u = hit.find(x => x.group && (x.overseer || x.leader));
-  return { name: m[1], user: u || null, found: hit.length > 0 };
+  return { name: m[1], user: u || null, found: hit.length > 0, all };
 }
 /* 同じ親番号の枝番（自分もふくむ・番号順）。枝番でない区域は自分だけ */
 const s13Kin = t => (t.pno ? D().territories.filter(x => !x.dummy && !isSpecial(x) && x.pno === t.pno).sort(byNo) : [t]);
@@ -14232,8 +14269,8 @@ function s13Rows(y) {
   return D().territories.filter(t => !t.dummy).slice().sort(byNo).map(t => {
     const list = [];
     D().returns.filter(r => r.terrId === t.id && r.lentAt).forEach(r =>
-      list.push({ name: s13Who(r.by, r.g), a: dstr(r.lentAt), c: r.completed ? dstr(r.at) : '', ret: dstr(r.at), lw: r.lowAuto ? 1 : 0, src: 'app' }));
-    if (t.holder && t.lentAt) list.push({ name: s13Who(t.holder, t.group), a: dstr(t.lentAt), c: '', ret: '', cur: true, src: 'app' });
+      list.push({ name: s13Who(r.by, r.g, r.ga), a: dstr(r.lentAt), c: r.completed ? dstr(r.at) : '', ret: dstr(r.at), lw: r.lowAuto ? 1 : 0, src: 'app' }));
+    if (t.holder && t.lentAt) list.push({ name: s13Who(t.holder, t.group, isAllUse(t)), a: dstr(t.lentAt), c: '', ret: '', cur: true, src: 'app' });
     paper.filter(x => x.kind === 'a' && x.terrId === t.id).forEach(x =>
       list.push({ name: x.name, a: x.a, c: x.c || '', ret: '', src: 'paper', id: x.id, cur: !x.c && paperLent(t) && x.a === t.paperLentAt }));
     // この年度に割り当てた記録と、前の年度から続いていた記録
@@ -14324,7 +14361,7 @@ function openS13Edit(tid, editId) {
   const man = (D().s13 || []).find(x => x.kind === 'p' && x.terrId === tid && Number(x.year) === y);
   const ed = editId ? (D().s13 || []).find(x => x.id === editId) : null;
   const gUsers = D().users.filter(u => u.group && (u.overseer || u.leader));
-  const names = [...new Set(gUsers.map(u => `グループ奉仕（${u.name}）`).concat(D().users.map(u => u.name), (D().s13 || []).filter(x => x.name).map(x => x.name)))];
+  const names = [...new Set(gUsers.map(u => `グループ奉仕（${u.name}）`).concat(gUsers.map(u => `全体の集まり（${u.name}）`),D().users.map(u => u.name), (D().s13 || []).filter(x => x.name).map(x => x.name)))];
   const kin = s13Kin(t);
   setSheet(headHtml(t, `区域${esc(t.no)}の記録`, `${y}奉仕年度（${y - 1}年9月〜${y}年8月）`) + `
     <h3 class="sub">この年度の割り当て</h3>
@@ -14348,11 +14385,11 @@ function openS13Edit(tid, editId) {
     <div class="seqnav"><button class="btn" id="s13Prev"${pos <= 0 ? ' disabled' : ''}>← 前の区域</button><button class="btn" id="s13Next"${pos >= order.length - 1 ? ' disabled' : ''}>次の区域 →</button></div>
     <button class="btn block" id="s13Done">表にもどる</button>`);
   const again = () => { openS13(y); openS13Edit(tid); };
-  // 「グループ奉仕（名前）」と入れたら、その人に渡すことを、入れる前に知らせる
+  // 「グループ奉仕（名前）」「全体の集まり（名前）」と入れたら、その人に渡すことを、入れる前に知らせる
   const gpHint = () => {
     const g = $('#s13C').value ? null : s13GroupOf($('#s13Name').value);
-    $('#s13Gp').innerHTML = !g ? 'グループで回る区域は「グループ奉仕（監督か司会者の名前）」と入れると、完了した日付が空のとき、その人のアプリに「グループ奉仕の区域」として届きます。'
-      : g.user ? `<b>→ ${esc(g.user.name)}さん（${esc(g.user.group)}グループ）のアプリに、「グループ奉仕の区域」として渡します。</b>返却はアプリでしてもらい、返却するとこの表の完了した日付も入ります。`
+    $('#s13Gp').innerHTML = !g ? '集まりで回る区域は「グループ奉仕（監督か司会者の名前）」か「全体の集まり（司会者の名前）」と入れると、完了した日付が空のとき、その人のアプリに「集まりで使う区域」として届きます。'
+      : g.user ? `<b>→ ${esc(g.user.name)}さん（${esc(g.user.group)}グループ）のアプリに、${g.all ? '「全体の集まりの区域」' : '「グループ奉仕の区域」'}として渡します。</b>返却はアプリでしてもらい、返却するとこの表の完了した日付も入ります。`
       : `<span class="tag-warn">「${esc(g.name)}」さんは、グループ監督・司会者としてアプリに登録されていません。紙の記録として入ります。</span>`;
   };
   $('#s13Name').oninput = gpHint; $('#s13C').oninput = gpHint; gpHint();
@@ -14376,15 +14413,16 @@ function openS13Edit(tid, editId) {
         ok.push(x);
       });
       if (!ok.length) { toast('渡せる区域がありません。' + skip.join('、')); return; }
-      if (!await ask(`区域${ok.map(x => x.no).join('・')}を、${u.name}さん（${u.group}グループ）の「グループ奉仕の区域」として、アプリに渡します。\n\n・${u.name}さんのアプリの区域カードに出ます\n・返却はアプリでしてもらいます。返却すると、この表の完了した日付も入ります` +
+      if (!await ask(`区域${ok.map(x => x.no).join('・')}を、${u.name}さん（${u.group}グループ）の${g.all ? '「全体の集まりの区域」' : '「グループ奉仕の区域」'}として、アプリに渡します。\n\n・${u.name}さんのアプリの区域カードに出ます\n・返却はアプリでしてもらいます。返却すると、この表の完了した日付も入ります` +
         (skip.length ? `\n\nほかの人が持っているので、次の区域は渡しません：\n${skip.join('\n')}` : ''), { ok: '渡す', danger: false })) return;
       const [yy, mm, dd] = a.split('-').map(Number), lent = new Date(yy, mm - 1, dd, 12).toISOString();
-      commit(`区域${ok.map(x => x.no).join('・')}を、${u.name}さんのグループ奉仕の区域にしました`, () => {
+      commit(`区域${ok.map(x => x.no).join('・')}を、${u.name}さんの${g.all ? '全体の集まり' : 'グループ奉仕'}の区域にしました`, () => {
         const ids = new Set(ok.map(x => x.id));
         // 紙の記録は、アプリの記録（受け取った日・返却）に置きかわる（同じ行が2つ出ないように）
         D().s13 = (D().s13 || []).filter(z => !(ids.has(z.terrId) && z.kind === 'a' && !z.c && (same(terrById(z.terrId), z) || s13Norm(z.name) === s13Norm(name))));
         ok.forEach(x => {
           x.holder = u.id; x.lentAt = lent; x.group = u.group; x.paperHand = a;
+          if (g.all) x.use = 'all'; else delete x.use;
           x.helpers = []; x.firstDoneAt = null; x.firstDonePct = null; delete x.firstLow; x.awayPoolAt = null; x.poolRetId = null;
           delete x.paperLentAt; delete x.selfTakenAt;
         });
@@ -15193,8 +15231,8 @@ function bindStatic() {
   $('#adTerrs').addEventListener('change', e => {
     const gp = e.target.closest('[data-grp]');
     if (gp) {
-      const t = terrById(gp.dataset.grp), g = (userById(t.holder) || {}).group || null;
-      commit(gp.checked ? `区域${t.no}を${g}グループの区域にしました` : `区域${t.no}を個人の区域にしました`, () => { t.group = gp.checked ? g : null; });
+      const t = terrById(gp.dataset.grp);
+      if (t) setTerrUse(t, gp.value);
       return;
     }
     const fr = e.target.closest('[data-lend]');
@@ -15212,7 +15250,7 @@ function bindStatic() {
       recordHandover(t, now); // 前の担当者の行を S-13 に残す
       t.holder = val;
       t.lentAt = now;
-      t.helpers = []; t.group = null; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
+      t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
     });
   });
 }

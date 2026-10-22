@@ -226,7 +226,7 @@
     let left = null;
     try { const r = roundInfo(t.id, true); if (r) left = r.c.todo; } catch (e) { left = null; }
     const due = dueOf(t), over = own && due && Date.parse(due) < Date.now();
-    const sub = (t.group ? `<span class="gbadge">${esc(t.group)}グループの区域</span> ` : '') +
+    const sub = (t.group ? `<span class="gbadge">${esc(useName(t))}の区域</span> ` : '') +
       (own ? (over ? '<span class="tag-warn">返す日を過ぎています</span>' : (due ? `返す目安：${fmtDay(due)}` : ''))
         : `${esc(uname(t.holder))}さんの区域を、一緒に回ります`);
     const mp = !own ? myPart(t) : null;
@@ -234,7 +234,7 @@
       ? `<div class="actions"><button class="btn small" data-helpers="${t.id}">今日回る人をえらぶ</button><button class="btn small" data-parts="${t.id}">回る範囲を分ける</button></div>` : '';
     return `<article class="tcard tc2${t.group ? ' grp' : ''}">
       ${openHead(`data-open="${t.id}"`, `区域${esc(t.no)} ${esc(t.name)}`,
-        `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${t.group ? 'グループ' : '区域'}</small>${esc(t.no)}</span>`, esc(t.name), sub)}
+        `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${!t.group ? '区域' : isAllUse(t) ? '全体' : 'グループ'}</small>${esc(t.no)}</span>`, esc(t.name), sub)}
       <div class="tbody">${left != null ? `<p class="kleft">あと <b>${left}</b> 軒</p>` : ''}
         ${own && typeof paperHandOf === 'function' && paperHandOf(t) ? '<p class="muted">紙のカードから引き継いだ区域です（紙で回った家は、数に入っていません）</p>' : ''}
         ${mp ? `<p class="hint-strong">今日のあなたの範囲があります（${esc(partMates(mp).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）</p>` : ''}</div>
