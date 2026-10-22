@@ -266,6 +266,10 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "区域{0}-{1}の目印が、枝番の線の外（線のない部分）にあります。線か目印の位置を確かめてください": "La marca del territorio {0}-{1} está fuera de las líneas de subdivisión (parte sin línea). Revise la línea o la posición de la marca",
 "区域{0}：枝番の線のない1つの部分（約{1}㎡）に、{2} の目印があり、どの番号か決められないので作りません。線を引いてください": "Territorio {0}: en una parte sin líneas de subdivisión (unos {1} m²) hay marcas de {2} y no se puede decidir el número; no se crea. Dibuje la línea",
 "区域{0}-{1}の目印がありますが、作れる場所（枝番の線のない部分）が見つかりませんでした": "Hay una marca del territorio {0}-{1}, pero no se encontró dónde crearlo (parte sin línea de subdivisión)",
+"区域{0}：どの枝番にも入らない細い部分（道など）約{1}㎡ を残しました。家があれば「区域の線を直す」で直してください": "Territorio {0}: se dejó una franja estrecha (calle, etc.) de unos {1} m² que no pertenece a ninguna subdivisión. Si hay casas, corríjala con «Corregir límites de territorio»",
+"区域{0}：親の線がないので、枝番を合わせた形を区域{1}の外の線にしました": "Territorio {0}: no hay línea del territorio principal; se usó la forma de las subdivisiones juntas como límite exterior del territorio {1}",
+"{0} の線「{1}」は区域{2}の番号ですが、区域{3}の中にあります。マイマップで名前を直してください（今回は入れません）": "La línea «{1}» de {0} lleva el número del territorio {2}, pero está dentro del territorio {3}. Corrija el nombre en Mis mapas (esta vez no se importa)",
+"{0} の線「{1}」は区域{2}の中にあるので入れません。枝番なら名前を「{3}」のように直してください": "La línea «{1}» de {0} está dentro del territorio {2}, por lo que no se importa. Si es una subdivisión, cámbiele el nombre, por ejemplo «{3}»",
 "区域{0}：枝番の面積の合計が、親の線の {1}% です（{2}）": "Territorio {0}: la suma de las subdivisiones es el {1}% del territorio principal ({2})",
 "枝番の線のない部分が残っています": "quedan partes sin línea de subdivisión",
 "枝番が重なっているか、はみ出しています": "hay subdivisiones superpuestas o que sobresalen",
@@ -356,6 +360,8 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 /* ---- 予定の印刷 ---- */
 "この月の予定を印刷": "Imprimir el programa del mes",
 "掲示板用": "para el tablero",
+/* ---- マイマップ取り込みの道のすき間・名前のまちがい（2026.13.46） ---- */
+"マイマップの取り込みで、枝番の線のずれや道のすき間がほかの枝番にまとわりつかないようにしました": "Al importar desde Mis mapas, el desfase de las líneas de las subdivisiones y los espacios de las calles ya no se pegan a otras subdivisiones",
 /* ---- マイマップ取り込みの枝番の細い帯・区域の札の位置（2026.13.45） ---- */
 "マイマップの取り込みで、枝番の線のずれでできる細い帯をなくしました。区域の番号の札が区域の中の広い所に出るようになりました": "Al importar desde Mis mapas, ya no quedan franjas estrechas por el desfase de las líneas de las subdivisiones. El número del territorio ahora aparece en la parte más ancha del territorio",
 /* ---- 簡単モードの「区域をもらう」（2026.13.44） ---- */
