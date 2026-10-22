@@ -126,16 +126,30 @@
   }
   /* 係のスマホで、紙の記録（S-13）のいちばん新しい完了日を、各区域の t.paperDone に書く。
      書く主体は係だけ。まだ paperDone がない区域には、はじめの1回でまとめて書かれる */
+  /* あわせて、紙の記録で「割り当てたが、まだ完了していない」区域は t.paperLentAt（割り当てた日）を書く（2026.13.48）。
+     ・名前は書かない（伝道者のスマホには「紙の記録で貸出中」だけが分かればよい。名前は係のスマホの S-13 から出す）
+     ・その割り当てのあとに、アプリで貸し出した区域は、アプリの記録を優先する（紙のカードをアプリの担当に渡したとき） */
   function syncPaperDone() {
     if (!isAdmin() || Store.needMeta || !Array.isArray(D().s13)) return;
-    const best = new Map();
-    D().s13.forEach(x => { if (x && x.terrId && x.c) { const c = String(x.c); if (!best.has(x.terrId) || best.get(x.terrId) < c) best.set(x.terrId, c); } });
+    const best = new Map(), lastA = new Map(), appLent = new Map();
+    const later = (m, k, v) => { if (v && (!m.has(k) || m.get(k) < v)) m.set(k, v); };
+    D().s13.forEach(x => {
+      if (!x || !x.terrId) return;
+      if (x.c) later(best, x.terrId, String(x.c));
+      // いちばん新しい紙の割り当て（完了した日付が空なら、まだ紙で持っている）
+      if (x.kind === 'a' && x.a) { const o = lastA.get(x.terrId); if (!o || String(o.a) < String(x.a)) lastA.set(x.terrId, x); }
+    });
+    const open = new Map();
+    lastA.forEach((x, k) => { if (!x.c) open.set(k, String(x.a)); });
+    (D().returns || []).forEach(r => { if (r && r.terrId && r.lentAt) later(appLent, r.terrId, dstr(r.lentAt)); });
     let ch = false;
     D().territories.forEach(t => {
       const want = best.get(t.id) || '';
-      if ((t.paperDone || '') === want) return;
-      if (want) t.paperDone = want; else delete t.paperDone;
-      ch = true;
+      if ((t.paperDone || '') !== want) { if (want) t.paperDone = want; else delete t.paperDone; ch = true; }
+      const pa = open.get(t.id) || '';
+      const app = [t.lentAt ? dstr(t.lentAt) : '', appLent.get(t.id) || ''].sort().pop();
+      const wantL = pa && !t.holder && pa > app ? pa : '';
+      if ((t.paperLentAt || '') !== wantL) { if (wantL) t.paperLentAt = wantL; else delete t.paperLentAt; ch = true; }
     });
     if (ch) { KM.memoClear(); Store.save(true); }
   }

@@ -3137,5 +3137,16 @@ window.KUIKI_I18N.es = {
 "練習中": "Práctica",
 "練習中です。本番の記録には入りません。": "Está en modo de práctica. Nada se guarda en los registros reales.",
 "練習をやめる": "Salir de la práctica",
-"練習用の地図です（家の印は実在の家ではありません）": "Mapa de práctica (las casas marcadas no son casas reales)"
+"練習用の地図です（家の印は実在の家ではありません）": "Mapa de práctica (las casas marcadas no son casas reales)",
+"貸出中（紙の記録）": "Asignado (registro en papel)",
+"紙の記録で持っている：{0}（貸出 {1}日）　返却したら、S-13で完了した日付を入れてください": "Lo tiene en papel: {0} ({1} días). Cuando lo devuelva, anote la fecha de terminado en el S-13",
+"（紙の記録：{0}）": "(registro en papel: {0})",
+"紙の記録で貸出中": "Asignado en papel",
+"紙の記録で貸出中（{0}）": "Asignado en papel ({0})",
+"紙の記録で貸出中：{0}（{1}から・{2}日目）": "Asignado en papel: {0} (desde {1} · día {2})",
+"紙の記録で貸出中（{0}から・{1}日目）": "Asignado en papel (desde {0} · día {1})",
+"紙の記録で貸出中（返却の目安を過ぎています）": "Asignado en papel (pasó la fecha sugerida de devolución)",
+"{0}に割り当て（{1}日目）　返却したら、S-13で完了した日付を入れてください": "Asignado el {0} (día {1}). Cuando lo devuelva, anote la fecha de terminado en el S-13",
+"{0}・{1}日目": "{0} · día {1}",
+"{0}（紙の記録）": "{0} (registro en papel)"
 };

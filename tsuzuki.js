@@ -26,7 +26,11 @@
   const esc2 = s => (typeof esc === 'function' ? esc(s) : String(s));
   const contDays = () => { const v = D().settings.contDays; return v == null || v === '' ? 60 : (Number(v) || 0); };
   /* schedule.js の isPartial と同じ：担当者なし・留守宅カードで回っていない・回り終えた日より後に返却 */
-  const isPartial = t => !!t && !t.holder && !t.awayPoolAt && !!t.returnedAt && (!t.completedAt || t.returnedAt > t.completedAt);
+  const isPartial = t => {
+    if (!t || t.holder || t.paperLentAt || t.awayPoolAt || !t.returnedAt) return false;
+    const done = [t.completedAt, t.paperDone].filter(Boolean).map(String).sort().pop() || ''; // 紙の記録で回り終えた日も数える
+    return !done || String(t.returnedAt) > done;
+  };
   /* 受け取るとき「続きから」になる区域か（受け取る前の状態で調べる） */
   function canCont(t) {
     if (!isPartial(t) || !t.lastRoundFrom) return false;

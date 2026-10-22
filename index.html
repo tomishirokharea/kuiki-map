@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.46"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.48"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -1029,7 +1029,7 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .rainnote{background:#EAF2FB;border-left:5px solid #1D4ED8}.rainnote small{display:block;color:var(--ink2,#555);font-size:12px}
 .evtag{display:inline-block;border:1.5px solid #6A1B9A;color:#4A1270;background:#fff;border-radius:6px;padding:0 6px;font-size:.8em;font-weight:700;margin-left:4px}
 .lendtag{display:inline-block;border-radius:6px;padding:0 6px;font-size:.85em;font-weight:700}
-.lendtag.auto{background:#E3F2FD;color:#0D47A1}.lendtag.open{background:#E8F5E9;color:#1B5E20}.lendtag.stop{background:#FFEBEE;color:#B71C1C}.lendtag.adm{background:#F3F4F6;color:#374151}
+.lendtag.auto{background:#E3F2FD;color:#0D47A1}.lendtag.open{background:#E8F5E9;color:#1B5E20}.lendtag.stop{background:#FFEBEE;color:#B71C1C}.lendtag.adm{background:#F3F4F6;color:#374151}.lendtag.lent{background:#FFF3E0;color:#8A4B00}
 .btn.wrap{white-space:normal;height:auto;line-height:1.4;padding-top:10px;padding-bottom:10px}
 .sortchips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 10px}
 .kchip.wide{grid-column:1/-1;flex-direction:row;justify-content:flex-start;gap:10px;padding:10px 12px;text-align:left;font-size:15px}.kchip.wide span{font-weight:400;font-size:13px;color:var(--ink2)}
@@ -8961,19 +8961,38 @@ const canAsk = forGroup => pendingOf(forGroup).length < reqLimit(forGroup);
 const lendMode = t => (t && (t.lend === 'open' || t.lend === 'stop' || t.lend === 'auto') ? t.lend : (t && t.free ? 'open' : 'auto'));
 /* 自動で受け取り可：区域係が「自動受け取り」を使うとき、正式に返却されてから決めた日数がたった区域と、まだ一度も回ったことのない区域 */
 function autoFreeOf(t) {
-  if (!t || Number(D().settings.autoFree) !== 1 || t.awayPoolAt) return false;
-  const base = [t.completedAt, t.returnedAt].filter(Boolean).sort().pop();
+  if (!t || Number(D().settings.autoFree) !== 1 || t.awayPoolAt || t.paperLentAt) return false;
+  // 紙の記録（S-13）で回り終えた日（t.paperDone）も、正式な返却として数える
+  const base = [t.completedAt, t.returnedAt, t.paperDone].filter(Boolean).map(String).sort().pop();
   if (!base) return true;
   return daysSince(base) >= (Number(D().settings.freeAfterDays) || 0);
 }
+/* 紙の記録（S-13）で貸出中の区域：t.paperLentAt（割り当てた日。係のスマホが S-13 から書く。伝道者のスマホにはS-13がないため）
+   だれが持っているか（名前）は、係のスマホの S-13 からだけ読む */
+const paperLent = t => !!(t && !t.holder && t.paperLentAt);
+function paperHoldOf(t) {
+  if (!paperLent(t)) return null;
+  const x = (D().s13 || []).filter(r => r && r.kind === 'a' && r.terrId === t.id && !r.c && r.a === t.paperLentAt).pop();
+  return { a: String(t.paperLentAt), name: x ? String(x.name || '') : '' };
+}
+const isLent = t => !!(t && (t.holder || paperLent(t)));
+/* 前回回り終えた日（係の区域一覧）：アプリの記録と紙の記録（S-13）の新しいほう。紙の記録なら、そう書く */
+function lastDoneTxt(t) {
+  const app = t.completedAt ? dstr(t.completedAt) : '', paper = t.paperDone ? String(t.paperDone) : '';
+  if (paper && paper > app) { const [y, m, d] = paper.split('-').map(Number); return `${fmtDay(new Date(y, m - 1, d).toISOString())}（紙の記録）`; }
+  if (app) return fmtDay(t.completedAt) + (t.completedPct != null && t.completedPct < 100 ? `（${t.completedPct}%）` : '');
+  return '記録なし';
+}
 function isFree(t) {
-  if (!t || t.holder) return false;
+  if (!t || isLent(t)) return false;
   const m = lendMode(t);
   if (m === 'stop') return false;
   if (m === 'open') return true;
   return autoFreeOf(t);
 }
 const lendTag = t => {
+  if (t && t.holder) return '<span class="lendtag lent">貸出中</span>';
+  if (paperLent(t)) return '<span class="lendtag lent">貸出中（紙の記録）</span>';
   const m = lendMode(t);
   if (m === 'stop') return '<span class="lendtag stop">貸出中止</span>';
   if (m === 'open') return '<span class="lendtag open">受取可（係）</span>';
@@ -8985,7 +9004,7 @@ const heldOf = g => D().territories.filter(t => t.holder === me().id && !!t.grou
 const hasRoom = g => heldOf(g) + pendingOf(g).length < holdMax(g);
 const canTakeFree = g => hasRoom(g) && (g || heldOf(false) < D().settings.selfTakeMax);
 const myPending = () => myPendings()[0];
-const freeTerrs = () => D().territories.filter(t => !t.holder && lendMode(t) !== 'stop' && !t.dummy); // 貸出中止の区域は、申し込みの一覧に出さない
+const freeTerrs = () => D().territories.filter(t => !isLent(t) && lendMode(t) !== 'stop' && !t.dummy); // 貸出中止・紙の記録で貸出中の区域は、申し込みの一覧に出さない
 const heldCount = uid => D().territories.filter(t => t.holder === uid).length;
 const agoLabel = iso => { const d = daysSince(iso); return d === 0 ? '今日' : `${d}日前`; };
 const byLongest = (a, b) => ((a.last || '') < (b.last || '') ? -1 : 1); // 長く回っていない順（記録なしが先）
@@ -12147,7 +12166,7 @@ function renderAdmin() {
     for (const u of targets(h)) { targetsN++; const sm = sum(K(h.id, u)); if (sm.met && now - Date.parse(sm.met.at) <= 90 * DAY) met90++; }
   }
   const outside = D().houses.filter(h => !h.terrId).length;
-  const lent = ts.filter(t => t.holder).length;
+  const lent = ts.filter(isLent).length;
   const over = ts.filter(t => t.holder && t.lentAt && daysSince(t.lentAt) > lendDays()).length;
   const dncN = Object.keys(D().dnc).length;
   const provN = D().houses.filter(h => h.prov).length;
@@ -12179,7 +12198,7 @@ function renderAdmin() {
     }).join('')}</tr>`).join('');
 
   // 区域一覧
-  const userOpts = sel => `<option value="">（だれも持っていない）</option>` +
+  const userOpts = (sel, ph) => `<option value="">${ph ? `（紙の記録：${esc(ph.name || '名前なし')}）` : '（だれも持っていない）'}</option>` +
     D().users.map(u => `<option value="${u.id}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
   const pcount = new Map();
   ts.forEach(t => { if (t.pno) pcount.set(t.pno, (pcount.get(t.pno) || 0) + 1); });
@@ -12192,23 +12211,25 @@ function renderAdmin() {
   }).join('');
   function trowOf(t) {
     const s = stats.get(t.id), d = t.lentAt ? daysSince(t.lentAt) : 0, due = dueOf(t), over = !!due && Date.parse(due) < Date.now();
-    const lent = t.holder ? t.lentAt : t.lastLentAt, firstAt = t.holder ? t.firstDoneAt : t.lastFirstAt;
-    const retAt = t.holder || t.awayPoolAt ? '' : (t.completedAt && (!t.returnedAt || t.completedAt >= t.returnedAt) ? t.completedAt : '');
+    const ph = paperHoldOf(t); // 紙の記録（S-13）で貸出中
+    const lent = t.holder ? t.lentAt : ph ? ph.a : t.lastLentAt, firstAt = t.holder ? t.firstDoneAt : ph ? '' : t.lastFirstAt;
+    const retAt = t.holder || ph || t.awayPoolAt ? '' : (t.completedAt && (!t.returnedAt || t.completedAt >= t.returnedAt) ? t.completedAt : '');
     const pool = poolInfo(t);
     return `<article class="trow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
       <div><b>${esc(t.name)}</b>${t.group ? ` <span class="gbadge">${esc(t.group)}グループ</span>` : ''}${isSpecial(t) ? `<span class="spbadge">特別区域：${esc(specialKindsText(t))}</span>${evTag(t)}` : ''} ${lendTag(t)}<div class="meta">
-        <span>貸し出した日 ${lent ? fmtDay(lent) : '—'}</span><span>1回目を回った日 ${firstAt ? fmtDay(firstAt) : '—'}</span><span>正式に返却した日 ${retAt ? fmtDay(retAt) : (t.holder ? '貸出中' : pool ? '留守宅カードで回っています' : '—')}${lowWaitNote(t)}</span>
+        <span>貸し出した日 ${lent ? fmtDay(lent) : '—'}</span><span>1回目を回った日 ${firstAt ? fmtDay(firstAt) : '—'}</span><span>正式に返却した日 ${retAt ? fmtDay(retAt) : (t.holder ? '貸出中' : ph ? '貸出中（紙の記録）' : pool ? '留守宅カードで回っています' : '—')}${lowWaitNote(t)}</span>
+        ${ph ? `<span>紙の記録で持っている：${esc(ph.name || '名前なし')}（貸出 ${daysSince(ph.a)}日）　返却したら、S-13で完了した日付を入れてください</span>` : ''}
         ${pool ? `<span>留守宅の訪ね直し ${pool.done} / ${pool.n}（${pool.pct}%・目安 ${awayRetPct()}%）</span><button class="btn small" data-poolfin="${t.id}">正式に返却したことにする</button>` : ''}
         ${t.holder ? `<span class="${over ? 'tag-warn' : ''}">返却の目安 ${fmtDay(due)}${over ? '（過ぎています）' : ''}</span>` : ''}
         <span>家・部屋 ${s.n}</span><span>90日以内に訪問 ${s.visited}</span>
-        <span>前回回り終えた日 ${t.completedAt ? fmtDay(t.completedAt) + (t.completedPct != null && t.completedPct < 100 ? `（${t.completedPct}%）` : '') : '記録なし'}</span>
+        <span>前回回り終えた日 ${lastDoneTxt(t)}</span>
         <span>最終記録 ${s.last ? fmtDate(s.last) : 'なし'}</span>
         ${AGE_ON ? `<span>字：${azaText(t)}</span>` : ''}
         ${t.holder ? `<span>貸出 ${d}日${t.firstDoneAt ? '・留守宅を回る段階' : ''}</span>` : ''}
         ${helpersOf(t).length ? `<span>今日一緒に回る人：${helpersOf(t).map(h => esc(uname(h.uid)) + 'さん').join('、')}</span>` : ''}
       </div></div>
       <div class="actions">
-        <label>担当 <select data-holder="${t.id}">${userOpts(t.holder)}</select></label>
+        <label>担当 <select data-holder="${t.id}">${userOpts(t.holder, ph)}</select></label>
         <button class="btn small" data-open="${t.id}">地図</button>
         <button class="btn small" data-redraw="${t.id}">線を直す</button>
         <button class="btn small" data-rename="${t.id}">番号・名前</button>
@@ -12235,11 +12256,12 @@ function openStatList(key) {
   const now = Date.now(), ts = D().territories.slice().sort(byNo), back = () => openStatList(key);
   let title = '', hint = '', body = '';
   if (key === 'terr') {
-    const lentT = ts.filter(t => t.holder), pool = ts.filter(t => !t.holder && t.awayPoolAt), stop = ts.filter(t => !t.holder && lendMode(t) === 'stop');
-    const freeT = ts.filter(t => !t.holder && !t.awayPoolAt && lendMode(t) !== 'stop');
+    const lentT = ts.filter(t => t.holder), paperT = ts.filter(paperLent), pool = ts.filter(t => !isLent(t) && t.awayPoolAt), stop = ts.filter(t => !isLent(t) && lendMode(t) === 'stop');
+    const freeT = ts.filter(t => !isLent(t) && !t.awayPoolAt && lendMode(t) !== 'stop');
     title = `区域の数 ${ts.length}`;
-    body = `<div class="tlsum"><span>貸出中</span><b>${lentT.length}</b><span>留守宅カードで回っている</span><b>${pool.length}</b><span>空いている</span><b>${freeT.length}</b><span>貸出中止</span><b>${stop.length}</b>${ts.some(isSpecial) ? `<span>そのうち特別区域</span><b>${ts.filter(isSpecial).length}</b>` : ''}</div>
+    body = `<div class="tlsum"><span>貸出中</span><b>${lentT.length}</b>${paperT.length ? `<span>紙の記録で貸出中</span><b>${paperT.length}</b>` : ''}<span>留守宅カードで回っている</span><b>${pool.length}</b><span>空いている</span><b>${freeT.length}</b><span>貸出中止</span><b>${stop.length}</b>${ts.some(isSpecial) ? `<span>そのうち特別区域</span><b>${ts.filter(isSpecial).length}</b>` : ''}</div>
       ${lentT.length ? `<h3 class="sub">貸出中（${lentT.length}）</h3>${lentT.sort((a, b) => (a.lentAt < b.lentAt ? -1 : 1)).map(t => statRow(t, `${esc(uname(t.holder))}さん・${daysSince(t.lentAt)}日目`, daysSince(t.lentAt) > lendDays())).join('')}` : ''}
+      ${paperT.length ? `<h3 class="sub">紙の記録で貸出中（${paperT.length}）</h3>${paperT.sort((a, b) => (a.paperLentAt < b.paperLentAt ? -1 : 1)).map(t => { const ph = paperHoldOf(t); return statRow(t, `${esc(ph.name || '名前なし')}・${daysSince(ph.a)}日目`, daysSince(ph.a) > lendDays()); }).join('')}` : ''}
       ${pool.length ? `<h3 class="sub">留守宅カードで回っている（${pool.length}）</h3>${pool.map(t => { const p = poolInfo(t); return statRow(t, p ? `訪ね直し ${p.done}/${p.n}（${p.pct}%）` : ''); }).join('')}` : ''}
       ${stop.length ? `<h3 class="sub">貸出中止（${stop.length}）</h3>${stop.map(t => statRow(t, '貸出中止')).join('')}` : ''}`;
   } else if (key === 'over') {
@@ -14130,7 +14152,7 @@ function s13Rows(y) {
       list.push({ name: uname(r.by), a: dstr(r.lentAt), c: r.completed ? dstr(r.at) : '', ret: dstr(r.at), lw: r.lowAuto ? 1 : 0, src: 'app' }));
     if (t.holder && t.lentAt) list.push({ name: uname(t.holder), a: dstr(t.lentAt), c: '', ret: '', cur: true, src: 'app' });
     paper.filter(x => x.kind === 'a' && x.terrId === t.id).forEach(x =>
-      list.push({ name: x.name, a: x.a, c: x.c || '', ret: '', src: 'paper', id: x.id }));
+      list.push({ name: x.name, a: x.a, c: x.c || '', ret: '', src: 'paper', id: x.id, cur: !x.c && paperLent(t) && x.a === t.paperLentAt }));
     // この年度に割り当てた記録と、前の年度から続いていた記録
     const inYear = x => (x.a >= S && x.a < E) || (x.a < S && (x.c || x.ret || (x.cur ? today : '')) >= S);
     const rows = list.filter(inYear).sort((p, q) => (p.a < q.a ? -1 : p.a > q.a ? 1 : 0));

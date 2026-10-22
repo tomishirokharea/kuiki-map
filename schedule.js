@@ -165,7 +165,7 @@
     const ts = eligible(), now = new Date(), today = ymd(now), ym = ymOf(now);
     const endM = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     const ds = ts.map(dueInfo);
-    const need = ds.filter(d => !d.t.holder && !d.t.awayPoolAt && d.last && d.startBy <= endM).sort((a, b) => a.left - b.left);
+    const need = ds.filter(d => !isLent(d.t) && !d.t.awayPoolAt && d.last && d.startBy <= endM).sort((a, b) => a.left - b.left);
     const given = new Set(), givenList = [];
     const addG = (tid, at, by) => { const k = tid + dstr(at); if (given.has(k)) return; given.add(k); const t = TID.get(tid); if (t) givenList.push({ t, at, by }); };
     ts.forEach(t => { if (t.lentAt && dstr(t.lentAt).startsWith(ym)) addG(t.id, t.lentAt, t.holder); });
@@ -303,7 +303,7 @@
     return `<div class="duerow" style="border-left-color:${ST[d.st][0]}"><div>
       <p>${chip(d.st)} <b>区域${esc(t.no)}</b> ${esc(t.name || '')}</p>
       <p class="muted">前回回り終えた日 ${showDay(d.last)}・期限 ${d.deadline ? showDay(d.deadline) : '—'}（${leftTxt(d)}）</p>
-      <p class="muted">${t.holder ? `貸出中：${esc(uname(t.holder))}さん（返却の目安 ${fmtDay(dueOf(t))}）` : t.awayPoolAt ? '留守宅カードで回っています' : '空いています'}${meetTag(t)}</p>
+      <p class="muted">${t.holder ? `貸出中：${esc(uname(t.holder))}さん（返却の目安 ${fmtDay(dueOf(t))}）` : paperLent(t) ? paperHoldTxt(t) : t.awayPoolAt ? '留守宅カードで回っています' : '空いています'}${meetTag(t)}</p>
       ${adjTag(t)}
     </div><div class="duebtns"><button class="btn small" data-open="${t.id}">地図</button><button class="btn small" data-dueadj="${t.id}">調整</button><button class="btn small primary" data-karte="${t.id}">カルテ</button></div></div>`;
   };
@@ -382,7 +382,7 @@
     return `<div class="tlrow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span><div>
       <p>${chip(d.st)} <b>${esc(t.name || '')}</b></p>
       <p class="muted">前回回り終えた日 ${showDay(d.last)}・${leftTxt(d)}</p>
-      <p class="muted">${t.holder ? `貸出中：${esc(uname(t.holder))}さん` : t.awayPoolAt ? '留守宅カードで回っています' : '空いています'}</p></div>
+      <p class="muted">${t.holder ? `貸出中：${esc(uname(t.holder))}さん` : paperLent(t) ? paperHoldTxt(t) : t.awayPoolAt ? '留守宅カードで回っています' : '空いています'}</p></div>
       <div class="btns"><button type="button" class="btn small" data-tlmap="${t.id}">地図</button><button type="button" class="btn small primary" data-tlkarte="${t.id}">カルテ</button></div></div>`;
   };
   function openDueList(key) {
@@ -519,7 +519,14 @@
      ・受け取る人が分かるように、一覧に「途中で返却（約○%）」「ほとんど回らずに返却」と出す
      ・係の仕事は増やさない（「今日」タブにも出さない） */
   const _autoFreeOf = window.autoFreeOf;
-  const isPartial = t => !!t && !t.holder && !t.awayPoolAt && !!t.returnedAt && (!t.completedAt || t.returnedAt > t.completedAt);
+  // 紙の記録（S-13）で回り終えた日（t.paperDone）が返却より新しければ、途中返却ではない。紙の記録で貸出中のときも同じ
+  const isPartial = t => {
+    if (!t || isLent(t) || t.awayPoolAt || !t.returnedAt) return false;
+    const done = [t.completedAt, t.paperDone].filter(Boolean).map(String).sort().pop() || '';
+    return !done || String(t.returnedAt) > done;
+  };
+  /* 紙の記録で貸出中（だれが持っているかは係のスマホにだけある） */
+  window.paperHoldTxt = t => { const ph = paperHoldOf(t); return ph ? `紙の記録で貸出中${ph.name ? '：' + esc(ph.name) : ''}（${showDay(ph.a)}から・${daysFrom(ph.a)}日目）` : ''; };
   window.autoFreeOf = function (t) {
     if (t && Number(D().settings.autoFree) === 1 && isPartial(t)) return true;
     return _autoFreeOf.apply(this, arguments);
@@ -1396,6 +1403,10 @@ button.ktag{cursor:pointer}
       try { const r = roundInfo(t.id, true); if (r) prog = r.phase === 'away' ? `　留守宅を訪ね直す段階：${r.aw.pct}%（目安 ${awayRetPct()}%）` : `　1回目：${r.pct1}%`; } catch (e) { /* 進み具合なしで出す */ }
       cls = over ? 'cv-bad' : 'cv-ok'; mark = over ? '▲' : '✓'; word = over ? '貸出中（返却の目安を過ぎています）' : '貸出中';
       sub = `${esc(uname(t.holder))}さん・${t.lentAt ? fmtDay(t.lentAt) + 'に受け取り（' + daysSince(t.lentAt) + '日目）' : ''}　返却の目安 ${t.lentAt ? fmtDay(dueOf(t)) : '—'}${prog}`;
+    } else if (paperLent(t)) {
+      const ph = paperHoldOf(t), over = daysFrom(ph.a) > lendDays();
+      cls = over ? 'cv-bad' : 'cv-ok'; mark = over ? '▲' : '✓'; word = over ? '紙の記録で貸出中（返却の目安を過ぎています）' : '紙の記録で貸出中';
+      sub = `${ph.name ? esc(ph.name) + '・' : ''}${showDay(ph.a)}に割り当て（${daysFrom(ph.a)}日目）　返却したら、S-13で完了した日付を入れてください`;
     } else if (t.awayPoolAt) { cls = 'cv-warn'; mark = '！'; word = '留守宅カードで回っています'; }
     else if (lendMode(t) === 'stop') { word = '貸出中止にしています'; mark = '－'; }
     { const pi = !t.holder && partialInfo(t); if (pi) { word = '空いています（途中で返却）'; sub = `${fmtDay(pi.at)}に返却・${pi.none ? 'ほとんど回っていません' : '回ったのは約' + pi.pct + '%'}`; } }
@@ -1411,7 +1422,7 @@ button.ktag{cursor:pointer}
       nums = `<p>${periodLabel(per)}の記録 <b>${n}件</b>${n ? `：会えた <b>${p}%</b>（拒否を含む）・留守 <b>${100 - p}%</b>` : ''}</p><p>訪問を控える家・部屋（拒否）<b>${karteDnc(t)}</b>軒</p>${candCountFor(t) ? `<p>何度訪ねても会えない家・部屋 <b>${candCountFor(t)}</b>軒（「状況」タブの下で確かめられます）</p>` : ''}`;
     }
     const hist = karteHist(t);
-    const free = !t.holder && lendMode(t) !== 'stop';
+    const free = !isLent(t) && lendMode(t) !== 'stop';
     const users = free ? D().users.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja')) : [];
     return headHtml(t, `区域${esc(t.no)}のカルテ`, esc(t.name || '')) + `
       <div class="cover ${cls}" role="status"><i aria-hidden="true">${mark}</i><div><b>${word}</b>${sub ? `<small>${sub}</small>` : ''}</div></div>
@@ -1772,7 +1783,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     // 区域の塗り（「入」のときだけ）。縮小しているときは、色を濃く・線を細くして、色が見やすいようにする
     if (on) {
       for (const t of ts) {
-        const c = DMC[dmClass(t)], held = !!t.holder, stop = lendMode(t) === 'stop';
+        const c = DMC[dmClass(t)], held = isLent(t), stop = lendMode(t) === 'stop';
         L.polygon(t.polygon, { color: '#222', weight: held || stop ? (mode === 'none' ? 2.5 : 4) : (mode === 'none' ? 1.2 : 2),
           dashArray: held ? '10 6' : stop ? '2 8' : null, fillColor: c[0], fillOpacity: mode === 'none' ? 0.6 : 0.4, opacity: 0.9, bubblingMouseEvents: false })
           .on('click', () => openKarte(t.id)).addTo(dueLayer);
@@ -1789,7 +1800,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       if (p.x < -20 || p.y < -20 || p.x > sz.x + 20 || p.y > sz.y + 20) return;
       let text, pri;
       if (on) {
-        const k = dmClass(t), c = DMC[k], held = !!t.holder, stop = lendMode(t) === 'stop';
+        const k = dmClass(t), c = DMC[k], held = isLent(t), stop = lendMode(t) === 'stop';
         text = cp ? `${c[1]}${t.no}` : `${c[1]} ${t.no}${held ? ' 貸' : stop ? ' 止' : ''}`;
         pri = DM_PRI[k];
       } else {
