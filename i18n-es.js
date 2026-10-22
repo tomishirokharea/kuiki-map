@@ -3168,5 +3168,6 @@ window.KUIKI_I18N.es = {
 "区域{0}を、{1}さん（{2}グループ）の「グループ奉仕の区域」として、アプリに渡しますか？": "¿Entregar el territorio {0} a {1} (grupo {2}) en la aplicación como «territorio para la predicación en grupo»?",
 "渡す": "Entregar",
 "紙の記録として入れる": "Guardar como registro en papel",
-"紙のカードから引き継いだ区域です（紙で回った家は、数に入っていません）": "Viene de la tarjeta en papel (las casas visitadas en papel no se cuentan)"
+"紙のカードから引き継いだ区域です（紙で回った家は、数に入っていません）": "Viene de la tarjeta en papel (las casas visitadas en papel no se cuentan)",
+"個人の区域とは別に数えます。申し込み中もふくみます。枝番は1つずつ数えます": "Se cuenta aparte de los territorios personales. Incluye solicitudes pendientes. Cada subdivisión cuenta como una"
 };

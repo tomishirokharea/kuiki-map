@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.52"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.53"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -9257,10 +9257,8 @@ function renderInbox() {
         <output class="wide">${st.holdMaxPersonal || 2}枚まで</output>
         <button type="button" data-kset="holdMaxPersonal" data-d="1" aria-label="枚数を増やす">＋</button></div></div>
     <div class="setrow">
-      <span>監督・司会者が持てるグループ奉仕の区域<br><small class="hint">個人の区域とは別に数えます。申し込み中もふくみます</small></span>
-      <div class="stepper"><button type="button" data-kset="holdMaxGroup" data-d="-1" aria-label="枚数を減らす">−</button>
-        <output class="wide">${st.holdMaxGroup || 2}枚まで</output>
-        <button type="button" data-kset="holdMaxGroup" data-d="1" aria-label="枚数を増やす">＋</button></div></div>
+      <span>監督・司会者が持てるグループ奉仕の区域<br><small class="hint">個人の区域とは別に数えます。申し込み中もふくみます。枝番は1つずつ数えます</small></span>
+      <div class="rng"><input type="range" min="1" max="40" step="1" value="${Math.min(40, Number(st.holdMaxGroup) || 2)}" data-range="holdMaxGroup" data-unit="枚まで" aria-label="枚数"><output>${Math.min(40, Number(st.holdMaxGroup) || 2)}枚まで</output></div></div>
     <div class="setrow">
       <span>1人が同時に「係に頼める」申し込み（個人の区域）<br><small class="hint">係の返事を待っている申し込みの数です</small></span>
       <div class="stepper"><button type="button" data-kset="reqMaxPersonal" data-d="-1" aria-label="件数を減らす">−</button>
@@ -15150,7 +15148,7 @@ function bindStatic() {
       const lim = RECO_LIM[key] || (key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 180] : key === 'followSkipDays' ? [0, 365] : key === 'groupMax' ? [1, 10]
         : key === 'syncGroupSec' ? [5, 30] : key === 'syncNormalSec' ? [10, 120]
         : key === 'reqMaxPersonal' || key === 'reqMaxGroup' ? [1, 5]
-        : key === 'holdMaxPersonal' ? [1, 10] : key === 'holdMaxGroup' ? [1, 12] // グループ：フェーズ1の過渡期は枝番ごとに数えるので12まで
+        : key === 'holdMaxPersonal' ? [1, 10] : key === 'holdMaxGroup' ? [1, 40] // グループ：フェーズ1の過渡期は枝番ごとに数えるので40まで
         : key === 'lowWait' ? [3, 30]
         : key === 'freeAfterDays' ? [0, 365] : [5, 60]);
       const cv = st[key] == null || st[key] === '' ? NaN : Number(st[key]);
