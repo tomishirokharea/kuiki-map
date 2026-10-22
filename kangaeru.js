@@ -607,7 +607,7 @@
       // 雨の日は、集合住宅のカード（エレベーターありが先）から選ぶ（index.html の isRainy・aptCardRank）
       const rain = typeof isRainy === 'function' && isRainy();
       const rk = t => (rain ? aptCardRank(t) : 0);
-      freeTerrs().filter(t => !taken.has(t.id)).map(t => ({ t, rk: rk(t), last: [t.completedAt, t.returnedAt].filter(Boolean).sort().pop() || '' }))
+      freeTerrs().filter(t => !taken.has(t.id)).map(t => ({ t, rk: rk(t), last: lastBackOf(t) }))
         .sort((a, b) => (a.rk - b.rk) || byLongest(a, b)).slice(0, 3).forEach(({ t, rk: r }) => {
           const take = isFree(t) && canTakeFree(false);
           const wet = rain && r < 2 ? `雨の日なので、集合住宅の多い区域です${r === 0 ? '（エレベーターあり）' : ''}。` : '';

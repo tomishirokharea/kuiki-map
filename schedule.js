@@ -585,7 +585,7 @@ button.ktag{cursor:pointer}
     const SIMPLE = typeof isSimple === 'function' && isSimple();
     if (reqSort === 'near' && !myPos) reqSort = 'reco';
     const sx = new Map(scoreList(free).map((x, i) => [x.t.id, Object.assign(x, { order: i })]));
-    const list = free.map(t => ({ t, last: [t.completedAt, t.returnedAt].filter(Boolean).sort().pop() || '', n: terrStats(t, 0).n,
+    const list = free.map(t => ({ t, last: lastBackOf(t), n: terrStats(t, 0).n,
       dist: myPos ? distM(myPos, center(t.polygon)) : null, yg: reqSort === 'young' ? youngShare(t) : null, sx: sx.get(t.id) }));
     const SORTS = { reco: (a, b) => a.sx.order - b.sx.order, near: (a, b) => a.dist - b.dist, long: byLongest, many: (a, b) => b.n - a.n,
       young: (a, b) => ((b.yg.pct == null ? -1 : b.yg.pct) - (a.yg.pct == null ? -1 : a.yg.pct)) || byLongest(a, b) };
@@ -1192,7 +1192,7 @@ button.ktag{cursor:pointer}
       if (n) row('#C2410C', `スマホの登録の申し込み　${n}件`, '本人のスマホに出ている番号と同じか、確かめてから登録します', go('inbox', 'adDevices', '確かめる'));
     }
     // 2 区域カードの申し込み（その場で貸し出せる）
-    const free = freeTerrs().map(t => ({ t, last: t.completedAt })).sort(byLongest);
+    const free = freeTerrs().map(t => ({ t, last: lastBackOf(t) })).sort(byLongest);
     D().requests.filter(r => !r.type && r.status === 'pending').sort((a, b) => (a.at < b.at ? -1 : 1)).forEach(r => {
       const selEl = document.querySelector(`[data-reqterr="${r.id}"]`);
       const want = r.terrId ? terrById(r.terrId) : null;

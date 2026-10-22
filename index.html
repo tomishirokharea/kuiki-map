@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.48"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.49"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -8976,6 +8976,12 @@ function paperHoldOf(t) {
   return { a: String(t.paperLentAt), name: x ? String(x.name || '') : '' };
 }
 const isLent = t => !!(t && (t.holder || paperLent(t)));
+/* 前回返却した日（区域をもらう一覧の表示・「返却から長い順」）：アプリの返却・回り終えた日と、紙の記録（S-13）で完了した日の新しいほう */
+function lastBackOf(t) {
+  const c = [t.completedAt, t.returnedAt].filter(Boolean).map(String);
+  if (t.paperDone) { const [y, m, d] = String(t.paperDone).split('-').map(Number); if (y && m && d) c.push(new Date(y, m - 1, d).toISOString()); }
+  return c.sort().pop() || '';
+}
 /* 前回回り終えた日（係の区域一覧）：アプリの記録と紙の記録（S-13）の新しいほう。紙の記録なら、そう書く */
 function lastDoneTxt(t) {
   const app = t.completedAt ? dstr(t.completedAt) : '', paper = t.paperDone ? String(t.paperDone) : '';
@@ -9083,7 +9089,7 @@ function openRequestSheet(g) {
   if (!canGroupTerr()) reqForGroup = false;
   const G = reqForGroup, canTake = canTakeFree(G);
   const list = freeTerrs().map(t => {
-    return { t, last: [t.completedAt, t.returnedAt].filter(Boolean).sort().pop() || '', n: terrStats(t, 0).n, dist: myPos ? distM(myPos, center(t.polygon)) : null, yg: reqSort === 'young' ? youngShare(t) : null };
+    return { t, last: lastBackOf(t), n: terrStats(t, 0).n, dist: myPos ? distM(myPos, center(t.polygon)) : null, yg: reqSort === 'young' ? youngShare(t) : null };
   });
   if (reqSort === 'near' && !myPos) reqSort = 'long';
   const SORTS = { near: (a, b) => a.dist - b.dist, long: byLongest, many: (a, b) => b.n - a.n,
@@ -9156,7 +9162,7 @@ function renderInbox() {
   const reqs = D().requests.filter(r => !r.type && r.status === 'pending').sort((a, b) => (a.at < b.at ? -1 : 1));
   const dels = delReqs().sort((a, b) => (a.at < b.at ? -1 : 1));
   const taken = D().territories.filter(t => t.holder && t.selfTakenAt && t.selfSeen === false);
-  const free = freeTerrs().map(t => ({ t, last: t.completedAt })).sort(byLongest);
+  const free = freeTerrs().map(t => ({ t, last: lastBackOf(t) })).sort(byLongest);
   let html = '';
   if (dels.length) {
     html += `<h2 class="sec">家の削除の申請（${dels.length}件）</h2>
