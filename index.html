@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.44"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.45"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3817,6 +3817,55 @@ function spPickData(st) {
 }
 function center(poly) {
   if (!okPoly(poly)) return HOME_VIEW.slice(); return [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length]; }
+/* 区域の札を置く場所：区域の中で、線からいちばん遠い点（polylabel：粗い格子から、見込みのあるマスだけ細かく分けて探す）。
+   center()（点の平均）は、帯・穴・L字やコの字の区域で、区域の外や別の区域の中に出てしまうため、札にはこちらを使う。
+   m に直して計算（精度 1m）。切れ込み（同じ点の再訪）のある輪でも、偶奇判定なので、穴の中には置かれない。
+   区域ごとに控える：配列が同じで形（点の数・位置の合計）が変わらないあいだは、計算しなおさない（線を直したときは、署名が変わって計算しなおす） */
+const LABEL_CACHE = new WeakMap();
+function labelPoint(poly) {
+  if (!okPoly(poly)) return center(poly);
+  let sg = poly.length;
+  for (let i = 0; i < poly.length; i++) sg += poly[i][0] * (1 + i % 7) + poly[i][1] * (2 + i % 5);
+  const hit = LABEL_CACHE.get(poly);
+  if (hit && hit.sg === sg) return hit.pt.slice();
+  const c0 = Math.cos(poly[0][0] * Math.PI / 180), n = poly.length;
+  const X = poly.map(p => p[1] * 111320 * c0), Y = poly.map(p => p[0] * 110540);
+  const sd = (x, y) => { // 区域の中ならプラス、外ならマイナスの、線までの距離
+    let inside = false, md = Infinity;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const ax = X[i], ay = Y[i], bx = X[j], by = Y[j];
+      if ((ay > y) !== (by > y) && x < (bx - ax) * (y - ay) / (by - ay) + ax) inside = !inside;
+      const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2)) : 0;
+      const ex = ax + t * dx - x, ey = ay + t * dy - y, d = ex * ex + ey * ey;
+      if (d < md) md = d;
+    }
+    return (inside ? 1 : -1) * Math.sqrt(md);
+  };
+  const x0 = Math.min(...X), x1 = Math.max(...X), y0 = Math.min(...Y), y1 = Math.max(...Y);
+  const w = x1 - x0, h = y1 - y0, size = Math.min(w, h);
+  let best = null;
+  if (size > 0) {
+    const mk = (x, y, hf) => { const d = sd(x, y); return { x, y, hf, d, mx: d + hf * Math.SQRT2 }; };
+    const q = []; // 見込み（mx）の大きい順に取り出す
+    const push = c => { q.push(c); let i = q.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (q[p].mx >= q[i].mx) break; [q[p], q[i]] = [q[i], q[p]]; i = p; } };
+    const pop = () => { const top = q[0], last = q.pop(); if (q.length) { q[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < q.length && q[l].mx > q[m].mx) m = l; if (r < q.length && q[r].mx > q[m].mx) m = r; if (m === i) break; [q[m], q[i]] = [q[i], q[m]]; i = m; } } return top; };
+    const half = size / 2;
+    for (let x = x0; x < x1; x += size) for (let y = y0; y < y1; y += size) push(mk(x + half, y + half, half));
+    best = mk((x0 + x1) / 2, (y0 + y1) / 2, 0);
+    let guard = 0;
+    while (q.length && guard++ < 20000) {
+      const c = pop();
+      if (c.d > best.d) best = c;
+      if (c.mx - best.d <= 1) continue; // これ以上細かく分けても、1m より良くならない
+      const hf = c.hf / 2;
+      push(mk(c.x - hf, c.y - hf, hf)); push(mk(c.x + hf, c.y - hf, hf)); push(mk(c.x - hf, c.y + hf, hf)); push(mk(c.x + hf, c.y + hf, hf));
+    }
+  }
+  const pt = best && best.d > 0 ? [best.y / 110540, best.x / (111320 * c0)] : center(poly);
+  LABEL_CACHE.set(poly, { sg, pt });
+  return pt.slice();
+}
 function distM(a, b) {
   const R = 6371000, toR = x => x * Math.PI / 180;
   const dLa = toR(b[0] - a[0]), dLn = toR(b[1] - a[1]);
@@ -3844,6 +3893,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.45', items: [
+    ['区', 'マイマップの取り込みで、枝番の線のずれでできる細い帯をなくしました。区域の番号の札が区域の中の広い所に出るようになりました']
+  ] },
   { v: '2026.13.44', items: [
     ['見', 'かんたんな表示の「区域をもらう」を見やすくしました（1つの区域は3行ほど。くわしい内容は「くわしく」の中、並べ方は1つのボタンに）']
   ] },
@@ -4909,7 +4961,7 @@ function renderTerrs() {
       interactive: tapOk && !gray, bubblingMouseEvents: false
     }).addTo(terrLayer);
     if (tapOk && !gray) poly.on('click', () => selectTerr(t.id === cur ? null : t.id, { toast: t.id !== cur }));
-    L.marker(center(t.polygon), {
+    L.marker(labelPoint(t.polygon), {
       icon: L.divIcon({ className: `terr-label${dim ? ' faint' : ''}${gray ? ' gray' : ''}${t.group && !gray ? ' grp' : ''}${kidNo(t) ? ' kidl' : ''}`, html: terrLabelHtml(t), iconSize: [0, 0] }),
       interactive: false, keyboard: false, pane: 'labelPane'
     }).addTo(terrLayer);
@@ -4921,7 +4973,7 @@ function renderTerrs() {
       const own = mp && p.id === mp.id;
       L.polygon(p.poly, { color: own ? '#00796B' : '#C2410C', weight: 4, dashArray: own ? null : '8 6',
         fillColor: own ? '#00796B' : '#C2410C', fillOpacity: own ? 0.08 : 0.05, interactive: false }).addTo(terrLayer);
-      L.marker(center(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
+      L.marker(labelPoint(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
     });
   }
   renderParents(cur); // 親番号の線と番号
@@ -4934,7 +4986,7 @@ function renderTerrs() {
       const own = mp && p.id === mp.id;
       L.polygon(p.poly, { color: own ? '#00796B' : '#C2410C', weight: 4, dashArray: own ? null : '8 6',
         fillColor: own ? '#00796B' : '#C2410C', fillOpacity: own ? 0.08 : 0.05, interactive: false }).addTo(terrLayer);
-      L.marker(center(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
+      L.marker(labelPoint(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
     });
   }
 }

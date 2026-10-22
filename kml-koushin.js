@@ -13,6 +13,8 @@
    ・枝番の整理（2026-10-21）：親の線の中で、枝番が重なり・すき間なく、親とぴったり同じ形になるようにする（親ごと。planTerrs ＞ planKids）
         ① 線を単純化して、となりの区域の角にそろえる（このあとは単純化しない）
         ② 枝番の線を親の線で切る（はみ出した広さが OVER_NOTE_M2 以上なら、確認画面にお知らせ）
+        ②' 枝番の線を、近く（SNAP_EDGE_M 以内）の親の線・となりの枝番の線に寄せる（手で描いた2〜3mのずれで、細い帯＝「ひげ」が残り、
+             自動で作る枝番の一部になったり、ほかの枝番を囲んだりするのを防ぐ。2026-10-22。snapKids）
         ③ 枝番どうしの重なりは、広さの小さいほうの枝番に入れる（大きいほうに穴ができたら、幅0の切れ込みで1本の輪にする）
         ④ 親から枝番を引いた残りの塊に番号を付ける
              1) 目印が中にある塊 → その番号の枝番（2) 目印が塊の外なら、MARK_NEAR_M 以内でいちばん近い塊）
@@ -42,6 +44,9 @@
   const MARK_NEAR_M = 30;      // 目印が塊の外にあっても、この距離までは使う
   const EDGE_NEAR_M = 2;       // 「接している」とみなす距離
   const GAP_NOTE_M2 = 1;       // 確認画面の「すき間を入れます」に数えるすき間の、いちばん小さい広さ（これより小さいのは計算のずれ。入れるだけで数えない）
+  const SNAP_EDGE_M = 5;       // 枝番の線を、親の線・となりの枝番の線に寄せる距離（手で描いた2〜3mのずれで、細い帯ができないように）
+  const SNAP_KEEP_M = 0.3;     // 辺の途中に点を入れるとき、辺の両端の点からこれ以内なら入れない
+  const SNAP_ROUNDS = 2;       // 寄せる → 点を入れる、をくり返す回数
 
   /* =========================================================
      読みとり（画面がなくても動く部分。ためしに動かすときは root.KmlKoushin を使う）
@@ -289,8 +294,96 @@
     return ring;
   }
 
+  /* 枝番の線を、近くの親の線・となりの枝番の線に寄せる（planKids の 3-2 のあと）。
+     ① 枝番の各点を、近い線の上の点へ動かす（SNAP_EDGE_M 以内）。親の線が近ければ親の線（角の近くなら角）へ、
+        そうでなければ、ほかの枝番の線のいちばん近い辺の上へ（となりの枝番と共有している点が、親の線から離れたまま残らないように）
+     ② 親の線・ほかの枝番の線の点が、枝番の辺から SNAP_EDGE_M 以内にあれば、その点を辺の途中に入れる（辺どうしがぴったり重なるように）
+     この2つを SNAP_ROUNDS 回くり返したあと、各枝番を union で自己交差のない形にし、もう一度親の線で切る。
+     計算は m に直して行う（その場所の緯度で経度を直す）。形は polygon-clipping の形（[経度, 緯度]）のまま、kidsG の g を置きかえる。
+     寄せた結果が空になる枝番は、寄せる前のまま残す */
+  function snapKids(kidsG, P) {
+    if (!kidsG.length) return;
+    const cos = Math.cos(P[0][0][0][1] * Math.PI / 180);
+    const toM = p => [p[0] * 111320 * cos, p[1] * 110540];
+    const fromM = q => [q[0] / (111320 * cos), q[1] / 110540];
+    const open = r => r.slice(0, -1);
+    const d2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    // 点 p から、辺 a-b への足（t：辺の上の位置 0〜1、q：足の点、d：距離）
+    const foot = (p, a, b) => {
+      const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2)) : 0;
+      const q = [a[0] + t * dx, a[1] + t * dy];
+      return { t, q, d: d2(p, q) };
+    };
+    const parentRings = P.flatMap(poly => poly.map(r => open(r).map(toM)));
+    // 形：枝番ごとに［多角形［輪［点（m）］］］
+    let shape = kidsG.map(k => k.g.map(poly => poly.map(r => open(r).map(toM))));
+    const targetsOf = (i, from) => { const tg = parentRings.slice(); from.forEach((s, j) => { if (j !== i) s.forEach(poly => tg.push(...poly)); }); return tg; };
+    // 点 p を、親の線へ寄せた位置（親の線から SNAP_EDGE_M 以内のとき）。親の角の近くで2つの辺に近いときは、その角へ
+    // （となりの枝番と共有している点も、同じ位置に動くので、枝番どうしの線は離れない）
+    const toParent = p => {
+      let foot0 = null, bf = SNAP_EDGE_M, corner = null, bc = Infinity;
+      for (const t of parentRings) {
+        const n = t.length, fs = t.map((a, s) => foot(p, a, t[(s + 1) % n]));
+        for (let s = 0; s < n; s++) {
+          if (fs[s].d < bf) { bf = fs[s].d; foot0 = fs[s].q; }
+          const e0 = fs[(s + n - 1) % n];
+          if (fs[s].d <= SNAP_EDGE_M && e0.d <= SNAP_EDGE_M && d2(fs[s].q, e0.q) > SNAP_KEEP_M) { const dv = d2(p, t[s]); if (dv < bc) { bc = dv; corner = t[s]; } }
+        }
+      }
+      return corner || foot0;
+    };
+    for (let round = 0; round < SNAP_ROUNDS; round++) {
+      // ① 点を、近い線の上へ。親の線が近ければ親の線へ、そうでなければ、となりの枝番の線のいちばん近い辺の上へ
+      //    （動かす前の形を基準にして、順番で結果が変わらないように）
+      const before = shape;
+      shape = before.map((polys, i) => {
+        const tg = targetsOf(i, before).slice(parentRings.length); // となりの枝番の輪だけ
+        return polys.map(poly => poly.map(r => r.map(p => {
+          let best = toParent(p);
+          if (!best) {
+            let bd = SNAP_EDGE_M;
+            for (const t of tg) for (let s = 0; s < t.length; s++) {
+              const f = foot(p, t[s], t[(s + 1) % t.length]);
+              if (f.d < bd) { bd = f.d; best = f.q; }
+            }
+          }
+          return best && d2(best, p) > 0.01 ? best : p;
+        })));
+      });
+      // ② 親の線・ほかの枝番の線の点を、近い辺の途中に入れる
+      const mid = shape;
+      shape = mid.map((polys, i) => {
+        const tg = targetsOf(i, mid);
+        return polys.map(poly => poly.map(r => {
+          let cur = r;
+          for (const t of tg) for (const w of t) {
+            let bi = -1, bd = SNAP_EDGE_M;
+            for (let s = 0; s < cur.length; s++) {
+              const a = cur[s], b = cur[(s + 1) % cur.length];
+              const f = foot(w, a, b);
+              if (f.t <= 0 || f.t >= 1) continue; // 辺の端に近いときは、①で動かす点にまかせる
+              if (f.d < bd) { bd = f.d; bi = s; }
+            }
+            if (bi < 0) continue;
+            const a = cur[bi], b = cur[(bi + 1) % cur.length];
+            if (d2(w, a) <= SNAP_KEEP_M || d2(w, b) <= SNAP_KEEP_M) continue;
+            cur = cur.slice(0, bi + 1).concat([w.slice()], cur.slice(bi + 1));
+          }
+          return cur;
+        }));
+      });
+    }
+    // 自己交差のない形にして、もう一度親の線で切る
+    kidsG.forEach((k, i) => {
+      const g = shape[i].map(poly => poly.map(r => { const c = r.map(fromM); c.push(c[0].slice()); return c; }));
+      const u = pcDo('union', g), c = u && u.length ? pcDo('intersection', u, P) : null;
+      if (c && c.length && mpArea(c) > 0.5) k.g = c;
+    });
+  }
+
   /* 親1つぶんの枝番を整える。
-     3-2 親の線で切る → 3-3 重なりを小さいほうの枝番に入れる → 3-4 親から枝番を引いた残りに番号を付ける（目印・今のルール・細いすき間は近くの枝番へ）
+     3-2 親の線で切る → 3-2' 親・となりの枝番の線に寄せる → 3-3 重なりを小さいほうの枝番に入れる → 3-4 親から枝番を引いた残りに番号を付ける（目印・今のルール・細いすき間は近くの枝番へ）
      → 3-5 面積の確かめ。polygon-clipping が失敗したら例外を投げる（呼んだ側が「直さずに入れる」にもどす） */
   function planKids(pno, v, ctx) {
     const { marks, claimed, usedNos, anyParent } = ctx;
@@ -309,6 +402,8 @@
       if (over >= OVER_NOTE_M2) out.fixNotes.push(`区域${k.no}の線が親の外に約${fmtM2(over)}㎡出ていたので切りました`);
       kidsG.push({ no: k.no, b: k.b, raw: k.raw, gen: false, g: inter });
     });
+    // 3-2' 枝番の線を、近くの親の線・となりの枝番の線に寄せる（手で描いたずれでできる細い帯を、残りの部分に作らないため）
+    snapKids(kidsG, P);
     // 3-3 重なりは、広さの小さいほうの枝番に入れる（大きいほうから、それより小さい枝番を引く）
     kidsG.forEach(k => { k.a = mpArea(k.g); k.bb = bbMP(k.g); });
     const asc = [...kidsG].sort((x, y) => x.a - y.a || Number(x.b) - Number(y.b));
@@ -401,7 +496,19 @@
       out.absorbed.push({ pno, to: best.no, a: b.a, poly: b.poly, bb: bbPoly(b.poly) });
     });
     // 5) どれにも当たらない塊は、番号を付けない（家は「枝番の線の外に残った家」として数え、係が線を引き直す）
-    kidsG.forEach(k => { k.ring = bridgePoly(largest(k.g).poly); });
+    //    寄せたあとでも、ほかの枝番を丸ごと囲んでいる残りの塊（自動で作る枝番）は、1本の輪にしたうえで、確認画面でお知らせする（本当に島のように囲まれた区域もあるので、止めない）
+    kidsG.forEach(k => {
+      const poly = largest(k.g).poly;
+      (k.gen ? poly.slice(1) : []).forEach(h => { // お知らせは、自動で作った枝番（残りの塊）だけ。手で描いた枝番が囲むときは、重なりのお知らせがすでに出る
+        kidsG.forEach(o => {
+          if (o === k) return;
+          const oa = mpArea(o.g);
+          const msg = `区域${k.no}が${o.no}を囲んでいます（まわりの線がずれている可能性があります）`;
+          if (oa > 0 && !out.fixNotes.includes(msg) && mpArea(pcDo('intersection', [[h]], o.g) || []) > oa * 0.5) out.fixNotes.push(msg);
+        });
+      });
+      k.ring = bridgePoly(poly);
+    });
     kidsG.forEach(k => out.specs.push({ no: k.no, pno, pnm: v.p.pnm, pp, poly: k.ring, kind: k.gen ? 'gen' : 'kid', raw: k.raw }));
     outsiders.forEach(k => out.specs.push({ no: k.no, pno, pnm: v.p.pnm, pp, poly: k.ring, kind: 'kid', raw: k.raw }));
     // 3-5 確かめ（合わなくても取り込みは止めない）

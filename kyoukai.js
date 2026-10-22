@@ -514,7 +514,7 @@
     S.issues.forEach((x, i) => {
       const on = i === S.ii;
       L.polygon(x.ring, { color: COL_ISSUE, weight: on ? 5 : 3, fillColor: COL_ISSUE, fillOpacity: 0.55, interactive: false, className: on ? 'sen-blink' : '' }).addTo(lay);
-      const m = L.marker(center(x.ring), { icon: L.divIcon({ className: '', html: `<div class="sen-iss${on ? ' on' : ''}">！</div>`, iconSize: [30, 30], iconAnchor: [15, 15] }), keyboard: false, zIndexOffset: on ? 3000 : 2500 });
+      const m = L.marker(labelPoint(x.ring), { icon: L.divIcon({ className: '', html: `<div class="sen-iss${on ? ' on' : ''}">！</div>`, iconSize: [30, 30], iconAnchor: [15, 15] }), keyboard: false, zIndexOffset: on ? 3000 : 2500 });
       m.on('click', () => focusIssue(i));
       m.addTo(lay);
     });

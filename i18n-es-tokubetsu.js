@@ -262,6 +262,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "区域{0}の線が親の外に約{1}㎡出ていたので切りました": "El límite del territorio {0} sobresalía unos {1} m² del principal; se recortó",
 "区域{0}と{1}が約{2}㎡重なっていたので、{1}（小さいほう）に入れました": "Los territorios {0} y {1} se superponían unos {2} m²; se asignó a {1} (el más pequeño)",
 "区域{0}の線は、ほかの枝番にすべて重なっていたので入れません": "El límite del territorio {0} estaba totalmente cubierto por otras subdivisiones; no se importa",
+"区域{0}が{1}を囲んでいます（まわりの線がずれている可能性があります）": "El territorio {0} rodea al {1} (puede que las líneas de alrededor estén desplazadas)",
 "区域{0}-{1}の目印が、枝番の線の外（線のない部分）にあります。線か目印の位置を確かめてください": "La marca del territorio {0}-{1} está fuera de las líneas de subdivisión (parte sin línea). Revise la línea o la posición de la marca",
 "区域{0}：枝番の線のない1つの部分（約{1}㎡）に、{2} の目印があり、どの番号か決められないので作りません。線を引いてください": "Territorio {0}: en una parte sin líneas de subdivisión (unos {1} m²) hay marcas de {2} y no se puede decidir el número; no se crea. Dibuje la línea",
 "区域{0}-{1}の目印がありますが、作れる場所（枝番の線のない部分）が見つかりませんでした": "Hay una marca del territorio {0}-{1}, pero no se encontró dónde crearlo (parte sin línea de subdivisión)",
@@ -355,6 +356,8 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 /* ---- 予定の印刷 ---- */
 "この月の予定を印刷": "Imprimir el programa del mes",
 "掲示板用": "para el tablero",
+/* ---- マイマップ取り込みの枝番の細い帯・区域の札の位置（2026.13.45） ---- */
+"マイマップの取り込みで、枝番の線のずれでできる細い帯をなくしました。区域の番号の札が区域の中の広い所に出るようになりました": "Al importar desde Mis mapas, ya no quedan franjas estrechas por el desfase de las líneas de las subdivisiones. El número del territorio ahora aparece en la parte más ancha del territorio",
 /* ---- 簡単モードの「区域をもらう」（2026.13.44） ---- */
 "あと{0}枚もらえます": "Puede recibir {0} más",
 "あと{0}枚もらえます（申し込み中 {1}件）": "Puede recibir {0} más (solicitudes: {1})",
