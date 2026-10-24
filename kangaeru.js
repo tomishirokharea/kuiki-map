@@ -366,7 +366,7 @@
         <p class="hint">${SLOTS.length}通りすべてを試す必要はありません。会えなかった家の${awayRetPct()}%を訪ね直すと、区域が完了します</p>`;
     }
     const age = (!simple && typeof AGE_ON !== 'undefined' && AGE_ON && typeof ageMap === 'function' && ageMap())
-      ? `<p><button type="button" class="agetype at-mix" data-prof="${tid}" data-back="">この地域のようす ›</button></p>` : '';
+      ? `<p><button type="button" class="agetype at-mix" data-prof="${esc(tid)}" data-back="">この地域のようす ›</button></p>` : '';
     const tableBox = few
       ? '<div class="slpriv"><b>家が少ない区域なので、くわしい数は出していません。</b></div>'
       : simple ? '' : `<div class="seg" role="group" aria-label="期間"><button type="button" data-kgper="4" aria-pressed="${ST_PER.v === 4}">直近4か月</button><button type="button" data-kgper="12" aria-pressed="${ST_PER.v === 12}">1年</button></div>
@@ -952,7 +952,7 @@
         }
         if (html.indexOf('data-evdel') >= 0) {
           myData().events.filter(e => e.tid).forEach(e => {
-            html = html.replace(`<button class="btn small danger" data-evdel="${e.id}">`, `${evBtn(e.id)}<button class="btn small danger" data-evdel="${e.id}">`);
+            html = html.replace(`<button class="btn small danger" data-evdel="${esc(e.id)}">`, `${evBtn(e.id)}<button class="btn small danger" data-evdel="${esc(e.id)}">`);
           });
         }
       }

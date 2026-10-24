@@ -233,9 +233,9 @@
         : `${esc(uname(t.holder))}さんの区域を、一緒に回ります`);
     const mp = !own && !lead ? myPart(t) : null;
     const grpRow = (own || lead) && t.group && D().settings.groupOn !== 0
-      ? `<div class="actions"><button class="btn small" data-helpers="${t.id}">今日回る人をえらぶ</button><button class="btn small" data-parts="${t.id}">回る範囲を分ける</button>${lead ? `<button class="btn small" data-leadquit="${t.id}">司会をやめる</button>` : ''}</div>` : '';
+      ? `<div class="actions"><button class="btn small" data-helpers="${esc(t.id)}">今日回る人をえらぶ</button><button class="btn small" data-parts="${esc(t.id)}">回る範囲を分ける</button>${lead ? `<button class="btn small" data-leadquit="${esc(t.id)}">司会をやめる</button>` : ''}</div>` : '';
     return `<article class="tcard tc2${t.group ? ' grp' : ''}">
-      ${openHead(`data-open="${t.id}"`, `区域${esc(t.no)} ${esc(t.name)}`,
+      ${openHead(`data-open="${esc(t.id)}"`, `区域${esc(t.no)} ${esc(t.name)}`,
         `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${!t.group ? '区域' : isAllUse(t) ? '全体' : 'グループ'}</small>${esc(t.no)}</span>`, esc(t.name), sub)}
       <div class="tbody">${left != null ? `<p class="kleft">あと <b>${left}</b> 軒</p>` : ''}
         ${own && typeof paperHandOf === 'function' && paperHandOf(t) ? '<p class="muted">紙のカードから引き継いだ区域です（紙で回った家は、数に入っていません）</p>' : ''}
@@ -253,14 +253,14 @@
     const hs = cardHelpers(c), hh = kind === 'help' ? hs.find(h => h.uid === me().id) : null;
     const left = Math.max(0, p.total - p.done);
     return `<article class="tcard tc2 away">
-      ${openHead(`data-awayopen="${c.id}"`, `留守宅カード ${esc(slotText(c.slot))}`,
+      ${openHead(`data-awayopen="${esc(c.id)}"`, `留守宅カード ${esc(slotText(c.slot))}`,
         `<span class="stamp away${t ? noCls(t.no) : ''}"><small>留守宅</small>${t ? esc(t.no) : '-'}</span>`,
         slotText(c.slot), (c.group ? `<span class="gbadge">${esc(useName(c))}</span> ` : '') + `区域${t ? esc(t.no) : '-'}　${t ? esc(t.name) : ''}` +
           (hh ? `<br>${esc(uname(hh.by))}さんの留守宅カードを、今日回ります` : ''))}
       <div class="tbody"><p class="kleft">あと <b>${left}</b> 軒</p>
         <p class="muted">${c.day ? '今日の終わりに自動で終わります' : fmtDay(c.expiresAt) + 'まで'}</p></div>
-      <div class="actions"><button class="btn primary" data-awayopen="${c.id}">地図をひらく</button>${kind === 'help' ? '' : `<button class="btn" data-awayend="${c.id}">返す</button>`}</div>
-      ${kind === 'gown' && D().settings.groupOn !== 0 ? `<div class="actions"><button class="btn small" data-chelpers="${c.id}">今日回る人をえらぶ</button></div>` : ''}
+      <div class="actions"><button class="btn primary" data-awayopen="${esc(c.id)}">地図をひらく</button>${kind === 'help' ? '' : `<button class="btn" data-awayend="${esc(c.id)}">返す</button>`}</div>
+      ${kind === 'gown' && D().settings.groupOn !== 0 ? `<div class="actions"><button class="btn small" data-chelpers="${esc(c.id)}">今日回る人をえらぶ</button></div>` : ''}
     </article>`;
   };
 

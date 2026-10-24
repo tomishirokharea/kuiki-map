@@ -297,7 +297,7 @@
       <p class="q">カード</p>
       ${cards.map(t => { const n = housesOf(t.id).length, u = housesOf(t.id).reduce((a, h) => a + specialTargets(h, t).length, 0); return `<div class="tlrow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span><div>
         <p><b>${n}件</b>${u !== n ? `（部屋 ${u}）` : ''}${typeof evTag === 'function' ? evTag(t) : ''}</p><p class="muted">${t.holder ? `貸出中：${esc(uname(t.holder))}さん` : lendMode(t) === 'stop' ? '貸出中止' : '空いています'}</p></div>
-        <div class="btns"><button type="button" class="btn small" data-tgmap="${t.id}">地図</button>${window.KM && window.KM.openKarte ? `<button type="button" class="btn small primary" data-tgkarte="${t.id}">カルテ</button>` : ''}</div></div>`; }).join('')}
+        <div class="btns"><button type="button" class="btn small" data-tgmap="${esc(t.id)}">地図</button>${window.KM && window.KM.openKarte ? `<button type="button" class="btn small primary" data-tgkarte="${esc(t.id)}">カルテ</button>` : ''}</div></div>`; }).join('')}
       ${orphan.length ? `<div class="notice warn">どのカードにも入っていない家が ${orphan.length}件あります（あとから登録した店など）。<div class="actions"><button type="button" class="btn small primary" id="tgOrphan">近いカードに入れる</button></div></div>` : ''}
       ${g ? `<button class="btn block primary" id="tgSplit">地図で分け直す（件数を変える・家を移す）</button>` : `<button class="btn block primary" id="tgSplit">件数で分ける（地図で分け方を見る）</button>`}
       ${g ? '' : '<button class="btn block" id="tgCond">条件を変える</button>'}
@@ -532,9 +532,9 @@
       const n = cards.reduce((a, x) => a + housesOf(x.id).length, 0), ex = sp.excl !== false && !sp.unmet;
       row.insertAdjacentHTML('beforebegin', `<div class="spgrp"><span class="stamp sm">特</span><b>特別区域：${esc(grpName(t))}</b>
         <span class="muted">${cards.length}枚・${n}件・${esc(specialKindsText(t))}</span>
-        <button type="button" class="btn small" data-spg="${t.id}">設定</button>
+        <button type="button" class="btn small" data-spg="${esc(t.id)}">設定</button>
         ${sp.unmet ? '' : `<div class="spx"><span>ふつうの区域カードから</span><div class="seg" role="group" aria-label="ふつうの区域カードから外すか">
-          <button type="button" data-spx="${t.id}" data-v="1" aria-pressed="${ex}">外す</button><button type="button" data-spx="${t.id}" data-v="0" aria-pressed="${!ex}">外さない</button></div></div>`}</div>`);
+          <button type="button" data-spx="${esc(t.id)}" data-v="1" aria-pressed="${ex}">外す</button><button type="button" data-spx="${esc(t.id)}" data-v="0" aria-pressed="${!ex}">外さない</button></div></div>`}</div>`);
     });
     if (!list.dataset.spbound) {
       list.dataset.spbound = '1';

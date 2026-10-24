@@ -3115,7 +3115,7 @@ function asgNoticeHtml() {
   return todayAsgs().filter(a => a.keys.some(k => !seen.has(k))).map(a => `<div class="notice info asgnote">
     <b>${a.label ? esc(a.label) : `区域${esc(a.t.no)}`}を、今日いっしょに回るように、たのまれました</b><br>
     ${esc(uname(a.by))}さんから${a.p ? `・回る範囲があります（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}
-    <span class="actions"><button class="btn small primary" data-asgopen="${a.t.id}"${a.card ? ` data-asgcard="${a.card}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
+    <span class="actions"><button class="btn small primary" data-asgopen="${esc(a.t.id)}"${a.card ? ` data-asgcard="${a.card}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
       <button class="btn small" data-asgok="${esc(a.keys.join(' '))}">わかりました</button></span></div>`).join('');
 }
 let seenParts = null;
@@ -3404,7 +3404,7 @@ let unameMask = null;
 const uname = id => (unameMask && unameMask(id)) || (userById(id) || { name: '不明' }).name;
 function userOptions(sel, noneLabel) {
   return (noneLabel ? `<option value="">${noneLabel}</option>` : '') +
-    D().users.map(u => `<option value="${u.id}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
+    D().users.map(u => `<option value="${esc(u.id)}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
 }
 const me = () => userById(D().currentUser) || D().users[0];
 const isAdmin = () => me().role === 'admin';
@@ -4797,7 +4797,7 @@ function openHelpers(tid, cid) {
   const gm = grp && !allU ? groupMembers(grp).filter(u => u.id !== me().id && !curIds.has(u.id)) : [];
   const room = max - cur.length;
   const cand = D().users.filter(u => !u.inactive && u.id !== me().id && !curIds.has(u.id)).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-  const row = u => `<label class="check" data-name="${esc(u.name)}"><input type="checkbox" data-hadd="${u.id}"${grp && u.group === grp ? ' data-ing="1"' : ''}>${esc(u.name)}</label>`;
+  const row = u => `<label class="check" data-name="${esc(u.name)}"><input type="checkbox" data-hadd="${esc(u.id)}"${grp && u.group === grp ? ' data-ing="1"' : ''}>${esc(u.name)}</label>`;
   const others = grp && !allU ? cand.filter(u => u.group !== grp) : cand;
   setSheet(headHtml(t, c ? `今日回る人をえらぶ（留守宅カード・${slotShort(c.slot)}）` : grp ? '今日回る人をえらぶ' : '一緒に回る人', `${fmtDay(new Date().toISOString())}の終わりまで`) + `
     ${cur.length ? `<p class="q">${grp ? '今日回る人' : '今日一緒に回る人'}（${cur.length}人）</p>` + cur.map(h => `<div class="setrow"><b>${esc(uname(h.uid))}さん</b><button class="btn small danger" data-hdel="${h.uid}">外す</button></div>`).join('') : ''}
@@ -5243,7 +5243,7 @@ function fillTerrJump() {
   const ts = isAdmin() ? all : all.filter(t => myTerr(t) || freeT(t));
   const head = ts.length ? '区域をえらぶ' : '受け取っている区域はありません';
   // 枝番の区域は、親の番号ごとにまとめる（例：区域5 の中に 5-1・5-2…）
-  const opt = t => `<option value="${t.id}">区域 ${esc(t.no)}${t.rest ? '（枝番の外）' : ''}${!isAdmin() && !myTerr(t) && freeT(t) ? '（自由に受け取れる）' : ''}</option>`;
+  const opt = t => `<option value="${esc(t.id)}">区域 ${esc(t.no)}${t.rest ? '（枝番の外）' : ''}${!isAdmin() && !myTerr(t) && freeT(t) ? '（自由に受け取れる）' : ''}</option>`;
   let html = '', gp = null;
   ts.forEach(t => {
     const p = t.pno || null;
@@ -5546,7 +5546,7 @@ function openPartAssign() {
   const gm = allU ? helpersOf(po).map(h => userById(h.uid)).filter(u => u && !u.inactive && u.id !== me().id)
     : po.group ? groupMembers(po.group).filter(u => u.id !== me().id) : [];
   const others = D().users.filter(u => !u.inactive && u.id !== me().id && !gm.some(g => g.id === u.id));
-  const row = u => `<label class="check${taken.has(u.id) ? ' dimmed' : ''}" data-name="${esc(u.name)}"><input type="checkbox" data-pu="${u.id}">${esc(u.name)}${taken.has(u.id) ? '<span class="muted">（ほかの範囲に入っています）</span>' : ''}</label>`;
+  const row = u => `<label class="check${taken.has(u.id) ? ' dimmed' : ''}" data-name="${esc(u.name)}"><input type="checkbox" data-pu="${esc(u.id)}">${esc(u.name)}${taken.has(u.id) ? '<span class="muted">（ほかの範囲に入っています）</span>' : ''}</label>`;
   const pc = partContents(t, poly, partDraw.cid ? po.keys : null), n = pc.total;
   setSheet(headHtml(t, 'この範囲をわたす人', `家・部屋 ${n}か所　今日の終わりまで`) + `
     ${partContentsHtml(pc)}
@@ -5590,7 +5590,7 @@ function openPartList(tid, cid) {
   const ps = partsOf(t);
   setSheet(headHtml(t0, '今日わたした範囲', `${ps.length}件　今日の終わりまで`) + `
     ${ps.length ? ps.map(p => `<div class="setrow"><div><b>${esc(partName(p))}</b><br><small class="muted">${esc(partContentsText(partContents(t0, p.poly, cid ? t.keys : null)) || '家の印なし')}</small></div>
-      <button class="btn small danger" data-pdel="${p.id}">取り消す</button></div>`).join('')
+      <button class="btn small danger" data-pdel="${esc(p.id)}">取り消す</button></div>`).join('')
       : '<div class="empty">まだありません。</div>'}
     <button class="btn primary block" id="plAdd">${partDraw && partDraw.tid === tid && partDraw.cid === cid ? '地図にもどって続けて分ける' : '＋ 地図で範囲を分ける'}</button>
     <button class="btn block" data-close>閉じる</button>`);
@@ -5660,7 +5660,7 @@ function openTarget(hid, unit, fromBuilding, review) {
           const row = `<li class="vrow${mine2 ? ' swipe-body' : ''}"><i class="pin st-${v.result}">${ST_CHAR[v.result]}</i><span>${fmtDate(v.at)}　${slotOf(d)}<br>${RESULT_LABEL[v.result]}${extra}</span></li>`;
           // 自分でつけた記録は、左にスワイプすると取り消せる
           return mine2
-            ? `<div class="swipe"><div class="swipe-acts"><button class="del" data-vdel="${v.id}">取り消し</button></div>${row}</div>`
+            ? `<div class="swipe"><div class="swipe-acts"><button class="del" data-vdel="${esc(v.id)}">取り消し</button></div>${row}</div>`
             : row;
         }).join('')}</ul>${vs.length > (st.step === 'review' ? 10 : 5) ? `<p class="muted">ほか ${vs.length - (st.step === 'review' ? 10 : 5)}件</p>` : ''}`
       : '<p class="muted">まだ記録はありません。</p>';
@@ -6811,7 +6811,7 @@ function followItem(k, f, mode) {
       <p class="muted">${mode === 'admin' ? `受け持ち：${esc(uname(f.by))}さん　` : ''}最後の記録から ${d}日${state}</p>
       ${m ? `<p class="muted">★${YOUNG.has(m.age) ? '・若い世代' : ''}${bs ? `　会えた時間帯：${bs}` : ''}</p>` : ''}
       ${memo ? `<p class="memoline">メモ：${esc(memoShort(memo))}</p>` : ''}
-    </div><button class="btn small" data-go="${hid}" data-unit="${esc(unit)}" data-route="1">地図で見る</button>
+    </div><button class="btn small" data-go="${esc(hid)}" data-unit="${esc(unit)}" data-route="1">地図で見る</button>
     ${acts ? `<div class="actions span">${acts}</div>` : ''}</article>`;
 }
 
@@ -8049,7 +8049,7 @@ async function openPdf(file) {
     window.pdfjsLib.GlobalWorkerOptions.workerSrc = LIB.pdfWorker;
     const data = new Uint8Array(await file.arrayBuffer());
     if (pdfDoc) { try { pdfDoc.destroy(); } catch (e) { /* 何もしない */ } }
-    pdfDoc = await window.pdfjsLib.getDocument({ data }).promise;
+    pdfDoc = await window.pdfjsLib.getDocument({ data, isEvalSupported: false }).promise; // isEvalSupported:false＝細工したPDFでスクリプトが動く弱点（CVE-2024-4367）の公式の回避策（点検①S4）
     pdfName = file.name || 'PDF';
     pdfPage = 1;
     openPdfPicker();
@@ -8844,7 +8844,7 @@ function cardHtml(t, own, helper) {
   const extra = (UI.cProg === 'on'
       ? `<div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪問の進み具合"><i style="width:${pct}%"></i></div>
       <p class="muted">${t.lentAt ? '受け取ってから' : 'この90日で'}訪問した家・部屋 ${s.visited} / ${s.n}</p>` : '') +
-    (own && ld ? `<div class="leadline"><p><span class="leadtag">今日の司会</span><b>${esc(uname(ld.uid))}さん</b>（今日まで）</p><button type="button" class="btn small" data-leadoff="${t.id}">司会を外す</button></div>` : '') +
+    (own && ld ? `<div class="leadline"><p><span class="leadtag">今日の司会</span><b>${esc(uname(ld.uid))}さん</b>（今日まで）</p><button type="button" class="btn small" data-leadoff="${esc(t.id)}">司会を外す</button></div>` : '') +
     ((own || lead) && partsOf(t).length ? `<p class="muted"><b>今日わたした範囲：</b>${partsOf(t).map(p => esc(partName(p))).join(' ／ ')}</p>` : '') +
     (!own && !lead && myPart(t) ? `<p class="hint-strong">今日のあなたの範囲があります（${esc(partMates(myPart(t)).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）。地図をひらくと、その範囲だけが目立ちます。</p>
       <p class="muted"><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=${center(myPart(t).poly)[0].toFixed(6)},${center(myPart(t).poly)[1].toFixed(6)}" target="_blank" rel="noopener">Googleマップでこの範囲へ</a></p>` : '') +
@@ -8852,11 +8852,11 @@ function cardHtml(t, own, helper) {
     ((own || helper) && UI.cReco === 'on' ? roundHint(t) : '') +
     (own && paperHandOf(t) ? '<p class="muted">紙の区域カード（S-13）から引き継いだ区域です。紙で回った家は、アプリの記録には入っていません。返却はこのアプリでしてください。</p>' : '');
   return `<article class="tcard tc2${t.group ? ' grp' : ''}">
-    ${openHead(`data-open="${t.id}"`, `区域${esc(t.no)} ${esc(t.name)}`,
+    ${openHead(`data-open="${esc(t.id)}"`, `区域${esc(t.no)} ${esc(t.name)}`,
       `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${!t.group ? '区域' : isAllUse(t) ? '全体' : 'グループ'}</small>${esc(t.no)}</span>`,
       esc(t.name), (t.group ? `<span class="gbadge">${esc(useName(t))}の区域</span> ` : '') + who)}
     ${extra ? `<div class="tbody">${extra}</div>` : ''}
-    <div class="actions">${(own || lead) && groupOk ? `<button class="btn" data-helpers="${t.id}">${t.group ? '今日回る人をえらぶ' : '一緒に回る人'}</button>${t.group ? `<button class="btn primary" data-parts="${t.id}">回る範囲を分ける</button>` : ''}` : ''}${own ? `<button class="btn" data-return="${t.id}">返却する</button>` : ''}${lead ? `<button class="btn" data-leadquit="${t.id}">司会をやめる</button>` : ''}</div>
+    <div class="actions">${(own || lead) && groupOk ? `<button class="btn" data-helpers="${esc(t.id)}">${t.group ? '今日回る人をえらぶ' : '一緒に回る人'}</button>${t.group ? `<button class="btn primary" data-parts="${esc(t.id)}">回る範囲を分ける</button>` : ''}` : ''}${own ? `<button class="btn" data-return="${esc(t.id)}">返却する</button>` : ''}${lead ? `<button class="btn" data-leadquit="${esc(t.id)}">司会をやめる</button>` : ''}</div>
   </article>`;
 }
 let cardTab = 'mine';
@@ -8892,7 +8892,7 @@ function renderCards() {
   }
   const helping = ts.filter(t => t.holder !== me().id && (isHelper(t) || isLead(t)) && !(canGroupTerr() && isLead(t))); // 今日の司会は「集まりで使う区域」に出す
   const myDummy = ts.find(t => t.dummy && t.holder === me().id);
-  $('#myCards').insertAdjacentHTML('afterbegin', myDummy ? `<div class="notice info"><b>検証用の区域${esc(myDummy.no)}を受け取っています。</b>おすすめや地図の出かたを確かめるための、ダミーの区域です。<span class="actions"><button class="btn small" data-dguide="${myDummy.id}">確かめ方を見る</button></span></div>` : '');
+  $('#myCards').insertAdjacentHTML('afterbegin', myDummy ? `<div class="notice info"><b>検証用の区域${esc(myDummy.no)}を受け取っています。</b>おすすめや地図の出かたを確かめるための、ダミーの区域です。<span class="actions"><button class="btn small" data-dguide="${esc(myDummy.id)}">確かめ方を見る</button></span></div>` : '');
   const helpC = activeCards().filter(c => c.by !== me().id && isCardHelper(c)); // グループの留守宅カードで、今日回るように頼まれたもの
   $('#myHelp').innerHTML = helping.length || helpC.length ? `<h2 class="sec">今日回る区域</h2><p class="hint">今日の終わりまで、この区域（カード）の家を記録できます。</p>` +
     helping.map(t => cardHtml(t, false, true)).join('') + helpC.map(c => awayCardHtml(c, 'help')).join('') : '';
@@ -8961,7 +8961,7 @@ function followCard(k, f, pinned) {
   const stg = followStage(f), d = followIdle(f), met = sum(k).met, memo = memoOf(k);
   const state = stg === 2 ? '（確認が必要）' : stg === 1 ? '（しばらく訪問なし）' : '';
   const A = (act, label, cls) => `<button class="btn small ${cls || ''}" data-fact="${act}" data-key="${esc(k)}">${label}</button>`;
-  let acts = A('memo', 'メモ・記録を開く', 'primary') + `<button class="btn small" data-go="${hid}" data-unit="${esc(unit)}" data-route="1">地図で見る</button>`;
+  let acts = A('memo', 'メモ・記録を開く', 'primary') + `<button class="btn small" data-go="${esc(hid)}" data-unit="${esc(unit)}" data-route="1">地図で見る</button>`;
   if (stg >= 1) acts += A('continue', '続ける');
   acts += A('remove', 'リストから外す', 'danger');
   const memoLines = memo ? memo.text.split('\n').slice(0, 3).join('\n') : '';
@@ -9100,7 +9100,7 @@ function openLeadPick() {
     const due = dueOf(t);
     const btn = mine ? '<span class="leadtag">今日の司会</span>'
       : l ? `<span class="muted leadbusy">今日は${esc(uname(l.uid))}さんが司会</span>`
-      : `<button class="btn small primary" data-leadtake="${t.id}">この区域で司会する</button>`;
+      : `<button class="btn small primary" data-leadtake="${esc(t.id)}">この区域で司会する</button>`;
     return `${head}<article class="pick" data-lq="${esc([t.no, t.name, uname(t.holder)].join(' '))}">
       <span class="stamp sm${noCls(t.no)} grp">${esc(t.no)}</span>
       <div><b>${esc(t.name)}</b>
@@ -9161,7 +9161,7 @@ function reqBoxesHtml(g) {
       <p><b>${p.forGroup ? (p.use === 'all' ? '全体の集まりの区域を' : `${esc(p.forGroup)}グループの区域を`) : '区域カードを'}申し込み中です</b></p>
       <p class="muted">希望：${t ? `区域${t.no}` : 'どこでもよい'}　${fmtDay(p.at)}に申し込み</p>
       <p class="muted">係が決めると、ここに加わります。</p>${sent}
-      <div class="actions"><button class="btn small" data-reqcancel="${p.id}">申し込みを取り消す</button></div></div>`;
+      <div class="actions"><button class="btn small" data-reqcancel="${esc(p.id)}">申し込みを取り消す</button></div></div>`;
   }).join('');
 }
 function renderRequestArea() {
@@ -9175,7 +9175,7 @@ function renderRequestArea() {
       <p><b>${p.forGroup ? (p.use === 'all' ? '全体の集まりの区域を' : `${esc(p.forGroup)}グループの区域を`) : '区域カードを'}申し込み中です</b></p>
       <p class="muted">希望：${t ? `区域${t.no}` : 'どこでもよい'}　${fmtDay(p.at)}に申し込み</p>
       <p class="muted">係が決めると、上の区域カードの一覧に加わります。</p>${sent}
-      <div class="actions"><button class="btn small" data-reqcancel="${p.id}">申し込みを取り消す</button></div></div>`;
+      <div class="actions"><button class="btn small" data-reqcancel="${esc(p.id)}">申し込みを取り消す</button></div></div>`;
   };
   // グループの区域を受け取れる人は、グループ・個人それぞれの見出しの中に出す（renderCards）
   if (canGroupTerr()) { $('#reqArea').innerHTML = ''; }
@@ -9187,11 +9187,11 @@ function renderRequestArea() {
   $('#reqNotice').innerHTML = done.map(r => {
     const t = terrById(r.terrId);
     if (r.type === 'delHouse') return r.status === 'approved'
-      ? `<div class="notice info"><b>「${esc(r.label || '家')}」の削除が承認されました。</b>地図から消えています。<span class="actions"><button class="btn small" data-reqseen="${r.id}">わかりました</button></span></div>`
-      : `<div class="notice warn"><b>「${esc(r.label || '家')}」の削除の申請は、見送りになりました。</b>くわしくは区域係に確認してください。<span class="actions"><button class="btn small" data-reqseen="${r.id}">わかりました</button></span></div>`;
+      ? `<div class="notice info"><b>「${esc(r.label || '家')}」の削除が承認されました。</b>地図から消えています。<span class="actions"><button class="btn small" data-reqseen="${esc(r.id)}">わかりました</button></span></div>`
+      : `<div class="notice warn"><b>「${esc(r.label || '家')}」の削除の申請は、見送りになりました。</b>くわしくは区域係に確認してください。<span class="actions"><button class="btn small" data-reqseen="${esc(r.id)}">わかりました</button></span></div>`;
     return r.status === 'approved'
-      ? `<div class="notice info"><b>係から区域${t ? t.no : ''}のカードが届きました。</b>「区域カード」の画面から地図をひらけます。<span class="actions"><button class="btn small" data-reqseen="${r.id}">わかりました</button></span></div>`
-      : `<div class="notice warn"><b>申し込みは今回見送りになりました。</b>くわしくは区域係に相談してください。<span class="actions"><button class="btn small" data-reqseen="${r.id}">わかりました</button></span></div>`;
+      ? `<div class="notice info"><b>係から区域${t ? t.no : ''}のカードが届きました。</b>「区域カード」の画面から地図をひらけます。<span class="actions"><button class="btn small" data-reqseen="${esc(r.id)}">わかりました</button></span></div>`
+      : `<div class="notice warn"><b>申し込みは今回見送りになりました。</b>くわしくは区域係に相談してください。<span class="actions"><button class="btn small" data-reqseen="${esc(r.id)}">わかりました</button></span></div>`;
   }).join('');
 }
 
@@ -9230,8 +9230,8 @@ function openRequestSheet(g) {
       <div><b>${esc(t.name)}</b>
         <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${dist != null ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null ? `<p class="muted">${yg.city ? `20〜39歳 ${yg.pct}%（市の年齢データ）` : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${ageLine(t)}</div>
       ${isFree(t) && canTake
-        ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
-        : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
+        ? `<button class="btn small primary" data-take="${esc(t.id)}">受け取る</button>`
+        : `<button class="btn small" data-ask="${esc(t.id)}">係に頼む</button>`}
     </article>`).join('');
   setSheet(headHtml(null, G ? `${esc(myGroup())}グループの区域をもらう` : (canGroupTerr() ? '個人の区域をもらう' : '区域カードをもう1枚'),
       `持てるのは${holdMax(G)}枚まで（今 ${heldOf(G)}枚・申し込み中 ${pendingOf(G).length}件）`) + `
@@ -9309,8 +9309,8 @@ function renderInbox() {
           <p class="muted">理由：${esc(r.reason || '—')}　${fmtDate(r.at)}に申請</p>
           ${h ? `<p class="muted">訪問の記録 ${n}件${hasF ? '・<b>再訪問の受け持ちあり</b>' : ''}${h.createdBy ? `　この家を追加した人：${h.createdBy === r.by ? '申請した本人' : esc(uname(h.createdBy)) + 'さん'}` : ''}</p>`
             : '<p class="tag-warn">この家は、すでにありません</p>'}
-        </div>${h ? `<button class="btn small" data-go="${h.id}" data-unit="">地図で見る</button>` : '<span></span>'}
-        <div class="actions span">${h ? `<button class="btn small danger" data-delok="${r.id}">削除する</button>` : ''}<button class="btn small" data-delno="${r.id}">${h ? '見送る' : '閉じる'}</button></div></article>`;
+        </div>${h ? `<button class="btn small" data-go="${esc(h.id)}" data-unit="">地図で見る</button>` : '<span></span>'}
+        <div class="actions span">${h ? `<button class="btn small danger" data-delok="${esc(r.id)}">削除する</button>` : ''}<button class="btn small" data-delno="${esc(r.id)}">${h ? '見送る' : '閉じる'}</button></div></article>`;
     }).join('');
   }
   if (reqs.length) {
@@ -9322,7 +9322,7 @@ function renderInbox() {
       const over = held.filter(t => t.lentAt && daysSince(t.lentAt) > 120).length;
       const def = wantFree ? want.id : (free[0] ? free[0].t.id : '');
       const opts = free.map(({ t, last }) =>
-        `<option value="${t.id}"${t.id === def ? ' selected' : ''}>区域${t.no}（${last ? `前回 ${fmtDay(last)}` : '回り終えた記録なし'}）</option>`).join('');
+        `<option value="${esc(t.id)}"${t.id === def ? ' selected' : ''}>区域${t.no}（${last ? `前回 ${fmtDay(last)}` : '回り終えた記録なし'}）</option>`).join('');
       return `<article class="ritem k-new"><div>
           <p class="rt">${esc(uname(r.by))}さん${r.forGroup ? ` <span class="gbadge">${r.use === 'all' ? '全体の集まり用' : `${esc(r.forGroup)}グループ用`}</span>` : ''}</p>
           <p class="muted">希望：${want ? `区域${want.no}${wantFree ? '' : '（すでに貸出中）'}` : 'どこでもよい'}　${fmtDay(r.at)}</p>
@@ -9330,9 +9330,9 @@ function renderInbox() {
         </div><span></span>
         <div class="actions span">
           ${free.length
-            ? `<label>貸し出す区域 <select data-reqterr="${r.id}">${opts}</select></label><button class="btn small primary" data-reqok="${r.id}">貸し出す</button>`
+            ? `<label>貸し出す区域 <select data-reqterr="${esc(r.id)}">${opts}</select></label><button class="btn small primary" data-reqok="${esc(r.id)}">貸し出す</button>`
             : '<span class="muted">空いている区域がありません。</span>'}
-          <button class="btn small" data-reqno="${r.id}">見送る</button>
+          <button class="btn small" data-reqno="${esc(r.id)}">見送る</button>
         </div></article>`;
     }).join('');
   }
@@ -9341,7 +9341,7 @@ function renderInbox() {
       `<article class="ritem k-away"><div>
         <p class="rt"><span class="stamp xs${noCls(t.no)}">${esc(t.no)}</span> ${esc(t.name)}</p>
         <p class="muted">${esc(uname(t.holder))}さん　${fmtDay(t.selfTakenAt)}に受け取り（今 ${heldCount(t.holder)}枚）</p>
-      </div><button class="btn small" data-takenseen="${t.id}">確認した</button></article>`).join('');
+      </div><button class="btn small" data-takenseen="${esc(t.id)}">確認した</button></article>`).join('');
   }
   if (!LIVE && !RENSHU) html = `<div class="notice warn"><b>この画面は「試作版」です。</b>この端末の中だけのデータで動いていて、ほかの人の申し込みは届きません。<br>
     本番で使うときは、区域係から配られたリンク（GitHub Pagesのアドレス）を開いてください。</div>` + html;
@@ -9448,7 +9448,7 @@ function renderInbox() {
 }
 function approveReq(id) {
   const r = D().requests.find(x => x.id === id); if (!r) return;
-  const sel = $(`[data-reqterr="${id}"]`), t = sel ? terrById(sel.value) : null;
+  const sel = $(`[data-reqterr="${CSS.escape(String(id))}"]`), t = sel ? terrById(sel.value) : null;
   if (!t || t.holder) { toast('その区域は貸し出せません'); return; }
   commit(`区域${t.no}を${uname(r.by)}さんに貸し出しました`, () => {
     const now = new Date().toISOString();
@@ -10387,7 +10387,7 @@ function openPlanSheet() {
         <span class="numbadge">${i + 1}</span>
         <div><b>${stopLabel(s)}</b><p class="muted">${s.reasons.slice(0, 3).join('・')}</p>
           <p class="muted">${i === 0 ? (myPos ? `現在地から約${fmtDist(s.dist)}` : 'ここから始めます') : `前の家から約${fmtDist(s.dist)}`}</p></div>
-        <button class="btn small" data-plan="${s.h.id}">地図で見る</button></li>`).join('')}</ol>`
+        <button class="btn small" data-plan="${esc(s.h.id)}">地図で見る</button></li>`).join('')}</ol>`
       : '<div class="empty">今の時間帯のおすすめはありません。<br>「進み具合」に切りかえて、残りの家を回ってください。</div>'}
     <button class="btn block" data-close>もどる</button>`);
   $('#planNear').onclick = () => locate(openPlanSheet);
@@ -10458,7 +10458,7 @@ function awayCardHtml(c, kind) {
   const left = Math.max(0, Math.ceil((Date.parse(c.expiresAt) - Date.now()) / DAY));
   const endText = c.day ? '今日の終わりに自動で終わります' : `あと${left}日で自動的に終わります`; // その日限りのカード
   return `<article class="tcard tc2 away">
-    ${openHead(`data-awayopen="${c.id}"`, `留守宅カード ${esc(slotText(c.slot))}`,
+    ${openHead(`data-awayopen="${esc(c.id)}"`, `留守宅カード ${esc(slotText(c.slot))}`,
       `<span class="stamp away${t ? noCls(t.no) : ''}"><small>留守宅</small>${t ? esc(t.no) : '-'}</span>`,
       slotText(c.slot), (c.group ? `<span class="gbadge">${esc(useName(c))}</span> ` : '') + `区域${t ? esc(t.no) : '-'}　${t ? esc(t.name) : ''}` +
         (hh ? `<br>${esc(uname(hh.by))}さんの留守宅カードを、今日回ります` : ''))}
@@ -10468,10 +10468,10 @@ function awayCardHtml(c, kind) {
       ${poolLineHtml(c)}
       ${p.total && p.done === p.total ? `<p><b>すべて訪ねました。${kind === 'help' ? '' : '「終える」を押してください。'}</b></p>` : ''}
       ${kind === 'gown' && hs.length ? `<p class="muted"><b>今日回る人（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : ''}
-      ${kind === 'gown' && c.group ? `<div class="seg" role="group" aria-label="回り方（分ける・シェア）"><button type="button" data-cmode="share" data-cid="${c.id}" aria-pressed="${c.mode !== 'split'}">シェア</button><button type="button" data-cmode="split" data-cid="${c.id}" aria-pressed="${c.mode === 'split'}">分ける</button></div>
+      ${kind === 'gown' && c.group ? `<div class="seg" role="group" aria-label="回り方（分ける・シェア）"><button type="button" data-cmode="share" data-cid="${esc(c.id)}" aria-pressed="${c.mode !== 'split'}">シェア</button><button type="button" data-cmode="split" data-cid="${esc(c.id)}" aria-pressed="${c.mode === 'split'}">分ける</button></div>
         <p class="hint">${c.mode === 'split' ? '分ける：地図に線を引いて、人ごとに範囲を分けます。' : 'シェア：全員が同じ家の一覧を見ます。'}</p>
         ${c.mode === 'split' && partsOf(c).length ? `<p class="muted"><b>今日わたした範囲：</b>${partsOf(c).map(x => esc(partName(x))).join(' ／ ')}</p>` : ''}` : ''}</div>
-    ${kind === 'help' ? '' : `<div class="actions">${kind === 'gown' && D().settings.groupOn !== 0 ? `<button class="btn" data-chelpers="${c.id}">今日回る人をえらぶ</button>${c.mode === 'split' ? `<button class="btn primary" data-cparts="${c.id}">回る範囲を分ける</button>` : ''}` : ''}<button class="btn" data-awayend="${c.id}">返却する</button></div>`}
+    ${kind === 'help' ? '' : `<div class="actions">${kind === 'gown' && D().settings.groupOn !== 0 ? `<button class="btn" data-chelpers="${esc(c.id)}">今日回る人をえらぶ</button>${c.mode === 'split' ? `<button class="btn primary" data-cparts="${esc(c.id)}">回る範囲を分ける</button>` : ''}` : ''}<button class="btn" data-awayend="${esc(c.id)}">返却する</button></div>`}
   </article>`;
 }
 function renderMyAwayCards() {
@@ -10523,7 +10523,7 @@ function openAwayPick(grp) {
           ${ageLine(x.t)}
           <p class="muted">まだ会えていない家 ${x.keys.length}軒${x.longDays ? `　いちばん長い家は${x.longDays}日会えていない` : ''}${x.dist != null ? `　ここから約${fmtDist(x.dist)}` : ''}${x.t.holder ? '　あなたの区域' : ''}</p>
           ${x.ext ? '<p class="muted">区域は回り終えています（残りの留守宅）</p>' : ''}
-        </div><button class="btn small primary" data-awaytake2="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`).join('')
+        </div><button class="btn small primary" data-awaytake2="${esc(x.t.id)}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`).join('')
         : `<div class="empty">今、合う留守宅カードはありません。${G ? '<br>集まりの時間帯を変えると、ほかのカードが見つかることがあります。' : reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`}
       <p class="hint">${awayExpText()}回り終えたら「返却する」を押します。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>
       <button class="btn block" data-close>もどる</button>`);
@@ -10553,7 +10553,7 @@ function renderAwaySuggest() {
       <p class="rt"><span class="stamp xs${noCls(x.t.no)}">${esc(x.t.no)}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}${dayOnlyN(x.keys.length) ? ' <span class="daytag">今日だけ</span>' : ''}</p>
       <p class="muted">まだ会えていない家 ${x.keys.length}軒${x.dist != null ? `　ここから約${fmtDist(x.dist)}` : ''}${x.t.holder ? '　あなたの区域' : ''}</p>
       ${x.ext ? '<p class="muted">区域は回り終えています（残りの留守宅）</p>' : ''}
-    </div><button class="btn small primary" data-awaytake="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`).join('') +
+    </div><button class="btn small primary" data-awaytake="${esc(x.t.id)}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`).join('') +
     (full ? `<p class="hint">持てる枚数に達しています。受け取り中のカードを終えると、受け取れます。</p>` : '')
     : `<div class="empty">今、合う留守宅カードはありません。${reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`;
 }
@@ -10601,7 +10601,7 @@ function extAdminHtml(idx, rrow, stpd) {
       : xs.why === 'using' ? `受け取り中${xs.using && xs.using.by && xs.using.by !== 'x' ? `<span data-notr>（${esc(uname(xs.using.by))}さん）</span>` : ''}`
       : xs.why === 'over' ? `期間が終わった（${fmtDay(new Date(xs.end - 1).toISOString())}まで）` : '止めている';
     return `<tr><th>区域${esc(t.no)}</th><td>${items.length}軒</td><td>${tc == null ? '—' : tc + ' / ' + SLOTS.length}</td><td>${state}</td>
-      <td>${lendMode(t) === 'stop' ? '<span class="muted">貸出中止</span>' : `<button type="button" class="btn small" data-extstop="${t.id}">${t.extStop ? '出す' : '止める'}</button>`}</td></tr>`;
+      <td>${lendMode(t) === 'stop' ? '<span class="muted">貸出中止</span>' : `<button type="button" class="btn small" data-extstop="${esc(t.id)}">${t.extStop ? '出す' : '止める'}</button>`}</td></tr>`;
   }).join('');
   return head + `<p class="q" data-hqk="extList">返却後の区域</p>` + (rows
     ? `<div class="scroll"><table class="slots narrow"><tr><th>区域</th><th>残りの家</th><th>区域で試した時間帯</th><th>状態</th><th></th></tr>${rows}</table></div>`
@@ -10677,7 +10677,7 @@ function renderAwayAdmin() {
     return `<article class="ritem k-new"><div>
       <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(x.h, x.u)}</p>
       <p class="muted">留守 ${visitsOf(x.k).length}回　すべての時間帯で会えていません</p>
-    </div><button class="btn small" data-go="${x.h.id}" data-unit="${esc(x.u)}">地図で見る</button></article>`;
+    </div><button class="btn small" data-go="${esc(x.h.id)}" data-unit="${esc(x.u)}">地図で見る</button></article>`;
   }).join('') + (hard.length > 30 ? `<p class="muted">ほか ${hard.length - 30}件</p>` : '')
     : '<div class="empty">今はありません。</div>';
 }
@@ -10736,7 +10736,7 @@ function renderReco() {
         <p class="rt"><span class="stamp xs${noCls(i.t.no)}">${esc(i.t.no)}</span> ${name}</p>
         <p class="muted">${esc(i.reason)}</p>
         ${i.dist != null ? `<p class="muted">ここから約 ${fmtDist(i.dist)}</p>` : ''}
-      </div><button class="btn small primary" data-go="${i.h.id}" data-unit="${esc(i.unit)}">地図で見る</button></article>`;
+      </div><button class="btn small primary" data-go="${esc(i.h.id)}" data-unit="${esc(i.unit)}">地図で見る</button></article>`;
   }).join('') + (more > 0 ? `<p class="muted">ほか ${more}件。上の分類で絞りこめます。</p>` : '')
     : '<div class="empty">今の条件に合う家はありません。</div>';
 }
@@ -11216,7 +11216,7 @@ function addDummy() {
     ${LIVE ? '<div class="notice warn"><b>本番のデータに入ります。</b>地図や係の画面の集計にも入るので、確かめ終わったら「ダミーを消す」で消してください。</div>' : ''}
     <p class="q">検証する人をえらぶ（8人まで）</p>
     <label class="field"><span>名前でさがす</span><input type="text" id="dmQ" placeholder="名前の一部を入れる" autocomplete="off"></label>
-    <div id="dmList">${users.map(u => `<label class="check" data-name="${esc(u.name)}"><input type="checkbox" data-dm="${u.id}"${u.id === me().id ? ' checked' : ''}>${esc(u.name)}${u.role === 'admin' ? '（区域係）' : ''}</label>`).join('')}</div>
+    <div id="dmList">${users.map(u => `<label class="check" data-name="${esc(u.name)}"><input type="checkbox" data-dm="${esc(u.id)}"${u.id === me().id ? ' checked' : ''}>${esc(u.name)}${u.role === 'admin' ? '（区域係）' : ''}</label>`).join('')}</div>
     <p class="hint">えらんだ人ごとに、その人が担当する検証用の区域（Z1〜）を作ります。年代や★は区域の担当者にしか見えない仕組みなので、1人に1区域です。<br>
       ほかに、だれでも留守宅カードを受け取れる共通の区域（Z0）を作ります。Z0と各自の区域には、どの時間帯でも留守宅カードが出るように、時間帯をずらした留守の家を入れます。</p>
     <button class="btn primary block" id="dmGo">えらんだ人のダミーを入れる</button>
@@ -12355,7 +12355,7 @@ function renderAdmin() {
 
   // 区域一覧
   const userOpts = (sel, ph) => `<option value="">${ph ? `（紙の記録：${esc(ph.name || '名前なし')}）` : '（だれも持っていない）'}</option>` +
-    D().users.map(u => `<option value="${u.id}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
+    D().users.map(u => `<option value="${esc(u.id)}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
   const pcount = new Map();
   ts.forEach(t => { if (t.pno) pcount.set(t.pno, (pcount.get(t.pno) || 0) + 1); });
   let lastP = null;
@@ -12375,7 +12375,7 @@ function renderAdmin() {
       <div><b>${esc(t.name)}</b>${t.group ? ` <span class="gbadge">${esc(useName(t))}</span>` : ''}${isSpecial(t) ? `<span class="spbadge">特別区域：${esc(specialKindsText(t))}</span>${evTag(t)}` : ''} ${lendTag(t)}<div class="meta">
         <span>貸し出した日 ${lent ? fmtDay(lent) : '—'}</span><span>1回目を回った日 ${firstAt ? fmtDay(firstAt) : '—'}</span><span>正式に返却した日 ${retAt ? fmtDay(retAt) : (t.holder ? '貸出中' : ph ? '貸出中（紙の記録）' : pool ? '留守宅カードで回っています' : '—')}${lowWaitNote(t)}</span>
         ${ph ? `<span>紙の記録で持っている：${esc(ph.name || '名前なし')}（貸出 ${daysSince(ph.a)}日）　返却したら、S-13で完了した日付を入れてください</span>` : ''}
-        ${pool ? `<span>留守宅の訪ね直し ${pool.done} / ${pool.n}（${pool.pct}%・目安 ${awayRetPct()}%）</span><button class="btn small" data-poolfin="${t.id}">正式に返却したことにする</button>` : ''}
+        ${pool ? `<span>留守宅の訪ね直し ${pool.done} / ${pool.n}（${pool.pct}%・目安 ${awayRetPct()}%）</span><button class="btn small" data-poolfin="${esc(t.id)}">正式に返却したことにする</button>` : ''}
         ${t.holder ? `<span class="${over ? 'tag-warn' : ''}">返却の目安 ${fmtDay(due)}${over ? '（過ぎています）' : ''}</span>` : ''}
         <span>家・部屋 ${s.n}</span><span>90日以内に訪問 ${s.visited}</span>
         <span>前回回り終えた日 ${lastDoneTxt(t)}</span>
@@ -12385,17 +12385,17 @@ function renderAdmin() {
         ${helpersOf(t).length ? `<span>今日一緒に回る人：${helpersOf(t).map(h => esc(uname(h.uid)) + 'さん').join('、')}</span>` : ''}
       </div></div>
       <div class="actions">
-        <label>担当 <select data-holder="${t.id}">${userOpts(t.holder, ph)}</select></label>
-        <button class="btn small" data-open="${t.id}">地図</button>
-        <button class="btn small" data-redraw="${t.id}">線を直す</button>
-        <button class="btn small" data-rename="${t.id}">番号・名前</button>
-        ${AGE_ON ? `<button class="btn small" data-azaedit="${t.id}">字を直す</button>` : ''}
-        <button class="btn small danger" data-delterr="${t.id}">削除</button>
-        <label>貸し出し <select data-lend="${t.id}">
+        <label>担当 <select data-holder="${esc(t.id)}">${userOpts(t.holder, ph)}</select></label>
+        <button class="btn small" data-open="${esc(t.id)}">地図</button>
+        <button class="btn small" data-redraw="${esc(t.id)}">線を直す</button>
+        <button class="btn small" data-rename="${esc(t.id)}">番号・名前</button>
+        ${AGE_ON ? `<button class="btn small" data-azaedit="${esc(t.id)}">字を直す</button>` : ''}
+        <button class="btn small danger" data-delterr="${esc(t.id)}">削除</button>
+        <label>貸し出し <select data-lend="${esc(t.id)}">
           <option value="auto"${lendMode(t) === 'auto' ? ' selected' : ''}>きまりのとおり</option>
           <option value="open"${lendMode(t) === 'open' ? ' selected' : ''}>貸出可能にする</option>
           <option value="stop"${lendMode(t) === 'stop' ? ' selected' : ''}>貸出中止にする</option></select></label>
-        ${isSpecial(t) ? `<button class="btn small" data-spedit="${t.id}">条件を変える</button>` : ''}
+        ${isSpecial(t) ? `<button class="btn small" data-spedit="${esc(t.id)}">条件を変える</button>` : ''}
         ${useSelectHtml(t, 'data-grp')}
       </div></article>`;
   }
@@ -12405,7 +12405,7 @@ function renderAdmin() {
 function statRow(t, sub, warn) {
   return `<div class="tlrow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span><div><p><b>${esc(t.name || '')}</b></p>
     <p class="muted${warn ? ' tag-warn' : ''}">${sub}</p></div>
-    <div class="btns"><button type="button" class="btn small" data-tlmap="${t.id}">地図</button>${window.KM && KM.openKarte ? `<button type="button" class="btn small primary" data-tlkarte="${t.id}">カルテ</button>` : ''}</div></div>`;
+    <div class="btns"><button type="button" class="btn small" data-tlmap="${esc(t.id)}">地図</button>${window.KM && KM.openKarte ? `<button type="button" class="btn small primary" data-tlkarte="${esc(t.id)}">カルテ</button>` : ''}</div></div>`;
 }
 function openStatList(key) {
   if (!isAdmin()) return;
@@ -12589,13 +12589,13 @@ function renderFollowAdmin() {
     return `<article class="ritem ${i.rel ? 'k-handoff' : 'k-interest'}"><div>
       <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(i.h, i.unit)}</p>
       <p class="muted">${i.rel ? '<b>引き継ぎ待ち</b>　' : ''}★${YOUNG.has(i.m.age) ? '・若い世代' : ''}　最後の記録から ${i.idle}日${bs ? `　会えた時間帯：${bs}` : ''}</p>
-    </div><button class="btn small" data-go="${i.h.id}" data-unit="${esc(i.unit)}">地図で見る</button>
+    </div><button class="btn small" data-go="${esc(i.h.id)}" data-unit="${esc(i.unit)}">地図で見る</button>
     <div class="actions span"><label>受け持つ人 <select data-assign="${esc(i.k)}">${userOptions('', '選んでください')}</select></label></div></article>`;
   }).join('') + (left.length > 30 ? `<p class="muted">ほか ${left.length - 30}件</p>` : '')
     : '<div class="empty">取り残されている家はありません。</div>';
 
   $('#adBulk').innerHTML = `
-    <label>だれから <select id="bkFrom"><option value="">選んでください</option>${ids.map(id => `<option value="${id}">${esc(uname(id))}（${by[id].n}件）</option>`).join('')}</select></label>
+    <label>だれから <select id="bkFrom"><option value="">選んでください</option>${ids.map(id => `<option value="${esc(id)}">${esc(uname(id))}（${by[id].n}件）</option>`).join('')}</select></label>
     <label>だれへ <select id="bkTo">${userOptions('', '引き継ぎ待ちにする')}</select></label>
     <button class="btn" id="bkGo">まとめて移す</button>`;
 }
@@ -13326,7 +13326,7 @@ function fillHelloReco() {
   if (ch) {
     const k = Math.max(1, Math.round(ch.exp));
     box.innerHTML = `<div class="hreco"><div><b>区域${esc(ch.t.no)}の留守宅カード</b><small>${esc(slotShort(ch.slot))}・${ch.keys.length}軒のうち、約${k}軒で会えそう</small></div>
-      <button type="button" class="btn primary" data-hchance="${ch.t.id}" data-slot="${esc(ch.slot)}">受け取る</button></div>`;
+      <button type="button" class="btn primary" data-hchance="${esc(ch.t.id)}" data-slot="${esc(ch.slot)}">受け取る</button></div>`;
     return;
   }
   box.innerHTML = '<p class="muted">今の時間帯のおすすめは、ありません。区域カードから回りましょう。</p>';
@@ -13383,13 +13383,13 @@ const canEditSched = s => isAdmin() || (isOverseer() && s.group === myGroup());
 /* 予定の1行。直せる人には、左にスワイプすると「編集」「削除」が出る形にする */
 /* 予定の行：押すと「Googleカレンダーに入れる・直す・消す」の画面が出る（行の中にボタンを置かず、行全体を押せるように） */
 function schedRow(s, withDate) {
-  const body = `<article class="ritem k-new schedrow swipe-body" data-sopen="${s.id}" role="button" tabindex="0" aria-label="${esc(fmtYmd(s.date))} ${esc(s.time || '')} ${esc(s.place || '場所未定')}の予定。押すと操作が出ます"><div>
+  const body = `<article class="ritem k-new schedrow swipe-body" data-sopen="${esc(s.id)}" role="button" tabindex="0" aria-label="${esc(fmtYmd(s.date))} ${esc(s.time || '')} ${esc(s.place || '場所未定')}の予定。押すと操作が出ます"><div>
       ${withDate ? `<p class="rt">${fmtYmd(s.date)}</p><p>${schedLine(s)}</p>` : `<p class="rt">${schedLine(s)}</p>`}
       <p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
       <span class="chev" aria-hidden="true">›</span></article>`;
   if (!canEditSched(s)) return body.replace(' swipe-body', '');
-  return `<div class="swipe" data-sid="${s.id}"><div class="swipe-acts" aria-label="この予定の操作">
-      <button type="button" data-scact="edit" data-sid="${s.id}">編集</button><button type="button" class="del" data-scact="del" data-sid="${s.id}">削除</button></div>${body}</div>`;
+  return `<div class="swipe" data-sid="${esc(s.id)}"><div class="swipe-acts" aria-label="この予定の操作">
+      <button type="button" data-scact="edit" data-sid="${esc(s.id)}">編集</button><button type="button" class="del" data-scact="del" data-sid="${esc(s.id)}">削除</button></div>${body}</div>`;
 }
 const swipeHint = list => (list.some(canEditSched)
   ? '<p class="hint">予定を<b>押す</b>と、Googleカレンダーに入れたり、直したり消したりできます。</p>'
@@ -13486,7 +13486,7 @@ function openDay(date) {
       <h3 class="sub">自分の予定 <span class="muted" style="font-size:14px">（このスマホだけ）</span></h3>
       ${ev.length ? ev.map(e => `<article class="ritem k-young"><div><p class="rt">${e.time ? esc(e.time) + '　' : ''}${esc(e.title)}</p></div>
         <span class="actions" style="margin:0"><a class="btn small" href="${gcalUrl(e.title, e.date, e.time, '', '', '')}" target="_blank" rel="noopener">Googleカレンダーへ</a>
-        <button class="btn small danger" data-evdel="${e.id}">消す</button></span></article>`).join('') : '<p class="muted">予定はありません。</p>'}
+        <button class="btn small danger" data-evdel="${esc(e.id)}">消す</button></span></article>`).join('') : '<p class="muted">予定はありません。</p>'}
       ${apptDayHtml(date)}
       <div class="inline" style="margin-top:8px"><input type="time" id="evTime" aria-label="時刻" style="min-height:52px;border-radius:12px;border:2px solid var(--ink2);padding:0 8px;max-width:130px">
         <input type="text" id="evTitle" maxlength="40" placeholder="例：〇〇さんと奉仕" style="min-height:52px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:18px"></div>
@@ -13663,8 +13663,8 @@ function homeRecoHtml() {
       <p class="recowhy"><b>${esc(recoLabel('reco:' + x.rk))}</b>　${esc(x.why)}</p>
       ${x.d != null && x.rk !== 'near' ? `<p class="muted">ここから約${fmtDist(x.d)}</p>` : ''}
       ${x.tag ? `<span class="recotag">${esc(x.tag)}</span>` : ''}
-    </div><button type="button" class="btn small primary" data-rgo="${x.h.id}" data-unit="${esc(x.u)}" data-rk="${x.rk}">地図で見る</button>
-    ${cs ? `<div class="actions span"><button type="button" class="btn small" data-rcard="${x.t.id}" data-slot="${esc(cur)}">この区域の留守宅カードを受け取る（${cs.keys.length}軒）</button></div>` : ''}</article>`;
+    </div><button type="button" class="btn small primary" data-rgo="${esc(x.h.id)}" data-unit="${esc(x.u)}" data-rk="${x.rk}">地図で見る</button>
+    ${cs ? `<div class="actions span"><button type="button" class="btn small" data-rcard="${esc(x.t.id)}" data-slot="${esc(cur)}">この区域の留守宅カードを受け取る（${cs.keys.length}軒）</button></div>` : ''}</article>`;
   }).join('');
   return `<h2 class="sec">空いた時間に、おすすめ</h2>
     <p class="hint">カードを受け取らなくても回れる、会えていない家です（今は${slotShort(cur)}）。記録すると、その区域の地図にも反映されます。</p>
@@ -13773,7 +13773,7 @@ function todayTodoHtml(todays) {
     h += `<div class="todo asg"><div class="asgtop"><span class="asgdot">${ICO_OK}</span>
         <div><b>${a.label ? esc(a.label) : `区域${esc(a.t.no)}`}を、今日いっしょに回るように、たのまれました</b>
         <small>${esc(uname(a.by))}さんから${a.p ? `・回る範囲あり（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}</small></div></div>
-      <div class="row"><button type="button" class="btn primary" data-asgopen="${a.t.id}"${a.card ? ` data-asgcard="${a.card}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
+      <div class="row"><button type="button" class="btn primary" data-asgopen="${esc(a.t.id)}"${a.card ? ` data-asgcard="${a.card}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
         <button type="button" class="btn" data-asgok="${esc(a.keys.join(' '))}">わかりました</button></div></div>`;
   });
   const mine = D().territories.filter(t => t.holder === me().id).sort(byNo);
@@ -13782,7 +13782,7 @@ function todayTodoHtml(todays) {
     h += `<div class="todo terr"><span class="stamp sm${noCls(t.no)}${t.group ? ' grp' : ''}">${esc(t.no)}</span>
       <div class="tbody2"><small>${t.group ? `${esc(useName(t))}の区域カード` : 'あなたの区域カード'}</small><b>${esc(t.name)}</b>
         ${r ? `<small>訪ねた家 ${r.c.done} / ${total}</small>` : ''}</div>
-      <button type="button" class="btn primary" data-openterr="${t.id}">地図 ›</button>
+      <button type="button" class="btn primary" data-openterr="${esc(t.id)}">地図 ›</button>
       ${r ? `<div class="progress" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${r.pct}%"></i></div>` : ''}</div>`;
   });
   if (mine.length > 3) h += `<p class="muted todonone">ほかに区域カードが${mine.length - 3}枚あります。「区域カード」の画面で見られます。</p>`;
@@ -13792,7 +13792,7 @@ function todayTodoHtml(todays) {
     h += `<div class="todo${ch.hot ? ' hot' : ''}"><span class="tico">${ch.hot ? ICO_SUN : ICO_CAL}</span>
       <div class="tbody2"><span class="hotlab">${ch.hot ? '今がチャンス・留守宅カード' : '今の時間帯の留守宅カード'}</span>
         <b>区域${esc(ch.t.no)}　${esc(slotShort(ch.slot))}</b><span>${n}軒のうち、約${k}軒で会えそう</span></div>
-      <button type="button" class="btn" data-chance="${ch.t.id}" data-slot="${esc(ch.slot)}">受け取る</button></div>`;
+      <button type="button" class="btn" data-chance="${esc(ch.t.id)}" data-slot="${esc(ch.slot)}">受け取る</button></div>`;
   }
   return `<h2 class="sec">今日やること</h2>` + (h || '<p class="muted todonone">今日の予定や、たのまれた区域はありません。</p>');
 }
@@ -14182,7 +14182,7 @@ function openDevRegister(id, back) {
   const users = D().users.filter(u => !u.inactive).slice().sort((a, b) => a.name.localeCompare(b.name, 'ja'));
   const h = norm(d.hint);
   const guess = h ? users.filter(u => { const n = norm(u.name); return n && (n.includes(h) || h.includes(n)); }) : [];
-  const btn = u => `<button class="namebtn" data-druid="${u.id}" data-name="${esc(u.name)}">${esc(u.name)}${u.group ? `<small>${esc(u.group)}グループ</small>` : ''}</button>`;
+  const btn = u => `<button class="namebtn" data-druid="${esc(u.id)}" data-name="${esc(u.name)}">${esc(u.name)}${u.group ? `<small>${esc(u.group)}グループ</small>` : ''}</button>`;
   setSheet(headHtml(null, 'このスマホを使う人', `番号 ${esc(d.code || '')}・${esc(d.label)}`) + `
     <div class="notice info">本人のスマホに出ている番号が <b class="devcode">${esc(d.code || '')}</b> か確かめてください。</div>
     ${guess.length ? `<p class="q">名乗った名前「${esc(d.hint)}」に近い人</p>${guess.map(btn).join('')}` : ''}
@@ -14254,14 +14254,14 @@ function renderPeople() {
       <datalist id="groupList">${groups.map(g => `<option value="${esc(g)}">`).join('')}</datalist>` : ''}
     ${users.map(u => `<article class="trow"><span class="stamp sm" style="font-size:16px">${esc(u.group || '—')}</span>
       <div><b>${esc(u.name)}</b>${u.role === 'admin' ? '（区域係）' : ''}${u.overseer ? ' <span class="gbadge">監督</span>' : ''}${u.leader ? ' <span class="gbadge">司会者</span>' : ''}</div>
-      ${admin ? `<div class="actions"><label>グループ <input type="text" list="groupList" maxlength="30" data-ugroup="${u.id}" value="${esc(u.group || '')}" style="min-height:46px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;width:120px"></label>
-        <label class="check"><input type="checkbox" data-uover="${u.id}"${u.overseer ? ' checked' : ''}>監督</label>
-        <label class="check"><input type="checkbox" data-ulead="${u.id}"${u.leader ? ' checked' : ''}>司会者</label>
+      ${admin ? `<div class="actions"><label>グループ <input type="text" list="groupList" maxlength="30" data-ugroup="${esc(u.id)}" value="${esc(u.group || '')}" style="min-height:46px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;width:120px"></label>
+        <label class="check"><input type="checkbox" data-uover="${esc(u.id)}"${u.overseer ? ' checked' : ''}>監督</label>
+        <label class="check"><input type="checkbox" data-ulead="${esc(u.id)}"${u.leader ? ' checked' : ''}>司会者</label>
         <div class="seg small" role="group" aria-label="役割">
-          <button type="button" data-urole="pub" data-id="${u.id}" aria-pressed="${u.role !== 'admin'}">伝道者</button>
-          <button type="button" data-urole="admin" data-id="${u.id}" aria-pressed="${u.role === 'admin'}">区域係</button></div>
-        <button class="btn small" data-ulink="${u.id}">リンク・QR</button>
-        ${u.id === me().id ? '' : `<button class="btn small danger" data-uoff="${u.id}">使うのをやめる</button>`}</div>` : ''}</article>`).join('')}`;
+          <button type="button" data-urole="pub" data-id="${esc(u.id)}" aria-pressed="${u.role !== 'admin'}">伝道者</button>
+          <button type="button" data-urole="admin" data-id="${esc(u.id)}" aria-pressed="${u.role === 'admin'}">区域係</button></div>
+        <button class="btn small" data-ulink="${esc(u.id)}">リンク・QR</button>
+        ${u.id === me().id ? '' : `<button class="btn small danger" data-uoff="${esc(u.id)}">使うのをやめる</button>`}</div>` : ''}</article>`).join('')}`;
   if (admin) {
     $('#adUserAdd').onclick = openAddUser;
     $('#adJoinQr').onclick = openJoinQr;
@@ -14272,7 +14272,7 @@ function renderPeople() {
       const role = b.dataset.urole;
       if (u.role === role) return;
       if (!await ask(`${u.name}さんを「${role === 'admin' ? '区域係' : '伝道者'}」にします。よろしいですか？`)) return;
-      setUserGroup(u, normGroup($(`[data-ugroup="${u.id}"]`).value), $(`[data-uover="${u.id}"]`).checked, $(`[data-ulead="${u.id}"]`).checked, role);
+      setUserGroup(u, normGroup($(`[data-ugroup="${CSS.escape(String(u.id))}"]`).value), $(`[data-uover="${CSS.escape(String(u.id))}"]`).checked, $(`[data-ulead="${CSS.escape(String(u.id))}"]`).checked, role);
     });
     $$('[data-uoff]', box).forEach(b => b.onclick = async () => {
       const u = userById(b.dataset.uoff); if (!u) return;
@@ -14285,7 +14285,7 @@ function renderPeople() {
   // グループ（入力が終わったとき＝ほかを押した・Enter）・監督・司会者は、変えたらすぐ保存する
   const saveRow = id => {
     const u = userById(id); if (!u) return;
-    const g = normGroup($(`[data-ugroup="${id}"]`, box).value), ov = $(`[data-uover="${id}"]`, box).checked, ld = $(`[data-ulead="${id}"]`, box).checked;
+    const g = normGroup($(`[data-ugroup="${CSS.escape(String(id))}"]`, box).value), ov = $(`[data-uover="${CSS.escape(String(id))}"]`, box).checked, ld = $(`[data-ulead="${CSS.escape(String(id))}"]`, box).checked;
     if ((u.group || '') === g && !!u.overseer === ov && !!u.leader === ld) return; // 変わっていない
     setUserGroup(u, g, ov, ld);
   };
@@ -14308,7 +14308,7 @@ function handoffHtml() {
       return `<article class="ritem k-handoff"><div>
         <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(h, unit)}</p>
         ${m ? `<p class="muted">前回 会えた日：${fmtDate(m.at)}</p>` : ''}</div>
-        <button class="btn small" data-go="${hid}" data-unit="${esc(unit)}">地図で見る</button>
+        <button class="btn small" data-go="${esc(hid)}" data-unit="${esc(unit)}">地図で見る</button>
         <div class="actions span"><button class="btn small primary" data-fact="take" data-key="${esc(k)}">私が受け持つ</button></div></article>`;
     }).join('');
 }
@@ -14425,7 +14425,7 @@ function s13BlockHtml(r, print) {
       return x.cur ? '<small>貸出中</small>' : x.ret ? `<small>返却 ${s13Fmt(x.ret)}${x.lw ? '（記録が少なく途中扱い）' : ''}</small>` : '';
     };
     const prevCls = !print && r.prevPaper && ci === 0 ? ' s13-paper' : '';
-    return `<tbody class="s13blk"${print ? '' : ` data-s13t="${r.t.id}"`}>
+    return `<tbody class="s13blk"${print ? '' : ` data-s13t="${esc(r.t.id)}"`}>
       <tr><td rowspan="2" class="no">${esc(r.t.no)}</td><td rowspan="2" class="prev${prevCls}">${ci === 0 ? s13Fmt(r.prev) : (print ? '' : '<small>続き</small>')}</td>
         ${slots.map(x => `<td colspan="2"${cls(x)}>${x ? esc(x.name) : ''}</td>`).join('')}</tr>
       <tr>${slots.map(x => `<td${cls(x)}>${x ? s13Fmt(x.a) : ''}</td><td${cls(x)}>${cdate(x)}</td>`).join('')}</tr></tbody>`;
@@ -14488,7 +14488,7 @@ function openS13Edit(tid, editId) {
     <h3 class="sub">この年度の割り当て</h3>
     ${r.rows.length ? r.rows.map(x => `<div class="setrow"><span><b>${esc(x.name)}</b>　${s13Fmt(x.a)} 〜 ${x.c ? s13Fmt(x.c) + ' 完了' : x.cur ? '貸出中' : x.ret ? '返却 ' + s13Fmt(x.ret) : '（完了日なし）'}
         <br><small class="hint">${x.src === 'paper' ? '紙から転記' : 'アプリの記録'}</small></span>
-        ${x.src === 'paper' ? `<span class="actions" style="margin:0"><button class="btn small" data-s13ed="${x.id}">直す</button><button class="btn small danger" data-s13del="${x.id}">消す</button></span>` : ''}</div>`).join('')
+        ${x.src === 'paper' ? `<span class="actions" style="margin:0"><button class="btn small" data-s13ed="${esc(x.id)}">直す</button><button class="btn small danger" data-s13del="${esc(x.id)}">消す</button></span>` : ''}</div>`).join('')
       : '<p class="muted">この年度の記録はありません。</p>'}
     <h3 class="sub">${ed ? '紙の記録を直す' : '紙の記録を転記する'}</h3>
     <label class="field"><span>伝道者の名前</span><input type="text" id="s13Name" list="s13Names" maxlength="30" value="${esc(ed ? ed.name : '')}" placeholder="例：山田 花子"></label>
@@ -15110,7 +15110,7 @@ function updateTabs() {
   $('#tabs').classList.toggle('many', nTabs >= 6); // 6つのときは、大きい文字でも名前が切れないように少し小さく
 }
 function fillWho() {
-  $('#whoSel').innerHTML = D().users.map(u => `<option value="${u.id}"${u.id === D().currentUser ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
+  $('#whoSel').innerHTML = D().users.map(u => `<option value="${esc(u.id)}"${u.id === D().currentUser ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
 }
 /* 区域が区域カードとして受け取られた、自分の返却後の留守宅カードを終える（カードを持つ本人の端末で、1回だけ知らせる）。
    描きかえの途中で保存しないよう、あとで動かす。終わった日は、区域が受け取られた日（寝かせの計算にも使う） */

@@ -66,7 +66,9 @@ async function main() {
   });
 
   try {
-    const url = PAGE + (TOKEN ? (PAGE.includes('?') ? '&' : '?') + 't=' + encodeURIComponent(TOKEN) : '');
+    // 合いことばはページの URL に付けず、開く前に端末の保存場所（localStorage）に入れる（GitHub Pages の記録に残らないように・点検①S9）
+    if (TOKEN) await ctx.addInitScript(tk => { try { if (!localStorage.getItem('kuiki_token')) localStorage.setItem('kuiki_token', tk); } catch (e) { /* 何もしない */ } }, TOKEN);
+    const url = PAGE;
     log('区域マップを開いています');
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 });
 

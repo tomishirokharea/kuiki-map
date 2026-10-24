@@ -434,7 +434,7 @@
       if (!st.lay) {
         b += `<p>玄関・インターホン・ポストが2つあるときに使います。迷ったときは、1軒のままにしてください。</p>
           <p class="q">分かれ方をえらんでください</p>
-          <div class="choices dulay">${Object.keys(LAYS).map(id => `<button class="choice" data-lay="${id}">${LAYS[id].name}<small>${LAYS[id].sub}</small></button>`).join('')}</div>
+          <div class="choices dulay">${Object.keys(LAYS).map(id => `<button class="choice" data-lay="${esc(id)}">${LAYS[id].name}<small>${LAYS[id].sub}</small></button>`).join('')}</div>
           <p class="hint-must">世帯の名前は場所（2階・左など）だけです。表札の名前は使いません。</p>
           <button class="btn block" id="dcBack">もどる</button>`;
       } else {

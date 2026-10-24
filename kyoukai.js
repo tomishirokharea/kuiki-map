@@ -431,7 +431,7 @@
     const nav = `${S.ii > 0 ? btn('issue', '前へ', 'small', ` data-i="${S.ii - 1}"`) : ''}${S.ii < n - 1 ? btn('issue', '次へ', 'small', ` data-i="${S.ii + 1}"`) : ''}${S.undo.length ? btn('undo', '↶ 戻す', 'small') : ''}`;
     if (x.k === 'gap') {
       hint.textContent = `${S.ii + 1}/${n}：すき間（${m2(x.area)}）。どの区域に入れますか？`;
-      body.innerHTML = head + `<div class="senrow">${x.adj.map(id => btn('gapTo', `区域${esc(tno(id))}に入れる`, 'small primary', ` data-t="${id}"`)).join('')}</div>
+      body.innerHTML = head + `<div class="senrow">${x.adj.map(id => btn('gapTo', `区域${esc(tno(id))}に入れる`, 'small primary', ` data-t="${esc(id)}"`)).join('')}</div>
         <div class="senrow">${nav}${btn('cancel', 'もどる', 'small')}</div>`;
     } else {
       hint.textContent = `${S.ii + 1}/${n}：区域${tno(x.a)}と区域${tno(x.b)}が重なっています（${m2(x.area)}）。どちらの区域にしますか？`;

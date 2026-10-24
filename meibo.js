@@ -119,7 +119,7 @@
   async function readPdf(file) {
     await loadScript(LIB.pdf);
     window.pdfjsLib.GlobalWorkerOptions.workerSrc = LIB.pdfWorker;
-    const doc = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const doc = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise; // CVE-2024-4367 の回避策（点検①S4）
     const tables = [];
     try {
       for (let p = 1; p <= Math.min(doc.numPages, 10); p++) {

@@ -94,7 +94,7 @@
         線を引き直すだけなら、消さずに「区域の線を直す」を使ってください。</p>
       <input type="search" id="tkDelQ" value="${esc(del.q)}" placeholder="番号・名前でさがす" aria-label="区域をさがす" style="width:100%;min-height:50px;border-radius:12px;border:2px solid var(--ink2);padding:0 12px;font-size:17px;margin:4px 0 8px">
       <div class="row"><button type="button" class="btn small" id="tkDelAll">${shown.every(t => del.sel.has(t.id)) && shown.length ? '表示中をすべて外す' : '表示中をすべてえらぶ'}</button></div>
-      <div>${shown.map(t => `<label class="tk-del"><input type="checkbox" data-tkd="${t.id}"${del.sel.has(t.id) ? ' checked' : ''}>
+      <div>${shown.map(t => `<label class="tk-del"><input type="checkbox" data-tkd="${esc(t.id)}"${del.sel.has(t.id) ? ' checked' : ''}>
         <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span><span class="tx"><b>${esc(t.name || '')}</b><small>家 ${housesOf(t.id).length}件${t.holder ? `・貸出中（${esc(uname(t.holder))}さん）` : ''}</small></span></label>`).join('') || '<div class="empty">見つかりません</div>'}</div>
       ${lent.length ? `<div class="notice warn">貸し出し中の区域があります（${lent.map(t => esc(t.no)).join('・')}）。消すと、その貸し出しは終わります。</div>` : ''}
       <button type="button" class="btn danger block" id="tkDelGo"${del.sel.size ? '' : ' disabled'}>えらんだ ${del.sel.size}区域の線を消す</button>

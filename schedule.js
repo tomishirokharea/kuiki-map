@@ -266,7 +266,7 @@
         return `<article class="ritem k-new"><div>
           <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(x.h, x.u)}</p>
           <p class="muted">留守 ${visitsOf(x.k).length}回・試した時間帯 ${slotCount(tr(x))}つ（${slotList(tr(x)).map(slotShort).join('、')}）</p>
-        </div><button class="btn small" data-go="${x.h.id}" data-unit="${esc(x.u)}">地図で見る</button></article>`;
+        </div><button class="btn small" data-go="${esc(x.h.id)}" data-unit="${esc(x.u)}">地図で見る</button></article>`;
       }).join('') + (hard.length > 30 ? `<p class="muted">ほか ${hard.length - 30}件</p>` : '')
         : '<div class="empty">今はありません。</div>');
   }
@@ -315,7 +315,7 @@
       <p class="muted">前回回り終えた日 ${showDay(d.last)}・期限 ${d.deadline ? showDay(d.deadline) : '—'}（${leftTxt(d)}）</p>
       <p class="muted">${t.holder ? `貸出中：${esc(uname(t.holder))}さん（返却の目安 ${fmtDay(dueOf(t))}）` : paperLent(t) ? paperHoldTxt(t) : t.awayPoolAt ? '留守宅カードで回っています' : '空いています'}${meetTag(t)}</p>
       ${adjTag(t)}
-    </div><div class="duebtns"><button class="btn small" data-open="${t.id}">地図</button><button class="btn small" data-dueadj="${t.id}">調整</button><button class="btn small primary" data-karte="${t.id}">カルテ</button></div></div>`;
+    </div><div class="duebtns"><button class="btn small" data-open="${esc(t.id)}">地図</button><button class="btn small" data-dueadj="${esc(t.id)}">調整</button><button class="btn small primary" data-karte="${esc(t.id)}">カルテ</button></div></div>`;
   };
   const adjTag = t => {
     const a = [];
@@ -363,7 +363,7 @@
         ${paces.map(p => `<div class="duerow" style="border-left-color:${ST.warn[0]}"><div>
           <p><b>区域${esc(p.t.no)}</b> ${esc(p.t.name || '')}</p>
           <p class="muted">${esc(uname(p.t.holder))}さん・受け取ってから${daysSince(p.t.lentAt)}日・進み具合 約${p.prog}%${p.phase === 'away' ? '（留守宅を回る段階）' : ''}</p>
-          <p class="tag-warn">${p.msg}</p></div><button class="btn small" data-open="${p.t.id}">地図</button></div>`).join('')}` : ''}
+          <p class="tag-warn">${p.msg}</p></div><button class="btn small" data-open="${esc(p.t.id)}">地図</button></div>`).join('')}` : ''}
       <h3 class="sub">これから12か月の期限</h3>
       <p class="hint">その月に1年の期限をむかえる区域の数です。数が多い月の区域は、前の月に早めに出すと、翌年の山も平らになります。</p>
       <div class="scroll"><table class="slots narrow duetbl"><tr><th>月</th><th>区域</th><th style="width:55%"></th></tr>
@@ -378,7 +378,7 @@
         ${sizes.map(s => `<div class="duerow" style="border-left-color:${ST.soon[0]}"><div>
           <p><b>区域${esc(s.t.no)}</b> ${esc(s.t.name || '')}</p>
           <p class="muted">回り終えるまで平均${s.avg}日（${s.n}回の平均）・${s.homes}軒・部屋</p></div>
-          <button class="btn small" data-open="${s.t.id}">地図</button></div>`).join('')}` : ''}
+          <button class="btn small" data-open="${esc(s.t.id)}">地図</button></div>`).join('')}` : ''}
       <h3 class="sub">区域ごとの期限（急ぐ順）</h3>
       ${m.none.length ? `<p class="hint">「前回の記録なし」の区域は、S-13に紙の記録（前回完了した日付）を転記すると期限が出ます。
         <button type="button" class="btn small" data-dues13>S-13を開く</button></p>` : ''}
@@ -393,7 +393,7 @@
       <p>${chip(d.st)} <b>${esc(t.name || '')}</b></p>
       <p class="muted">前回回り終えた日 ${showDay(d.last)}・${leftTxt(d)}</p>
       <p class="muted">${t.holder ? `貸出中：${esc(uname(t.holder))}さん` : paperLent(t) ? paperHoldTxt(t) : t.awayPoolAt ? '留守宅カードで回っています' : '空いています'}</p></div>
-      <div class="btns"><button type="button" class="btn small" data-tlmap="${t.id}">地図</button><button type="button" class="btn small primary" data-tlkarte="${t.id}">カルテ</button></div></div>`;
+      <div class="btns"><button type="button" class="btn small" data-tlmap="${esc(t.id)}">地図</button><button type="button" class="btn small primary" data-tlkarte="${esc(t.id)}">カルテ</button></div></div>`;
   };
   function openDueList(key) {
     if (!isAdmin()) return;
@@ -409,12 +409,12 @@
       title = `今月出した区域 ${m.given}`; hint = `今月、貸し出した（受け取られた）区域です。目安は毎月 約${m.avg}区域です。`;
       body = m.givenList.sort((a, b) => (a.at < b.at ? 1 : -1)).map(g => `<div class="tlrow"><span class="stamp sm${noCls(g.t.no)}">${esc(g.t.no)}</span><div>
         <p><b>${esc(g.t.name || '')}</b></p><p class="muted">${showDay(dstr(g.at))}${g.by ? `・${esc(uname(g.by))}さん` : ''}${g.t.holder ? '' : '・返却ずみ'}</p></div>
-        <div class="btns"><button type="button" class="btn small" data-tlmap="${g.t.id}">地図</button><button type="button" class="btn small primary" data-tlkarte="${g.t.id}">カルテ</button></div></div>`).join('');
+        <div class="btns"><button type="button" class="btn small" data-tlmap="${esc(g.t.id)}">地図</button><button type="button" class="btn small primary" data-tlkarte="${esc(g.t.id)}">カルテ</button></div></div>`).join('');
     } else if (key === 'pace') {
       title = `声かけ候補（貸出中） ${paces.length}`; hint = '受け取ってからの日数のわりに、進み具合が遅い区域です。本人に自動で知らせることはしません。必要なときは、区域係から声をかけてください。';
       body = paces.map(p => `<div class="tlrow"><span class="stamp sm${noCls(p.t.no)}">${esc(p.t.no)}</span><div>
         <p><b>${esc(p.t.name || '')}</b></p><p class="muted">${esc(uname(p.t.holder))}さん・受け取ってから${daysSince(p.t.lentAt)}日・進み具合 約${p.prog}%</p><p class="tag-warn">${p.msg}</p></div>
-        <div class="btns"><button type="button" class="btn small" data-tlmap="${p.t.id}">地図</button><button type="button" class="btn small primary" data-tlkarte="${p.t.id}">カルテ</button></div></div>`).join('');
+        <div class="btns"><button type="button" class="btn small" data-tlmap="${esc(p.t.id)}">地図</button><button type="button" class="btn small primary" data-tlkarte="${esc(p.t.id)}">カルテ</button></div></div>`).join('');
     } else return;
     setSheet(headHtml(null, title, '期限の見張り') + `<p class="hint">${hint}</p>` + (body || '<div class="empty">ありません</div>') + '<button class="btn block" data-close>もどる</button>');
     const S = $('#sheet');
@@ -651,9 +651,9 @@ button.ktag{cursor:pointer}
     const infoHtml = x => { const { t, last, n, dist, yg } = x; return `${reqSort === 'reco' ? recoLine(x) : ''}
           <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${showDist(x) ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}`; };
     const btnsHtml = x => { const t = x.t; return `<div class="pickbtns">${canGet(x)
-          ? `<button class="btn small primary" data-take="${t.id}">受け取る</button>`
-          : `<button class="btn small" data-ask="${t.id}">係に頼む</button>`}
-          ${window.nozoku ? `<button class="btn small" data-peek="${t.id}" aria-label="区域${esc(t.no)}の場所を地図で見る">地図</button>` : ''}</div>`; };
+          ? `<button class="btn small primary" data-take="${esc(t.id)}">受け取る</button>`
+          : `<button class="btn small" data-ask="${esc(t.id)}">係に頼む</button>`}
+          ${window.nozoku ? `<button class="btn small" data-peek="${esc(t.id)}" aria-label="区域${esc(t.no)}の場所を地図で見る">地図</button>` : ''}</div>`; };
     const rowHtml = x => { const t = x.t; return SIMPLE ? kRow(x) : `<article class="pick">
         <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
         <div><b>${esc(t.name)}</b>${typeof evTag === 'function' ? evTag(t) : ''}
@@ -674,7 +674,7 @@ button.ktag{cursor:pointer}
       else if (rainHit && aptCardRank(t) < 2) out.push(`<span class="ktag">${aptCardRank(t) === 0 ? '集合住宅・エレベーターあり' : '集合住宅が多い'}</span>`);
       const ml = meetLabel(t); if (ml) out.push(`<span class="ktag">${esc(ml)}</span>`);
       const p = prof(t);
-      if (p && KTYPE[p.type]) out.push(`<button type="button" class="ktag" data-prof="${t.id}" data-back="req">${KTYPE[p.type]} ›</button>`);
+      if (p && KTYPE[p.type]) out.push(`<button type="button" class="ktag" data-prof="${esc(t.id)}" data-back="req">${KTYPE[p.type]} ›</button>`);
       const tags = out.slice(0, 2);
       if (x.sx && x.sx.pin) tags.unshift('<span class="ktag kurg">急ぎ</span>');
       return tags.length ? `<p class="ktags">${tags.join('')}</p>` : '';
@@ -836,7 +836,7 @@ button.ktag{cursor:pointer}
   function profLine(t, back) {
     const p = prof(t);
     if (!p) return typeof ageLine === 'function' ? ageLine(t) : '';
-    return `<p class="agelines"><button type="button" class="agetype at-${p.type}" data-prof="${t.id}" data-back="${back || ''}">${TYPES[p.type].name} ›</button>` +
+    return `<p class="agelines"><button type="button" class="agetype at-${p.type}" data-prof="${esc(t.id)}" data-back="${back || ''}">${TYPES[p.type].name} ›</button>` +
       `${esc(p.aza)}は${p.tl}が${Math.round(p.tv)}%${p.rank && p.rank.top ? `・市内${p.rank.n}地域で<b>${p.rank.i}番目</b>に多い` : ''}</p>` +
       (p.est ? `<p class="muted">この区域に${p.tl}がおよそ${p.est}人（推計）</p>` : '');
   }
@@ -1158,7 +1158,7 @@ button.ktag{cursor:pointer}
       if (!one) return '';
       const slot = cardSlotOf(c), on = focusSlots(one).includes(slot);
       return on ? `<br><span class="slfocus on">重点中</span>`
-        : `<br><button type="button" class="slfocus" data-focust="${one.id}" data-focuss="${slot}" aria-label="${esc(slotShort(slot))}の留守宅カードを出す">出す</button>`;
+        : `<br><button type="button" class="slfocus" data-focust="${esc(one.id)}" data-focuss="${slot}" aria-label="${esc(slotShort(slot))}の留守宅カードを出す">出す</button>`;
     };
     const cell = c => {
       const n = q.n[c], m = q.m[c];
@@ -1179,7 +1179,7 @@ button.ktag{cursor:pointer}
     const sel = s.sc === 'aza'
       ? `<select id="slSel" aria-label="字をえらぶ">${s.gs.map(g => `<option value="${esc(g.name)}"${g.name === s.g.name ? ' selected' : ''}>${esc(g.name)}（${g.terrs.length}区域）</option>`).join('')}</select>`
       : s.sc === 'terr'
-        ? `<select id="slSel" aria-label="区域をえらぶ">${s.all.map(t => `<option value="${t.id}"${s.t && t.id === s.t.id ? ' selected' : ''}>区域${esc(t.no)}　${esc(t.name || '')}</option>`).join('')}</select>` : '';
+        ? `<select id="slSel" aria-label="区域をえらぶ">${s.all.map(t => `<option value="${esc(t.id)}"${s.t && t.id === s.t.id ? ' selected' : ''}>区域${esc(t.no)}　${esc(t.name || '')}</option>`).join('')}</select>` : '';
     const tiny = s.sc === 'aza' && s.g.homes < SL_AZA_MIN;
     return `<h2 class="sec">曜日と時間帯ごとの「会えた」割合（拒否を含む）</h2>
       <p class="hint">「会えた」と「拒否」を会えた側、「留守」を会えなかった側として数えています。</p>
@@ -1248,7 +1248,7 @@ button.ktag{cursor:pointer}
     const a = ts.slice(0, max || 8).map(t => esc(t.no));
     return a.join('・') + (ts.length > (max || 8) ? `　ほか${ts.length - (max || 8)}区域` : '');
   };
-  const terrBtns = (ts, max) => ts.slice(0, max || 3).map(t => `<button type="button" class="btn small" data-topen="${t.id}">区域${esc(t.no)}の地図</button>`).join('');
+  const terrBtns = (ts, max) => ts.slice(0, max || 3).map(t => `<button type="button" class="btn small" data-topen="${esc(t.id)}">区域${esc(t.no)}の地図</button>`).join('');
 
   /* 今日の対応の項目。対応がないものは作らない */
   function todayItems() {
@@ -1263,15 +1263,15 @@ button.ktag{cursor:pointer}
     // 2 区域カードの申し込み（その場で貸し出せる）
     const free = freeTerrs().map(t => ({ t, last: lastBackOf(t) })).sort(byLongest);
     D().requests.filter(r => !r.type && r.status === 'pending').sort((a, b) => (a.at < b.at ? -1 : 1)).forEach(r => {
-      const selEl = document.querySelector(`[data-reqterr="${r.id}"]`);
+      const selEl = document.querySelector(`[data-reqterr="${CSS.escape(String(r.id))}"]`);
       const want = r.terrId ? terrById(r.terrId) : null;
       const pick = (selEl && terrById(selEl.value)) || (want && free.some(x => x.t.id === want.id) ? want : (free[0] ? free[0].t : null));
       const held = D().territories.filter(t => t.holder === r.by);
       const over = held.filter(t => t.lentAt && daysSince(t.lentAt) > 120).length;
       row('#1565C0', `${esc(uname(r.by))}さんが、区域カードを申し込んでいます${r.forGroup ? (r.use === 'all' ? '（全体の集まり用）' : `（${esc(r.forGroup)}グループ用）`) : ''}`,
         `希望：${want ? `区域${esc(want.no)}${want.holder ? '（すでに貸出中）' : ''}` : 'どこでもよい'}　今持っているカード ${held.length}枚${over ? `<span class="tag-warn">4か月超 ${over}枚</span>` : ''}`,
-        (pick ? `<button type="button" class="btn small primary" data-tok="${r.id}" data-tterr="${pick.id}">区域${esc(pick.no)}を貸し出す</button>` : '<span class="muted">空いている区域がありません</span>') +
-        `<button type="button" class="btn small" data-tno="${r.id}">見送る</button>`);
+        (pick ? `<button type="button" class="btn small primary" data-tok="${esc(r.id)}" data-tterr="${esc(pick.id)}">区域${esc(pick.no)}を貸し出す</button>` : '<span class="muted">空いている区域がありません</span>') +
+        `<button type="button" class="btn small" data-tno="${esc(r.id)}">見送る</button>`);
     });
     // 3 家の削除の申請（記録も消えるので、ここでは決めない）
     const dn = delReqs().length;
@@ -1279,7 +1279,7 @@ button.ktag{cursor:pointer}
     // 4 自分で受け取られた区域（その場で確認できる）
     D().territories.filter(t => t.holder && t.selfTakenAt && t.selfSeen === false).forEach(t => {
       row('#00796B', `${esc(uname(t.holder))}さんが、区域${esc(t.no)}を自分で受け取りました`, `${fmtDay(t.selfTakenAt)}に受け取り（今 ${heldCount(t.holder)}枚）`,
-        `<button type="button" class="btn small primary" data-ttaken="${t.id}">確認した</button><button type="button" class="btn small" data-topen="${t.id}">地図</button>`);
+        `<button type="button" class="btn small primary" data-ttaken="${esc(t.id)}">確認した</button><button type="button" class="btn small" data-topen="${esc(t.id)}">地図</button>`);
     });
     // 5 今月中に出したい区域
     if (m.need.length) row('#C2410C', `今月中に出したい区域　${m.need.length}区域`, `出さないと1年の期限に間に合いません：区域${listNos(m.need.map(d => d.t))}`, go('status', 'adDue') + karteBtns(m.need.map(d => d.t), 2));
@@ -1508,9 +1508,9 @@ button.ktag{cursor:pointer}
       ${profLine(t, 'karte:' + t.id) || '<p class="muted">年齢データがないため、出せません。</p>'}
       <p class="kq">S-13の履歴（新しい順）</p>
       ${hist.length ? `<ul class="khist">${hist.map(h => `<li>${showDay(h.a)} 〜 ${h.c ? showDay(h.c) : h.cur ? '貸出中' : h.ret ? '返却 ' + showDay(h.ret) : ''}　${esc(h.name)}さん</li>`).join('')}</ul>` : '<p class="muted">記録がありません。</p>'}
-      ${free ? `<p class="kq">貸し出す</p><div class="klend"><select id="kLendSel" aria-label="貸し出す人をえらぶ"><option value="">人をえらんでください</option>${users.map(u => `<option value="${u.id}">${esc(u.name)}（今 ${heldCount(u.id)}枚）</option>`).join('')}</select>
+      ${free ? `<p class="kq">貸し出す</p><div class="klend"><select id="kLendSel" aria-label="貸し出す人をえらぶ"><option value="">人をえらんでください</option>${users.map(u => `<option value="${esc(u.id)}">${esc(u.name)}（今 ${heldCount(u.id)}枚）</option>`).join('')}</select>
         <button type="button" class="btn primary" id="kLend">貸し出す</button></div>` : ''}
-      <div class="kact"><button type="button" class="btn" data-kmap="${t.id}">地図で見る</button><button type="button" class="btn" data-ks12="${t.id}">S-12を印刷</button><button type="button" class="btn" data-kadj="${t.id}">区域の調整</button></div>
+      <div class="kact"><button type="button" class="btn" data-kmap="${esc(t.id)}">地図で見る</button><button type="button" class="btn" data-ks12="${esc(t.id)}">S-12を印刷</button><button type="button" class="btn" data-kadj="${esc(t.id)}">区域の調整</button></div>
       ${karteOpsHtml(t)}
       <button class="btn block" data-close>閉じる</button>`;
   }
@@ -1551,7 +1551,7 @@ button.ktag{cursor:pointer}
       list.addEventListener('click', e => { const b = e.target.closest('[data-karte]'); if (b) openKarte(b.dataset.karte); });
     }
   }
-  const karteBtns = (ts, max) => ts.slice(0, max || 2).map(t => `<button type="button" class="btn small" data-tkarte="${t.id}">区域${esc(t.no)}のカルテ</button>`).join('');
+  const karteBtns = (ts, max) => ts.slice(0, max || 2).map(t => `<button type="button" class="btn small" data-tkarte="${esc(t.id)}">区域${esc(t.no)}のカルテ</button>`).join('');
 
   /* =========================================================
      第4弾（2）毎月の点検（「設定・データ」タブの上）／設定の変更履歴／整理とバックアップの状態
@@ -1650,8 +1650,8 @@ button.ktag{cursor:pointer}
     box.innerHTML = `<h2 class="sec" id="adOps">毎月の点検</h2>
       <div class="cover ${warn ? 'cv-warn' : 'cv-ok'}" role="status"><i aria-hidden="true">${warn ? '！' : '✓'}</i><div><b>${warn ? `要確認が${warn}件あります` : 'いまのところ、問題はありません'}</b><small>月が変わると、係のチェックは空に戻ります</small></div></div>
       ${items.map(i => `<div class="duerow opsrow" style="border-left-color:${MK[i.state][0]}"><div><p><b>${MK[i.state][1]}</b>　${esc(i.title)}</p><p class="muted">${i.detail}</p></div>
-        ${i.state === 'todo' ? `<div class="duebtns"><button type="button" class="btn small primary" data-opschk="${i.id}" data-on="1">確認した</button></div>`
-          : i.state === 'done' ? `<div class="duebtns"><button type="button" class="btn small" data-opschk="${i.id}" data-on="0">取り消す</button></div>` : '<div></div>'}</div>`).join('')}
+        ${i.state === 'todo' ? `<div class="duebtns"><button type="button" class="btn small primary" data-opschk="${esc(i.id)}" data-on="1">確認した</button></div>`
+          : i.state === 'done' ? `<div class="duebtns"><button type="button" class="btn small" data-opschk="${esc(i.id)}" data-on="0">取り消す</button></div>` : '<div></div>'}</div>`).join('')}
       <details class="dueset"><summary>設定の変更・書き出しの履歴（新しい順・${hist.length}件）</summary>
         ${hist.length ? `<ul class="opsh">${hist.map(h => /^書き出し：/.test(h.name)
           ? `<li>${esc(h.at)}　${esc(h.who)}さん：<b>${esc(h.name)}</b>${h.to ? `（${esc(h.to)}）` : ''}</li>`
@@ -1704,8 +1704,8 @@ button.ktag{cursor:pointer}
     const isApt = x.h.type === 'apt';
     return `<div class="duerow" style="border-left-color:#8A6D00"><div><p><b>${candName(x)}</b></p>
       <p class="muted">${prov ? 'まだ一度も訪ねていない仮の家です' : `留守 ${x.s.awayN}回（${slotCount(x.s.awaySlots)}つの時間帯）・${showDay(dstr(x.first))}〜${showDay(dstr(x.s.last.at))}`}${x.letter ? '<span class="tag-warn">手紙の候補にも入っています</span>' : ''}</p></div>
-      <div class="duebtns"><button type="button" class="btn small" data-cmap="${x.h.id}">地図で見る</button>
-        ${isApt ? '<span class="muted">部屋は地図で確かめてください</span>' : `<button type="button" class="btn small danger" data-cgone="${x.h.id}">空き家だった</button>`}
+      <div class="duebtns"><button type="button" class="btn small" data-cmap="${esc(x.h.id)}">地図で見る</button>
+        ${isApt ? '<span class="muted">部屋は地図で確かめてください</span>' : `<button type="button" class="btn small danger" data-cgone="${esc(x.h.id)}">空き家だった</button>`}
         <button type="button" class="btn small primary" data-clive="${esc(x.k)}">人が住んでいた</button>
         <button type="button" class="btn small" data-cwait="${esc(x.k)}">様子を見る</button></div></div>`;
   }
@@ -2297,7 +2297,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     const lm = lendMode(t);
     return `<p class="kq">区域の操作</p><div class="kops">
       ${t.holder ? `<div class="krow"><button type="button" class="btn primary" data-kret>返却する（回り終えたかを確かめる）</button></div>
-        <label>担当を変える <select data-khold aria-label="担当を変える"><option value="">えらんでください</option>${users.filter(u => u.id !== t.holder).map(u => `<option value="${u.id}">${esc(u.name)}（今 ${heldCount(u.id)}枚）</option>`).join('')}</select></label>
+        <label>担当を変える <select data-khold aria-label="担当を変える"><option value="">えらんでください</option>${users.filter(u => u.id !== t.holder).map(u => `<option value="${esc(u.id)}">${esc(u.name)}（今 ${heldCount(u.id)}枚）</option>`).join('')}</select></label>
         ${useSelectHtml(t, 'data-kgrp')}` : ''}
       ${pool ? `<div class="krow"><button type="button" class="btn" data-kpoolfin>正式に返却したことにする（留守宅の訪ね直し ${pool.pct}%）</button></div>` : ''}
       <label>貸し出しのきまり <select data-klend aria-label="貸し出しのきまり">
@@ -2522,7 +2522,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     } finally { decideBusy = false; }
   }
   window.approveReq = function (id, tid0) {
-    const sel = document.querySelector(`[data-reqterr="${id}"]`);
+    const sel = document.querySelector(`[data-reqterr="${CSS.escape(String(id))}"]`);
     const tid = tid0 || (sel ? sel.value : '');
     return decide(id, r => {
       const t = terrById(tid);
@@ -2611,13 +2611,13 @@ body.duemode .terr-label:not(.duelab){display:none}
     const pref = D().users.filter(u => !u.inactive && (s.group ? u.group === s.group && (u.overseer || u.leader) : canGroupUser(u)))
       .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
     const others = D().users.filter(u => !u.inactive && !pref.includes(u)).sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
-    const opt = u => `<option value="${u.id}">${esc(u.name)}${u.overseer ? '（監督）' : u.leader ? '（司会者）' : ''}</option>`;
+    const opt = u => `<option value="${esc(u.id)}">${esc(u.name)}${u.overseer ? '（監督）' : u.leader ? '（司会者）' : ''}</option>`;
     setSheet(headHtml(null, '集まりに合う区域', `${fmtYmd(s.date)} ${esc(s.time || '')}　${esc(s.place || '')}　${esc(schedGroupName(s.group))}`) + `
       <p class="hint">${mc ? `${esc(mc.label)}の集まりです。` : ''}空いている区域から、この時間帯に会えている区域・まだ試していない区域・期限の近い区域を、近い順に考えて3つまで出しています（記録と統計からの目安です）。${placePos(s) ? '' : s.group && window.GC && GC.has(s.group) ? (!admin ? '' : `場所の位置が分からないため、${esc(s.group)}グループの中心（区域係が地図に置いた点）からの近さを使っています。`) : '場所の位置が分からないため、近さは使っていません（地図の目印に同じ名前があると、近さも使います）。'}${!s.group && window.GC && GC.any() ? 'どのグループの中心からも遠い区域は、少し先に出しています。' : ''}</p>
       ${list.length ? list.map(x => `<div class="mfit"><p><b>区域${esc(x.t.no)}</b>　${esc(x.t.name || '')}</p>${x.why.map(w => `<p class="muted">${w}</p>`).join('')}
-        <div class="krow"><button type="button" class="btn small" data-mfmap="${x.t.id}">地図</button>${admin ? `<button type="button" class="btn small" data-mfkarte="${x.t.id}">カルテ</button>` : ''}</div>
-        ${admin ? `<div class="klend"><select data-mfuser="${x.t.id}" aria-label="貸し出す人"><option value="">貸し出す人をえらぶ</option>${pref.length ? `<optgroup label="${s.group ? `${esc(s.group)}グループの監督・司会者` : '監督・司会者'}">${pref.map(opt).join('')}</optgroup>` : ''}<optgroup label="ほかの人">${others.map(opt).join('')}</optgroup></select>
-          <button type="button" class="btn small primary" data-mflend="${x.t.id}">${s.group ? 'グループの区域として貸し出す' : '全体の集まりの区域として貸し出す'}</button></div>
+        <div class="krow"><button type="button" class="btn small" data-mfmap="${esc(x.t.id)}">地図</button>${admin ? `<button type="button" class="btn small" data-mfkarte="${esc(x.t.id)}">カルテ</button>` : ''}</div>
+        ${admin ? `<div class="klend"><select data-mfuser="${esc(x.t.id)}" aria-label="貸し出す人"><option value="">貸し出す人をえらぶ</option>${pref.length ? `<optgroup label="${s.group ? `${esc(s.group)}グループの監督・司会者` : '監督・司会者'}">${pref.map(opt).join('')}</optgroup>` : ''}<optgroup label="ほかの人">${others.map(opt).join('')}</optgroup></select>
+          <button type="button" class="btn small primary" data-mflend="${esc(x.t.id)}">${s.group ? 'グループの区域として貸し出す' : '全体の集まりの区域として貸し出す'}</button></div>
           ${s.group ? '' : '<p class="hint">監督・司会者でない人をえらんだときは、個人の区域として貸し出します。</p>'}` : ''}</div>`).join('')
         : '<div class="tdnone"><b>今、空いている区域がありません</b></div>'}
       ${admin ? '' : '<p class="hint">区域が必要なときは、「区域カード」画面の「区域をもらう」から申し込んでください。</p>'}
