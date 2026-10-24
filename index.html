@@ -2043,6 +2043,7 @@ const DATA_VER = 2; // データの種類が増えたら上げる（端末が一
 const CACHE_KEYS = ['c2_meta', 'c2_houses', 'c2_visits']; // 端末の保存：3つに分けて、変わった分だけ書く
 const BIG_SAVE_GAP_MS = 10 * 60000; // 家・記録（大きい部分）を端末に書く間隔の最短（閉じるときは、いつでも書く）
 const FAILED_KEY = 'kuiki_failed'; // 何度送っても受け付けられなかった変更（捨てずに取っておく）
+const ORPHAN_KEY = 'kuiki_orphan', ORPHAN_DAYS = 7; // 合いことばが使えなくなったときの、まだ送っていない変更（同じ人として登録し直したら送る・点検②H-10）
 const metaSigOf = j => JSON.stringify([j.users || null, j.settings || null, j.currentUser || null]);
 const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'schedules', 'users', 's13', 'agedata'];
 const MAP_COLS = ['dnc', 'follows', 'released', 'caution']; // caution＝注意（！）の印（chui.js）
@@ -2189,13 +2190,23 @@ function refill(cur, v) {
   return Object.assign(cur, v);
 }
 /* まだ送っていない変更を、手元のデータに重ねる */
+/* 家の部屋の「もとの一覧」：前に送った（または受け取った）家の部屋と、今の部屋がちがうときだけ、前の一覧を返す（点検②V4）。
+   サーバーは、足した部屋・消した部屋だけを今の一覧に当てはめるので、ほかの人がほぼ同時に足した部屋が消えない */
+function unitsBase(prevJ, h) {
+  if (!prevJ || !h) return null;
+  let prev = null;
+  try { prev = JSON.parse(prevJ); } catch (e) { return null; }
+  const a = Array.isArray(prev && prev.units) ? prev.units : [], b = Array.isArray(h.units) ? h.units : [];
+  return JSON.stringify(a) === JSON.stringify(b) ? null : a.slice();
+}
 function applyDiff(st, ch) {
   ARR_COLS.forEach(c => {
     if (!ch[c]) return;
     const m = new Map((st[c] || []).map(x => [x.id, x]));
     ch[c].up.forEach(x => {
-      const cur = m.get(x.id);
-      if (cur && c !== 'visits') refill(cur, clone(x)); else m.set(x.id, clone(x));
+      const cur = m.get(x.id), y = clone(x);
+      if (c === 'houses') delete y.ub; // 送るときだけに付ける「もとの一覧」は、手元のデータには入れない
+      if (cur && c !== 'visits') refill(cur, y); else m.set(x.id, y);
     });
     ch[c].del.forEach(id => m.delete(id));
     st[c] = [...m.values()];
@@ -2206,7 +2217,7 @@ function applyDiff(st, ch) {
     ch[c].up.forEach(x => { st[c][x.id] = clone(x.value); });
     ch[c].del.forEach(id => { delete st[c][id]; });
   });
-  if (ch.settings) st.settings = clone(ch.settings);
+  if (ch.settings) st.settings = Object.assign({}, st.settings || {}, clone(ch.settings)); // 変えた項目だけのこともあるので、重ねる
 }
 
 const Store = {
@@ -2270,8 +2281,12 @@ const Store = {
         if (c === 'visits') { // 訪問記録は追加と削除だけ
           if (!f.has(x.id)) { up.push(clone(x)); f.set(x.id, 1); }
         } else {
-          const j = JSON.stringify(x);
-          if (f.get(x.id) !== j) { up.push(JSON.parse(j)); f.set(x.id, j); }
+          const j = JSON.stringify(x), prevJ = f.get(x.id);
+          if (prevJ !== j) {
+            const y = JSON.parse(j);
+            if (c === 'houses') { const ub = unitsBase(prevJ, y); if (ub) y.ub = ub; } // 部屋を変えたときは、もとの一覧も送る（点検②V4）
+            up.push(y); f.set(x.id, j);
+          }
         }
       }
       for (const id of [...f.keys()]) if (!seen.has(id)) { del.push(id); f.delete(id); }
@@ -2287,7 +2302,18 @@ const Store = {
       if (up.length || del.length) out[c] = { up, del };
     });
     const sj = JSON.stringify(d.settings);
-    if (sj !== fp.settings) { out.settings = JSON.parse(sj); fp.settings = sj; }
+    if (sj !== fp.settings) {
+      // 変えた項目だけを送る。2人の係がほぼ同時に別の設定を変えても、前の人の変更を元にもどさない（点検②V7。サーバーは送られた項目だけを変える）
+      let prev = null;
+      try { prev = JSON.parse(fp.settings || 'null'); } catch (e) { prev = null; }
+      const cur = JSON.parse(sj);
+      if (prev && typeof prev === 'object') {
+        const diff = {};
+        Object.keys(cur).forEach(k => { if (JSON.stringify(cur[k]) !== JSON.stringify(prev[k])) diff[k] = cur[k]; });
+        out.settings = Object.keys(diff).length ? diff : cur;
+      } else out.settings = cur;
+      fp.settings = sj;
+    }
     return out;
   },
   save(skipVisits) {
@@ -2307,9 +2333,11 @@ const Store = {
   /* 家1件だけを、すぐ送信待ちに入れる */
   pushHouse(h, del) {
     if (!LIVE) { this.save(); return; }
+    const prevJ = this.fp.houses.get(h.id), y = del ? null : clone(h);
+    if (y) { const ub = unitsBase(prevJ, y); if (ub) y.ub = ub; } // 部屋を変えたときは、もとの一覧も送る（点検②V4）
     if (del) this.fp.houses.delete(h.id); else this.fp.houses.set(h.id, JSON.stringify(h));
     this.dirty.houses = true; if (del) this.dirty.visits = true;
-    this.queue.push({ houses: { up: del ? [] : [clone(h)], del: del ? [h.id] : [] } });
+    this.queue.push({ houses: { up: del ? [] : [y], del: del ? [h.id] : [] } });
     this.persistQueue();
     this.saveCacheSoon();
     flush();
@@ -2355,6 +2383,7 @@ const Store = {
     this.permSeen = new Set(ps.t.map(x => 't:' + x).concat(ps.f.map(x => 'f:' + x)));
     this.reapplyQueue();
     scrubVisits();
+    restoreOrphan();
   },
   /* 変わった分だけを受け取ったとき。
      送信待ちがないときは、変わった家・記録だけを直す（3万件を調べ直さない）。
@@ -2634,10 +2663,32 @@ function authLost() {
   clearTimeout(Store.cacheTimer);
   IDB.clearCache().catch(() => {});
   clearAllMemos();
+  // まだ送っていない記録は消さずに、別に取っておく（招待リンクを作り直したときなど）。同じ人として登録し直したら送り、7日たったら消す（点検②H-10）
+  let kept = 0;
+  try {
+    const uid = Store.data && Store.data.currentUser ? String(Store.data.currentUser) : ''; // currentUser は使う人の id
+    if (uid && Store.queue.length) { lsSet(ORPHAN_KEY, JSON.stringify({ uid, at: new Date().toISOString(), queue: Store.queue })); kept = Store.queue.length; }
+  } catch (e) { kept = 0; /* 取っておけなくても、消すのは続ける */ }
   [TOKEN_KEY, QUEUE_KEY, SYNC_KEY, PENDING_KEY, FAILED_KEY].forEach(lsDel);
   Store.queue = [];
   showBlocking('このスマホは使えなくなりました',
-    '区域係がこのスマホの登録を外したか、リンクが作り直されました。区域の情報は、このスマホから消しました。もう一度使うときは、区域係からもらったリンクを開いてください。');
+    '区域係がこのスマホの登録を外したか、リンクが作り直されました。区域の情報は、このスマホから消しました。もう一度使うときは、区域係からもらったリンクを開いてください。' +
+    (kept ? `まだ送っていない記録（${kept}件）は、7日のあいだ取っておきます。区域係からもらった新しいリンクを開くと、送ります。` : ''));
+}
+/* 取っておいた「まだ送っていない記録」を、同じ人として登録し直したときに送る（ちがう人・7日すぎは消す） */
+function restoreOrphan() {
+  let o = null;
+  try { o = JSON.parse(lsGet(ORPHAN_KEY) || 'null'); } catch (e) { o = null; }
+  if (!o) return;
+  const cu = Store.data && Store.data.currentUser ? String(Store.data.currentUser) : '';
+  if (!cu) return;
+  lsDel(ORPHAN_KEY);
+  if (!Array.isArray(o.queue) || !o.queue.length || o.uid !== cu || !(daysSince(o.at) <= ORPHAN_DAYS)) return;
+  Store.queue = o.queue.concat(Store.queue);
+  Store.persistQueue();
+  Store.reapplyQueue();
+  sendRetry = true; // サーバーは、すでに届いているものを二重にしない
+  setTimeout(() => { toast(`前に送れなかった記録を送ります（${o.queue.length}件）`); flush(true); }, 1500);
 }
 
 /* ---------- 共通リンク：名前をえらぶ → 係の承認を待つ ---------- */
@@ -3162,9 +3213,15 @@ function mergeChanges(list) {
   let settings;
   list.forEach(ch => {
     Object.keys(ch).forEach(c => {
-      if (c === 'settings') { settings = ch.settings; return; }
+      if (c === 'settings') { settings = Object.assign({}, settings || {}, ch.settings); return; } // 変えた項目だけのこともあるので、重ねる
       const o = acc[c] || (acc[c] = { up: new Map(), del: new Set() });
-      ch[c].up.forEach(x => { o.del.delete(x.id); o.up.set(x.id, x); });
+      ch[c].up.forEach(x => {
+        o.del.delete(x.id);
+        const prev = o.up.get(x.id);
+        // 家の部屋の「もとの一覧」は、まとめる前のいちばん古いもの（サーバーが知っている一覧）を使う（点検②V4）
+        if (c === 'houses' && prev && prev.ub) x = Object.assign({}, x, { ub: prev.ub });
+        o.up.set(x.id, x);
+      });
       ch[c].del.forEach(id => { o.up.delete(id); o.del.add(id); });
     });
   });
@@ -3241,8 +3298,9 @@ async function flush(force) {
     flushing = false; updateSyncBadge();
   }
   if (rejected) {
-    const NAME = { requests: '区域カードの申し込み', territories: '区域', houses: '家', visits: '訪問の記録', follows: '再訪問の受け持ち', awayCards: '留守宅カード', settings: '設定' };
-    const kinds = [...new Set(rejectedList.map(r => NAME[r.c] || r.c))];
+    const NAME = { requests: '区域カードの申し込み', territories: '区域', houses: '家', visits: '訪問の記録', follows: '再訪問の受け持ち', awayCards: '留守宅カード', settings: '設定',
+      returns: '返却の記録', dnc: '拒否の印', caution: '注意の印', released: '再訪問の引き継ぎ', schedules: '集まりの予定', s13: '区域割り当ての記録（S-13）', agedata: '年齢のデータ', users: '使う人' }; // 名前のない種類も英語のまま出さない（点検②V2）
+    const kinds = [...new Set(rejectedList.map(r => NAME[r.c] || 'ほかの変更'))];
     toast(fixed ? `${kinds.join('・')}は受け付けられませんでした。元の状態にもどしました`
       : `${kinds.join('・')}は受け付けられませんでした。最新の情報に更新します`);
     if (!fixed) Store.needFull = true;
@@ -14108,6 +14166,10 @@ function openAddUser() {
       const name = f.name.trim();
       if (!name) { toast('名前を入れてください'); return; }
       const body = { name, role: f.role, group: normGroup(f.group), overseer: f.overseer, leader: f.leader };
+      // 送信の番号：返事が届かずにもう一度押しても、同じ人を2人にしない（同じ内容なら同じ番号・点検②V11）
+      const sig = JSON.stringify(body);
+      if (f.ridFor !== sig) { f.rid = 'ua' + uid(); f.ridFor = sig; }
+      body.rid = f.rid;
       if (!LIVE) { // 試作版：この端末の中だけに追加
         const u = Object.assign({ id: 'u' + uid(), name, role: f.role }, body.group ? { group: body.group } : {},
           f.overseer ? { overseer: true } : {}, f.leader ? { leader: true } : {});
