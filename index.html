@@ -3249,7 +3249,7 @@ function mergeChanges(list) {
 }
 /* 送信に失敗したときは、2秒→4秒→8秒…（最大1分）と間をあけて送り直す。
    同じ変更が何度送っても受け付けられないときは、それを脇に置いて、ほかの記録の送受信を止めない */
-let flushFail = 0, flushNextAt = 0, headFail = 0;
+let flushFail = 0, flushNextAt = 0, headFail = 0, skewWarned = false;
 // 送り直しの印：前の送信の返事が届かなかったとき（と、アプリを開いて最初の送信）は、サーバーに「すでに届いているかもしれない」と伝える。
 // サーバーは、その記録がシートにすでにあるか確かめてから入れる（同じ記録が2行にならないように・監査D3）
 let sendRetry = true;
@@ -3281,13 +3281,14 @@ async function flush(force) {
       if (headFail < 2) { // 失敗が続くときは、1件ずつ送って原因の変更を見つける
         while (take < Store.queue.length && n + changeCount(Store.queue[take]) <= SEND_BATCH) n += changeCount(Store.queue[take++]);
       }
-      const body = { changes: take === 1 ? Store.queue[0] : mergeChanges(Store.queue.slice(0, take)), since: Store.seq };
+      const body = { changes: take === 1 ? Store.queue[0] : mergeChanges(Store.queue.slice(0, take)), since: Store.seq, ct: Date.now() }; // ct：端末の今の時刻（時計がずれていれば、サーバーが記録の日時を直す・点検②V19）
       if (sendRetry) body.re = 1;
       const keepalive = document.hidden && JSON.stringify(body).length < 50000; // 閉じる直前の送信
       sendRetry = true; // 返事が届くまでは「届いたかどうか分からない」
       const j = await api('sync', body, { keepalive });
       sendRetry = false;
       flushFail = 0; headFail = 0; flushNextAt = 0;
+      if (j.skew && !skewWarned) { skewWarned = true; setTimeout(() => toast('スマホの時刻がずれています。スマホの設定で、日付と時刻を「自動」にしてください'), 1500); }
       const rj = j.rejected || [];
       if (rj.length) {
         rejected += rj.length; rejectedList = rejectedList.concat(rj);

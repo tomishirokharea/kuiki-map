@@ -19,6 +19,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "「共有」を押します。": "Toque «Compartir».",
 "共有": "Compartir",
 "ホーム画面に追加": "Agregar a inicio",
+"スマホの時刻がずれています。スマホの設定で、日付と時刻を「自動」にしてください": "La hora del teléfono no es correcta. En los ajustes del teléfono, ponga la fecha y la hora en «Automático»",
 "「その他」を押して、「ホーム画面に追加」を押します。": "Toque «Más» y luego «Agregar a inicio».",
 "見つからないときは、出てきたメニューを上に動かします。": "Si no lo encuentra, deslice hacia arriba el menú que aparece.",
 "「その他」の中にあることもあります。": "También puede estar dentro de «Más».",
