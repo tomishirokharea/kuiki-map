@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.57"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.58"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="config.js"></script><!-- GASのURLと、会衆ごとの設定はこのファイルに書きます（無ければ試作モード） -->
-<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><script src="i18n-es-guruchu.js"></script><!-- スペイン語の辞書 / Diccionario español -->
+<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><script src="i18n-es-guruchu.js"></script><script src="i18n-es-meibo.js"></script><!-- スペイン語の辞書 / Diccionario español -->
 <script src="i18n.js"></script><!-- 言語の切りかえ / Cambio de idioma -->
 <script>
 /* iPhoneのホーム画面アプリで、下のタブの下に空白が出ることがある（iOSが画面の高さを、上の時刻の帯の分だけ短く伝えるため）。
@@ -14136,7 +14136,8 @@ function renderPeople() {
   const noGroup = admin ? D().users.filter(u => !u.inactive && !u.group).length : 0;
   box.innerHTML = `<h2 class="sec">${admin ? '人とグループ' : `${esc(myGroup())}グループの人`}</h2>
     ${admin ? `<div class="row"><button class="btn primary" id="adUserAdd">＋ 人を追加</button>
-      <button class="btn" id="adJoinQr">共通リンクのQRを見せる</button></div>
+      <button class="btn" id="adJoinQr">共通リンクのQRを見せる</button>
+      ${window.MEIBO ? '<button class="btn" id="adMeibo">名簿（PDF）から更新</button>' : ''}</div>
       <p class="hint">集まりのときは「共通リンクのQR」を見せると、みんながその場で申し込めます。申し込みは「申請・承認」で承認します。</p>` : ''}
     ${noGroup ? `<div class="notice warn"><b>グループが決まっていない人が ${noGroup}人 います。</b>この人たちには、グループの集まりの予定は届きません（「全体」の予定だけが届きます）。</div>` : ''}
     ${admin ? `<p class="hint">グループの名前（例：A、北）と、グループ監督・司会者かどうかを決めます。変えると、すぐに保存されます。<br>監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>
@@ -14154,6 +14155,7 @@ function renderPeople() {
   if (admin) {
     $('#adUserAdd').onclick = openAddUser;
     $('#adJoinQr').onclick = openJoinQr;
+    if ($('#adMeibo')) $('#adMeibo').onclick = () => window.MEIBO.open(); // グループ編成のときに、名簿のPDFからまとめて直す（meibo.js）
     $$('[data-ulink]', box).forEach(b => b.onclick = () => { const u = userById(b.dataset.ulink); if (u) openUserLink(u, false); });
     $$('[data-urole]', box).forEach(b => b.onclick = async () => {
       const u = userById(b.dataset.id); if (!u) return;
@@ -14164,7 +14166,9 @@ function renderPeople() {
     });
     $$('[data-uoff]', box).forEach(b => b.onclick = async () => {
       const u = userById(b.dataset.uoff); if (!u) return;
-      if (!await ask(`${u.name}さんが区域マップを使うのをやめます。\nこの人のスマホでは、次に開いたときに区域の情報が消えます。よろしいですか？`)) return;
+      if (!await ask('', { title: `${u.name}さんが区域マップを使うのをやめますか？`,
+        body: 'この人のスマホでは、次に開いたときに区域の情報が消えます。\n再訪問のメモ（次の約束・📌）も消え、あとで使えるようにしても元にもどりません（本人がバックアップを保存していれば、もどせます）。\n受け持ちの家のリストと、会えた記録は残ります。',
+        ok: '使うのをやめる', cancel: 'このまま使う', danger: true })) return;
       setUserGroup(u, u.group || '', !!u.overseer, !!u.leader, u.role, false);
     });
   }
@@ -15446,6 +15450,7 @@ init();
 <script src="torikomi.js"></script><!-- 区域係の「区域の線・取り込み」：線を引く・直す・消す、えらんだものだけを取り込む（2026-10-21） -->
 <script src="tokubetsu.js"></script><!-- 特別区域を決めた件数ずつのカードに分ける・ふつうの区域カードから外す切りかえ（2026-10-21） -->
 <script src="nozoku.js"></script><!-- 受け取る前に、地図で場所を見る（2026-10-21） -->
+<script src="meibo.js"></script><!-- 名簿（グループ表のPDF）から、人とグループをまとめて直す（区域係だけ・2026-10-24） -->
 <script src="guruchu.js"></script><!-- グループの中心：区域係が地図に置き、グループ奉仕の区域の近さに使う（2026-10-23） -->
 </body>
 </html>
