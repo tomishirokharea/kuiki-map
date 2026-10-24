@@ -402,8 +402,9 @@
     R('.maptools select', 'min-height:56px;font-size:20px'),
     R('.helpbtn', 'width:56px;height:56px'),
     R('#legendKeys', 'display:none'),
-    `.maptools>.kband{flex-basis:100%;box-shadow:none;pointer-events:none;margin:0}`,
-    `.kband span.kb{display:inline-block;background:#fff;border:2px solid var(--terr);border-radius:12px;padding:4px 12px;font-size:18px;font-weight:700;box-shadow:0 2px 6px #0003}`,
+    // 「あと○軒」は区域えらびの右に同じ高さで並べる（地図を広く見せる・改善案A1）。入らない幅のときは、折り返して今までどおり下の段に
+    `.maptools>.kband{flex:1 1 auto;min-width:0;display:flex;box-shadow:none;pointer-events:none;margin:0}`,
+    `.kband span.kb{display:flex;align-items:center;justify-content:center;gap:.25em;width:100%;min-height:56px;box-sizing:border-box;background:#fff;border:2px solid var(--terr);border-radius:12px;padding:4px 12px;font-size:18px;font-weight:700;box-shadow:0 2px 6px #0003;white-space:nowrap}`,
     `.kband span.kb b{font-size:22px;color:var(--terr)}`
   ].join('\n');
   document.head.appendChild(css4);
@@ -498,13 +499,31 @@
     if (lr) lr.onclick = () => { toggleLegend(false); openReturnSheet(r.t.id); };
   }
   let bandTm = 0;
+  /* 区域えらびの幅を、えらんでいる区域の文字に合わせる（いちばん長い選択肢の幅にならないように）。
+     文字を「とても大きく」にしても、「あと○軒」と1段に並びやすくする（改善案A1）。入らなければ、帯は下の段に折り返す */
+  let fitCv = null;
+  function fitJump(on) {
+    const sel = document.getElementById('terrJump'); if (!sel) return;
+    const o = on ? sel.options[sel.selectedIndex] : null;
+    if (!o) { sel.style.width = ''; return; }
+    try {
+      const cs = getComputedStyle(sel);
+      fitCv = fitCv || document.createElement('canvas');
+      const cx = fitCv.getContext('2d');
+      cx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const w = Math.ceil(cx.measureText(o.text).width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth) + 30); // 30：右の▼の分
+      sel.style.width = w + 'px'; // いちばん広くても CSS の max-width（44vw）まで
+    } catch (e) { sel.style.width = ''; }
+  }
   function paintBand() {
     const tools = document.getElementById('mapTools'); if (!tools) return;
     let el = document.getElementById('kBand');
     const r = simple() && currentView === 'map' && typeof roundTerr !== 'undefined' && roundTerr ? roundInfo(roundTerr) : null;
+    fitJump(!!r);
     if (!r) { if (el) el.hidden = true; return; }
     if (!el) { el = document.createElement('div'); el.id = 'kBand'; el.className = 'kband'; el.setAttribute('aria-live', 'polite'); tools.appendChild(el); }
-    el.innerHTML = `<span class="kb"><span>区域${esc(r.t.no)}</span>　<span>あと</span> <b>${r.c.todo}</b> <span>軒</span></span>`;
+    // 区域の番号は左の区域えらびに出ているので、ここは「あと○軒」だけ（改善案A1）。読み上げでは区域の番号も伝える
+    el.innerHTML = `<span class="kb" aria-label="区域${esc(r.t.no)}　あと${r.c.todo}軒"><span>あと</span> <b>${r.c.todo}</b> <span>軒</span></span>`;
     el.hidden = false;
   }
   const bandSoon = () => { clearTimeout(bandTm); bandTm = setTimeout(() => { try { paintBand(); } catch (e) { console.error(e); } }, 200); };
