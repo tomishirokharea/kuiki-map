@@ -130,7 +130,8 @@
       if (r === null && depth === 0 && n.length <= 300 && MISSING.size < 3000) MISSING.set(n, (MISSING.get(n) || 0) + 1);
     }
     if (CACHE.size > 30000) CACHE.clear();
-    CACHE.set(n, r);
+    // 深さの上限で訳せなかった（null）ものは覚えない。あとでその文だけが出たときに訳せるように（例：時間帯「土日の朝（〜11時）」）
+    if (depth === 0 || r !== null) CACHE.set(n, r);
     return r;
   }
 
