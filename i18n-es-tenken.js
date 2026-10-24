@@ -35,5 +35,11 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "集合住宅で部屋を押したり記録したりしたとき、「会えた・留守」のボタンがいつも見えるようにしました。部屋は階ごとに分け、前回の結果を「会・留・拒」の字でも出します": "En los edificios, al tocar o registrar una habitación, los botones «En casa / Ausente» ahora siempre quedan a la vista. Las habitaciones se agrupan por piso y el resultado anterior también se muestra con letras («会・留・拒»)",
 "かんたんな表示の区域カードに「地図をひらく」ボタンを付けました": "En la vista sencilla, las tarjetas de territorio ahora tienen el botón «Abrir mapa»",
 "iPhone（iOS 26）の「ホーム画面に追加」の手順を、新しい画面に合わせました": "Se actualizaron los pasos para «Agregar a inicio» en iPhone (iOS 26)",
-"安全と記録の正確さのための見直しをしました（電波が弱い所で返却したときに出ていた「受け付けられませんでした」のお知らせなど）": "Se hicieron ajustes de seguridad y de exactitud de los registros (por ejemplo, el aviso «No se aceptó» que aparecía al devolver con mala señal)"
+"安全と記録の正確さのための見直しをしました（電波が弱い所で返却したときに出ていた「受け付けられませんでした」のお知らせなど）": "Se hicieron ajustes de seguridad y de exactitud de los registros (por ejemplo, el aviso «No se aceptó» que aparecía al devolver con mala señal)",
+/* 2026.13.66：途中の返却・持てる枚数に届いているとき・地図の目印の取りこみ */
+"途中で返却する": "Devolver sin terminar",
+"区域を返すと、またもらえます。": "Cuando devuelva un territorio, podrá recibir otro.",
+"{0}件を取りこみました（サーバーが外したもの {1}件）": "Se importaron {0} (el servidor descartó {1})",
+"{0}件を取りこみました。同じ目印がもうあった{1}件は、足していません": "Se importaron {0}. {1} ya existían y no se agregaron",
+"{0}件を取りこみました。同じ目印がもうあった{1}件は、足していません（サーバーが外したもの {2}件）": "Se importaron {0}. {1} ya existían y no se agregaron (el servidor descartó {2})"
 });
