@@ -1741,14 +1741,19 @@ button.ktag{cursor:pointer}
     const total = tids.reduce((a, id) => a + c.by.get(id).filter(x => !ckOn(x.k) && !candSeen.has(x.k)).length, 0);
     const provN = [...c.prov.values()].reduce((a, l) => a + l.length, 0);
     const terrs = tids.map(id => TID.get(id)).filter(Boolean).sort(byNo);
+    // たたんだ一覧の中身は、開いたときに作る（家が多いと、開かない一覧だけで数万の部品になり、係の画面が数秒止まるため・点検③P3）
+    const lazy = [];
+    const lz = fn => { lazy.push(fn); return `<div data-lazy="${lazy.length - 1}"></div>`; };
     box.innerHTML = `<h2 class="sec" id="adCandH">何度訪ねても会えない家（${total}軒）</h2>
       <div class="notice warn"><b>この一覧は、区域係だけが見るものです。</b>住んでいないかもしれない家の情報なので、人に見せたり、写真に撮ったり、書き写したりしないでください。</div>
       <p class="hint">違う時間帯で${CAND.minAway}回以上留守で、一度も会えていない家です（夜か土日を含み、最初から最後まで${Math.round(CAND.minSpanDays / 30)}か月以上）。現地で様子を確かめて、「空き家だった」か「人が住んでいた」を選びます。</p>
       ${terrs.length ? terrs.map(t => {
         const list = c.by.get(t.id).filter(x => !ckOn(x.k) && !candSeen.has(x.k));
-        return `<details class="dueset"><summary>区域${esc(t.no)}　${esc(t.name || '')}（${list.length}軒）</summary>${list.map(x => candRow(x, false)).join('')}</details>`;
+        return `<details class="dueset"><summary>区域${esc(t.no)}　${esc(t.name || '')}（${list.length}軒）</summary>${lz(() => list.map(x => candRow(x, false)).join(''))}</details>`;
       }).join('') : '<div class="tdnone"><b>確かめる家はありません</b></div>'}
-      ${provN ? `<details class="dueset"><summary>地図から入れた仮の家で、まだ一度も訪ねていない家（${provN}軒）</summary>${[...c.prov.entries()].map(([id, l]) => TID.get(id) ? `<p class="q">区域${esc(TID.get(id).no)}</p>` + l.filter(x => !ckOn(x.k) && !candSeen.has(x.k)).slice(0, 30).map(x => candRow(x, true)).join('') : '').join('')}</details>` : ''}`;
+      ${provN ? `<details class="dueset"><summary>地図から入れた仮の家で、まだ一度も訪ねていない家（${provN}軒）</summary>${lz(() => [...c.prov.entries()].map(([id, l]) => TID.get(id) ? `<p class="q">区域${esc(TID.get(id).no)}</p>` + l.filter(x => !ckOn(x.k) && !candSeen.has(x.k)).slice(0, 30).map(x => candRow(x, true)).join('') : '').join(''))}</details>` : ''}`;
+    const fill = d => { const slot = d.open && d.querySelector(':scope > [data-lazy]'); if (slot && lazy[Number(slot.dataset.lazy)]) slot.outerHTML = lazy[Number(slot.dataset.lazy)](); };
+    box.querySelectorAll('details.dueset').forEach(d => { fill(d); d.addEventListener('toggle', () => fill(d)); });
   }
 
   /* =========================================================
