@@ -621,8 +621,11 @@ button.ktag{cursor:pointer}
 .krain{margin:6px 0 4px;font-size:17px;color:#1E3A8A}
 .krain small{margin-left:8px;font-size:14px;color:var(--ink2);white-space:nowrap}`;
   document.head.appendChild(cssK);
+  // 簡単モード：はじめは5件と「もっと見る」（10/09 の指示書3.4・改善案A2）。並べ方を変えたとき・地図で見てもどったときは、開いたまま
+  const REQ_FIRST = 5;
+  let reqMore = false;
   window.openRequestSheet = function (g) {
-    if (g !== undefined) { reqForGroup = !!g; reqUse = 'grp'; } // 開き直したときは、グループ奉仕から
+    if (g !== undefined) { reqForGroup = !!g; reqUse = 'grp'; reqMore = false; } // 開き直したときは、グループ奉仕から（簡単モードは、はじめの5件から）
     if (!canGroupTerr()) reqForGroup = false;
     const G = reqForGroup, canTake = canTakeFree(G), free = freeTerrs();
     // 持てる枚数に届いている（full）・係への申し込みの件数に届いている（!askOk）ときは、押しても断られるボタンを出さない（点検④U8）
@@ -688,7 +691,12 @@ button.ktag{cursor:pointer}
         ${btnsHtml(x)}
         <details class="kp-more"><summary>くわしく</summary>${infoHtml(x)}</details>
       </article>`;
-    const rowsCan = list.filter(canGet).map(rowHtml).join(''), rowsAsk = list.filter(x => !canGet(x)).map(rowHtml).join('');
+    // 簡単モードは、受け取れる区域から順に5件だけ作る（残りは「もっと見る」を押したときに作る。会いやすさなどの計算も、見せる分だけ）
+    const canL = list.filter(canGet), askL = list.filter(x => !canGet(x));
+    const cut = SIMPLE && !reqMore && canL.length + askL.length > REQ_FIRST;
+    const canV = cut ? canL.slice(0, REQ_FIRST) : canL, askV = cut ? askL.slice(0, Math.max(0, REQ_FIRST - canV.length)) : askL;
+    const restN = canL.length + askL.length - canV.length - askV.length;
+    const rowsCan = canV.map(rowHtml).join(''), rowsAsk = askV.map(rowHtml).join('');
     const both = !!rowsCan && !!rowsAsk;   // 両方あるときだけ、見出しで分ける
     const rows = (both ? '<p class="q">今すぐ受け取れる区域</p>' : '') + rowsCan + (both ? '<p class="q">係に頼む区域（係が決めて届けます）</p>' : '') + rowsAsk;
     // 簡単モードの上の1行：「あと○枚もらえます」（申し込み中があるときだけ、その件数も）
@@ -731,11 +739,13 @@ button.ktag{cursor:pointer}
       ${rainUi}
       ${reqSort === 'near' && !GRP ? '<div class="row"><button class="btn small" id="reqNear">現在地を更新する</button></div>' : ''}
       ${rows || '<div class="empty">今、空いている区域はありません。</div>'}
+      ${restN > 0 ? `<button type="button" class="btn block" id="reqMore">もっと見る（あと${restN}件）</button>` : ''}
       ${askOk ? '<button class="btn block primary" data-ask="">どこでもよいので係に頼む</button>' : ''}
       <button class="btn block${full ? ' primary' : ''}" data-close>もどる</button>`);
     const S = $('#sheet');
     sortTip(S);
     if ($('#reqNear')) $('#reqNear').onclick = () => locate(window.openRequestSheet);
+    if ($('#reqMore')) $('#reqMore').onclick = () => { reqMore = true; const y = S.scrollTop; window.openRequestSheet(); S.scrollTop = y; };
     $$('[data-rsort]', S).forEach(x => x.onclick = () => {
       reqSort = x.dataset.rsort;
       if (reqSort === 'near' && !myPos && !GRP) { locate(window.openRequestSheet); return; }
@@ -1039,7 +1049,7 @@ button.ktag{cursor:pointer}
           ${G ? '' : `<div class="row"><button class="btn small" id="apSlots">${reg ? '行ける時間を変える' : '行ける時間を登録する'}</button></div>`}
           ${full ? `<div class="notice warn">${G ? 'グループの' : ''}留守宅カードは${D().settings.awayMax}枚まで持てます。受け取り中のカードを終えると、受け取れます。</div>` : ''}
           ${list.length ? list.slice(0, shown).map(x => (SIMPLE ? kAway(x) : awayItem(x, cur, full, 'data-awaytake2'))).join('') +
-              (SIMPLE && !more && list.length > shown ? '<button type="button" class="btn block" id="apMore">もっと見る</button>' : '')
+              (SIMPLE && !more && list.length > shown ? `<button type="button" class="btn block" id="apMore">もっと見る（あと${Math.min(list.length, 20) - shown}件）</button>` : '')
             : `<div class="empty">今、合う留守宅カードはありません。${G ? '<br>集まりの時間帯を変えると、ほかのカードが見つかることがあります。' : reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`}
           ${SIMPLE ? '' : `<p class="hint">${awayExpText()}回り終えたら「返却する」を押します。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>`}
           <button class="btn block" data-close>もどる</button>`);
