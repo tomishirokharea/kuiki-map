@@ -255,7 +255,7 @@
     return `<article class="tcard tc2 away">
       ${openHead(`data-awayopen="${c.id}"`, `留守宅カード ${esc(slotText(c.slot))}`,
         `<span class="stamp away${t ? noCls(t.no) : ''}"><small>留守宅</small>${t ? esc(t.no) : '-'}</span>`,
-        slotText(c.slot), (c.group ? `<span class="gbadge">${esc(c.group)}グループ</span> ` : '') + `区域${t ? esc(t.no) : '-'}　${t ? esc(t.name) : ''}` +
+        slotText(c.slot), (c.group ? `<span class="gbadge">${esc(useName(c))}</span> ` : '') + `区域${t ? esc(t.no) : '-'}　${t ? esc(t.name) : ''}` +
           (hh ? `<br>${esc(uname(hh.by))}さんの留守宅カードを、今日回ります` : ''))}
       <div class="tbody"><p class="kleft">あと <b>${left}</b> 軒</p>
         <p class="muted">${c.day ? '今日の終わりに自動で終わります' : fmtDay(c.expiresAt) + 'まで'}</p></div>

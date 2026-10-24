@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.59"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.60"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -4793,7 +4793,7 @@ function openHelpers(tid, cid) {
   if (D().settings.groupOn === 0) { toast('今は「一緒に回る」は使えない設定です'); return; }
   const max = grp ? 40 : D().settings.groupMax, cur = curOf(), curIds = new Set(cur.map(h => h.uid));
   if (!c) { curIds.add(t.holder); const l = leadOf(t); if (l) curIds.add(l.uid); } // 担当者と今日の司会は、もう記録できるので出さない
-  const allU = !c && isAllUse(t); // 全体の集まりは、グループで分けずに名前順だけで出す
+  const allU = c ? isAllUse(c) : isAllUse(t); // 全体の集まり（区域・留守宅カード）は、グループで分けずに名前順だけで出す
   const gm = grp && !allU ? groupMembers(grp).filter(u => u.id !== me().id && !curIds.has(u.id)) : [];
   const room = max - cur.length;
   const cand = D().users.filter(u => !u.inactive && u.id !== me().id && !curIds.has(u.id)).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
@@ -8874,7 +8874,7 @@ function renderCards() {
   const tap = '<p class="hint taphint">区域の番号か名前を押すと、地図がひらきます。</p>';
   if (canGroupTerr()) {
     const gC = mine.filter(t => t.group).sort((a, b) => (isAllUse(a) ? 1 : 0) - (isAllUse(b) ? 1 : 0) || byNo(a, b)), pC = mine.filter(t => !t.group); // グループ奉仕 → 全体の集まり
-    const gA = activeCards().filter(c => c.by === me().id && c.group); // グループで回る留守宅カード
+    const gA = activeCards().filter(c => c.by === me().id && c.group).sort((a, b) => (isAllUse(a) ? 1 : 0) - (isAllUse(b) ? 1 : 0)); // グループで回る留守宅カード（グループ → 全体の集まり）
     const lC = ts.filter(t => t.holder !== me().id && isLead(t)); // 今日の司会（ほかの人のカード）
     $('#myCards').innerHTML = (mine.length || lC.length ? tap : '') +
       `<h2 class="sec gsec">集まりで使う区域</h2>
@@ -9855,9 +9855,9 @@ const isCardHelper = c => cardHelpers(c).some(h => h.uid === me().id);
 const myAwayCount = g => activeCards().filter(c => c.by === me().id && !!c.group === !!g).length; // 個人とグループは別々に数える
 let awayGroupSlot = null, awayGroupMode = 'share'; // グループの留守宅カードの回り方：'share'（シェア）／'split'（分ける）
 /* グループの次の集まり（2週間以内）の時間帯。なければ今の時間帯 */
-function nextGroupSlot() {
-  const now = Date.now(), g = myGroup();
-  const ts = D().schedules.filter(s => s.group === g && s.date)
+function nextGroupSlot(all) { // all：全体の集まりの予定（group が空）から決める
+  const now = Date.now(), g = all ? '' : myGroup();
+  const ts = D().schedules.filter(s => (s.group || '') === g && s.date)
     .map(s => Date.parse(`${s.date}T${s.time || '09:00'}:00`))
     .filter(t => isFinite(t) && t > now - 3 * 3600000 && t < now + 14 * DAY).sort((a, b) => a - b);
   return slotOf(new Date(ts.length ? ts[0] : now));
@@ -10050,7 +10050,8 @@ function takeAwayCard(tid, slot, grp) {
   if (xs) card.ext = 1;
   if (day) card.day = 1;
   if (G) { card.group = myGroup(); card.helpers = []; card.mode = awayGroupMode === 'split' ? 'split' : 'share'; card.view = 'new'; card.parts = []; }
-  commit(`${G ? 'グループの' : ''}留守宅カード（区域${t.no}・${slotShort(slot)}）を受け取りました`, () => { D().awayCards.push(card); });
+  if (G && reqUse === 'all') card.use = 'all'; // 全体の集まりで回る留守宅カード（2026-10-24）
+  commit(`${G ? (card.use === 'all' ? '全体の集まりの' : 'グループの') : ''}留守宅カード（区域${t.no}・${slotShort(slot)}）を受け取りました`, () => { D().awayCards.push(card); });
   if (G) openHelpers(null, card.id); // グループのカードは、続けて「今日回る人」をえらぶ
   else openAwayCard(card.id);
 }
@@ -10458,7 +10459,7 @@ function awayCardHtml(c, kind) {
   return `<article class="tcard tc2 away">
     ${openHead(`data-awayopen="${c.id}"`, `留守宅カード ${esc(slotText(c.slot))}`,
       `<span class="stamp away${t ? noCls(t.no) : ''}"><small>留守宅</small>${t ? esc(t.no) : '-'}</span>`,
-      slotText(c.slot), (c.group ? `<span class="gbadge">${esc(c.group)}グループ</span> ` : '') + `区域${t ? esc(t.no) : '-'}　${t ? esc(t.name) : ''}` +
+      slotText(c.slot), (c.group ? `<span class="gbadge">${esc(useName(c))}</span> ` : '') + `区域${t ? esc(t.no) : '-'}　${t ? esc(t.name) : ''}` +
         (hh ? `<br>${esc(uname(hh.by))}さんの留守宅カードを、今日回ります` : ''))}
     <div class="tbody">
       <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪ねた割合"><i style="width:${pct}%"></i></div>
@@ -15153,7 +15154,7 @@ function bindStatic() {
     else if ((x = q('[data-helpers]'))) openHelpers(x.dataset.helpers);
     else if ((x = q('[data-parts]'))) startPartSplit(x.dataset.parts); // 一覧を出さずに、すぐ地図で分ける
     else if (q('[data-awaypick]')) openAwayPick();
-    else if (q('[data-gawaypick]')) openAwayPick(true);
+    else if (q('[data-gawaypick]')) { reqUse = 'grp'; openAwayPick(true); } // グループ奉仕から（画面で全体の集まりに切りかえられる）
     else if ((x = q('[data-chelpers]'))) openHelpers(null, x.dataset.chelpers);
     else if ((x = q('[data-cmode]'))) setCardMode(x.dataset.cid, x.dataset.cmode);
     else if ((x = q('[data-cparts]'))) startCardSplit(x.dataset.cparts);

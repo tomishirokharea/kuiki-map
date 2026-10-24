@@ -719,7 +719,7 @@ button.ktag{cursor:pointer}
     setSheet(headHtml(null, G ? '集まりで使う区域をもらう' : (canGroupTerr() ? '個人の区域をもらう' : '区域カードをもう1枚'), headSub) + `
       ${G ? `<p class="q">使う集まり</p>
         <div class="seg" role="group" aria-label="使う集まり"><button type="button" data-ruse="grp" aria-pressed="${!ALL}">${esc(myGroup())}グループ奉仕</button><button type="button" data-ruse="all" aria-pressed="${ALL}">全体の集まり</button></div>
-        ${ALL ? '' : `<div class="seg" role="group" aria-label="もらうカード"><button type="button" aria-pressed="true">区域カード</button><button type="button" data-gaway aria-pressed="false">留守宅カード</button></div>`}
+        <div class="seg" role="group" aria-label="もらうカード"><button type="button" aria-pressed="true">区域カード</button><button type="button" data-gaway aria-pressed="false">留守宅カード</button></div>
         <p class="hint">${ALL ? '全体の集まり（金曜の晩・日曜の昼など、グループをこえた集まり）で使う区域です。' : 'グループの区域は、奉仕の集まりで使います。'}受け取ったら「今日回る人をえらぶ」で、回る人を決められます。グループ奉仕と全体の集まりは、合わせて${holdMax(true)}枚までです。</p>` : ''}
       <p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。</p>
       ${!canTake && list.some(x => isFree(x.t)) ? `<div class="notice warn">この区域は自分では受け取れません（${G ? '' : `自分で受け取れるのは${D().settings.selfTakeMax}枚まで・`}上限に届いています）。係に頼むことはできます。</div>` : ''}
@@ -991,7 +991,7 @@ button.ktag{cursor:pointer}
       const G = !!grp && canGroupTerr();
       awayG = G;
       const u = me(), reg = !!(u.slots && u.slots.length), cur = slotOf(new Date());
-      if (G && !awayGroupSlot) awayGroupSlot = nextGroupSlot();
+      if (G && !awayGroupSlot) awayGroupSlot = nextGroupSlot(reqUse === 'all');
       const key = 'kuiki_awaysort_' + u.id, ageOn = !!(AGE_ON && ageMap());
       const paint = () => {
         const slots = G ? [awayGroupSlot] : reg ? u.slots.slice().sort(bySlot) : [cur];
@@ -1013,10 +1013,13 @@ button.ktag{cursor:pointer}
         const full = myAwayCount(G) >= D().settings.awayMax;
         const sorts = [['easy', '会いやすい順'], ['near', '近い順'], ['long', '長く会えていない順'], ['many', '家が多い順']]
           .concat(ageOn ? [['young', '若い世代が多い順']] : []).concat(G ? [] : [['now', '今の時間帯']]);
-        setSheet(headHtml(null, G ? `${esc(myGroup())}グループで回る留守宅カード` : '留守宅カードをえらぶ',
+        const ALL = G && reqUse === 'all'; // 全体の集まりで回る留守宅カード（2026-10-24）
+        setSheet(headHtml(null, G ? (ALL ? '全体の集まりで回る留守宅カード' : `${esc(myGroup())}グループで回る留守宅カード`) : '留守宅カードをえらぶ',
             G ? `持てるのは${D().settings.awayMax}枚まで（今 ${myAwayCount(true)}枚）` : reg ? `行ける時間：${slots.map(slotShort).join('、')}` : `今の時間帯：${slotShort(cur)}`) + `
           ${offToday() ? OFF_NOTE : ''}
-          ${G ? `<div class="seg" role="group" aria-label="もらうカード"><button type="button" data-gterr aria-pressed="false">区域カード</button><button type="button" aria-pressed="true">留守宅カード</button></div>
+          ${G ? `<p class="q">使う集まり</p>
+            <div class="seg" role="group" aria-label="使う集まり"><button type="button" data-ause="grp" aria-pressed="${!ALL}">${esc(myGroup())}グループ奉仕</button><button type="button" data-ause="all" aria-pressed="${ALL}">全体の集まり</button></div>
+            <div class="seg" role="group" aria-label="もらうカード"><button type="button" data-gterr aria-pressed="false">区域カード</button><button type="button" aria-pressed="true">留守宅カード</button></div>
             <label class="field"><span>集まりの時間帯</span><select id="apGSlot">${SLOTS.map(x => `<option value="${x}"${x === awayGroupSlot ? ' selected' : ''}>${slotText(x)}</option>`).join('')}</select></label>` : ''}
           <div class="seg uiseg" role="group" aria-label="並び順">
             ${sorts.map(([v, l]) => `<button type="button" data-asort="${v}" aria-pressed="${sort === v}">${l}</button>`).join('')}
@@ -1031,7 +1034,12 @@ button.ktag{cursor:pointer}
         $$('[data-asort]', S).forEach(b => b.onclick = () => { lsSet(key, b.dataset.asort); paint(); });
         if ($('#apSlots')) $('#apSlots').onclick = openSlotSheet;
         if ($('#apGSlot')) $('#apGSlot').onchange = e => { awayGroupSlot = e.target.value; paint(); };
-        if ($('[data-gterr]', S)) $('[data-gterr]', S).onclick = () => window.openRequestSheet(true);
+        if ($('[data-gterr]', S)) $('[data-gterr]', S).onclick = () => { reqForGroup = true; window.openRequestSheet(); }; // 使う集まり（グループ／全体）はそのまま
+        $$('[data-ause]', S).forEach(b => b.onclick = () => {
+          const nu = b.dataset.ause === 'all' ? 'all' : 'grp';
+          if (nu === reqUse) return;
+          reqUse = nu; awayGroupSlot = nextGroupSlot(nu === 'all'); paint(); // 時間帯は、その集まりの次の予定から
+        });
         $$('[data-awaytake2]', S).forEach(b => b.onclick = () => { closeSheet(); takeAwayCard(b.dataset.awaytake2, b.dataset.slot, G); });
       };
       paint();
