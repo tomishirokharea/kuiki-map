@@ -74,7 +74,7 @@
   }
   const candCount = (tid) => { const t = terrById(tid); if (!t || !t.cands) return 0; const u = usedCids(); return t.cands.filter(c => !u.has(c.i)).length; };
   const dTxt = d => d < 20 ? 'すぐ近く' : d < 1000 ? `約${Math.round(d / 10) * 10}m` : `約${(d / 1000).toFixed(1)}km`;
-  const tags = c => `${c.f ? `<span class="aw-tag">${c.f}階建て</span>` : '<span class="aw-tag warn">階数 不明</span>'}${c.g === 0 ? '<span class="aw-tag">1階に部屋なし</span>' : ''}${c.k ? '<span class="aw-tag">オートロック</span>' : ''}${c.b === 'no' ? '<span class="aw-tag ban">立入禁止</span>' : c.b === 'letter' ? '<span class="aw-tag ban">手紙のみ</span>' : ''}${c.ac === 'ev' ? '<span class="aw-tag">エレベーター</span>' : c.ac === 'st' ? '<span class="aw-tag">縦階段</span>' : ''}${c.p ? '<span class="aw-tag warn">場所はだいたい</span>' : ''}${c.m ? `<span style="font-size:14px;margin-top:4px">メモ：${esc(c.m.length > 40 ? c.m.slice(0, 40) + '…' : c.m)}</span>` : ''}`;
+  const tags = c => `${c.r && c.r.length ? `<span class="aw-tag">部屋番号あり（${c.r.length}）</span>` : ''}${c.f ? `<span class="aw-tag">${c.f}階建て</span>` : '<span class="aw-tag warn">階数 不明</span>'}${c.g === 0 ? '<span class="aw-tag">1階に部屋なし</span>' : ''}${c.k ? '<span class="aw-tag">オートロック</span>' : ''}${c.b === 'no' ? '<span class="aw-tag ban">立入禁止</span>' : c.b === 'letter' ? '<span class="aw-tag ban">手紙のみ</span>' : ''}${c.ac === 'ev' ? '<span class="aw-tag">エレベーター</span>' : c.ac === 'st' ? '<span class="aw-tag">縦階段</span>' : ''}${c.p ? '<span class="aw-tag warn">場所はだいたい</span>' : ''}${c.m ? `<span style="font-size:14px;margin-top:4px">メモ：${esc(c.m.length > 40 ? c.m.slice(0, 40) + '…' : c.m)}</span>` : ''}`;
 
   /* ---------- 部屋の名前 ---------- */
   const FMTS = [['n3', '101', '階＋番号'], ['dash', '2-1', '階－番号'], ['alpha', '2A', '階＋英字'], ['free', '自由', '自分で入力']];
@@ -171,7 +171,9 @@
       const f = list.find(x => x.c.i === b.dataset.ci); if (!f) return;
       const c = f.c;
       s.cand = c; s.name = c.n || s.name; if (c.f) s.floors = Math.min(MAX_FLOORS, c.f);
-      s.g1 = c.g !== 0; s.lock = !!c.k; s.ban = c.b || ''; s.step = 'form'; paint(s);
+      s.g1 = c.g !== 0; s.lock = !!c.k; s.ban = c.b || ''; s.step = 'form';
+      if (c.r && c.r.length && !s.edit) { s.mode = 'room'; s.fmt = 'free'; s.extra = c.r.slice(0, 300); s.del = new Set(); } // 旧区域カードの部屋（apt-heya.js）
+      paint(s);
     });
     if ($('#awMore')) $('#awMore').onclick = () => { s.more = true; paint(s, true); };
     $('#awNew').onclick = () => { s.step = 'form'; paint(s); };
@@ -275,7 +277,7 @@
     };
     if ($('#awAddOk')) $('#awAddOk').onclick = addOk;
     if (ad) ad.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); addOk(); } };
-    if ($('#awBack')) $('#awBack').onclick = () => { s.step = 'pick'; s.cand = null; paint(s); };
+    if ($('#awBack')) $('#awBack').onclick = () => { if (s.cand && s.cand.r && !s.edit) { s.extra = []; s.mode = 'floor'; s.fmt = 'n3'; } s.step = 'pick'; s.cand = null; paint(s); };
     if ($('#awClose')) $('#awClose').onclick = () => { closeSheet(); if (s.hid) (s.edit ? openBuilding : (id) => openTarget(id, '', false))(s.hid); };
     $('#awSave').onclick = () => save(s);
   }

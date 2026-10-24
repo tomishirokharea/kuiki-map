@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.61"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.62"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -7510,7 +7510,8 @@ function openAddForm(ll, tid, editId) {
   const pickCand = c => {
     keep();
     f.cand = c; f.label = c.n || f.label; f.lock = !!c.k; f.ban = c.b || '';
-    if (f.n.nm === 'floor' && c.f) f.n.rooms = Array.from({ length: Math.min(40, c.f) }, (_, i) => i === 0 && c.g === 0 ? 0 : (f.n.rooms[i] != null && f.n.rooms[i] > 0 ? f.n.rooms[i] : (f.n.rooms[f.n.rooms.length - 1] || 2)));
+    if (c.r && c.r.length) { f.n.nm = 'free'; f.n.manual = c.r.join(' '); } // 旧区域カードの部屋（apt-heya.js）
+    else if (f.n.nm === 'floor' && c.f) f.n.rooms = Array.from({ length: Math.min(40, c.f) }, (_, i) => i === 0 && c.g === 0 ? 0 : (f.n.rooms[i] != null && f.n.rooms[i] > 0 ? f.n.rooms[i] : (f.n.rooms[f.n.rooms.length - 1] || 2)));
     paint();
   };
   const bindCands = () => {
@@ -15616,6 +15617,7 @@ init();
 <script src="chizu.js"></script>
 <script src="apt-import.js"></script>
 <script src="apt-wizard.js"></script>
+<script src="apt-heya.js"></script>
 <script src="naoshi.js"></script><!-- まちがえた記録の直し方・二世帯住宅 -->
 <script src="kyohi.js"></script><!-- 係の画面の「拒否」：一覧・エクセル／マイマップの取り込み・地図でえらぶ -->
 <script src="chui.js"></script><script src="kml-koushin.js"></script><!-- 注意（！）の印：地図の！・記録の画面の注意・家の編集の「この家の印」・係の一覧 -->

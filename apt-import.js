@@ -426,7 +426,7 @@
     if (p.kind === 1) {
       if (h.type !== 'house' || (h.units && h.units.length)) return false;
       h.type = 'apt'; h.label = String(c.n || '').slice(0, 40);
-      h.units = unitsOf({ floors: c.f || 0, floor1: c.g === 0 ? '0' : '1' });
+      h.units = c.r && c.r.length ? c.r.slice(0, 300) : unitsOf({ floors: c.f || 0, floor1: c.g === 0 ? '0' : '1' }); // 旧区域カードの部屋（apt-heya.js）
       delete h.prov; delete h.kind; delete h.uk; delete h.ul;
       if (c.k) h.lock = true; else delete h.lock;
       if (c.b) h.ban = c.b; else delete h.ban;
@@ -435,7 +435,7 @@
     } else {
       if (h.type !== 'apt') return false;
       if (!h.label) h.label = String(c.n || '').slice(0, 40);
-      if (!h.units.length) h.units = unitsOf({ floors: c.f || 0, floor1: c.g === 0 ? '0' : '1' });
+      if (!h.units.length) h.units = c.r && c.r.length ? c.r.slice(0, 300) : unitsOf({ floors: c.f || 0, floor1: c.g === 0 ? '0' : '1' });
       if (c.k) h.lock = true;
       if (c.b && !h.ban) h.ban = c.b;
       if (c.m && !h.bn) h.bn = c.m;
@@ -564,17 +564,17 @@
         if (v) it.c.m = v; else delete it.c.m;
       });
       // 前の候補を置きかえる：このファイルにない候補は、使ったもの（家につながっているもの）だけ残す
-      const oldA = new Map(), usedIds = new Set(), newIds = new Set(plan.items.map(x => x.c.i));
+      const oldA = new Map(), oldR = new Map(), usedIds = new Set(), newIds = new Set(plan.items.map(x => x.c.i));
       D().houses.forEach(h => { if (h.cid) usedIds.add(h.cid); });
       D().territories.forEach(t => {
         if (!t.cands) return;
-        t.cands.forEach(c => { if (c.a) oldA.set(c.i, c.a); });
+        t.cands.forEach(c => { if (c.a) oldA.set(c.i, c.a); if (c.r) oldR.set(c.i, c.r); });
         const keep = t.cands.filter(c => !newIds.has(c.i) && usedIds.has(c.i));
         if (keep.length) t.cands = keep; else delete t.cands;
       });
       plan.by.forEach((list, tid) => {
         const t = terrById(tid); if (!t) return;
-        list.forEach(c => { if (oldA.has(c.i) && usedIds.has(c.i)) c.a = oldA.get(c.i); });
+        list.forEach(c => { if (oldA.has(c.i) && usedIds.has(c.i)) c.a = oldA.get(c.i); if (oldR.has(c.i) && !c.r) c.r = oldR.get(c.i); }); // 旧区域カードの部屋は残す
         t.cands = (t.cands || []).concat(list).sort((a, b) => String(a.n).localeCompare(String(b.n), 'ja')).slice(0, 600);
       });
       let nAuto = 0;
@@ -621,6 +621,9 @@
       ${nAutoP ? `<button class="btn block" id="aiAutoList">自動で入れた建物を確かめる（${nAutoP}棟）</button>` : ''}
       <label class="btn primary block">CSV（またはKML・KMZ）を選んで登録する<input type="file" id="aiCandFile" accept=".kml,.kmz,.csv,text/csv,text/plain,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden></label>
       <p class="hint">場所は、マイマップで直したKML／KMZのピンの場所を使います（CSVのときは住所から調べます）。住所はアプリに保存しません。</p>
+      <h3 class="sub">④ 旧区域カードの部屋を入れる</h3>
+      <p class="hint">紙の区域カードから読み取った一覧（エクセル）を選ぶと、<b>建物名</b>でアパート（または候補）を探して、<b>階ごとの部屋番号</b>を入れます。確認の欄に「○」を付けた行だけ入れます。入れる前に、内容を確かめる画面が出ます。</p>
+      <label class="btn block">読み取り一覧（エクセル）を選ぶ<input type="file" id="ahFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden></label>
       <details class="more"><summary>くわしい方法（全部の記録のリセット・家に直接取り込む）</summary>
         <h3 class="sub">全部の記録をリセット</h3>
         <p class="hint">訪問の記録 ${c.visits}件・拒否 ${c.dnc}件・再訪問 ${c.follows}件・留守宅カード ${c.cards}件も、すべて消します。</p>
@@ -935,5 +938,5 @@
     if (!isAdmin()) { toast('区域係だけが使えます'); return; }
     openMain();
   });
-  window.AptImport = { parseCsv, buildings, unitsOf, makePlan, dropRefs, sensWords, applyAuto, parseMyMap, resetData, counts, makeCandPlan, autoPicks, autoPending, resetApts, aptCounts };
+  window.AptImport = { openMain, parseCsv, buildings, unitsOf, makePlan, dropRefs, sensWords, applyAuto, parseMyMap, resetData, counts, makeCandPlan, autoPicks, autoPending, resetApts, aptCounts };
 })();
