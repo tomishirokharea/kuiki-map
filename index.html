@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.60"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.61"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -14592,6 +14592,8 @@ function openS13Edit(tid, editId) {
    ・表：区域の線・家・拒否の家と、まわりの建物（国土地理院の淡色地図）。留守などの記録は出さない
    ・裏：集合住宅の部屋（拒否の部屋は黒）。両面印刷で表と裏が重なる並びにする
    ・地図の画像は、すべて受け取ってから印刷する（印刷で地図が欠けないように）
+   ・地図の隅に、区域までの道順を開くGoogleマップのQRを入れる（家・区域の線にかからない隅を自動で選ぶ。
+     中身は区域の中の1点の緯度・経度だけで、家や人の情報は入れない。QRは端末の中で作るので、通信はいらない）
    ========================================================= */
 const S12_TILE = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png';
 const S12_SIZE = {
@@ -14664,7 +14666,66 @@ function s12Prep(t, S, byT) {
   const v = pts.length ? s12View(pts, S.mapW, S.mapH, S.kMin) : null;
   const apts = hs.filter(h => h.type === 'apt').sort((a, b) => b.lat - a.lat || a.lng - b.lng); // 北から順に番号
   const latC = pts.length ? pts.reduce((s, p) => s + p[0], 0) / pts.length : 26;
-  return { t, hs, poly, v, apts, latC, spOut, tiles: v ? s12Tiles(v) : [] };
+  return { t, hs, poly, v, apts, latC, spOut, tiles: v ? s12Tiles(v) : [], nav: s12NavUrl(t, poly, hs), qrMm: S.mapW > 150 ? 17 : 14 };
+}
+/* QRで開く道順：区域の線があれば、区域の中で線からいちばん遠い点（区域の札と同じ点。L字の区域でも外に出ない）。
+   線のないふつうの区域は、家の平均にいちばん近い家。家が散らばる特別区域（線なし）は、1つの行き先に決められないので出さない */
+function s12NavUrl(t, poly, hs) {
+  let p = null;
+  if (poly) p = labelPoint(poly);
+  else if (!isSpecial(t) && hs.length) {
+    const la = hs.reduce((s, h) => s + h.lat, 0) / hs.length, ln = hs.reduce((s, h) => s + h.lng, 0) / hs.length;
+    const h = hs.reduce((b, x) => (Math.hypot(x.lat - la, x.lng - ln) < Math.hypot(b.lat - la, b.lng - ln) ? x : b));
+    p = [h.lat, h.lng];
+  }
+  if (!p || !isFinite(p[0]) || !isFinite(p[1])) return '';
+  return `https://www.google.com/maps/dir/?api=1&destination=${p[0].toFixed(6)},${p[1].toFixed(6)}`;
+}
+/* 道順のQR（地図の隅）。四隅のうち、家の印・区域の中・方位や縮尺にかからない隅を選ぶ */
+function s12QrSvg(c, P, mm, f) {
+  if (!c.nav) return '';
+  let g;
+  try { g = QR.matrix(c.nav); } catch (e) { return ''; }
+  const n = g.length, qz = 2;                 // 白い余白は2マス分（白い札の上に置くので、これで読める）
+  const side = c.qrMm, cap = side * 0.13;     // QRの一辺（mm）と、下の説明の高さ
+  const bw = mm(side + 1), bh = mm(side + 1 + cap), W = c.v.w, H = c.v.h, gap = mm(1.5);
+  const cand = [
+    [gap, gap],                                   // 左上
+    [W - bw - gap, H - bh - mm(4)],               // 右下（出典の上）
+    [gap, H - bh - mm(6.5)],                      // 左下（縮尺の上）
+    [W - bw - gap, mm(10)]                        // 右上（方位の下）
+  ];
+  const poly = c.poly ? c.poly.map(p => P(p[0], p[1])) : null;
+  const inside = (x, y) => {
+    let r = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i], [xj, yj] = poly[j];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) r = !r;
+    }
+    return r;
+  };
+  const hp = c.hs.map(h => P(h.lat, h.lng));
+  let best = null;
+  cand.forEach(([x, y], i) => {
+    const m = mm(1.5);
+    let sc = hp.filter(([a, b]) => a > x - m && a < x + bw + m && b > y - m && b < y + bh + m).length * 4;
+    if (poly) for (let a = 0; a <= 4; a++) for (let b = 0; b <= 4; b++) if (inside(x + bw * a / 4, y + bh * b / 4)) sc++;
+    sc += i * 0.01;                                // 同じなら、上の順（左上から）
+    if (!best || sc < best.sc) best = { sc, x, y };
+  });
+  const x0 = best.x, y0 = best.y, u = mm(side) / (n + qz * 2), ox = x0 + mm(0.5) + u * qz, oy = y0 + mm(0.5) + u * qz;
+  let d = '';
+  for (let r = 0; r < n; r++) {
+    for (let cc = 0; cc < n; cc++) {
+      if (!g[r][cc]) continue;
+      let e = cc; while (e + 1 < n && g[r][e + 1]) e++; // 横に続く黒いマスは1本にまとめる
+      d += `M${f(ox + cc * u)},${f(oy + r * u)}h${f((e - cc + 1) * u + 0.05)}v${f(u + 0.05)}h${f(-(e - cc + 1) * u - 0.05)}z`;
+      cc = e;
+    }
+  }
+  return `<g class="s12qr"><rect x="${f(x0)}" y="${f(y0)}" width="${f(bw)}" height="${f(bh)}" rx="${mm(0.8)}" fill="#fff" stroke="#222" stroke-width="${mm(0.2)}"/>` +
+    `<path d="${d}" fill="#000" shape-rendering="crispEdges"/>` +
+    `<text x="${f(x0 + bw / 2)}" y="${f(y0 + mm(side + 0.6) + mm(cap) / 2)}" font-size="${mm(cap * 0.78)}" font-weight="700" fill="#000" text-anchor="middle" dominant-baseline="central" textLength="${f(bw - mm(1.2))}" lengthAdjust="spacingAndGlyphs">Googleマップで道順</text></g>`;
 }
 const s12Dnc = () => D().dnc || {};
 /* 名前のある建物（「名前を出す範囲」が「地図に見えている全体」のとき、ほかの区域の建物の名前も出すため） */
@@ -14783,6 +14844,8 @@ function s12MapSvg(c, tileUrl) {
     `<text x="${f(bx + len + mm(1))}" y="${f(by - mm(0.6))}" font-size="${mm(2)}" fill="#222">${meters >= 1000 ? meters / 1000 + 'km' : meters + 'm'}</text></g>`;
   // 出典
   s += `<text x="${f(v.w - mm(1.5))}" y="${f(v.h - mm(1.3))}" font-size="${mm(1.7)}" fill="#333" text-anchor="end" ${halo}>出典：国土地理院（淡色地図）</text>`;
+  // 区域までの道順のQR（いちばん上に重ねる）
+  s += s12QrSvg(c, P, mm, f);
   return s + '</svg>';
 }
 function s12FrontHtml(c, tileUrl, stamp) {
