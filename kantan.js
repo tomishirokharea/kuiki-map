@@ -378,6 +378,154 @@
     return r;
   };
 
+  /* =========================================================
+     第4段（1）ホーム（指示書3.2）
+     ・あいさつ → たのまれた区域（今のまま）→ 次の集まり（道順）→ あなたの区域カード（3枚まで・あと○軒・地図をひらく）
+       → これからの予定（14日・5件まで。押すと今の画面）→「カレンダーで見る」を押したときだけカレンダー
+     ・奉仕時間を使う人は、タイマー・目標がその上（今のまま）。予定の印刷（監督・係）も今のまま
+     ========================================================= */
+  let calOpen = false;
+  const css4 = document.createElement('style');
+  css4.textContent = [
+    R('.homemain>h2.sec', 'display:none'),
+    `.khome .sec{margin-top:18px}`,
+    `.knext{background:#fff;border:2px solid var(--line);border-radius:16px;padding:12px 16px;margin:10px 0}`,
+    `.knext .klbl{font-weight:700;color:var(--ink2);margin:0}`,
+    `.knext .kdate{font-size:26px;font-weight:700;margin:4px 0 0;line-height:1.3}`,
+    `.knext .ktime{font-size:21px;margin:2px 0 4px}`,
+    `.khcard{background:#fff;border:2px solid var(--line);border-radius:16px;padding:12px 16px;margin:10px 0}`,
+    `.khcard .khrow{display:flex;gap:12px;align-items:center}`,
+    `.khcard .kleft{margin:2px 0 0}`,
+    `.khcard .kp-nm{margin-left:.5em;font-weight:400}`,
+    // 地図（指示書3.6）：区域えらび・右下のボタンを大きく、「あと○軒」の帯、印の見かたは「?」の中に4つだけ
+    R('.maptools select', 'min-height:56px;font-size:20px'),
+    R('.helpbtn', 'width:56px;height:56px'),
+    R('#legendKeys', 'display:none'),
+    `.maptools>.kband{flex-basis:100%;box-shadow:none;pointer-events:none;margin:0}`,
+    `.kband span.kb{display:inline-block;background:#fff;border:2px solid var(--terr);border-radius:12px;padding:4px 12px;font-size:18px;font-weight:700;box-shadow:0 2px 6px #0003}`,
+    `.kband span.kb b{font-size:22px;color:var(--terr)}`
+  ].join('\n');
+  document.head.appendChild(css4);
+
+  const nameOf = t => { const nm = String(t.name || '').trim(); return nm && nm !== '区域' + t.no && nm !== String(t.no) ? nm : ''; };
+  const leftOf = t => { try { const r = roundInfo(t.id, true); return r ? r.c.todo : null; } catch (e) { return null; } };
+  const _renderHome = window.renderHome;
+  window.renderHome = function () {
+    const out = _renderHome.apply(this, arguments);
+    try { if (simple()) simpleHome(); } catch (e) { console.error(e); }
+    return out;
+  };
+  function simpleHome() {
+    const view = document.getElementById('view-home'), cal = document.getElementById('homeCal');
+    if (!view || view.hidden || !cal) return;
+    const calInner = cal.innerHTML; // 今のカレンダー（「カレンダーで見る」を押したときだけ出す）
+    const now = new Date(), today = ymd(now), until = new Date(); until.setDate(until.getDate() + 14);
+    const last = ymd(until), hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    // 今日の集まりは、終わったもの（終わりの時刻がないときは、はじまりから2時間）を「次」にしない
+    const endOf = s => { if (s.end) return s.end; if (!s.time) return '24:00'; const [h, m] = s.time.split(':').map(Number); return `${String(Math.min(24, h + 2)).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`; };
+    const scheds = D().schedules.filter(s => s.date >= today && (!s.group || s.group === myGroup() || isAdmin()) && !(s.date === today && endOf(s) < hm))
+      .sort((a, b) => ((a.date + (a.time || '')) < (b.date + (b.time || '')) ? -1 : 1));
+    const next = scheds[0] || null;
+    const href = next ? placeHref(next) : '';
+    let h = '<div class="khome">';
+    h += next
+      ? `<div class="knext"><p class="klbl">次の集まり</p>
+          <p class="kdate">${next.date === today ? '<span>今日</span>　' : ''}${fmtYmd(next.date)}</p>
+          <p class="ktime">${schedLine(next)}</p>
+          <p class="muted">${esc(schedGroupName(next.group))}${next.note ? '　' + esc(next.note) : ''}</p>
+          ${href ? `<a class="btn primary block" href="${esc(href)}" target="_blank" rel="noopener">道順</a>` : ''}</div>`
+      : '<div class="knext"><p class="klbl">次の集まり</p><p class="ktime">予定はまだありません</p></div>';
+    const mine = D().territories.filter(t => t.holder === me().id).sort(byNo);
+    h += '<h2 class="sec">あなたの区域カード</h2>';
+    h += mine.length ? mine.slice(0, 3).map(t => {
+      const left = leftOf(t), nm = nameOf(t);
+      return `<article class="khcard"><div class="khrow"><span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}">${esc(t.no)}</span>
+          <div><b>区域${esc(t.no)}</b>${nm ? `<span class="kp-nm">${esc(nm)}</span>` : ''}
+            ${left != null ? `<p class="kleft">あと <b>${left}</b> 軒</p>` : ''}</div></div>
+          <button type="button" class="btn primary block" data-openterr="${esc(t.id)}">地図をひらく</button></article>`;
+    }).join('') + (mine.length > 3 ? `<p class="muted">ほかに区域カードが${mine.length - 3}枚あります。「区域カード」の画面で見られます。</p>` : '')
+      : '<p class="muted">持っている区域カードはありません。</p>';
+    // これからの予定：次の集まりのあと、14日の中で5件まで（集まり＋自分の予定）
+    const items = scheds.filter(s => s !== next && s.date <= last).map(s => ({ k: s.date + (s.time || ''), html: schedRow(s, true) }));
+    (myData().events || []).filter(e => e.date >= today && e.date <= last).forEach(e => items.push({
+      k: e.date + (e.time || ''),
+      html: `<article class="ritem k-young" data-day="${esc(e.date)}" role="button" tabindex="0"><div><p class="rt">${fmtYmd(e.date)}</p>
+        <p>${e.time ? esc(e.time) + '　' : ''}${esc(e.title)}</p><p class="muted">自分の予定</p></div><span class="chev" aria-hidden="true">›</span></article>`
+    }));
+    items.sort((a, b) => (a.k < b.k ? -1 : 1));
+    if (items.length) h += '<h2 class="sec">これからの予定</h2>' + items.slice(0, 5).map(x => x.html).join('');
+    h += `<button type="button" class="btn block" id="kCalBtn" aria-expanded="${calOpen}">${calOpen ? 'カレンダーを閉じる' : 'カレンダーで見る'}</button></div>`;
+    cal.innerHTML = h + (calOpen ? calInner : '');
+    const b = document.getElementById('kCalBtn');
+    if (b) b.onclick = () => { calOpen = !calOpen; renderHome(); };
+  }
+
+  /* =========================================================
+     第4段（2）地図（指示書3.6）
+     ・回さない・「進み具合」に固定・印の大きさ（index.html の rotAllowed・roundMode・pinScale）
+     ・「?」の中：あと○軒・「返す」・印の見かた4つだけ
+     ・自分の区域をえらんでいるとき、上の区域えらびの下に「区域12　あと28軒」の帯
+     ========================================================= */
+  const _renderLegend = window.renderLegend;
+  window.renderLegend = function () {
+    const out = _renderLegend.apply(this, arguments);
+    try { if (simple()) simpleLegend(); } catch (e) { console.error(e); }
+    return out;
+  };
+  function simpleLegend() {
+    const box = document.getElementById('legendInfo'); if (!box) return;
+    const key = (cls, mark, label) => `<span><i class="pin mini st-plain${cls}">${mark}</i>${label}</span>`;
+    const keys = `<p class="keys">${key('', '', 'まだ訪ねていない家')}${key(' done', '<u>✓</u>', '訪ねた家')}${key(' prev', '<u class="b">✓</u>', '最近会えた家')}<span><i class="pin mini st-dnc">拒</i>拒否（訪問しない）</span></p>`;
+    const r = typeof roundTerr !== 'undefined' && roundTerr ? roundInfo(roundTerr) : null;
+    if (!r) { box.innerHTML = keys; return; }
+    const n = r.c, own = r.t.holder === me().id, lead = !own && typeof isLead === 'function' && isLead(r.t);
+    // ほかの部品が足した行（前の人の続き・今日のあなたの範囲）は残す
+    const cont = [...box.querySelectorAll('p.muted')].find(p => /前の人/.test(p.textContent));
+    const part = [...box.querySelectorAll('.okmsg')].find(p => /今日のあなたの範囲/.test(p.textContent));
+    const nm = nameOf(r.t);
+    box.innerHTML = `<p class="lgtitle"><b><span>区域${esc(r.t.no)}</span>${nm ? ` <span>${esc(nm)}</span>` : ''}</b>${own ? '' : lead ? '（今日の司会）' : '（一緒に回る）'}</p>
+      ${n.todo ? `<p class="kleft">あと <b>${n.todo}</b> 軒</p>` : '<p class="okmsg"><b>すべての家に緑のチェックがつきました。</b>区域を回り終えました。</p>'}
+      <div class="progress big" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${r.pct}%"></i></div>
+      <div id="kLgKeep"></div>
+      ${keys}
+      <div class="row">${(own || lead) && r.t.group && D().settings.groupOn !== 0 ? '<button type="button" class="btn small" id="lgParts">回る範囲を分ける</button>' : ''}${own ? '<button type="button" class="btn" id="lgReturn">返す</button>' : ''}</div>`;
+    const keep = document.getElementById('kLgKeep');
+    if (part) keep.appendChild(part);
+    if (cont) keep.appendChild(cont);
+    const lp = document.getElementById('lgParts'), lr = document.getElementById('lgReturn');
+    if (lp) lp.onclick = () => { toggleLegend(false); startPartSplit(r.t.id); };
+    if (lr) lr.onclick = () => { toggleLegend(false); openReturnSheet(r.t.id); };
+  }
+  let bandTm = 0;
+  function paintBand() {
+    const tools = document.getElementById('mapTools'); if (!tools) return;
+    let el = document.getElementById('kBand');
+    const r = simple() && currentView === 'map' && typeof roundTerr !== 'undefined' && roundTerr ? roundInfo(roundTerr) : null;
+    if (!r) { if (el) el.hidden = true; return; }
+    if (!el) { el = document.createElement('div'); el.id = 'kBand'; el.className = 'kband'; el.setAttribute('aria-live', 'polite'); tools.appendChild(el); }
+    el.innerHTML = `<span class="kb"><span>区域${esc(r.t.no)}</span>　<span>あと</span> <b>${r.c.todo}</b> <span>軒</span></span>`;
+    el.hidden = false;
+  }
+  const bandSoon = () => { clearTimeout(bandTm); bandTm = setTimeout(() => { try { paintBand(); } catch (e) { console.error(e); } }, 200); };
+  const _renderHouses = window.renderHouses;
+  window.renderHouses = function () {
+    const out = _renderHouses.apply(this, arguments);
+    bandSoon();
+    return out;
+  };
+  const _showView2 = window.showView;
+  window.showView = function () {
+    const out = _showView2.apply(this, arguments);
+    bandSoon();
+    return out;
+  };
+  const _applyUi2 = window.applyUi;
+  window.applyUi = function () {
+    const out = _applyUi2.apply(this, arguments);
+    try { if (typeof applyRotSetting === 'function' && typeof map !== 'undefined' && map) applyRotSetting(); bandSoon(); } catch (e) { console.error(e); }
+    return out;
+  };
+
   /* 画面ができたあと：今の状態にそろえる */
   try { syncAdm(); if (Store.data) { updateTabs(); } } catch (e) { console.error(e); }
   if (Store.data && typeof map !== 'undefined' && map) { try { renderAll(); } catch (e) { console.error(e); } }

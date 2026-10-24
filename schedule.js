@@ -997,9 +997,12 @@ button.ktag{cursor:pointer}
       const u = me(), reg = !!(u.slots && u.slots.length), cur = slotOf(new Date());
       if (G && !awayGroupSlot) awayGroupSlot = nextGroupSlot(reqUse === 'all');
       const key = 'kuiki_awaysort_' + u.id, ageOn = !!(AGE_ON && ageMap());
+      // 簡単モード（指示書3.5）：並び順のボタン・会える見込みの％・地域のようす・説明文は出さない。並びは「会いやすい順」で固定。はじめは3件
+      const SIMPLE = typeof isSimple === 'function' && isSimple();
+      let more = false;
       const paint = () => {
         const slots = G ? [awayGroupSlot] : reg ? u.slots.slice().sort(bySlot) : [cur];
-        let sort = lsGet(key) || 'long';
+        let sort = SIMPLE ? 'easy' : lsGet(key) || 'long';
         if (sort === 'young' && !ageOn) sort = 'long';
         if (sort === 'near' && !myPos) { locate(paint); }
         const list = withAway(awaySuggestions(u.id, slots), unmetIndex()).map(x => Object.assign(x, { chance: meetChance(x.t, x.slot).p }));
@@ -1018,6 +1021,11 @@ button.ktag{cursor:pointer}
         const sorts = [['easy', '会いやすい順'], ['near', '近い順'], ['long', '長く会えていない順'], ['many', '家が多い順']]
           .concat(ageOn ? [['young', '若い世代が多い順']] : []).concat(G ? [] : [['now', '今の時間帯']]);
         const ALL = G && reqUse === 'all'; // 全体の集まりで回る留守宅カード（2026-10-24）
+        // 簡単モードの1行：区域番号・時間帯・○軒・受け取る（区域をもらうの簡単な形と同じ見た目）
+        const kAway = x => `<article class="pick kpick"><div class="kp-head"><b>区域${esc(x.t.no)}</b><span class="kp-n">${x.keys.length}軒</span></div>
+            <p class="kp-st">${slotText(x.slot)}</p>
+            <div class="pickbtns"><button class="btn small primary" data-awaytake2="${esc(x.t.id)}" data-slot="${esc(x.slot)}"${full ? ' disabled' : ''}>受け取る</button></div></article>`;
+        const shown = SIMPLE && !more ? 3 : 20;
         setSheet(headHtml(null, G ? (ALL ? '全体の集まりで回る留守宅カード' : `${esc(myGroup())}グループで回る留守宅カード`) : '留守宅カードをえらぶ',
             G ? `持てるのは${D().settings.awayMax}枚まで（今 ${myAwayCount(true)}枚）` : reg ? `行ける時間：${slots.map(slotShort).join('、')}` : `今の時間帯：${slotShort(cur)}`) + `
           ${offToday() ? OFF_NOTE : ''}
@@ -1025,18 +1033,20 @@ button.ktag{cursor:pointer}
             <div class="seg" role="group" aria-label="使う集まり"><button type="button" data-ause="grp" aria-pressed="${!ALL}">${esc(myGroup())}グループ奉仕</button><button type="button" data-ause="all" aria-pressed="${ALL}">全体の集まり</button></div>
             <div class="seg" role="group" aria-label="もらうカード"><button type="button" data-gterr aria-pressed="false">区域カード</button><button type="button" aria-pressed="true">留守宅カード</button></div>
             <label class="field"><span>集まりの時間帯</span><select id="apGSlot">${SLOTS.map(x => `<option value="${x}"${x === awayGroupSlot ? ' selected' : ''}>${slotText(x)}</option>`).join('')}</select></label>` : ''}
-          <div class="seg uiseg" role="group" aria-label="並び順">
+          ${SIMPLE ? '' : `<div class="seg uiseg" role="group" aria-label="並び順">
             ${sorts.map(([v, l]) => `<button type="button" data-asort="${v}" aria-pressed="${sort === v}">${l}</button>`).join('')}
-          </div>
+          </div>`}
           ${G ? '' : `<div class="row"><button class="btn small" id="apSlots">${reg ? '行ける時間を変える' : '行ける時間を登録する'}</button></div>`}
           ${full ? `<div class="notice warn">${G ? 'グループの' : ''}留守宅カードは${D().settings.awayMax}枚まで持てます。受け取り中のカードを終えると、受け取れます。</div>` : ''}
-          ${list.length ? list.slice(0, 20).map(x => awayItem(x, cur, full, 'data-awaytake2')).join('')
+          ${list.length ? list.slice(0, shown).map(x => (SIMPLE ? kAway(x) : awayItem(x, cur, full, 'data-awaytake2'))).join('') +
+              (SIMPLE && !more && list.length > shown ? '<button type="button" class="btn block" id="apMore">もっと見る</button>' : '')
             : `<div class="empty">今、合う留守宅カードはありません。${G ? '<br>集まりの時間帯を変えると、ほかのカードが見つかることがあります。' : reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`}
-          <p class="hint">${awayExpText()}回り終えたら「返却する」を押します。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>
+          ${SIMPLE ? '' : `<p class="hint">${awayExpText()}回り終えたら「返却する」を押します。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>`}
           <button class="btn block" data-close>もどる</button>`);
         const S = $('#sheet');
         $$('[data-asort]', S).forEach(b => b.onclick = () => { lsSet(key, b.dataset.asort); paint(); });
         if ($('#apSlots')) $('#apSlots').onclick = openSlotSheet;
+        if ($('#apMore')) $('#apMore').onclick = () => { more = true; paint(); };
         if ($('#apGSlot')) $('#apGSlot').onchange = e => { awayGroupSlot = e.target.value; paint(); };
         if ($('[data-gterr]', S)) $('[data-gterr]', S).onclick = () => { reqForGroup = true; window.openRequestSheet(); }; // 使う集まり（グループ／全体）はそのまま
         $$('[data-ause]', S).forEach(b => b.onclick = () => {

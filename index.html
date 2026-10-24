@@ -4334,7 +4334,7 @@ const ROT_START = 12; // これ以上ひねったら回し始める（度）。�
 const ROT_SNAP = 8;   // 北からこの角度以内で指をはなしたら、北にもどす（度）
 let mapDeg = 0, rotEndAt = 0, rotAnim = 0, lastMoveEnd = 0;
 const rotSupported = () => !!(window.CSS && CSS.supports && CSS.supports('rotate', '1deg'));
-const rotAllowed = () => rotSupported() && UI.mapRot !== 'off';
+const rotAllowed = () => rotSupported() && UI.mapRot !== 'off' && UI.mode === 'detail'; // 簡単モードでは2本指で回さない（右下の「北」も出ない・指示書3.6）
 const rotPt = (p, rad) => { const c = Math.cos(rad), s = Math.sin(rad); return L.point(p.x * c - p.y * s, p.x * s + p.y * c); };
 const degNorm = d => ((d % 360) + 540) % 360 - 180; // -180〜180度に
 (function patchLeafletForRotation() {
@@ -5018,7 +5018,7 @@ function renderLegend() {
   const n = r.c, total = n.todo + n.done + n.recent, pct = r.pct, m = roundMode();
   const own = r.t.holder === me().id, lead = !own && isLead(r.t);
   const key = (cls, mark, label) => `<span><i class="pin mini st-plain${cls}">${mark}</i>${label}</span>`;
-  const plan = roundPlan(r), first = plan[0];
+  const plan = UI.mode !== 'detail' ? [] : roundPlan(r), first = plan[0]; // 簡単モードはおすすめ順を出さないので、計算もしない
   const planUnits = plan.reduce((a, x) => a + x.units.length, 0);
   let body = '';
   if (!n.todo) {
@@ -5216,9 +5216,9 @@ function renderHouses() {
   const mine = myPlaces(), dimOthers = !sel && !isAdmin(); // 何も選んでいないときは、自分の区域以外を薄く
   const okT = lockOn() && mode === 'normal' ? openTerrIds() : null;
   // 家が混んでいるとき（印を並べると画面の半分近くをおおうとき）は、小さな点で出す
-  const sz = map.getSize(), pinPx = 36 * (PINS[uiEff().pin] || PINS.normal)[0];
-  // （いちばん近くまで拡大したとき・19以上は、いつもくわしい印）
-  const dense = !fkeys && map.getZoom() < 19 && (list.length > 800 || list.length * pinPx * pinPx > sz.x * sz.y * 0.45);
+  const sz = map.getSize(), pinPx = 36 * pinScale();
+  // （いちばん近くまで拡大したとき・19以上は、いつもくわしい印。簡単モードは18以上）
+  const dense = !fkeys && map.getZoom() < (UI.mode !== 'detail' ? 18 : 19) && (list.length > 800 || list.length * pinPx * pinPx > sz.x * sz.y * 0.45);
   for (const h of list) {
     const allowed = !okT || canTapHouse(h, okT, mine);
     const op = fade * (allowed && dimOthers && !isMyHouse(h, mine) ? 0.4 : 1);
@@ -5309,7 +5309,7 @@ const DOT = {
   lock: { fillColor: '#C9CFCC', color: '#9AA5A0', weight: 1.5 }
 };
 function dotStyle(h, ff, locked) {
-  const r = (h.type === 'apt' ? 8 : 6) * (PINS[uiEff().pin] || PINS.normal)[0];
+  const r = (h.type === 'apt' ? 8 : 6) * (UI.mode !== 'detail' ? (UI.size === 'xlarge' ? 1.25 : 1) * 1.4 : (PINS[uiEff().pin] || PINS.normal)[0]); // 簡単モードの小さな点は半径1.4倍
   if (locked) return { s: Object.assign({ radius: r }, DOT.lock), o: 0.6 };
   const since = periodStart(h), ks = targets(h).map(u => K(h.id, u));
   if (!ks.length) return { s: Object.assign({ radius: r }, DOT.plain), o: 1 };
@@ -10228,6 +10228,7 @@ const doneMark = st => (st === 'done' || st === 'done fade' ? '<u>✓</u>' : st 
 const PLAN_SIZE = 10;
 // 一緒に回る人は、同じおすすめ順で重ならないよう、はじめは「進み具合」で表示する
 const roundMode = () => {
+  if (UI.mode !== 'detail') return 'progress'; // 簡単モードは「進み具合」に固定（番号つきのおすすめ順は出さない・指示書3.6）
   if (me().roundMode) return me().roundMode;
   const t = roundTerr ? terrById(roundTerr) : null;
   return t && !canLead(t) ? 'progress' : 'reco';
@@ -10993,6 +10994,8 @@ function loadFont(k, previewText) {
   document.head.appendChild(l);
 }
 const PINS = { small: [0.85, '小さめ'], normal: [1, '標準'], large: [1.25, '大きく'] };
+// 家の印の大きさ（倍）：簡単モードは標準でも1.15倍・「とても大きく」のときは1.25倍（指示書3.6）
+const pinScale = () => (UI.mode !== 'detail' ? (UI.size === 'xlarge' ? 1.25 : 1.15) : (PINS[uiEff().pin] || PINS.normal)[0]);
 let UI = Object.assign({}, UI_DEFAULT);
 const uiKey = () => 'kuiki_ui_' + (Store.data ? me().id : 'guest');
 function uiLoad() {
@@ -11056,7 +11059,7 @@ function applyUi() {
   const e = uiEff(), r = document.documentElement.style;
   setThemeVars(themeOf(e));
   r.setProperty('--z', String(zoomOf(e)));
-  r.setProperty('--pin', String((PINS[e.pin] || PINS.normal)[0]));
+  r.setProperty('--pin', String(pinScale()));
   r.setProperty('--font', fontStack(e.font));
   loadFont(e.font); // 標準以外の文字は、使うときだけ読み込む
   document.body.classList.toggle('simple', UI.mode !== 'detail');
@@ -15274,7 +15277,7 @@ function openTerr(id) {
   zoomHintShown = false; // 区域カードから入ったときは、案内をもう一度出す
   showView('map');
   selectTerr(id, { fit: true });
-  if (beginner()) setTimeout(() => toast('右下の「?」を押すと、この区域の進み具合やおすすめ順が見られます', null, null, { below: '#mapTools' }), 2500);
+  if (beginner()) setTimeout(() => toast(UI.mode !== 'detail' ? '右下の「?」を押すと、印の見かたと「返す」ボタンが出ます' : '右下の「?」を押すと、この区域の進み具合やおすすめ順が見られます', null, null, { below: '#mapTools' }), 2500); // 簡単モードは、おすすめ順を出さないので文を変える
 }
 
 /* ---------- ボタンの動き ---------- */
