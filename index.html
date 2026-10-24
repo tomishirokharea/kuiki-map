@@ -376,10 +376,12 @@ ol.plan p{margin:0}
 .unitstrip{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
 .uchip{position:relative;min-width:54px;min-height:42px;border-radius:8px;border:2px solid transparent;font-weight:700;font-size:15px}
 .uchip.cur{outline:4px solid var(--draw);outline-offset:2px}
+.uchip .ust{font-size:.8em;margin-right:3px;font-weight:800}
+.ustrips .ugrp{margin-top:8px}
 .uchip.donec::after{content:'✓';position:absolute;right:-7px;top:-9px;width:18px;height:18px;border-radius:99px;background:var(--ok);color:#fff;font-size:11px;display:grid;place-items:center;border:2px solid #fff}
 .seqroom{font-size:20px;margin:12px 0 0}
 .seqroom b{font-size:36px}
-.seqnav{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.seqnav{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px;margin-top:14px} /* 文字を大きくしても横にはみ出さない（入らないときは2段） */
 .choice small{font-size:13px;font-weight:400}
 #blocker{position:fixed;inset:0;z-index:5000;background:var(--bg);display:grid;place-items:center;padding:24px}
 .blockbox{max-width:520px;background:#fff;border:2px solid var(--line);border-radius:16px;padding:24px;font-size:19px}
@@ -931,6 +933,8 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .hsteps p{margin:0 0 6px}
 .hnum{width:36px;height:36px;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;font-size:20px;display:grid;place-items:center}
 .hpic{display:inline-flex;align-items:center;gap:10px;background:#F2F2F7;border-radius:12px;padding:8px 14px;color:#007AFF;font-size:17px;font-weight:700}
+.hpic.hmore{font-size:30px;line-height:1;padding:2px 20px 10px;letter-spacing:2px}
+.hsteps .hstep{font-weight:700}
 .hpic svg{width:30px;height:30px}
 .homeadd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .homeadd p{flex:1;min-width:180px;margin:0}
@@ -2604,13 +2608,25 @@ async function openHomeGuide() {
     }
   }
   lsSet(HOME_SEEN, '1');
-  const iosSteps = `<ol class="hsteps">
-      <li><span class="hnum">1</span><div><p>画面の下（iPadは上）にある <b>共有ボタン</b> を押します。</p><span class="hpic">${SHARE_SVG}</span>
-        <p class="hint">見つからないときは、画面の下の「…」を押すと出てきます。</p></div></li>
-      <li><span class="hnum">2</span><div><p>出てきたメニューを上に動かして、<b>「ホーム画面に追加」</b>を押します。</p><span class="hpic">${ADDHOME_SVG}ホーム画面に追加</span></div></li>
-      <li><span class="hnum">3</span><div><p>右上の <b>「追加」</b> を押します。ホーム画面に「${esc(uiEff().appName || '区域マップ')}」のアイコンができます。</p></div></li>
-      <li><span class="hnum">4</span><div><p>できたアイコンを押して開きます。<b>名前の登録はいりません。</b>そのまま使えます。</p></div></li>
-    </ol>
+  // iOS 26 からの Safari は、共有ボタンが「…」の中に入った（Safari の版は User-Agent の Version/○○。iOS の版の数字は 18_6 のまま変わらない・点検④U4）
+  const sv = Number((navigator.userAgent.match(/Version\/(\d+)/) || [])[1]) || 0, ios26 = sv >= 26;
+  const iPad = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  const appNm = esc(uiEff().appName || '区域マップ');
+  const MORE_PIC = '<span class="hpic hmore" aria-hidden="true">…</span>';
+  // 文は、スペイン語の辞書で1文ずつ置きかえられるよう、手順ごとに1つの文にする
+  const iosStepsList = ios26 && !iPad ? [
+      `<p class="hstep">画面の下の右にある「…」を押します。</p>${MORE_PIC}`,
+      `<p class="hstep">「共有」を押します。</p><span class="hpic">${SHARE_SVG}共有</span>`,
+      `<p class="hstep">「その他」を押して、「ホーム画面に追加」を押します。</p><span class="hpic">${ADDHOME_SVG}ホーム画面に追加</span><p class="hint hint-must">見つからないときは、出てきたメニューを上に動かします。</p>`,
+      `<p>右上の <b>「追加」</b> を押します。ホーム画面に「${appNm}」のアイコンができます。</p>`
+    ] : [
+      `<p>画面の下（iPadは上）にある <b>共有ボタン</b> を押します。</p><span class="hpic">${SHARE_SVG}</span>
+        <p class="hint hint-must">見つからないときは、画面の下の「…」を押すと出てきます。</p>`,
+      `<p>出てきたメニューを上に動かして、<b>「ホーム画面に追加」</b>を押します。</p><span class="hpic">${ADDHOME_SVG}ホーム画面に追加</span>${ios26 ? '<p class="hint hint-must">「その他」の中にあることもあります。</p>' : ''}`,
+      `<p>右上の <b>「追加」</b> を押します。ホーム画面に「${appNm}」のアイコンができます。</p>`
+    ];
+  iosStepsList.push(`<p>できたアイコンを押して開きます。<b>名前の登録はいりません。</b>そのまま使えます。</p>`);
+  const iosSteps = `<ol class="hsteps">${iosStepsList.map((x, i) => `<li><span class="hnum">${i + 1}</span><div>${x}</div></li>`).join('')}</ol>
     ${ready ? '<div class="notice info">この画面は開いたままで、1から進めてください。15分以内にアイコンを作って開けば、そのまま使えます。</div>' : ''}`;
   const androidSteps = `<ol class="hsteps">
       <li><span class="hnum">1</span><div><p>画面の右上の <b>「︙」</b> を押します。</p></div></li>
@@ -2928,7 +2944,9 @@ function expandHouse(a) {
 }
 /* valid：返事の形を確かめる（まちがった形の返事が来たときも、送り直す） */
 async function apiRetry(action, extra, onRetry, valid) {
-  const waits = [2000, 5000, 10000, 20000];
+  // 説明会のように大勢が同時に開くと、Google の「同時に動かせる処理の数」に届くことがある（持ち主1人で30）。
+  // あきらめずに、間をあけて（みんながずれるように）6回まで送り直す（合わせて約2分・点検③P6）
+  const waits = [2000, 5000, 10000, 20000, 30000, 40000];
   for (let i = 0; ; i++) {
     try {
       const j = await api(action, extra, { timeout: 120000 });
@@ -2943,7 +2961,7 @@ async function apiRetry(action, extra, onRetry, valid) {
     } catch (e) {
       if (!e.retry || i >= waits.length) throw e;
       if (onRetry) onRetry(i + 1, e);
-      await wait(waits[i] + Math.random() * 1500); // みんなが同時にやり直さないよう、少しずらす
+      await wait(waits[i] * (0.8 + Math.random() * 0.6)); // みんなが同時にやり直さないよう、ずらす
     }
   }
 }
@@ -7178,6 +7196,19 @@ function seqStepsHtml(st, k) {
   if (st.step === 'dnc') return refuseStepHtml(true);
   return '';
 }
+const UST_GLYPH = { met: '会', away: '留', refused: '拒', dnc: '拒' }, UST_NAME = { met: '会えた', away: '留守', refused: '拒否', dnc: '拒否' };
+/* 続けて入力：今の部屋の見出しから「とばして次へ」までが画面に入るように、下から出る画面を動かす。
+   部屋の一覧が長い建物で、部屋を押したり記録したりするたびに、ボタンが画面の外に出ないように（点検④U2） */
+function seqShowRoom(S) {
+  const room = S && S.querySelector('.seqroom'), nav = S && S.querySelector('.seqnav');
+  if (!room || !nav) return;
+  const sr = S.getBoundingClientRect(), top = room.getBoundingClientRect().top, bot = nav.getBoundingClientRect().bottom;
+  if (bot <= sr.bottom - 4 && top >= sr.top) return; // もう見えている
+  // 見出しを上の端から少し下に。入りきらないときは、見出しを上の端に。
+  // 文字を大きくしているとき（画面の zoom）は、見た目の長さと scrollTop の長さがちがうので、その比で直す
+  const z = S.clientHeight ? sr.height / S.clientHeight : 1;
+  S.scrollTop += Math.min(top - sr.top - 12, Math.max(0, bot - sr.bottom + 16)) / (z > 0 ? z : 1);
+}
 function openAptSeq(hid, startUnit) {
   const h0 = houseById(hid); if (!h0 || !h0.units.length) return;
   const t = terrById(h0.terrId);
@@ -7205,11 +7236,15 @@ function openAptSeq(hid, startUnit) {
     const h = houseById(hid); if (!h) { closeSheet(); return; }
     const n = h.units.length, cnt = h.units.filter(doneToday).length, need = h.units.filter(u => !isRef(u)).length;
     let b = headHtml(t, esc(h.label || '集合住宅'), `${inRound ? '受け取ってから訪ねた部屋' : '今日入力した部屋'} ${cnt} / ${need}`);
-    b += `<div class="unitstrip">${h.units.map((u, i) => {
-      const s = statusOf(K(hid, u));
-      const uk = unitKind(h, u);
-      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}へ">${kindBadge(uk)}${esc(uName(h, u))}</button>`;
-    }).join('')}</div>`;
+    // 部屋のボタン：前回の結果は色だけでなく「会・留・拒」の字でも見せる。部屋が多い建物は階ごとに分ける（点検④U3）
+    const chip = u => {
+      const i = h.units.indexOf(u), s = statusOf(K(hid, u)), uk = unitKind(h, u), g = UST_GLYPH[s];
+      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? '（前回 ' + UST_NAME[s] + '）' : ''}へ">${kindBadge(uk)}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
+    };
+    const groups = h.units.length > 10 ? unitGroups(h) : [];
+    b += groups.length > 1
+      ? `<div class="ustrips">${groups.map(([g, us]) => `<p class="ugrp">${esc(g || 'そのほか')}</p><div class="unitstrip">${us.map(chip).join('')}</div>`).join('')}</div>`
+      : `<div class="unitstrip">${h.units.map(chip).join('')}</div>`;
     b += banNotice(h) + bldMemoHtml(h);
     if (window.chuiNotice) b += window.chuiNotice(h, st.finished ? '' : h.units[idx]); // 注意（！）
     if (st.finished) {
@@ -7235,6 +7270,7 @@ function openAptSeq(hid, startUnit) {
     setSheet(b);
 
     const S = $('#sheet'), k = st.finished ? null : K(hid, h.units[idx]);
+    seqShowRoom(S); // 部屋の一覧が長いときも、今の部屋の「会えた・留守」が見えるところまで動かす（点検④U2）
     $$('[data-jump]', S).forEach(x => x.onclick = () => go(Number(x.dataset.jump)));
     $$('[data-res]', S).forEach(x => x.onclick = () => {
       const r = x.dataset.res;
@@ -9559,7 +9595,7 @@ function openReturnSheet(tid) {
          <p class="muted">だれでも受け取って、違う曜日・時間帯に訪ねられます。留守宅が目安（${ret}%）まで訪ね直されたときに、区域の返却が完了します。</p>`
       : `<p class="hint-strong">途中の返却になります。回った家が、目安（${th}%）に届いていません。</p>
          <p class="muted">${returnFreeText(t)}</p>
-         <p class="hint">まだ回るときは「もどる」を押して、続けて回ってください。</p>`;
+         <p class="hint hint-must">まだ回るときは「もどる」を押して、続けて回ってください。</p>`;
   // 紙の区域カード（S-13）から引き継いだ区域：紙で回った家はアプリにないので、本人に回り終えたかを聞く
   const ph = paperHandOf(t) && plan.kind !== 'done';
   const phPart = !ph ? '' : `<p class="hint-strong">紙の区域カード（S-13）から引き継いだ区域です。</p>

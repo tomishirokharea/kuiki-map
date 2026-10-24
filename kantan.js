@@ -88,6 +88,10 @@
     R('.uchip.donec::after', "content:'済';width:auto;min-width:30px;height:24px;padding:0 6px;border-radius:12px;font-size:16px;right:-8px;top:-12px"),
     // 地図の印の✓を大きく
     R('#map .pin:not(.mini) u', 'width:24px;height:24px;font-size:16px;left:-11px;top:-11px'),
+    // 記録のあとの「取り消す」などのお知らせ：文字18px・ボタンの高さ52px（指示書3.9・点検④U1。小さな帯にはしない＝schedule.js）
+    R('.xmini', 'width:52px;height:52px;font-size:30px;right:-10px;top:-12px'), // 設定の小さな「×」も、押しやすい大きさに（点検④U11）
+    R('#toast', 'font-size:calc(18px * var(--z,1))'),
+    R('#toast button', 'min-height:calc(52px * var(--z,1));font-size:calc(18px * var(--z,1));padding:0 16px'),
     // 区域カードの「あと○軒」
     `.kleft{margin:6px 0 2px;font-size:20px}.kleft b{font-size:38px;line-height:1.15;color:var(--terr)}`,
     `.kmore{background:#fff;border:2px solid var(--line);border-radius:12px;padding:0 12px;margin:12px 0}`,
@@ -240,8 +244,8 @@
       <div class="tbody">${left != null ? `<p class="kleft">あと <b>${left}</b> 軒</p>` : ''}
         ${own && typeof paperHandOf === 'function' && paperHandOf(t) ? '<p class="muted">紙のカードから引き継いだ区域です（紙で回った家は、数に入っていません）</p>' : ''}
         ${mp ? `<p class="hint-strong">今日のあなたの範囲があります（${esc(partMates(mp).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）</p>` : ''}
-        ${ld ? `<div class="leadline"><p><span class="leadtag">今日の司会</span><b>${esc(uname(ld.uid))}さん</b></p><button type="button" class="btn small" data-leadoff="${t.id}">司会を外す</button></div>` : ''}</div>
-      ${own ? `<div class="actions"><button class="btn primary" data-return="${t.id}">返す</button></div>` : ''}
+        ${ld ? `<div class="leadline"><p><span class="leadtag">今日の司会</span><b>${esc(uname(ld.uid))}さん</b></p><button type="button" class="btn small" data-leadoff="${esc(t.id)}">司会を外す</button></div>` : ''}</div>
+      ${own ? `<div class="actions"><button class="btn primary" data-open="${esc(t.id)}">地図をひらく</button><button class="btn" data-return="${esc(t.id)}">返す</button></div>` : ''}
       ${grpRow}
     </article>`;
   };
@@ -269,6 +273,12 @@
     if (simple()) { const ad = document.getElementById('allDetails'); if (ad && ad.open) ad.open = false; }
     const r = _renderCards.apply(this, arguments);
     if (simple()) $$('#myCards .taphint').forEach(e => e.classList.add('hint-must'));
+    // 「ホーム画面に追加」の案内は、簡単モードでは区域カードのあとに（文字を大きくしても、最初の画面に区域カードが入るように・点検④U6）
+    const ha = document.getElementById('homeAdd'), pm = document.getElementById('paneMine');
+    if (ha && pm) {
+      if (simple()) { if (pm.nextElementSibling !== ha) pm.after(ha); }
+      else if (pm.previousElementSibling !== ha) pm.before(ha);
+    }
     return r;
   };
 

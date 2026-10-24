@@ -2089,8 +2089,10 @@ body.duemode .terr-label:not(.duelab){display:none}
     try {
       const el = document.getElementById('toast');
       clearTimeout(quietTm);
-      el.classList.toggle('quiet', quietOn);
-      if (quietOn) quietTm = setTimeout(() => { el.hidden = true; el.classList.remove('quiet'); }, 8000);
+      // 簡単モードでは小さな帯にしない：ふつうのお知らせと同じ形・下のタブのすぐ上・12秒（指示書3.9・点検④U1）
+      const quiet = quietOn && !(typeof isSimple === 'function' && isSimple());
+      el.classList.toggle('quiet', quiet);
+      if (quiet) quietTm = setTimeout(() => { el.hidden = true; el.classList.remove('quiet'); }, 8000);
     } catch (e) { /* 表示だけの話 */ }
     return r;
   };
