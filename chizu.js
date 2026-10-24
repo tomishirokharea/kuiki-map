@@ -454,25 +454,29 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
   /* 係：登録・直す（chunk 300件ずつ）。試作版は、この端末だけに残す */
   async function lmSend(items, opt) {
     const saved = [], rejected = [];
+    let same = 0; // 同じ目印（名前・種類・場所）がもうあって、サーバーが足さなかった数（点検②V11）
     if (!LIVE) {
       items.forEach(it => { const id = it.id || 'l' + uid(); const rev = ++LM.rev; saved.push({ id, name: it.name, kind: it.kind, lat: it.lat, lng: it.lng, src: it.src || '', rev }); });
       lmMerge(saved); lmPersist(); lmRender(); lmLegendPaint();
-      return { saved, rejected };
+      return { saved, rejected, same };
     }
     for (let i = 0; i < items.length; i += 300) {
       const chunk = items.slice(i, i + 300).map(x => ({ id: x.id || '', name: x.name, kind: x.kind, lat: x.lat, lng: x.lng, src: x.src || '' }));
       const j = await api('lm_save', { items: chunk, import: !!(opt && opt.csv) }, { timeout: 90000 });
       (j.items || []).forEach(x => saved.push(x));
       (j.rejected || []).forEach(x => rejected.push(x));
+      same += Number(j.same) || 0;
       LM.rev = Math.max(LM.rev, Number(j.rev) || 0);
     }
     lmMerge(saved); lmPersist(); lmRender(); lmLegendPaint(); lmRepaintViews();
-    return { saved, rejected };
+    if (document.getElementById('adLmBox')) paintLmList(); // 係の画面の目印の一覧と件数も、すぐ新しくする
+    return { saved, rejected, same };
   }
   async function lmDelSend(id) {
     if (LIVE) { const j = await api('lm_del', { id }); LM.rev = Math.max(LM.rev, Number(j.rev) || 0); }
     else LM.rev++;
     lmMerge([{ id, del: 1 }]); lmPersist(); lmRender(); lmLegendPaint(); lmRepaintViews();
+    if (document.getElementById('adLmBox')) paintLmList();
   }
 
   /* ---- 地図に出す ---- */
@@ -748,7 +752,8 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
       toast('取りこんでいます…');
       try {
         const r = await lmSend(items.map(x => ({ name: x.name, kind: x.kind, lat: x.lat, lng: x.lng, src: sc.src })), { csv: true });
-        toast(`${r.saved.length}件を取りこみました${r.rejected.length ? `（サーバーが外したもの ${r.rejected.length}件）` : ''}`);
+        // 同じ目印がもうあった分は足さない（取りこみの押し直し・同じ一覧の取りこみ直しで、目印を2つにしない）
+        toast(`${r.saved.length - r.same}件を取りこみました${r.same ? `。同じ目印がもうあった${r.same}件は、足していません` : ''}${r.rejected.length ? `（サーバーが外したもの ${r.rejected.length}件）` : ''}`);
       } catch (e) { toast('取りこめませんでした。通信を確認してください'); }
     };
   }
