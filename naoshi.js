@@ -77,7 +77,7 @@
   function groupHolds(v) {
     if (typeof canGroupTerr !== 'function' || !canGroupTerr()) return false;
     const t = terrOfVisit(v);
-    if (t && t.group && t.holder === me().id) return true;
+    if (t && t.group && (t.holder === me().id || (typeof isLead === 'function' && isLead(t)))) return true; // 今日の司会も（2026-10-24）
     const k = K(v.houseId, v.unit);
     return activeCards().some(c => c.group && c.by === me().id && Array.isArray(c.keys) && c.keys.includes(k));
   }
@@ -196,7 +196,8 @@
   const _cardHtml = window.cardHtml;
   window.cardHtml = function (t, own) {
     const html = _cardHtml.apply(this, arguments);
-    if (!own || !t || !t.group || typeof canGroupTerr !== 'function' || !canGroupTerr()) return html;
+    const lead = !own && t && typeof isLead === 'function' && isLead(t); // 今日の司会（2026-10-24）
+    if (!(own || lead) || !t || !t.group || typeof canGroupTerr !== 'function' || !canGroupTerr()) return html;
     const i = html.lastIndexOf('</article>');
     if (i < 0) return html;
     return html.slice(0, i) + `<div class="actions"><button type="button" class="btn small" data-fixday="${esc(t.id)}">今日の記録を直す</button></div>` + html.slice(i);
