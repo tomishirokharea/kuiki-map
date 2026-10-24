@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.63"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.64"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="config.js"></script><!-- GASのURLと、会衆ごとの設定はこのファイルに書きます（無ければ試作モード） -->
-<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><script src="i18n-es-guruchu.js"></script><script src="i18n-es-meibo.js"></script><script src="i18n-es-shikai.js"></script><!-- スペイン語の辞書 / Diccionario español -->
+<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><script src="i18n-es-guruchu.js"></script><script src="i18n-es-meibo.js"></script><script src="i18n-es-shikai.js"></script><script src="i18n-es-tenken.js"></script><!-- スペイン語の辞書 / Diccionario español -->
 <script src="i18n.js"></script><!-- 言語の切りかえ / Cambio de idioma -->
 <script>
 /* iPhoneのホーム画面アプリで、下のタブの下に空白が出ることがある（iOSが画面の高さを、上の時刻の帯の分だけ短く伝えるため）。
@@ -3983,6 +3983,13 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.64', items: [
+    ['会', 'かんたんな表示で、記録のあとの「取り消す」を大きく、長め（12秒）に出すようにしました'],
+    ['集', '集合住宅で部屋を押したり記録したりしたとき、「会えた・留守」のボタンがいつも見えるようにしました。部屋は階ごとに分け、前回の結果を「会・留・拒」の字でも出します'],
+    ['区', 'かんたんな表示の区域カードに「地図をひらく」ボタンを付けました'],
+    ['家', 'iPhone（iOS 26）の「ホーム画面に追加」の手順を、新しい画面に合わせました'],
+    ['守', '安全と記録の正確さのための見直しをしました（電波が弱い所で返却したときに出ていた「受け付けられませんでした」のお知らせなど）']
+  ] },
   { v: '2026.13.56', items: [
     ['近', 'グループ奉仕の区域をもらうとき、「近い順」「おすすめ順」が、グループの中心（区域係が地図に置いた、グループの人がだいたい住んでいるあたり）からの近さを使うようになりました。期限の近い「急ぎ」の区域は、今までどおりいちばん上に出ます']
   ] },
