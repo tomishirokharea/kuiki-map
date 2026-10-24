@@ -41,5 +41,22 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "区域を返すと、またもらえます。": "Cuando devuelva un territorio, podrá recibir otro.",
 "{0}件を取りこみました（サーバーが外したもの {1}件）": "Se importaron {0} (el servidor descartó {1})",
 "{0}件を取りこみました。同じ目印がもうあった{1}件は、足していません": "Se importaron {0}. {1} ya existían y no se agregaron",
-"{0}件を取りこみました。同じ目印がもうあった{1}件は、足していません（サーバーが外したもの {2}件）": "Se importaron {0}. {1} ya existían y no se agregaron (el servidor descartó {2})"
+"{0}件を取りこみました。同じ目印がもうあった{1}件は、足していません（サーバーが外したもの {2}件）": "Se importaron {0}. {1} ya existían y no se agregaron (el servidor descartó {2})",
+/* 2026.13.67：簡単モードのホーム・留守宅カードをえらぶ・地図（10/09 の指示書の第4段） */
+"次の集まり": "Próxima reunión",
+"{0}（〜11時）": "{0} (hasta las 11)",
+"{0}（11〜14時）": "{0} (de 11 a 14 h)",
+"{0}（14〜17時）": "{0} (de 14 a 17 h)",
+"{0}（17〜19時）": "{0} (de 17 a 19 h)",
+"{0}（19時〜）": "{0} (desde las 19)",
+"予定はまだありません": "Todavía no hay reuniones programadas",
+"持っている区域カードはありません。": "No tiene tarjetas de territorio.",
+"これからの予定": "Próximas reuniones",
+"カレンダーで見る": "Ver en el calendario",
+"カレンダーを閉じる": "Cerrar el calendario",
+"訪ねた家": "Casa visitada",
+"最近会えた家": "Casa con contacto reciente",
+"右下の「?」を押すと、印の見かたと「返す」ボタンが出ます": "Toque «?» abajo a la derecha para ver el significado de las marcas y el botón «Devolver»",
+"かんたんな表示のホームに、次の集まりと「あなたの区域カード」を大きく出すようにしました。カレンダーは「カレンダーで見る」で開きます": "En la vista sencilla, el inicio ahora muestra en grande la próxima reunión y «Su tarjeta de territorio». El calendario se abre con «Ver en el calendario»",
+"かんたんな表示の地図に「区域○　あと○軒」の帯を出し、地図は回らないようにしました。留守宅カードをえらぶ画面も見やすくしました": "En la vista sencilla, el mapa muestra una franja «Territorio ○ · Faltan ○ casas» y ya no gira. También se simplificó la pantalla para elegir tarjetas de casas ausentes"
 });
