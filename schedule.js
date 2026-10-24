@@ -437,7 +437,7 @@
       <div class="setrow"><span>夜（19時〜）も、留守宅を訪ねる時間帯として提案する</span>
         ${seg('nightOn', [[1, '提案する'], [0, '提案しない']], nightOn() ? 1 : 0)}</div>
       <div class="setrow" style="display:block"><span>訪問を控える日<br><small class="hint">この日は、全員の画面で「おすすめ」と「留守宅カード」の提案を止めます（地域の行事の日など）</small></span>
-        <div class="offlist">${offs.map(x => `<button type="button" data-offdel="${x}" aria-label="${showDay(x)}を消す">${showDay(x)}（${'日月火水木金土'[parseYmd(x).getDay()]}） ×</button>`).join('') || '<span class="muted">登録はありません</span>'}</div>
+        <div class="offlist">${offs.map(x => `<button type="button" data-offdel="${esc(x)}" aria-label="${showDay(x)}を消す">${showDay(x)}（${'日月火水木金土'[parseYmd(x).getDay()]}） ×</button>`).join('') || '<span class="muted">登録はありません</span>'}</div>
         <div class="dueadd"><input type="date" id="dueOffIn" min="${ymd(new Date())}" aria-label="訪問を控える日"><button type="button" class="btn small" data-offadd>追加する</button></div></div>
     </details>`;
   }
@@ -625,6 +625,8 @@ button.ktag{cursor:pointer}
     if (g !== undefined) { reqForGroup = !!g; reqUse = 'grp'; } // 開き直したときは、グループ奉仕から
     if (!canGroupTerr()) reqForGroup = false;
     const G = reqForGroup, canTake = canTakeFree(G), free = freeTerrs();
+    // 持てる枚数に届いている（full）・係への申し込みの件数に届いている（!askOk）ときは、押しても断られるボタンを出さない（点検④U8）
+    const full = !hasRoom(G), askOk = !full && canAsk(G);
     const SIMPLE = typeof isSimple === 'function' && isSimple();
     // グループ奉仕の区域をもらうとき、そのグループの中心（係が地図に置いた点。guruchu.js）があれば、近さはそこから計る
     const GRP = G && reqUse !== 'all' && window.GC && GC.has(myGroup()) ? myGroup() : null;
@@ -652,7 +654,7 @@ button.ktag{cursor:pointer}
           <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${showDist(x) ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}`; };
     const btnsHtml = x => { const t = x.t; return `<div class="pickbtns">${canGet(x)
           ? `<button class="btn small primary" data-take="${esc(t.id)}">受け取る</button>`
-          : `<button class="btn small" data-ask="${esc(t.id)}">係に頼む</button>`}
+          : askOk ? `<button class="btn small" data-ask="${esc(t.id)}">係に頼む</button>` : ''}
           ${window.nozoku ? `<button class="btn small" data-peek="${esc(t.id)}" aria-label="区域${esc(t.no)}の場所を地図で見る">地図</button>` : ''}</div>`; };
     const rowHtml = x => { const t = x.t; return SIMPLE ? kRow(x) : `<article class="pick">
         <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
@@ -721,14 +723,16 @@ button.ktag{cursor:pointer}
         <div class="seg" role="group" aria-label="使う集まり"><button type="button" data-ruse="grp" aria-pressed="${!ALL}">${esc(myGroup())}グループ奉仕</button><button type="button" data-ruse="all" aria-pressed="${ALL}">全体の集まり</button></div>
         <div class="seg" role="group" aria-label="もらうカード"><button type="button" aria-pressed="true">区域カード</button><button type="button" data-gaway aria-pressed="false">留守宅カード</button></div>
         <p class="hint">${ALL ? '全体の集まり（金曜の晩・日曜の昼など、グループをこえた集まり）で使う区域です。' : 'グループの区域は、奉仕の集まりで使います。'}受け取ったら「今日回る人をえらぶ」で、回る人を決められます。グループ奉仕と全体の集まりは、合わせて${holdMax(true)}枚までです。</p>` : ''}
-      <p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。</p>
-      ${!canTake && list.some(x => isFree(x.t)) ? `<div class="notice warn">この区域は自分では受け取れません（${G ? '' : `自分で受け取れるのは${D().settings.selfTakeMax}枚まで・`}上限に届いています）。係に頼むことはできます。</div>` : ''}
+      ${full ? `<div class="notice warn">${G ? '集まりで使う区域' : '個人の区域'}は${holdMax(G)}枚までです（申し込み中もふくみます）。<br>区域を返すと、またもらえます。</div>`
+        : `<p class="hint">「受け取る」の区域は、すぐにあなたのカードになります。<br>「係に頼む」の区域は、係が決めてから届きます。</p>
+      ${!askOk ? `<div class="notice warn">${G ? 'グループ用' : '個人'}の申し込みは、${reqLimit(G)}件までです。係の返事を待ってください</div>`
+        : !canTake && list.some(x => isFree(x.t)) ? `<div class="notice warn">この区域は自分では受け取れません（${G ? '' : `自分で受け取れるのは${D().settings.selfTakeMax}枚まで・`}上限に届いています）。係に頼むことはできます。</div>` : ''}`}
       ${sortUi}
       ${rainUi}
       ${reqSort === 'near' && !GRP ? '<div class="row"><button class="btn small" id="reqNear">現在地を更新する</button></div>' : ''}
       ${rows || '<div class="empty">今、空いている区域はありません。</div>'}
-      <button class="btn block primary" data-ask="">どこでもよいので係に頼む</button>
-      <button class="btn block" data-close>もどる</button>`);
+      ${askOk ? '<button class="btn block primary" data-ask="">どこでもよいので係に頼む</button>' : ''}
+      <button class="btn block${full ? ' primary' : ''}" data-close>もどる</button>`);
     const S = $('#sheet');
     sortTip(S);
     if ($('#reqNear')) $('#reqNear').onclick = () => locate(window.openRequestSheet);
@@ -746,7 +750,7 @@ button.ktag{cursor:pointer}
       const x = list.find(y => y.t.id === b.dataset.peek); if (!x) return;
       const can = canGet(x), G0 = G, U0 = reqUse;
       window.nozoku.peek(x.t.id, { back: () => { reqForGroup = G0; reqUse = U0; window.openRequestSheet(); }, takeLabel: can ? '受け取る' : '係に頼む',
-        take: () => { reqForGroup = G0; reqUse = U0; if (can) takeTerr(x.t.id); else askTerr(x.t.id); },
+        take: can || askOk ? () => { reqForGroup = G0; reqUse = U0; if (can) takeTerr(x.t.id); else askTerr(x.t.id); } : null, // 断られるときは「受け取る・係に頼む」を出さない
         sub: `${x.n}軒・部屋　${x.last ? `前回返却した日 ${fmtDay(x.last)}` : 'まだ回ったことがない区域'}` });
     });
   };

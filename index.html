@@ -483,6 +483,7 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 @media (prefers-reduced-motion:reduce){.updbtn,.updbtn.busy svg{animation:none}}
 .uiseg{display:flex;flex-wrap:wrap;width:100%;margin:4px 0 6px}
 .uiseg button{flex:1;min-width:84px}
+.uiseg.sizeseg button{flex:1 1 auto;min-width:0;padding:0 10px;white-space:nowrap} /* 文字の大きさ：「とても大きく」を2行に折らない（文字を「とても大きく」にした幅360pxのスマホでも1行・点検④U11） */
 .swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
 .swatch{min-height:56px;border-radius:12px;border:3px solid var(--line);background:#fff;font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;padding:0 10px}
 .swatch i{width:26px;height:26px;border-radius:50%;background:var(--c);flex:none}
@@ -3191,7 +3192,7 @@ function asgNoticeHtml() {
   return todayAsgs().filter(a => a.keys.some(k => !seen.has(k))).map(a => `<div class="notice info asgnote">
     <b>${a.label ? esc(a.label) : `区域${esc(a.t.no)}`}を、今日いっしょに回るように、たのまれました</b><br>
     ${esc(uname(a.by))}さんから${a.p ? `・回る範囲があります（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}
-    <span class="actions"><button class="btn small primary" data-asgopen="${esc(a.t.id)}"${a.card ? ` data-asgcard="${a.card}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
+    <span class="actions"><button class="btn small primary" data-asgopen="${esc(a.t.id)}"${a.card ? ` data-asgcard="${esc(a.card)}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
       <button class="btn small" data-asgok="${esc(a.keys.join(' '))}">わかりました</button></span></div>`).join('');
 }
 let seenParts = null;
@@ -4199,10 +4200,14 @@ function splashGreeting() {
 
 /* ---------- お知らせ ---------- */
 let toastTimer = null;
-function toast(msg, undoFn, action) {
+function toast(msg, undoFn, action, opt) {
   const el = $('#toast');
   const act = action || (undoFn ? { label: '取り消す', fn: undoFn } : null);
   el.innerHTML = `<span>${esc(msg)}</span>` + (act ? `<button type="button">${esc(act.label)}</button>` : '');
+  // opt.below：その部品のすぐ下に出す（地図の案内で、右下の「現在地」ボタンを隠さないため・点検④U12）。ふだんは下のタブの上
+  const bel = opt && opt.below ? $(opt.below) : null, br = bel ? bel.getBoundingClientRect() : null;
+  if (br && br.height > 0) { el.style.top = Math.round(br.bottom + 8) + 'px'; el.style.bottom = 'auto'; }
+  else { el.style.top = ''; el.style.bottom = ''; }
   el.hidden = false;
   if (act) el.querySelector('button').onclick = () => { clearTimeout(toastTimer); el.hidden = true; act.fn(); };
   // 「取り消す」などのボタン以外のところ（文字など）をさわると、すぐ消す
@@ -9627,9 +9632,10 @@ function openReturnSheet(tid) {
       <button class="btn block wrap" data-pool>留守宅カードにして返す（だれでも受け取れる）</button>
       ${r.phase === 'first' ? '<button class="btn block wrap" data-afirst>1回目を終えたことにして、本人が留守宅を回る</button>' : ''}
       <button class="btn block wrap" data-fin="0">途中で返却する（回り終えた記録はつけません）</button></details>`;
+  // 目安に届いていない「途中の返却」は、ボタンを目立たせない（濃い色で返却をすすめない・点検④U5）
   setSheet(headHtml(t, `区域${t.no}を返却します`, sub) + `
     ${ph ? phPart : `${firstPart}${awayPart}${result}
-    <button class="btn primary block wrap" data-retgo>返却する</button>`}
+    ${plan.kind === 'partial' ? '<button class="btn block wrap" data-retgo>途中で返却する</button>' : '<button class="btn primary block wrap" data-retgo>返却する</button>'}`}
     ${self}
     <button class="btn block" data-close>もどる</button>
     ${admBox}`);
@@ -11136,7 +11142,7 @@ function openUiSheet() {
   const tab = currentView;
   const paint = keep => {
     const top = keep ? $('#sheet').scrollTop : 0, det = UI.mode === 'detail';
-    const seg = (key, opts, cur) => `<div class="seg uiseg" role="group">${opts.map(([v, l]) =>
+    const seg = (key, opts, cur, cls) => `<div class="seg uiseg${cls ? ' ' + cls : ''}" role="group">${opts.map(([v, l]) =>
       `<button type="button" data-ui="${key}" data-v="${v}" aria-pressed="${(cur === undefined ? UI[key] : cur) === v}">${l}</button>`).join('')}</div>`;
     const sizeOpts = (det ? ['small', 'normal', 'large', 'xlarge'] : ['normal', 'large', 'xlarge']).map(k => [k, SIZES[k][1]]);
     const SAMPLE = 'あいう 区域マップ';
@@ -11147,7 +11153,7 @@ function openUiSheet() {
          <div class="zoomrow"><input type="range" id="uiPct" min="80" max="160" step="5" value="${pct}" aria-label="文字の大きさ（％）"><output id="uiPctOut">${pct}%</output></div>
          <div class="zoomprev" id="uiPctPrev" style="font-size:${18 * pct / 100}px">あいう 区域マップ 123</div>
          <div class="row"><button type="button" class="btn small" id="uiPct100">標準（100%）にもどす</button></div>`
-      : seg('size', sizeOpts, uiEff().size);
+      : seg('size', sizeOpts, uiEff().size, 'sizeseg');
     const S_TEXT = `<h3 class="sub">文字</h3>${det ? S_SIZE : `<p class="q">文字の大きさ</p>${S_SIZE}`}` + (det
       ? `<p class="q">文字の種類</p>
          <div class="fontgrid">${Object.entries(FONTS).map(([k, v]) =>
@@ -13882,7 +13888,7 @@ function todayTodoHtml(todays) {
     h += `<div class="todo asg"><div class="asgtop"><span class="asgdot">${ICO_OK}</span>
         <div><b>${a.label ? esc(a.label) : `区域${esc(a.t.no)}`}を、今日いっしょに回るように、たのまれました</b>
         <small>${esc(uname(a.by))}さんから${a.p ? `・回る範囲あり（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}</small></div></div>
-      <div class="row"><button type="button" class="btn primary" data-asgopen="${esc(a.t.id)}"${a.card ? ` data-asgcard="${a.card}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
+      <div class="row"><button type="button" class="btn primary" data-asgopen="${esc(a.t.id)}"${a.card ? ` data-asgcard="${esc(a.card)}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
         <button type="button" class="btn" data-asgok="${esc(a.keys.join(' '))}">わかりました</button></div></div>`;
   });
   const mine = D().territories.filter(t => t.holder === me().id).sort(byNo);
@@ -15268,7 +15274,7 @@ function openTerr(id) {
   zoomHintShown = false; // 区域カードから入ったときは、案内をもう一度出す
   showView('map');
   selectTerr(id, { fit: true });
-  if (beginner()) setTimeout(() => toast('右下の「?」を押すと、この区域の進み具合やおすすめ順が見られます'), 2500);
+  if (beginner()) setTimeout(() => toast('右下の「?」を押すと、この区域の進み具合やおすすめ順が見られます', null, null, { below: '#mapTools' }), 2500);
 }
 
 /* ---------- ボタンの動き ---------- */

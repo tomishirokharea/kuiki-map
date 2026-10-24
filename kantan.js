@@ -90,6 +90,7 @@
     R('#map .pin:not(.mini) u', 'width:24px;height:24px;font-size:16px;left:-11px;top:-11px'),
     // 記録のあとの「取り消す」などのお知らせ：文字18px・ボタンの高さ52px（指示書3.9・点検④U1。小さな帯にはしない＝schedule.js）
     R('.xmini', 'width:52px;height:52px;font-size:30px;right:-10px;top:-12px'), // 設定の小さな「×」も、押しやすい大きさに（点検④U11）
+    R('.grabhint', 'padding:0 44px'), // 「下にスワイプすると…」の文が、大きくした「×」の下に入らないように（左右そろえて中央のまま）
     R('#toast', 'font-size:calc(18px * var(--z,1))'),
     R('#toast button', 'min-height:calc(52px * var(--z,1));font-size:calc(18px * var(--z,1));padding:0 16px'),
     // 区域カードの「あと○軒」

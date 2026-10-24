@@ -435,7 +435,7 @@
         <div class="senrow">${nav}${btn('cancel', 'もどる', 'small')}</div>`;
     } else {
       hint.textContent = `${S.ii + 1}/${n}：区域${tno(x.a)}と区域${tno(x.b)}が重なっています（${m2(x.area)}）。どちらの区域にしますか？`;
-      body.innerHTML = head + `<div class="senrow">${btn('ovTo', `区域${esc(tno(x.a))}にする`, 'small primary', ` data-t="${x.a}"`)}${btn('ovTo', `区域${esc(tno(x.b))}にする`, 'small primary', ` data-t="${x.b}"`)}</div>
+      body.innerHTML = head + `<div class="senrow">${btn('ovTo', `区域${esc(tno(x.a))}にする`, 'small primary', ` data-t="${esc(x.a)}"`)}${btn('ovTo', `区域${esc(tno(x.b))}にする`, 'small primary', ` data-t="${esc(x.b)}"`)}</div>
         <div class="senrow">${nav}${btn('cancel', 'もどる', 'small')}</div>`;
     }
   }
