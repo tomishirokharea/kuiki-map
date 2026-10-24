@@ -2975,6 +2975,9 @@ async function apiRetry(action, extra, onRetry, valid) {
    ・一覧が使えないとき（古いサーバーなど）は、これまでどおりシートから分けて受け取る（meta のあとに）
    ・opt.parallel … 同時に取りに行く数の目安（はじめて開くとき6、全員の読み直しのときは2） */
 const PART_STEP = { houses: 5000, visits: 20000 };
+// シートから分けて読むときは、前の分と少し重ねて読む。読み込みのあいだに、ほかの人が記録を取り消したり家を消したりすると、
+// シートの行が上にずれて、分けめの記録が抜けることがあるため。重なって2回届いた分は、あとで1つにする（点検②V8）
+const PART_OVERLAP = { houses: 100, visits: 200 };
 async function runPool(tasks, n) {
   const out = new Array(tasks.length);
   let i = 0;
@@ -3009,18 +3012,22 @@ async function loadAll(onProgress, onRetry, opt) {
   prog({ pct: 4, stage: 'houses', eta: null });
   const fetchPart = (part, offset, extra) => apiRetry('load', Object.assign({ part, offset }, extra || {}), onRetry, valid)
     .then(r => { done += r.rows.length; tick(); return r; });
-  const inOrder = async (part, off, chunks) => { // 1つずつ順に
-    while (off !== null && off !== undefined) { const r = await fetchPart(part, off); chunks.push(r.rows); off = r.next; }
+  const inOrder = async (part, off, chunks) => { // 1つずつ順に（前の分と少し重ねて読む）
+    const ov = PART_OVERLAP[part] || 0;
+    while (off !== null && off !== undefined) {
+      const r = await fetchPart(part, off); chunks.push(r.rows);
+      off = r.next === null || r.next === undefined ? null : r.next - Math.min(ov, Math.floor((r.next - off) / 10)); // 1回に返す件数が少ないサーバーでも、先へ進む
+    }
     return chunks;
   };
   // シートから分けて受け取る（meta のあとに読むので、変更番号の順は正しい）
   const loadPart = async (part, n) => {
-    const step = PART_STEP[part], offs = [];
+    const size = PART_STEP[part], step = size - (PART_OVERLAP[part] || 0), offs = [];
     for (let o = 0; o < Math.max(1, cnt[part] || 0); o += step) offs.push(o);
     const rs = await runPool(offs.map(o => () => fetchPart(part, o)), n);
-    if (rs.some((r, k) => r.next !== null && r.next !== undefined && r.next !== offs[k] + step)) return inOrder(part, 0, []); // サーバーの件数がちがう
+    if (rs.some((r, k) => r.next !== null && r.next !== undefined && r.next !== offs[k] + size)) return inOrder(part, 0, []); // サーバーの件数がちがう
     const chunks = rs.map(r => r.rows), lastR = rs[rs.length - 1];
-    return lastR.next !== null && lastR.next !== undefined ? inOrder(part, lastR.next, chunks) : chunks; // 読み込みのあいだに増えた分
+    return lastR.next !== null && lastR.next !== undefined ? inOrder(part, lastR.next - (PART_OVERLAP[part] || 0), chunks) : chunks; // 読み込みのあいだに増えた分
   };
   const isSnap = r => !!(r && r.snap && !r.gone && isFinite(Number(r.seq)));
   // 記録の一覧：最初の分から全体の件数がわかるので、残りを同時に（3つまで）
