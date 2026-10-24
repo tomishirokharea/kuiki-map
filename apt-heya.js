@@ -21,6 +21,11 @@
    ========================================================= */
 (function () {
   'use strict';
+  if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.63')) {
+    CHANGELOG.unshift({ v: '2026.13.63', items: [
+      ['集', '「旧区域カードの部屋を入れる」で、駐車場・店・家主だけの階には「1階」などの枠を残さないようにしました（記録のある枠は残します）']
+    ] });
+  }
   if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.62')) {
     CHANGELOG.unshift({ v: '2026.13.62', items: [
       ['集', '「アパートの登録」に「旧区域カードの部屋を入れる」ができました。紙の区域カードから読み取った一覧（エクセル）を選ぶと、建物名でアパートを探して、階ごとの部屋番号を入れます'],
@@ -89,9 +94,9 @@
     if (/^[0-9A-Za-z\-]{1,10}$/.test(t)) return t.toUpperCase();     // 3A・2-1・A201・3-A・B1 は書かれたまま
     return '';
   }
-  /* 戻り値：{ units: [...], frames: [2,…], skipped: 数 } */
+  /* 戻り値：{ units: [...], frames: [2,…], listed: [カードに書いてある階], skipped: 数 } */
   function parseFloors(text) {
-    const out = { units: [], frames: [], skipped: 0, top: 0 };
+    const out = { units: [], frames: [], listed: [], skipped: 0, top: 0 };
     String(text || '').normalize('NFKC').replace(/：/g, ':').split(/\s*\/\s*/).forEach(seg => {
       const i = seg.indexOf(':'); if (i < 0) return;
       const lab = seg.slice(0, i).trim(); let items = seg.slice(i + 1).trim();
@@ -104,7 +109,7 @@
       const toks = [];
       items.split(/[,、]/).map(s => s.trim()).filter(Boolean).forEach(tk => expand(tk).forEach(x => toks.push(x)));
       fls.forEach(fl => {
-        if (!isB) out.top = Math.max(out.top, fl);
+        if (!isB) { out.top = Math.max(out.top, fl); if (!out.listed.includes(fl)) out.listed.push(fl); }
         toks.forEach(tk => {
           // 「各01,02」のような書き方（階＋番号）
           const u = /^0\d$/.test(tk) && !isB ? `${fl}${tk}` : unitName(fl, tk, isB);
@@ -196,11 +201,12 @@
       }
       if (noName(r.name)) { plan.noName.push(r); return; }
       const key = r.parent + '|' + nrm(baseName(r.name));
-      if (!groups.has(key)) groups.set(key, { parent: r.parent, name: baseName(r.name), rows: [], units: [], frames: [], skipped: 0, top: 0, fixed: false });
+      if (!groups.has(key)) groups.set(key, { parent: r.parent, name: baseName(r.name), rows: [], units: [], frames: [], listed: [], skipped: 0, top: 0, fixed: false });
       const g = groups.get(key), p = parseFloors(d.text);
       g.rows.push(r); g.fixed = g.fixed || !!d.fixed;
       p.units.forEach(u => { if (!g.units.includes(u)) g.units.push(u); });
       p.frames.forEach(f => { if (!g.frames.includes(f)) g.frames.push(f); });
+      p.listed.forEach(f => { if (!g.listed.includes(f)) g.listed.push(f); });
       g.skipped += p.skipped; g.top = Math.max(g.top, p.top);
     });
     const idx = buildIndex(), usedTarget = new Map();
@@ -232,7 +238,8 @@
     const before = h.units.slice();
     if (g.mode === 'replace') {
       const fls = new Set(g.units.map(u => { const q = typeof unitPos === 'function' ? unitPos(u) : null; return q ? q.fl : null; }).filter(Boolean));
-      // 記録のある枠と、一覧に部屋がない階の枠は残す
+      (g.listed || []).forEach(f => fls.add(f)); // 「1階：駐車場」「4階：家主」のように書いてある階も、カードで分かっている階
+      // 記録のある枠と、カードに書いていない階の枠は残す
       const keep = before.filter(u => !g.units.includes(u) && (unitHasRec(h.id, u) || (B_FRAME.test(u) && !fls.has(+u.match(B_FRAME)[1]))));
       h.units = g.units.concat(keep).slice(0, MAX_UNITS);
       const ul = Object.assign({}, h.ul || {});
@@ -285,7 +292,7 @@
       <p class="hint">入れる部屋：<b>${nRooms}部屋</b>。建物名で、同じ親区域のアパート（なければ候補）を探しました。</p>
       <p class="hint"><b>入れる行</b>：確認の欄が「○」の行と、確認の欄に直した内容（「3階:1,2,3 / 2階:…」）を書いた行です。「取り込まない」と書いた行は入れません。</p>
       <label class="check"><input type="checkbox" id="ahBlank"${useBlank ? ' checked' : ''}><span>確認の欄が空の行も入れる<br><small class="muted">「要確認」の行は入れません。紙と見くらべていない行なので、あとで建物の画面で確かめてください。</small></span></label>
-      <p class="hint">・「1階・2階…」の枠だけのアパートは、部屋番号に置きかえます（記録のある枠は「（部屋不明）」として、一覧に部屋がない階の枠はそのまま残します）。<br>
+      <p class="hint">・「1階・2階…」の枠だけのアパートは、部屋番号に置きかえます（記録のある枠は「（部屋不明）」として、カードに書いていない階の枠はそのまま残します）。<br>
         ・すでに部屋番号があるアパートは、足りない部屋だけ足します（消しません）。<br>
         ・店・事務所・駐車場は部屋にしません。家主は「1階家主」のように入れます。</p>
       ${det('入れる建物', plan.todo, g => `${grpLine(g)}<br><small class="muted">${g.kind === 'cand' ? '候補に' : g.mode === 'add' ? `足す部屋 ${g.add.length}` : '枠を部屋番号に'}：${esc((g.mode === 'add' ? g.add : g.units).slice(0, 12).join(' '))}${(g.mode === 'add' ? g.add : g.units).length > 12 ? ' …' : ''}${g.far ? '　<b>親区域がちがう建物です</b>' : ''}${g.fixed ? '　（確認の欄の内容）' : ''}</small>`)}
