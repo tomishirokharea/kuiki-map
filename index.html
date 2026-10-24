@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.67"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.68"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="config.js"></script><!-- GASのURLと、会衆ごとの設定はこのファイルに書きます（無ければ試作モード） -->
-<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><script src="i18n-es-guruchu.js"></script><script src="i18n-es-meibo.js"></script><script src="i18n-es-shikai.js"></script><script src="i18n-es-tenken.js"></script><!-- スペイン語の辞書 / Diccionario español -->
+<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><script src="i18n-es-guruchu.js"></script><script src="i18n-es-meibo.js"></script><script src="i18n-es-shikai.js"></script><script src="i18n-es-tenken.js"></script><script src="i18n-es-kaizen.js"></script><!-- スペイン語の辞書 / Diccionario español -->
 <script src="i18n.js"></script><!-- 言語の切りかえ / Cambio de idioma -->
 <script>
 /* iPhoneのホーム画面アプリで、下のタブの下に空白が出ることがある（iOSが画面の高さを、上の時刻の帯の分だけ短く伝えるため）。
@@ -347,7 +347,7 @@ button.tile:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
 .pin.mini u{width:14px;height:14px;font-size:9px;left:-6px;top:-6px;border-width:1px}
 .cardbar .keys{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:15px;margin:6px 0}
 .cardbar .keys span{display:inline-flex;align-items:center;gap:5px}
-.keyhelp summary{min-height:40px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+.keyhelp summary{min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer}
 .keyhelp p{font-size:14px;margin:2px 0}
 .pin s{position:absolute;right:-13px;top:-13px;min-width:24px;height:24px;border-radius:99px;background:var(--draw);color:#fff;text-decoration:none;font-size:14px;font-weight:700;display:grid;place-items:center;border:2px solid #fff;padding:0 4px;line-height:1}
 .pin.apt s{top:auto;bottom:-13px}
@@ -747,6 +747,7 @@ html[lang="es"] .atabs button{font-size:13px;white-space:normal;line-height:1.15
 .adsub{display:flex;flex-wrap:nowrap;margin:-4px 0 8px}
 .adsub button{flex:1 1 auto;min-height:48px;font-size:16px;white-space:nowrap;padding:0 6px!important;min-width:0}
 .adsub [data-admap]{flex:1.3 1 auto}
+.adsub [data-admap]::after{content:' ›'} /* 押すと地図に移る（ほかの3つは同じ画面の中の切りかえ）ことが分かるように（改善案A9） */
 @media (max-width:380px){.adsub button{font-size:15px;padding:0 4px!important}}
 .atabs .cnt{position:static;display:inline-grid;margin-left:4px;vertical-align:middle}
 
@@ -794,7 +795,7 @@ html[lang="es"] .atabs button{font-size:13px;white-space:normal;line-height:1.15
 /* 下から出る画面の上：つまみと、小さな「×」（帯にはしない） */
 .grabrow{position:relative;min-height:22px}
 .grabrow .grab{margin:4px auto 6px}
-.xmini{position:absolute;right:-6px;top:-8px;width:40px;height:40px;border-radius:50%;border:0;background:transparent;color:var(--ink2);font-size:26px;line-height:1}
+.xmini{position:absolute;right:-8px;top:-10px;width:44px;height:44px;border-radius:50%;border:0;background:transparent;color:var(--ink2);font-size:26px;line-height:1}
 .northbtn{position:absolute;right:10px;bottom:152px;z-index:520;width:48px;height:48px;border-radius:50%;border:2px solid var(--ink);background:#fff;color:var(--ink);box-shadow:0 2px 6px #0003;padding:0;display:grid;place-items:center}
 .northbtn .ndl{display:block;width:40px;height:40px;rotate:var(--ndeg,0deg)}
 .northbtn svg{width:40px;height:40px;display:block}
@@ -3992,6 +3993,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.68', items: [
+    ['家', 'くわしい表示の「二世帯住宅にする」は、家の画面の「この家を編集」の中（下の方）に移しました']
+  ] },
   { v: '2026.13.67', items: [
     ['家', 'かんたんな表示のホームに、次の集まりと「あなたの区域カード」を大きく出すようにしました。カレンダーは「カレンダーで見る」で開きます'],
     ['地', 'かんたんな表示の地図に「区域○　あと○軒」の帯を出し、地図は回らないようにしました。留守宅カードをえらぶ画面も見やすくしました']

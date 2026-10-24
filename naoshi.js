@@ -236,6 +236,17 @@
     if (!S || !curTgt || S.querySelector('.dupx, .unitstrip, .fixline')) return;
     const h = houseById(curTgt.hid); if (!h) return;
     const title = S.querySelector('#sheetTitle');
+    // 二世帯住宅にする（くわしい表示・一戸建て）：めったに使わない操作なので、家の画面ではなく
+    // 「この家を編集」の画面の下（場所を直す・削除と同じ所）に置く（改善案A9・2026-10-25）
+    if (title && title.textContent === 'この家を編集') {
+      const sep = S.querySelector('.aw-sep'), asHouse = S.querySelector('[data-type="house"][aria-pressed="true"]');
+      if (sep && asHouse && !curTgt.unit && h.type === 'house' && !isSimple() && !S.querySelector('#fDuplex')) {
+        const hid0 = curTgt.hid;
+        sep.insertAdjacentHTML('afterbegin', '<button class="btn block" id="fDuplex">二世帯住宅にする</button>');
+        S.querySelector('#fDuplex').onclick = () => openDuplexConvert(hid0);
+      }
+      return;
+    }
     if (!title || title.innerHTML !== targetName(h, curTgt.unit)) return; // 家の記録の画面のときだけ
     const { hid, unit } = curTgt;
     const k = K(hid, unit);
@@ -249,12 +260,7 @@
         bindFixLine(S, () => openTarget(hid, unit));
       }
     }
-    // 2) 二世帯住宅にする（くわしい表示・一戸建て）
-    const ed = S.querySelector('#fEditHouse');
-    if (ed && !unit && h.type === 'house' && !isSimple() && !S.querySelector('#fDuplex')) {
-      ed.insertAdjacentHTML('afterend', '<button class="btn block" id="fDuplex">二世帯住宅にする</button>');
-      S.querySelector('#fDuplex').onclick = () => openDuplexConvert(hid);
-    }
+    // 2) 二世帯住宅にする：「この家を編集」の中へ移した（上の分岐）
   }
 
   /* =========================================================

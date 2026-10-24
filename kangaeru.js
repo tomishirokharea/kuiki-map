@@ -28,7 +28,7 @@
   css.textContent = `.kgcard{margin:10px 0}
 .kgthanks{background:#E8F5E9;border:2px solid #2E7D32;border-radius:14px;padding:12px 14px}
 .kgbig{font-size:34px;font-weight:700;color:var(--brand);line-height:1.2}
-.kgwhy{display:block;width:100%;text-align:left;background:none;border:0;padding:4px 0;color:var(--ink2);font-size:16px;line-height:1.5}
+.kgwhy{display:block;width:100%;min-height:44px;text-align:left;background:none;border:0;padding:8px 0;color:var(--ink2);font-size:16px;line-height:1.5} /* 押せる所は44px以上（改善案A9） */
 .kgwhy:after{content:' ›';font-weight:700}
 .kgsm{font-size:15px;color:var(--ink2)}
 .kgday{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:6px 0}

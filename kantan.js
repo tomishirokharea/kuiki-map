@@ -271,7 +271,8 @@
 
   const _renderCards = window.renderCards;
   window.renderCards = function () {
-    if (simple()) { const ad = document.getElementById('allDetails'); if (ad && ad.open) ad.open = false; }
+    // 「ほかの区域を見る」は、簡単モードでは出さない（10/09 の指示書3.3・改善案A9。くわしいモードは今までどおり）
+    { const ad = document.getElementById('allDetails'); if (ad) { if (simple() && ad.open) ad.open = false; ad.hidden = simple(); } }
     const r = _renderCards.apply(this, arguments);
     if (simple()) $$('#myCards .taphint').forEach(e => e.classList.add('hint-must'));
     // 「ホーム画面に追加」の案内は、簡単モードでは区域カードのあとに（文字を大きくしても、最初の画面に区域カードが入るように・点検④U6）
