@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.75"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.76"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -332,6 +332,11 @@ button.tile:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
 .trow1 .tl-go{font-size:26px;line-height:1;color:var(--ink2)}
 .trow1[hidden],.tlist>[hidden]{display:none}
 .tlist>.pgrp,.tlist>.spgrp{border-top:1px solid var(--line);margin:0;border-radius:0}
+/* 係の画面「人」の一覧：1人1行。押すと下から出る画面で直す（改善案A5）。区域の一覧と同じ行の形 */
+.uplist{background:#fff;border:2px solid var(--line);border-radius:12px;overflow:hidden;margin-top:8px}
+.uplist>.trow1:first-child{border-top:0}
+.uplist>.prow-ro{cursor:default}
+.uplist>.prow-ro:hover{background:#fff}
 @container tlist (min-width:860px){
   .tlhead,.trow1{display:grid;grid-template-columns:64px minmax(140px,2fr) 150px minmax(110px,1.3fr) 104px 128px 140px 72px 24px;gap:0 10px;align-items:center}
   .tlhead{padding:8px 12px;font-size:14px;font-weight:700;color:var(--ink2);background:#F4F6F8;border-bottom:1px solid var(--line)}
@@ -14561,10 +14566,7 @@ async function approveDevice(d, extra, name, back) {
 }
 function renderPeople() {
   const box = $('#adPeople'); if (!box) return;
-  // グループ名を入力しているあいだは描き直さない（同期のたびに、入れかけの文字が消えないように）
-  const ae = document.activeElement;
-  if (ae && box.contains(ae) && ae.matches('input[type="text"]')) return;
-  const admin = isAdmin(), groups = groupsAll();
+  const admin = isAdmin();
   const users = D().users.filter(u => !u.inactive && (admin || u.group === myGroup())).slice()
     .sort((a, b) => (a.group || '～').localeCompare(b.group || '～', 'ja') || a.name.localeCompare(b.name, 'ja'));
   const noGroup = admin ? D().users.filter(u => !u.inactive && !u.group).length : 0;
@@ -14574,52 +14576,66 @@ function renderPeople() {
       ${window.MEIBO ? '<button class="btn" id="adMeibo">名簿（PDF）から更新</button>' : ''}</div>
       <p class="hint">集まりのときは「共通リンクのQR」を見せると、みんながその場で申し込めます。申し込みは「申請・承認」で承認します。</p>` : ''}
     ${noGroup ? `<div class="notice warn"><b>グループが決まっていない人が ${noGroup}人 います。</b>この人たちには、グループの集まりの予定は届きません（「全体」の予定だけが届きます）。</div>` : ''}
-    ${admin ? `<p class="hint">グループの名前（例：A、北）と、グループ監督・司会者かどうかを決めます。変えると、すぐに保存されます。<br>監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>
-      <datalist id="groupList">${groups.map(g => `<option value="${esc(g)}">`).join('')}</datalist>` : ''}
-    ${users.map(u => `<article class="trow"><span class="stamp sm" style="font-size:16px">${esc(u.group || '—')}</span>
-      <div><b>${esc(u.name)}</b>${u.role === 'admin' ? '（区域係）' : ''}${u.overseer ? ' <span class="gbadge">監督</span>' : ''}${u.leader ? ' <span class="gbadge">司会者</span>' : ''}</div>
-      ${admin ? `<div class="actions"><label>グループ <input type="text" list="groupList" maxlength="30" data-ugroup="${esc(u.id)}" value="${esc(u.group || '')}" style="min-height:46px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;width:120px"></label>
-        <label class="check"><input type="checkbox" data-uover="${esc(u.id)}"${u.overseer ? ' checked' : ''}>監督</label>
-        <label class="check"><input type="checkbox" data-ulead="${esc(u.id)}"${u.leader ? ' checked' : ''}>司会者</label>
-        <div class="seg small" role="group" aria-label="役割">
-          <button type="button" data-urole="pub" data-id="${esc(u.id)}" aria-pressed="${u.role !== 'admin'}">伝道者</button>
-          <button type="button" data-urole="admin" data-id="${esc(u.id)}" aria-pressed="${u.role === 'admin'}">区域係</button></div>
-        <button class="btn small" data-ulink="${esc(u.id)}">リンク・QR</button>
-        ${u.id === me().id ? '' : `<button class="btn small danger" data-uoff="${esc(u.id)}">使うのをやめる</button>`}</div>` : ''}</article>`).join('')}`;
+    ${admin ? '<p class="hint">人の行を押すと、グループ・監督・司会者・役割を直せます（直して「保存する」を押したときだけ変わります）。<br>監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>' : ''}
+    <div class="uplist">${users.map(u => {
+      const who = `<span class="stamp sm" style="font-size:16px">${esc(u.group || '—')}</span>
+        <span class="tl-n"><b>${esc(u.name)}${u.role === 'admin' ? '（区域係）' : ''}${u.overseer ? ' <span class="gbadge">監督</span>' : ''}${u.leader ? ' <span class="gbadge">司会者</span>' : ''}</b></span>`;
+      // 区域係：1人1行。押すと下から出る画面で直す（改善案A5。押しまちがいでグループや役割が変わらないように）
+      return admin ? `<button type="button" class="trow1" data-uedit="${esc(u.id)}">${who}<span class="tl-go" aria-hidden="true">›</span></button>` : `<div class="trow1 prow-ro">${who}</div>`;
+    }).join('')}</div>`;
   if (admin) {
     $('#adUserAdd').onclick = openAddUser;
     $('#adJoinQr').onclick = openJoinQr;
     if ($('#adMeibo')) $('#adMeibo').onclick = () => window.MEIBO.open(); // グループ編成のときに、名簿のPDFからまとめて直す（meibo.js）
-    $$('[data-ulink]', box).forEach(b => b.onclick = () => { const u = userById(b.dataset.ulink); if (u) openUserLink(u, false); });
-    $$('[data-urole]', box).forEach(b => b.onclick = async () => {
-      const u = userById(b.dataset.id); if (!u) return;
-      const role = b.dataset.urole;
-      if (u.role === role) return;
-      if (!await ask(`${u.name}さんを「${role === 'admin' ? '区域係' : '伝道者'}」にします。よろしいですか？`)) return;
-      setUserGroup(u, normGroup($(`[data-ugroup="${CSS.escape(String(u.id))}"]`).value), $(`[data-uover="${CSS.escape(String(u.id))}"]`).checked, $(`[data-ulead="${CSS.escape(String(u.id))}"]`).checked, role);
-    });
-    $$('[data-uoff]', box).forEach(b => b.onclick = async () => {
-      const u = userById(b.dataset.uoff); if (!u) return;
+    $$('[data-uedit]', box).forEach(b => b.onclick = () => openEditUser(b.dataset.uedit));
+  }
+}
+/* 1人の役割・グループを直す（係の画面「人」の行を押したとき・改善案A5）。直して「保存する」を押したときだけ保存する */
+function openEditUser(id) {
+  const u0 = userById(id); if (!u0 || !isAdmin()) return;
+  const groups = groupsAll();
+  const roleOf = u => (u.role === 'admin' ? 'admin' : 'pub');
+  const f = { role: roleOf(u0), group: u0.group || '', overseer: !!u0.overseer, leader: !!u0.leader };
+  const paint = () => {
+    const u = userById(id); if (!u) { closeSheet(); return; }
+    setSheet(headHtml(null, `${esc(u.name)}さん`, '役割とグループを直します') + `
+      <p class="q">役割</p>
+      <div class="seg uiseg" role="group" aria-label="役割">
+        <button type="button" data-eurole="pub" aria-pressed="${f.role === 'pub'}">伝道者</button>
+        <button type="button" data-eurole="admin" aria-pressed="${f.role === 'admin'}">区域係</button></div>
+      <label class="field"><span>グループ</span>
+        <input type="text" id="euGroup" list="groupList" maxlength="30" value="${esc(f.group)}" placeholder="例：北"></label>
+      <datalist id="groupList">${groups.map(g => `<option value="${esc(g)}">`).join('')}</datalist>
+      <label class="check"><input type="checkbox" id="euOver"${f.overseer ? ' checked' : ''}>グループ監督</label>
+      <label class="check"><input type="checkbox" id="euLead"${f.leader ? ' checked' : ''}>司会者</label>
+      <p class="hint">監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>
+      <button class="btn primary block" id="euSave">保存する</button>
+      <button class="btn block" id="euLink">リンク・QR</button>
+      ${u.id === me().id ? '' : '<div class="kops"><details><summary>この人が使うのをやめる</summary><p class="hint">この人のスマホでは、次に開いたときに区域の情報が消えます。</p><button class="btn block danger" id="euOff">使うのをやめる</button></details></div>'}
+      <button class="btn block" data-close>やめる</button>`);
+    const keep = () => { f.group = $('#euGroup').value; f.overseer = $('#euOver').checked; f.leader = $('#euLead').checked; };
+    $$('[data-eurole]', $('#sheet')).forEach(x => x.onclick = () => { keep(); f.role = x.dataset.eurole; sheetKeep = true; paint(); });
+    $('#euGroup').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('#euSave').click(); } };
+    $('#euSave').onclick = async () => {
+      keep();
+      const u = userById(id); if (!u) { closeSheet(); return; }
+      const g = normGroup(f.group), roleCh = roleOf(u) !== f.role;
+      if (!roleCh && (u.group || '') === g && !!u.overseer === f.overseer && !!u.leader === f.leader) { closeSheet(); toast('変わったところはありません'); return; }
+      if (roleCh && !await ask(`${u.name}さんを「${f.role === 'admin' ? '区域係' : '伝道者'}」にします。よろしいですか？`)) return;
+      closeSheet();
+      if (roleCh) setUserGroup(u, g, f.overseer, f.leader, f.role); else setUserGroup(u, g, f.overseer, f.leader);
+    };
+    $('#euLink').onclick = () => { const u = userById(id); if (u) openUserLink(u, false); };
+    if ($('#euOff')) $('#euOff').onclick = async () => {
+      const u = userById(id); if (!u) return;
       if (!await ask('', { title: `${u.name}さんが区域マップを使うのをやめますか？`,
         body: 'この人のスマホでは、次に開いたときに区域の情報が消えます。\n再訪問のメモ（次の約束・📌）も消え、あとで使えるようにしても元にもどりません（本人がバックアップを保存していれば、もどせます）。\n受け持ちの家のリストと、会えた記録は残ります。',
         ok: '使うのをやめる', cancel: 'このまま使う', danger: true })) return;
+      closeSheet();
       setUserGroup(u, u.group || '', !!u.overseer, !!u.leader, u.role, false);
-    });
-  }
-  // グループ（入力が終わったとき＝ほかを押した・Enter）・監督・司会者は、変えたらすぐ保存する
-  const saveRow = id => {
-    const u = userById(id); if (!u) return;
-    const g = normGroup($(`[data-ugroup="${CSS.escape(String(id))}"]`, box).value), ov = $(`[data-uover="${CSS.escape(String(id))}"]`, box).checked, ld = $(`[data-ulead="${CSS.escape(String(id))}"]`, box).checked;
-    if ((u.group || '') === g && !!u.overseer === ov && !!u.leader === ld) return; // 変わっていない
-    setUserGroup(u, g, ov, ld);
+    };
   };
-  if (admin) {
-    $$('[data-ugroup]', box).forEach(x => {
-      x.onchange = () => saveRow(x.dataset.ugroup);
-      x.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); x.blur(); } };
-    });
-    $$('[data-uover],[data-ulead]', box).forEach(x => x.onchange = () => saveRow(x.dataset.uover || x.dataset.ulead));
-  }
+  paint();
 }
 
 /* ---- 引き継ぎを待っている家（再訪問の一覧の下に出す） ---- */

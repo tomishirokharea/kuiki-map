@@ -220,7 +220,7 @@
     el.innerHTML = boxHtml();
     // 「人とグループ」の見出し・ボタン・説明のすぐあと（人の一覧の前）に置く。描き直しを飛ばしたとき（入力中）は、置いた場所のまま
     if (el.parentNode !== box) {
-      const first = box.querySelector('article.trow');
+      const first = box.querySelector('.uplist') || box.querySelector('article.trow'); // 人の一覧（1人1行・改善案A5）の前
       if (first) box.insertBefore(el, first); else box.appendChild(el);
     }
   }

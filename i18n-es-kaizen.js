@@ -7,6 +7,11 @@ window.KUIKI_I18N = window.KUIKI_I18N || {};
 window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "この家を編集": "Editar esta casa",
 "申し込み・承認・確認を待っているもの": "Solicitudes, aprobaciones y confirmaciones pendientes",
+"人の行を押すと、グループ・監督・司会者・役割を直せます（直して「保存する」を押したときだけ変わります）。": "Toque la fila de una persona para cambiar su grupo, superintendente, conductor o función (solo cambia al tocar «Guardar»).",
+"役割とグループを直します": "Cambiar función y grupo",
+"この人が使うのをやめる": "Dar de baja a esta persona",
+"この人のスマホでは、次に開いたときに区域の情報が消えます。": "En el teléfono de esta persona, la información de territorios se borrará la próxima vez que lo abra.",
+"監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。": "El superintendente y el conductor reciben territorios de grupo y eligen quién sale ese día. Solo el superintendente puede poner reuniones.",
 "持っている人": "Quién lo tiene",
 "貸し出した日": "Fecha de préstamo",
 "返却の目安": "Devolver hacia",
