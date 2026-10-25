@@ -174,4 +174,6 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "メモに「{0}」とあります。建物のメモは、みんなが見ます。住んでいる人のこと（名前・国籍・年齢・病気など）が入っていなければ、このまま保存してください。": "La nota dice «{0}». Todos ven las notas del edificio. Si no contiene datos de los residentes (nombre, nacionalidad, edad, enfermedades, etc.), guárdela así.",
 "メモに「{0}」とあります。建物のメモは、くわしい表示の人みんなが見ます。住んでいる人のこと（名前・国籍・年齢・病気など）が入っていなければ、このまま保存してください。": "La nota dice «{0}». Todos los que usan la vista detallada ven las notas del edificio. Si no contiene datos de los residentes (nombre, nacionalidad, edad, enfermedades, etc.), guárdela así.",
 "家を「アパート・マンション」に変える画面でも、エレベーター（まだ確かめていない／あり／なし）と建物のメモを入れられるようにしました。部屋を入力する画面の上に出ます": "En la pantalla para convertir una casa en «apartamento/edificio» ahora también se puede indicar el ascensor (aún no confirmado / sí / no) y la nota del edificio. Aparecen arriba en la pantalla para registrar los cuartos.",
+/* 2026.13.84：家を追加のメニューを小さくしたとき、iPhoneの時刻の下に入らない・となりに「追加を終わる」 */
+"「家を追加」のメニューを小さくしたとき、iPhoneの時刻の表示に重なって見えなくなっていたのを直しました。小さくしたままでも、となりの「追加を終わる」ですぐ終われます": "Al minimizar el menú de «Agregar casa», quedaba oculto debajo de la hora del iPhone; ya está corregido. Aun minimizado, puede terminar enseguida con «Terminar», que aparece al lado.",
 });

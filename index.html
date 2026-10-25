@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.83"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE も合わせて上げる -->
+<meta name="app-version" content="2026.13.84"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE も合わせて上げる -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -862,6 +862,11 @@ html[lang="es"] .atabs button{font-size:13px;white-space:normal;line-height:1.15
 .pin.prov{border-style:dashed;opacity:.9}
 .barmini{min-height:52px;border-radius:12px;border:2px solid var(--ink);background:#fff;color:var(--ink);font-weight:700;font-size:17px;padding:0 16px;display:flex;align-items:center;gap:10px}
 .modebar.folded{padding:6px;background:transparent;border:0;box-shadow:none;width:auto;left:10px;right:auto}
+.modebar .minirow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.modebar .minirow .btn{box-shadow:0 2px 6px #0004}
+.modebar .minirow .barmini{box-shadow:0 2px 6px #0004}
+/* 作業中は上の帯を隠すので、作業の帯がiPhoneの時刻・電池の表示の下に入らないようにする */
+body.focusmode .modebar{top:calc((10px + env(safe-area-inset-top,0px)) / var(--z,1))}
 .vrow{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
 .qrbox{display:flex;justify-content:center;padding:12px;background:#fff;border:2px solid var(--line);border-radius:12px}
 .qrbox canvas{width:100%;max-width:340px;height:auto;image-rendering:pixelated}
@@ -1564,7 +1569,10 @@ body.renshu #btnUpd{display:none!important}
         </details>
       </div>
       <div class="modebar" id="addBar" hidden>
-        <button type="button" class="barmini" id="addMini" hidden aria-label="家を追加のメニューを出す">家を追加 ▾<span class="muted" id="addMiniCount"></span></button>
+        <div class="minirow" id="addMiniRow" hidden>
+          <button type="button" class="barmini" id="addMini" aria-label="家を追加のメニューを出す">家を追加 ▾<span class="muted" id="addMiniCount"></span></button>
+          <button type="button" class="btn primary" id="addEndMini">追加を終わる</button>
+        </div>
         <div id="addFull">
           <p><b>家を追加：</b><span id="addMsg"></span></p>
           <div class="seg" role="group" aria-label="追加のしかた">

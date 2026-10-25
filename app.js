@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.83';
+var APP_JS_VER = '2026.13.84';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2464,6 +2464,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.84', items: [
+    ['家', '「家を追加」のメニューを小さくしたとき、iPhoneの時刻の表示に重なって見えなくなっていたのを直しました。小さくしたままでも、となりの「追加を終わる」ですぐ終われます']
+  ] },
   { v: '2026.13.83', items: [
     ['集', '家を「アパート・マンション」に変える画面でも、エレベーター（まだ確かめていない／あり／なし）と建物のメモを入れられるようにしました。部屋を入力する画面の上に出ます']
   ] },
@@ -6050,7 +6053,7 @@ const ADD_MSG = {
 let addFoldTimer = null;
 function setAddFold(on) {
   clearTimeout(addFoldTimer);
-  $('#addMini').hidden = !on;
+  $('#addMiniRow').hidden = !on; // 小さくしたときも「追加を終わる」はすぐ押せるように、となりに出す
   $('#addFull').hidden = on;
   $('#addBar').classList.toggle('folded', on);
   if (!on) addFoldTimer = setTimeout(() => { if (mode === 'add') setAddFold(true); }, 5000);
@@ -13893,6 +13896,7 @@ function bindStatic() {
   $('#addMini').onclick = () => setAddFold(false);
   $('#addFold').onclick = () => setAddFold(true);
   $('#addBase').onclick = () => { setBase(baseName === 'pale' ? 'photo' : 'pale'); updateAddBar(); };
+  $('#addEndMini').onclick = () => $('#addCancel').click(); // 小さくしたときの「追加を終わる」も、同じ終わり方にする
   $('#addCancel').onclick = () => {
     closeSheet(); setMode('normal');
     if (LIVE && Store.queue.length) {
