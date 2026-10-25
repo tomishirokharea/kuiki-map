@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.71"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.72"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -1628,7 +1628,7 @@ body.renshu #btnUpd{display:none!important}
     <section class="view" id="view-admin" hidden>
       <div class="wrap">
         <div class="seg subtabs atabs" id="adTabs" role="group" aria-label="係の画面の切りかえ">
-          <button type="button" data-ap="inbox" aria-pressed="true">今日<b class="cnt" id="apCnt" hidden>0</b></button>
+          <button type="button" data-ap="inbox" aria-pressed="true">今日<b class="cnt" id="apCnt" hidden title="申し込み・承認・確認を待っているもの">0</b></button>
           <button type="button" data-ap="terr" aria-pressed="false">区域</button>
           <button type="button" data-ap="sched" aria-pressed="false">予定</button>
           <button type="button" data-ap="status" aria-pressed="false" hidden>状況</button>
@@ -1719,7 +1719,7 @@ body.renshu #btnUpd{display:none!important}
     <button data-view="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>地図</button>
     <button data-view="reco" id="tabReco" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>おすすめ</button>
     <button data-view="follow" id="tabFollow" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7"/><path d="M20 4v4.7h-4.7"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.3"/><path d="M4 20v-4.7h4.7"/></svg>再訪問</button>
-    <button data-view="admin" id="tabAdmin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 20h18M6 17v-6M11 17V6M16 17v-9"/></svg><span id="tabAdminLabel">係の画面</span><b class="tabbadge" id="tabBadge" hidden>0</b></button>
+    <button data-view="admin" id="tabAdmin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 20h18M6 17v-6M11 17V6M16 17v-9"/></svg><span id="tabAdminLabel">係の画面</span><b class="tabbadge" id="tabBadge" hidden title="申し込み・承認・確認を待っているもの">0</b></button>
   </nav>
 </div>
 
@@ -2090,11 +2090,14 @@ function scrubVisits() {
   if (!u || u.role === 'admin') return;
   const ps = permSig(), hold = new Set(ps.t), fk = new Set(ps.f);
   const terrOfHouse = new Map(d.houses.map(h => [h.id, h.terrId]));
+  let gone = 0;
   d.visits.forEach(v => {
     if (v.by === u.id || (v.age === undefined && v.interest === undefined)) return;
     if (hold.has(terrOfHouse.get(v.houseId)) || fk.has(v.houseId + '|' + (v.unit || ''))) return;
-    delete v.age; delete v.interest;
+    delete v.age; delete v.interest; gone++;
   });
+  // 消したものがあったときは、端末の保存（記録）も書き直す（改善案C6）。開いた直後は大きな書きこみをしないので、そのときは次に記録を書くとき（10分ごと・閉じるとき）に書く
+  if (gone) { Store.dirty.visits = true; Store.saveCacheSoon(); }
 }
 /* 新しく区域や再訪問を受け持ったら、その区域の記録の詳細だけを受け取る（3万件を読み直さない） */
 let permLoading = false;
@@ -9479,7 +9482,7 @@ function renderInbox() {
   if (LIVE) html = `<div class="setrow"><span>最後に確認した時刻：<b>${Store.syncAt ? fmtTime(new Date(Store.syncAt)) : 'まだ'}</b>${Store.queue.length ? `<br><span class="tag-warn">未送信 ${Store.queue.length}件</span>` : ''}</span>
     <button type="button" class="btn small primary" id="adSync">今すぐ確認する</button></div>` + html;
   $('#adInbox').innerHTML = html;
-  const pendN = reqs.length + taken.length + dels.length + devPending().length;
+  const pendN = waitCount(); // 申し込み・削除の申請・自分で受け取られた区域・スマホの登録（下のタブの数字と同じ）
   $('#adInboxEmpty').innerHTML = pendN ? '' : '<div class="empty">今、承認や申し込みを待っているものはありません。</div>';
   $('#apCnt').textContent = pendN; $('#apCnt').hidden = !pendN;
   if ($('#adSync')) $('#adSync').onclick = async () => {
@@ -15296,12 +15299,17 @@ function renderAll(skipIndex) {
   if (currentView === 'admin') { if (isAdmin()) renderAdmin(); else if (isOverseer()) renderOverseer(); }
   updateAdminBadge();
 }
+/* 人を待たせているもの（区域カードの申し込み・家の削除の申請・自分で受け取られた区域の確認・スマホの登録の申し込み）の数。
+   下のタブ「係の画面」の数字と、中の「今日」の数字は、どちらもこれにそろえる（改善案A8。期限の近い区域などは数に入れず、「今日の対応」の中だけに出す） */
+function waitCount() {
+  return D().requests.filter(r => r.status === 'pending' && (!r.type || r.type === 'delHouse')).length +
+    D().territories.filter(t => t.holder && t.selfTakenAt && t.selfSeen === false).length +
+    devPending().length;
+}
 function updateAdminBadge() {
   const b = $('#tabBadge');
   if (!isAdmin()) { b.hidden = true; return; }
-  const n = D().requests.filter(r => r.status === 'pending').length +
-    D().territories.filter(t => t.holder && t.selfTakenAt && t.selfSeen === false).length +
-    devPending().length;
+  const n = waitCount();
   b.textContent = n; b.hidden = !n;
 }
 function openTerr(id) {

@@ -6,6 +6,7 @@
 window.KUIKI_I18N = window.KUIKI_I18N || {};
 window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "この家を編集": "Editar esta casa",
+"申し込み・承認・確認を待っているもの": "Solicitudes, aprobaciones y confirmaciones pendientes",
 "もっと見る（あと{0}件）": "Ver más (quedan {0})",
 "かんたんな表示の「区域カードをもう1枚」は、はじめに5件だけ出すようにしました。ほかの区域は「もっと見る」で見られます": "En la vista sencilla, «Otra tarjeta de territorio» ahora muestra primero 5 territorios. Los demás se ven con «Ver más»",
 "区域{0}　あと{1}軒": "Territorio {0}: faltan {1} casas",

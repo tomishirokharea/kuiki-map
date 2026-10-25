@@ -1411,7 +1411,8 @@ button.ktag{cursor:pointer}
     const em = document.getElementById('adInboxEmpty');
     if (em) em.innerHTML = '';
     const cnt = document.getElementById('apCnt');
-    if (cnt) { cnt.textContent = items.length; cnt.hidden = !items.length; }
+    // 「今日」の数字は、人を待たせているもの（申し込み・承認・確認）の数。下のタブの数字と同じ（改善案A8。期限の近い区域などは、この一覧の中だけに出す）
+    if (cnt) { const wn = typeof waitCount === 'function' ? waitCount() : items.length; cnt.textContent = wn; cnt.hidden = !wn; }
     fixTabLabel();
     loadOps(false);
   }
