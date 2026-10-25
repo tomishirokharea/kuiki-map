@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.79"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE も合わせて上げる -->
+<meta name="app-version" content="2026.13.80"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE も合わせて上げる -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -220,8 +220,6 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .tbar .tbtn small{font-size:12.5px;font-weight:400;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .tbar .tbtn[aria-expanded=true]{background:#DCE8F7;border-color:var(--brand)}
 .tbar .tbtn[aria-expanded=true] .tgl{display:inline-block;transform:rotate(180deg)}
-.takeset{border:2px solid var(--brand);border-radius:12px;padding:4px 12px 8px;margin:0 0 12px;background:#fff}
-.takeset .takeclose{margin-top:6px}
 .printpick{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;align-items:stretch}
 .printpick input[type=month]{flex:1 1 9em;min-width:0;max-width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:17px;background:#fff;color:var(--ink);-webkit-appearance:none;appearance:none}
 .printpick .btn{flex:1 1 11em;min-width:0;white-space:normal;line-height:1.25;flex-direction:column}
@@ -1658,6 +1656,10 @@ body.renshu #btnUpd{display:none!important}
         </div>
         <div class="apane" data-apane="sched" hidden><div id="adSched"></div></div>
         <div class="apane" data-apane="people" hidden><div id="adPeople"></div></div>
+        <!-- 区域係の「状況」と設定「区域の決め」を左右に（kimari.js）。パソコン（幅1,180px以上）は右の欄、スマホは下から出る画面に出す。
+             設定の行は app.js（貸し出しと返却・そのほか・留守宅カード・返却後）と schedule.js（手紙・提案）が、下の箱に描く -->
+        <div class="krwrap" id="krWrap">
+        <div class="krmain">
         <div class="apane" data-apane="status" hidden>
         <button class="btn primary block" id="adS13">区域割り当ての記録（S-13）を見る・印刷する</button>
         <button class="btn block" id="adS12">区域カード（S-12）を印刷する</button>
@@ -1670,15 +1672,39 @@ body.renshu #btnUpd{display:none!important}
         <p class="hint" id="adMeetHint"></p>
         <div class="scroll" id="adMeet"></div>
         </div>
+        <div class="apane" data-apane="status2" hidden>
+        <h2 class="sec">留守宅の状況</h2>
+        <div id="adAwaySet"></div>
+        <h3 class="sub">まだ試していない家の数（時間帯ごと）</h3>
+        <p class="hint">枠で囲んだ時間帯がいちばん手薄です。集まりの時間を決める参考にしてください。</p>
+        <div class="scroll"><table class="slots" id="adAwaySlots"></table></div>
+        <h3 class="sub">区域ごと</h3>
+        <div class="scroll" id="adAwayTerrs"></div>
+        <h3 class="sub" id="adHardH">なかなか会えない家（すべての時間帯で留守）</h3>
+        <p class="hint">手紙など、別の方法を検討してください。</p>
+        <div id="adHard"></div>
+        </div>
+        </div>
+        <aside class="krside" id="krSide" aria-label="区域の決め（設定）">
+        <div id="adRules" class="krules">
+          <div class="krhead"><h2 class="sec">区域の決め（設定）</h2><button type="button" class="icon-btn" data-krclose aria-label="区域の決めを閉じる">×</button></div>
+          <p class="hint">変えると、すぐ全員に効きます。左の状況もすぐ変わります。状況の「かかわる設定」を押すと、ここに飛びます。</p>
+          <details class="krg" data-krg="lend" open><summary>貸し出しと返却</summary><div id="krLend" class="krbox"></div></details>
+          <details class="krg" data-krg="away" open><summary>留守宅カード</summary><div id="krAway" class="krbox"></div></details>
+          <details class="krg" data-krg="ext" open><summary>返却後の留守宅カード</summary><div id="krExt" class="krbox"></div></details>
+          <details class="krg" data-krg="tips"><summary>手紙・提案・おすすめの順</summary><div id="krTips" class="krbox"></div></details>
+          <details class="krg" data-krg="etc"><summary>受け取れる枚数・一緒に回る など（状況には効かない設定）</summary><div id="krEtc" class="krbox"></div></details>
+        </div>
+        </aside>
+        </div>
         <div class="apane" data-apane="terr" hidden>
         <h2 class="sec" data-hqk="terrList">区域の一覧</h2>
         <!-- 一覧の上は2つのボタンだけにして、一覧まですぐ届くようにする（2026-10-21）。
-             「区域の線・取り込み」は下から出る画面（torikomi.js）、「貸し出しのきまり」はその場で開く -->
+             「区域の線・取り込み」は下から出る画面（torikomi.js）、「貸し出しのきまり」は状況の「区域の決め」を開く -->
         <div class="tbar" id="adTerrTools">
           <button type="button" class="btn tbtn" id="adMake"><span>区域の線・取り込み</span><small>線を引く・直す・ファイル・特別区域</small></button>
-          <button type="button" class="btn tbtn" id="adTakeTgl" aria-expanded="false" aria-controls="adTakeSet"><span>貸し出しのきまり <i class="tgl" aria-hidden="true">▾</i></span><small id="adTakeSum"></small></button>
+          <button type="button" class="btn tbtn" id="adTakeTgl"><span>貸し出しのきまり <i class="tgl" aria-hidden="true">›</i></span><small id="adTakeSum"></small></button>
         </div>
-        <div id="adTakeSet" class="takeset" hidden></div>
         <!-- 下から出る画面のボタンが使う、元のボタンとファイルの入り口（画面には出さない） -->
         <div id="adMakeSrc" hidden>
           <button class="btn primary" id="adNewTerr">＋ 新しい区域の線を引く</button>
@@ -1691,18 +1717,6 @@ body.renshu #btnUpd{display:none!important}
         <div id="adTerrs"></div>
         </div>
         <div class="apane" data-apane="dnc" hidden><div id="adDnc"></div></div>
-        <div class="apane" data-apane="status2" hidden>
-        <h2 class="sec">留守宅の状況</h2>
-        <div id="adAwaySet"></div>
-        <h3 class="sub">まだ試していない家の数（時間帯ごと）</h3>
-        <p class="hint">枠で囲んだ時間帯がいちばん手薄です。集まりの時間を決める参考にしてください。</p>
-        <div class="scroll"><table class="slots" id="adAwaySlots"></table></div>
-        <h3 class="sub">区域ごと</h3>
-        <div class="scroll" id="adAwayTerrs"></div>
-        <h3 class="sub">なかなか会えない家（すべての時間帯で留守）</h3>
-        <p class="hint">手紙など、別の方法を検討してください。</p>
-        <div id="adHard"></div>
-        </div>
         <div class="apane" data-apane="set" hidden>
         <div id="adReco"></div>
         <div id="adAge"></div>
@@ -1770,5 +1784,6 @@ body.renshu #btnUpd{display:none!important}
 <script src="nozoku.js"></script><!-- 受け取る前に、地図で場所を見る（2026-10-21） -->
 <script src="meibo.js"></script><!-- 名簿（グループ表のPDF）から、人とグループをまとめて直す（区域係だけ・2026-10-24） -->
 <script src="guruchu.js"></script><!-- グループの中心：区域係が地図に置き、グループ奉仕の区域の近さに使う（2026-10-23） -->
+<script src="kimari.js"></script><!-- 区域係の「状況」と設定「区域の決め」を左右に。状況の札から設定に飛ぶ（2026-10-25・いちばん最後に読む） -->
 </body>
 </html>

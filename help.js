@@ -696,7 +696,7 @@
       var row = rows[i];
       row.setAttribute('data-hq', '1'); // 1回だけ
       var k = keyOf(row); if (!k) continue;
-      if (inSheet && !SHEET_KEYS[k]) continue;
+      if (inSheet && !SHEET_KEYS[k] && !row.closest('#adRules')) continue; // 区域の決め（kimari.js）は、下から出る画面でも付ける
       if (!HELP.ja[k]) { if (demo() && !warned[k]) { warned[k] = 1; console.info('説明のない設定：' + k); } continue; }
       var lab = row.firstElementChild; if (!lab || lab.querySelector('.qhelp')) continue;
       var br = lab.querySelector('br');
@@ -706,7 +706,7 @@
     for (var j = 0; j < heads.length; j++) {
       var h = heads[j], hk = h.getAttribute('data-hqk');
       h.setAttribute('data-hq', '1');
-      if (inSheet && !SHEET_KEYS[hk]) continue;
+      if (inSheet && !SHEET_KEYS[hk] && !h.closest('#adRules')) continue;
       if (HELP.ja[hk] && !h.querySelector('.qhelp')) h.appendChild(qBtn(hk));
     }
   }

@@ -220,17 +220,16 @@
     };
   }
 
-  /* 係の設定：続きから回る期間（「返却の目安」の下に足す） */
+  /* 係の設定：続きから回る期間（状況の右の「区域の決め」の「貸し出しと返却」の最後に足す・kimari.js） */
   const _renderInbox = window.renderInbox;
   if (typeof _renderInbox === 'function') {
     window.renderInbox = function () {
       const out = _renderInbox.apply(this, arguments);
       try {
-        const box = document.getElementById('adTakeSet');
+        const box = document.getElementById('krLend');
         if (box && !box.querySelector('[data-range="contDays"]')) {
           const v = contDays();
-          const end = box.querySelector('[data-takeclose]'); // 「閉じる」ボタンの前に足す
-          (end || box).insertAdjacentHTML(end ? 'beforebegin' : 'beforeend', `<div class="setrow">
+          box.insertAdjacentHTML('beforeend', `<div class="setrow">
       <span>途中で返された区域を、次の人が続きから回る期間<br><small class="hint">途中で返却された区域を、この日数のあいだに受け取ると、前の人が訪ねた家は「済み」のまま続きから回れます。0にすると使いません</small></span>
       <div class="rng"><input type="range" min="0" max="365" step="5" value="${v}" data-range="contDays" data-unit="日" aria-label="日数"><output>${v}日</output></div></div>`);
         }

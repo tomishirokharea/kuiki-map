@@ -274,7 +274,7 @@
   function paintLetters() {
     const box = document.getElementById('adHard');
     if (!box) return;
-    const head = box.previousElementSibling && box.previousElementSibling.previousElementSibling;
+    const head = document.getElementById('adHardH') || (box.previousElementSibling && box.previousElementSibling.previousElementSibling);
     if (head && head.tagName === 'H3') head.textContent = '手紙の候補（違う時間帯で何度も留守だった家）';
     const tr = x => (x.triedAll != null ? x.triedAll : x.tried);
     const hard = [...unmetIndex().values()].flat().filter(x => x.hard)
@@ -356,6 +356,10 @@
       box.addEventListener('click', dueClick);
     }
     const m = monthStats(), ld = lendDays();
+    // 区域係の決め（おすすめ順・留守宅を終える回数・夜・訪問を控える日）は、状況の右の「区域の決め」（kimari.js）の「手紙・提案・おすすめの順」に出す
+    const tips = document.getElementById('krTips'), rules = document.getElementById('adRules');
+    if (tips) tips.innerHTML = setHtml();
+    if (rules && !rules.dataset.dueBound) { rules.dataset.dueBound = '1'; rules.addEventListener('click', dueClick); }
     const paces = m.ts.filter(t => t.holder).map(paceOf).filter(p => p && p.msg).sort((a, b) => b.el - a.el);
     const maxN = Math.max(1, ...m.months.map(x => x.list.length));
     const peak = m.months.filter(x => x.list.length >= Math.max(3, Math.ceil(m.avg * 1.5)));
@@ -365,7 +369,6 @@
     box.innerHTML = `<h2 class="sec">期限の見張り</h2>
       <p class="hint">1区域は留守宅も含めて返却の目安（${ld}日）以内、全区域は前回回り終えた日から1年以内に回る、という原則で計算しています。
         前回回り終えた日は、アプリの記録とS-13に転記した紙の記録のうち、新しいほうを使います。</p>
-      ${setHtml()}
       <div class="tiles">
         ${dueTile('over', m.over.length, '1年の期限を過ぎた区域', '', m.over.length)}
         ${dueTile('warn', m.warn.length, `期限まで${PIN_DAYS}日以内`, '', m.warn.length)}
@@ -441,14 +444,12 @@
     $$('[data-tlkarte]', S).forEach(b => b.onclick = () => openKarte(b.dataset.tlkarte, back));
     const s13 = $('[data-tls13]', S); if (s13) s13.onclick = () => { closeSheet(); openS13(); };
   }
-  /* 区域係の決め（おすすめ順・留守宅・訪問を控える日）。開いているかどうかを覚えておく */
-  let setOpen = false;
+  /* 区域係の決め（おすすめ順・留守宅・訪問を控える日）。状況の右の「区域の決め」（kimari.js）に出す設定の行 */
   function setHtml() {
-    const yw = wYoung(), yl = (YW.find(x => x[0] === yw) || [0, yw + '点'])[1], offs = offDays().filter(x => x >= ymd(new Date()));
+    const yw = wYoung(), offs = offDays().filter(x => x >= ymd(new Date()));
     const seg = (key, opts, cur) => `<div class="seg" role="group">${opts.map(([v, l]) =>
       `<button type="button" data-sset="${key}" data-v="${v}" aria-pressed="${cur === v}">${l}</button>`).join('')}</div>`;
-    return `<details class="dueset"${setOpen ? ' open' : ''}><summary>区域係の決め（若い世代 ${yl}・手紙の候補は${triesAll()}回から・控える日 ${offs.length}日）</summary>
-      <div class="setrow"><span>おすすめ順で、若い世代の多い区域をどれだけ前に出すか<br><small class="hint">夏休み・年末年始・連休など、若い世代が家にいやすい時期は「強」にします。どれにしても、期限の近い区域がいちばん前です</small></span>
+    return `<div class="setrow"><span>おすすめ順で、若い世代の多い区域をどれだけ前に出すか<br><small class="hint">夏休み・年末年始・連休など、若い世代が家にいやすい時期は「強」にします。どれにしても、期限の近い区域がいちばん前です</small></span>
         ${seg('youngW', YW, yw)}</div>
       <div class="setrow"><span>留守宅を終える回数<br><small class="hint">違う時間帯でこの回数留守だった家を「手紙の候補」の一覧に出します（留守宅の画面に出ます）。留守宅カードに入れるかどうかは、「留守宅訪問のルール」で決めます。区域ごとにも変えられます（各区域の「調整」）</small></span>
         <div class="stepper"><button type="button" data-dueset="awayTries" data-d="-1" aria-label="減らす">−</button><output class="wide">${triesAll()}回</output>
@@ -457,8 +458,7 @@
         ${seg('nightOn', [[1, '提案する'], [0, '提案しない']], nightOn() ? 1 : 0)}</div>
       <div class="setrow" style="display:block"><span>訪問を控える日<br><small class="hint">この日は、全員の画面で「おすすめ」と「留守宅カード」の提案を止めます（地域の行事の日など）</small></span>
         <div class="offlist">${offs.map(x => `<button type="button" data-offdel="${esc(x)}" aria-label="${showDay(x)}を消す">${showDay(x)}（${'日月火水木金土'[parseYmd(x).getDay()]}） ×</button>`).join('') || '<span class="muted">登録はありません</span>'}</div>
-        <div class="dueadd"><input type="date" id="dueOffIn" min="${ymd(new Date())}" aria-label="訪問を控える日"><button type="button" class="btn small" data-offadd>追加する</button></div></div>
-    </details>`;
+        <div class="dueadd"><input type="date" id="dueOffIn" min="${ymd(new Date())}" aria-label="訪問を控える日"><button type="button" class="btn small" data-offadd>追加する</button></div></div>`;
   }
   const saveSet = (fn, msg) => { fn(D().settings); Store.save(); renderAll(); toast(msg || '設定を変えました'); };
   function dueClick(e) {
@@ -535,8 +535,6 @@
         paintCand(); loadOps(false);
         paintDue();
         paintSlotBox();
-        const d = document.querySelector('#adDue details.dueset');
-        if (d) d.addEventListener('toggle', () => { setOpen = d.open; });
       }
     } catch (e) { console.error(e); }
   };
@@ -1309,9 +1307,9 @@ button.ktag{cursor:pointer}
       const want = r.terrId ? terrById(r.terrId) : null;
       const pick = (selEl && terrById(selEl.value)) || (want && free.some(x => x.t.id === want.id) ? want : (free[0] ? free[0].t : null));
       const held = D().territories.filter(t => t.holder === r.by);
-      const over = held.filter(t => t.lentAt && daysSince(t.lentAt) > 120).length;
+      const over = held.filter(pastDue).length; // 返却の目安を過ぎたカード（前は120日で数えていた）
       row('#1565C0', `${esc(uname(r.by))}さんが、区域カードを申し込んでいます${r.forGroup ? (r.use === 'all' ? '（全体の集まり用）' : `（${esc(r.forGroup)}グループ用）`) : ''}`,
-        `希望：${want ? `区域${esc(want.no)}${want.holder ? '（すでに貸出中）' : ''}` : 'どこでもよい'}　今持っているカード ${held.length}枚${over ? `<span class="tag-warn">4か月超 ${over}枚</span>` : ''}`,
+        `希望：${want ? `区域${esc(want.no)}${want.holder ? '（すでに貸出中）' : ''}` : 'どこでもよい'}　今持っているカード ${held.length}枚${over ? `<span class="tag-warn">返却の目安を過ぎた ${over}枚</span>` : ''}`,
         (pick ? `<button type="button" class="btn small primary" data-tok="${esc(r.id)}" data-tterr="${esc(pick.id)}">区域${esc(pick.no)}を貸し出す</button>` : '<span class="muted">空いている区域がありません</span>') +
         `<button type="button" class="btn small" data-tno="${esc(r.id)}">見送る</button>`);
     });
@@ -2224,12 +2222,13 @@ body.duemode .terr-label:not(.duelab){display:none}
       ['上の欄に、番号（例：53）・名前・字・持っている人の名前を入れると、すぐ見つかります。その下のボタンで、貸出中・空いている・期限が近い区域などに絞れます。',
         '区域の行を押すと、その区域の「カルテ」が開きます。区域の操作はカルテにまとめています（貸し出し・担当を変える・返却・貸出中止・線を直す・S-12の印刷など）。',
         '「状況」で、期限・時間帯の表・留守宅のようすが見られます。「期限の地図」で、期限ごとに色分けした地図が見られます。',
-        '自動受け取り・枚数・返却の目安などの決まりは、「貸し出しのきまり」を開くと変えられます。'],
+        '自動受け取り・枚数・返却の目安などの決まりは、「貸し出しのきまり」を押すと、「状況」の「区域の決め」で変えられます。'],
       ['毎月：「状況」で、期限の近い区域と「何度訪ねても会えない家」を確かめる']],
     status: ['「状況」でやること',
       ['期限の見張り：全区域を1年で回るために、今月出したい区域が分かります。',
         '時間帯の表：「区域ごと」にすると、まだ試していない枠などに「出す」ボタンが出ます。押すと、その時間帯の留守宅カードが、全員の一覧の上に「区域係のおすすめ」として出ます。',
-        '会えた成果：はじめて会えた家と、時間帯を変えて会えた家の数です（会衆全体の数だけで、人ごとの数は出しません）。'],
+        '会えた成果：はじめて会えた家と、時間帯を変えて会えた家の数です（会衆全体の数だけで、人ごとの数は出しません）。',
+        '区域の決め（設定）：パソコンでは右に出ます。スマホでは「区域の決め（設定）を開く」で出ます。各見出しの下の「かかわる設定」を押すと、その設定に飛び、その場で変えられます。変えると、すぐ全員に効きます。'],
       ['毎月：期限の見張りと、何度訪ねても会えない家を確かめる']],
     dnc: ['「拒否」でやること',
       ['奉仕者が「拒否」と記録した家と、区域係が取り込んだ・追加した拒否が、区域ごとに並びます。区域の行を押すと開きます。',
@@ -2888,7 +2887,7 @@ body.duemode .terr-label:not(.duelab){display:none}
   }
 
   /* ほかの部品（kangaeru.js）が同じ計算を使うための窓口。写さずに、ここの関数をそのまま使ってもらう */
-  window.KM = { coverInfo, lastDone, dueInfo, eligible, PIN_DAYS, slotQuery, slotTableHtml, openKarte, SL_FEW, SL_BEST, memoClear: () => { MEMO.clear(); TMEMO.clear(); } };
+  window.KM = { coverInfo, lastDone, dueInfo, eligible, PIN_DAYS, slotQuery, slotTableHtml, openKarte, SL_FEW, SL_BEST, triesAll, memoClear: () => { MEMO.clear(); TMEMO.clear(); } };
 
   /* 試作版などで、この部品より先に画面ができていたときは描き直す */
   if (Store.data && typeof map !== 'undefined' && map) { try { renderAll(); } catch (e) { console.error(e); } }

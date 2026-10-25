@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.79';
+var APP_JS_VER = '2026.13.80';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -7900,14 +7900,14 @@ function renderInbox() {
       const want = r.terrId ? terrById(r.terrId) : null;
       const wantFree = !!want && !want.holder;
       const held = D().territories.filter(t => t.holder === r.by);
-      const over = held.filter(t => t.lentAt && daysSince(t.lentAt) > 120).length;
+      const over = held.filter(pastDue).length;
       const def = wantFree ? want.id : (free[0] ? free[0].t.id : '');
       const opts = free.map(({ t, last }) =>
         `<option value="${esc(t.id)}"${t.id === def ? ' selected' : ''}>区域${t.no}（${last ? `前回 ${fmtDay(last)}` : '回り終えた記録なし'}）</option>`).join('');
       return `<article class="ritem k-new"><div>
           <p class="rt">${esc(uname(r.by))}さん${r.forGroup ? ` <span class="gbadge">${r.use === 'all' ? '全体の集まり用' : `${esc(r.forGroup)}グループ用`}</span>` : ''}</p>
           <p class="muted">希望：${want ? `区域${want.no}${wantFree ? '' : '（すでに貸出中）'}` : 'どこでもよい'}　${fmtDay(r.at)}</p>
-          <p class="muted">今持っているカード ${held.length}枚${over ? `<span class="tag-warn">4か月超 ${over}枚</span>` : ''}</p>
+          <p class="muted">今持っているカード ${held.length}枚${over ? `<span class="tag-warn">返却の目安を過ぎた ${over}枚</span>` : ''}</p>
         </div><span></span>
         <div class="actions span">
           ${free.length
@@ -7942,90 +7942,96 @@ function renderInbox() {
 
   const st = D().settings;
   paintTakeTgl();
-  $('#adTakeSet').innerHTML = `<div class="setrow">
-    <span>「自由に受け取ってよい」区域を、1人が自分で受け取れる枚数<br><small class="hint">すでに持っているカードも数えます</small></span>
-    <div class="stepper"><button type="button" data-takemax="-1" aria-label="枚数を減らす">−</button><output class="wide">${st.selfTakeMax}枚まで</output>
-    <button type="button" data-takemax="1" aria-label="枚数を増やす">＋</button></div></div>
-    <div class="setrow">
-      <span>自動受け取り<br><small class="hint">「使う」にすると、きまりに合う区域を、伝道者が自分で受け取れます（まだ一度も回っていない区域と、正式に返却されてから下の日数がたった区域）</small></span>
-      <div class="seg" role="group"><button type="button" data-sset="autoFree" data-v="1" aria-pressed="${Number(st.autoFree) === 1}">使う</button>
-      <button type="button" data-sset="autoFree" data-v="0" aria-pressed="${Number(st.autoFree) !== 1}">使わない</button></div></div>
-    <div class="setrow">
-      <span>正式に返却されてから、自動で受け取り可になるまで</span>
-      <div class="rng"><input type="range" min="0" max="365" step="5" value="${Number(st.freeAfterDays) || 0}" data-range="freeAfterDays" data-unit="日" aria-label="日数"><output>${Number(st.freeAfterDays) || 0}日</output></div></div>
-    <div class="setrow">
+  // 貸し出しのきまりの設定の行は、状況の右の「区域の決め」に出す（kimari.js・状況と設定を左右に）。
+  // 状況に効くもの（返却の目安・完了の目安など）は「貸し出しと返却」に、ほかは「受け取れる枚数・一緒に回る など」に分ける
+  const R = {
+    lendDays: `<div class="setrow">
       <span>返却の目安（受け取ってから）<br><small class="hint">カードに「返却の目安」の日付が出ます。過ぎると係の一覧で目立ちます</small></span>
-      <div class="rng"><input type="range" min="30" max="365" step="5" value="${lendDays()}" data-range="lendDays" data-unit="日" aria-label="日数"><output>${lendDays()}日</output></div></div>
-    <div class="setrow">
-      <span>留守宅を回り終えたとみなす割合<br><small class="hint">1回目に会えなかった家のうち、この割合を訪ね直すと、伝道者が返却できます</small></span>
-      <div class="rng"><input type="range" min="0" max="100" step="5" value="${awayRetPct()}" data-range="awayRetPct" data-unit="%" aria-label="割合"><output>${awayRetPct()}%</output></div></div>
-    <div class="setrow">
-      <span>1人が持てる区域カード（個人の区域）<br><small class="hint">持っているカードと、申し込み中をあわせた数です</small></span>
-      <div class="stepper"><button type="button" data-kset="holdMaxPersonal" data-d="-1" aria-label="枚数を減らす">−</button>
-        <output class="wide">${st.holdMaxPersonal || 2}枚まで</output>
-        <button type="button" data-kset="holdMaxPersonal" data-d="1" aria-label="枚数を増やす">＋</button></div></div>
-    <div class="setrow">
-      <span>監督・司会者が持てる集まりで使う区域<br><small class="hint">グループ奉仕と全体の集まりを合わせて数えます（個人の区域とは別）。申し込み中もふくみます。枝番は1つずつ数えます</small></span>
-      <div class="rng"><input type="range" min="1" max="40" step="1" value="${Math.min(40, Number(st.holdMaxGroup) || 2)}" data-range="holdMaxGroup" data-unit="枚まで" aria-label="枚数"><output>${Math.min(40, Number(st.holdMaxGroup) || 2)}枚まで</output></div></div>
-    <div class="setrow">
-      <span>1人が同時に「係に頼める」申し込み（個人の区域）<br><small class="hint">係の返事を待っている申し込みの数です</small></span>
-      <div class="stepper"><button type="button" data-kset="reqMaxPersonal" data-d="-1" aria-label="件数を減らす">−</button>
-        <output class="wide">${st.reqMaxPersonal}件まで</output>
-        <button type="button" data-kset="reqMaxPersonal" data-d="1" aria-label="件数を増やす">＋</button></div></div>
-    <div class="setrow">
-      <span>監督・司会者が同時に「係に頼める」申し込み（グループの区域）<br><small class="hint">個人の申し込みとは別に数えます</small></span>
-      <div class="stepper"><button type="button" data-kset="reqMaxGroup" data-d="-1" aria-label="件数を減らす">−</button>
-        <output class="wide">${st.reqMaxGroup}件まで</output>
-        <button type="button" data-kset="reqMaxGroup" data-d="1" aria-label="件数を増やす">＋</button></div></div>
-    <div class="setrow">
+      <div class="rng"><input type="range" min="30" max="365" step="5" value="${lendDays()}" data-range="lendDays" data-unit="日" aria-label="日数"><output>${lendDays()}日</output></div></div>`,
+    donePct: `<div class="setrow">
     <span>区域カードを「完了」にできる目安<br><small class="hint">訪ねた家の割合。目安に届くと、本人の画面に「返却して完了にできます」と出ます</small></span>
     <div class="stepper"><button type="button" data-donepct="-5" aria-label="目安を下げる">−</button><output class="wide">${st.donePct}%</output>
-    <button type="button" data-donepct="5" aria-label="目安を上げる">＋</button></div></div>
-    <div class="setrow" data-hk="lowOn">
+    <button type="button" data-donepct="5" aria-label="目安を上げる">＋</button></div></div>`,
+    awayRetPct: `<div class="setrow">
+      <span>留守宅を回り終えたとみなす割合<br><small class="hint">1回目に会えなかった家のうち、この割合を訪ね直すと、伝道者が返却できます</small></span>
+      <div class="rng"><input type="range" min="0" max="100" step="5" value="${awayRetPct()}" data-range="awayRetPct" data-unit="%" aria-label="割合"><output>${awayRetPct()}%</output></div></div>`,
+    lowOn: `<div class="setrow" data-hk="lowOn">
       <span>記録の少ない正式返却を、自動で確かめる<br><small class="hint">区域係が目安に届かないまま正式返却にしたとき、決めた日数のあとに記録を数え直し、届いていなければ途中の返却にします</small></span>
       <div class="seg" role="group" aria-label="記録の少ない正式返却を自動で確かめる"><button type="button" data-sset="lowOn" data-v="1" aria-pressed="${Number(st.lowOn) !== 0}">使う</button>
-      <button type="button" data-sset="lowOn" data-v="0" aria-pressed="${Number(st.lowOn) === 0}">使わない</button></div></div>
-    ${Number(st.lowOn) !== 0 ? `<div class="setrow" data-hk="lowWait">
+      <button type="button" data-sset="lowOn" data-v="0" aria-pressed="${Number(st.lowOn) === 0}">使わない</button></div></div>`,
+    lowWait: Number(st.lowOn) !== 0 ? `<div class="setrow" data-hk="lowWait">
       <span>確かめるまで待つ日数<br><small class="hint">この間に届いた記録（返却した日より前の日付）も数えます</small></span>
       <div class="stepper"><button type="button" data-kset="lowWait" data-d="-1" aria-label="日数を減らす">−</button>
         <output class="wide">${lowWaitDays()}日</output>
-        <button type="button" data-kset="lowWait" data-d="1" aria-label="日数を増やす">＋</button></div></div>` : ''}
-    <div class="setrow">
-      <span>「一緒に回る」を使う<br><small class="hint">区域の担当者が、今日の終わりまで仲間を加えて、同じ区域を一緒に回れます</small></span>
-      <div class="seg" role="group" aria-label="一緒に回るを使う">
-        <button type="button" data-sset="groupOn" data-v="1" aria-pressed="${st.groupOn !== 0}">使う</button>
-        <button type="button" data-sset="groupOn" data-v="0" aria-pressed="${st.groupOn === 0}">使わない</button></div></div>
-    ${st.groupOn !== 0 ? `<div class="setrow">
-      <span>1つの区域に加えられる人数<br><small class="hint">担当者のほかに、一緒に回れる人の数です</small></span>
-      <div class="stepper"><button type="button" data-kset="groupMax" data-d="-1" aria-label="人数を減らす">−</button>
-        <output class="wide">${st.groupMax}人まで</output>
-        <button type="button" data-kset="groupMax" data-d="1" aria-label="人数を増やす">＋</button></div></div>` : ''}
-    <div class="setrow">
-      <span>地図で、自分の区域以外を選べないようにする<br><small class="hint">「自由に受け取ってよい」区域は、オンでもえらべます（その場で受け取れます）。区域係は、この設定にかかわらず、すべての区域をえらべます</small><br><small class="hint">オンにすると、伝道者の地図では、受け取っている区域・自分の留守宅カードの家だけを選べます。ほかの区域は灰色になります（係は、いつもすべて選べます）</small></span>
-      <div class="seg" role="group" aria-label="自分の区域以外を選べないようにする">
-        <button type="button" data-sset="lockOthers" data-v="1" aria-pressed="${st.lockOthers !== 0}">オン</button>
-        <button type="button" data-sset="lockOthers" data-v="0" aria-pressed="${st.lockOthers === 0}">オフ</button></div></div>
-    <div class="setrow">
+        <button type="button" data-kset="lowWait" data-d="1" aria-label="日数を増やす">＋</button></div></div>` : '',
+    autoFree: `<div class="setrow">
+      <span>自動受け取り<br><small class="hint">「使う」にすると、きまりに合う区域を、伝道者が自分で受け取れます（まだ一度も回っていない区域と、正式に返却されてから下の日数がたった区域）</small></span>
+      <div class="seg" role="group"><button type="button" data-sset="autoFree" data-v="1" aria-pressed="${Number(st.autoFree) === 1}">使う</button>
+      <button type="button" data-sset="autoFree" data-v="0" aria-pressed="${Number(st.autoFree) !== 1}">使わない</button></div></div>`,
+    freeAfterDays: `<div class="setrow">
+      <span>正式に返却されてから、自動で受け取り可になるまで</span>
+      <div class="rng"><input type="range" min="0" max="365" step="5" value="${Number(st.freeAfterDays) || 0}" data-range="freeAfterDays" data-unit="日" aria-label="日数"><output>${Number(st.freeAfterDays) || 0}日</output></div></div>`,
+    skipDays: `<div class="setrow">
       <span>「最近会えた家」として、新しく回るときに青いチェックを付ける期間<br><small class="hint">区域を受け取る前のこの期間に会えた家（留守宅カードなど）は、はじめから薄い色と青いチェックで表示し、「おすすめ順」に出ません（0＝使わない）</small></span>
       <div class="stepper"><button type="button" data-kset="skipDays" data-d="-10" aria-label="期間を短くする">−</button>
         <output class="wide">${st.skipDays ? st.skipDays + '日' : '使わない'}</output>
-        <button type="button" data-kset="skipDays" data-d="10" aria-label="期間を長くする">＋</button></div></div>
-    <div class="setrow">
+        <button type="button" data-kset="skipDays" data-d="10" aria-label="期間を長くする">＋</button></div></div>`,
+    followSkipDays: `<div class="setrow">
       <span>再訪問の家を、区域カードで「最近会えた家（とばしてよい）」にする期間<br><small class="hint">再訪問をしている人が最後に会えた日から数えます。この期間がすぎると、区域カードを回る人も訪ねてよい家になります（0＝使わない）</small></span>
       <div class="stepper"><button type="button" data-kset="followSkipDays" data-d="-10" aria-label="期間を短くする">−</button>
         <output class="wide">${st.followSkipDays ? st.followSkipDays + '日' : '使わない'}</output>
-        <button type="button" data-kset="followSkipDays" data-d="10" aria-label="期間を長くする">＋</button></div></div>
-    <div class="setrow">
-      <span>再訪問のメモを、同じ人のほかの端末（iPadなど）でも使えるようにする<br><small class="hint">メモは各自の端末の中で暗号化してから保管するので、係の画面やシートでは読めません。「使わない」にすると、保管しているメモをサーバーから消し、これまでどおり各自のスマホの中だけになります（スマホの中のメモは消えません）</small></span>
-      <div class="seg" role="group" aria-label="再訪問のメモをほかの端末でも使う">
-        <button type="button" data-sset="memoSync" data-v="1" aria-pressed="${st.memoSync !== 0}">使う</button>
-        <button type="button" data-sset="memoSync" data-v="0" aria-pressed="${st.memoSync === 0}">使わない</button></div></div>
-    <div class="setrow">
+        <button type="button" data-kset="followSkipDays" data-d="10" aria-label="期間を長くする">＋</button></div></div>`,
+    skipDone: `<div class="setrow">
       <span>「最近会えた家」を完了の数に入れる<br><small class="hint">入れると、回り終えた割合（％）に数えます</small></span>
       <div class="seg" role="group" aria-label="完了の数に入れる">
         <button type="button" data-sset="skipDone" data-v="1" aria-pressed="${st.skipDone !== 0}">入れる</button>
-        <button type="button" data-sset="skipDone" data-v="0" aria-pressed="${st.skipDone === 0}">入れない</button></div></div>
-    <button type="button" class="btn block takeclose" data-takeclose>貸し出しのきまりを閉じる</button>`;
+        <button type="button" data-sset="skipDone" data-v="0" aria-pressed="${st.skipDone === 0}">入れない</button></div></div>`,
+    selfTakeMax: `<div class="setrow">
+    <span>「自由に受け取ってよい」区域を、1人が自分で受け取れる枚数<br><small class="hint">すでに持っているカードも数えます</small></span>
+    <div class="stepper"><button type="button" data-takemax="-1" aria-label="枚数を減らす">−</button><output class="wide">${st.selfTakeMax}枚まで</output>
+    <button type="button" data-takemax="1" aria-label="枚数を増やす">＋</button></div></div>`,
+    holdMaxPersonal: `<div class="setrow">
+      <span>1人が持てる区域カード（個人の区域）<br><small class="hint">持っているカードと、申し込み中をあわせた数です</small></span>
+      <div class="stepper"><button type="button" data-kset="holdMaxPersonal" data-d="-1" aria-label="枚数を減らす">−</button>
+        <output class="wide">${st.holdMaxPersonal || 2}枚まで</output>
+        <button type="button" data-kset="holdMaxPersonal" data-d="1" aria-label="枚数を増やす">＋</button></div></div>`,
+    holdMaxGroup: `<div class="setrow">
+      <span>監督・司会者が持てる集まりで使う区域<br><small class="hint">グループ奉仕と全体の集まりを合わせて数えます（個人の区域とは別）。申し込み中もふくみます。枝番は1つずつ数えます</small></span>
+      <div class="rng"><input type="range" min="1" max="40" step="1" value="${Math.min(40, Number(st.holdMaxGroup) || 2)}" data-range="holdMaxGroup" data-unit="枚まで" aria-label="枚数"><output>${Math.min(40, Number(st.holdMaxGroup) || 2)}枚まで</output></div></div>`,
+    reqMaxPersonal: `<div class="setrow">
+      <span>1人が同時に「係に頼める」申し込み（個人の区域）<br><small class="hint">係の返事を待っている申し込みの数です</small></span>
+      <div class="stepper"><button type="button" data-kset="reqMaxPersonal" data-d="-1" aria-label="件数を減らす">−</button>
+        <output class="wide">${st.reqMaxPersonal}件まで</output>
+        <button type="button" data-kset="reqMaxPersonal" data-d="1" aria-label="件数を増やす">＋</button></div></div>`,
+    reqMaxGroup: `<div class="setrow">
+      <span>監督・司会者が同時に「係に頼める」申し込み（グループの区域）<br><small class="hint">個人の申し込みとは別に数えます</small></span>
+      <div class="stepper"><button type="button" data-kset="reqMaxGroup" data-d="-1" aria-label="件数を減らす">−</button>
+        <output class="wide">${st.reqMaxGroup}件まで</output>
+        <button type="button" data-kset="reqMaxGroup" data-d="1" aria-label="件数を増やす">＋</button></div></div>`,
+    groupOn: `<div class="setrow">
+      <span>「一緒に回る」を使う<br><small class="hint">区域の担当者が、今日の終わりまで仲間を加えて、同じ区域を一緒に回れます</small></span>
+      <div class="seg" role="group" aria-label="一緒に回るを使う">
+        <button type="button" data-sset="groupOn" data-v="1" aria-pressed="${st.groupOn !== 0}">使う</button>
+        <button type="button" data-sset="groupOn" data-v="0" aria-pressed="${st.groupOn === 0}">使わない</button></div></div>`,
+    groupMax: st.groupOn !== 0 ? `<div class="setrow">
+      <span>1つの区域に加えられる人数<br><small class="hint">担当者のほかに、一緒に回れる人の数です</small></span>
+      <div class="stepper"><button type="button" data-kset="groupMax" data-d="-1" aria-label="人数を減らす">−</button>
+        <output class="wide">${st.groupMax}人まで</output>
+        <button type="button" data-kset="groupMax" data-d="1" aria-label="人数を増やす">＋</button></div></div>` : '',
+    lockOthers: `<div class="setrow">
+      <span>地図で、自分の区域以外を選べないようにする<br><small class="hint">「自由に受け取ってよい」区域は、オンでもえらべます（その場で受け取れます）。区域係は、この設定にかかわらず、すべての区域をえらべます</small><br><small class="hint">オンにすると、伝道者の地図では、受け取っている区域・自分の留守宅カードの家だけを選べます。ほかの区域は灰色になります（係は、いつもすべて選べます）</small></span>
+      <div class="seg" role="group" aria-label="自分の区域以外を選べないようにする">
+        <button type="button" data-sset="lockOthers" data-v="1" aria-pressed="${st.lockOthers !== 0}">オン</button>
+        <button type="button" data-sset="lockOthers" data-v="0" aria-pressed="${st.lockOthers === 0}">オフ</button></div></div>`,
+    memoSync: `<div class="setrow">
+      <span>再訪問のメモを、同じ人のほかの端末（iPadなど）でも使えるようにする<br><small class="hint">メモは各自の端末の中で暗号化してから保管するので、係の画面やシートでは読めません。「使わない」にすると、保管しているメモをサーバーから消し、これまでどおり各自のスマホの中だけになります（スマホの中のメモは消えません）</small></span>
+      <div class="seg" role="group" aria-label="再訪問のメモをほかの端末でも使う">
+        <button type="button" data-sset="memoSync" data-v="1" aria-pressed="${st.memoSync !== 0}">使う</button>
+        <button type="button" data-sset="memoSync" data-v="0" aria-pressed="${st.memoSync === 0}">使わない</button></div></div>`,
+  };
+  const lendBox = $('#krLend'), etcBox = $('#krEtc');
+  if (lendBox) lendBox.innerHTML = ['lendDays', 'donePct', 'awayRetPct', 'lowOn', 'lowWait', 'autoFree', 'freeAfterDays', 'skipDays', 'followSkipDays', 'skipDone'].map(k => R[k]).join('');
+  if (etcBox) etcBox.innerHTML = ['selfTakeMax', 'holdMaxPersonal', 'holdMaxGroup', 'reqMaxPersonal', 'reqMaxGroup', 'groupOn', 'groupMax', 'lockOthers', 'memoSync'].map(k => R[k]).join('');
 }
 function approveReq(id) {
   const r = D().requests.find(x => x.id === id); if (!r) return;
@@ -8806,6 +8812,8 @@ function returnPlan(r) {
 const lendDays = () => Number(D().settings.lendDays) || 120;
 const awayRetPct = () => (D().settings.awayRetPct == null ? 70 : Number(D().settings.awayRetPct));
 const dueOf = t => (t && t.lentAt ? new Date(Date.parse(t.lentAt) + lendDays() * DAY).toISOString() : '');
+/* 返却の目安を過ぎた貸出か。係の画面の「状況」・内訳・「今日」・申し込みの一覧で、同じ数え方にそろえる（区域カードの「返却の目安」の日付と同じ） */
+const pastDue = t => !!(t && t.holder && t.lentAt && Date.parse(dueOf(t)) < Date.now());
 /* 留守宅を回る段階：1回目に留守だった時間帯と、まだ訪ねていない時間帯（違う曜日・時間に訪ねると会えやすい） */
 function awayAdvice(r) {
   const tried = slotList(r.aw.slots);
@@ -9166,17 +9174,17 @@ function openSlotSheet() {
 
 /* 係：返却後の留守宅カード（区域＞状況の「留守宅カードの出し方」の下）。設定と、返却後の区域の一覧
    一覧は renderAwayAdmin で作った idx（unmetIndex の結果）を使い回す（区域ごとに unmetIndex を呼ばない）。受け取り中の人の名前は係の画面だけ */
+/* 返却後の留守宅カード：set＝設定の行（状況の右の「区域の決め」に出す）・table＝返却後の区域の表（左の状況に出す） */
 function extAdminHtml(idx, rrow, stpd) {
   const x = extSet(), st = D().settings, fd = Number(st.freeAfterDays) || 0, auto = Number(st.autoFree) === 1 && fd > 0;
-  const head = `<p class="q"><b>返却後の留守宅カード</b></p>` +
-    rrow('返却後の留守宅カード', '区域が正式に返却されたあと、まだ会えていない家を、まだ試していない時間帯だけで、だれでも受け取れるカードにします',
+  const head = rrow('返却後の留守宅カード', '区域が正式に返却されたあと、まだ会えていない家を、まだ試していない時間帯だけで、だれでも受け取れるカードにします',
       `<div class="seg" role="group"><button type="button" data-sset="extOn" data-v="1" aria-pressed="${x.on}">使う</button>
         <button type="button" data-sset="extOn" data-v="0" aria-pressed="${!x.on}">使わない</button></div>`) +
     (x.on ? rrow('寝かせる日数', '正式返却から、また前のカードが終わってから、この日数は出しません。家ごとにも、最後に訪ねてからこの日数は入れません', stpd('extRest', x.rest, '日', '寝かせる日数', 1)) +
       rrow('1軒あたりの回数', '返却後に、同じ家を訪ねる上限です（同じ日は1回）', stpd('extCap', x.cap, '回', '1軒あたりの回数', 1)) +
       rrow('出す期間', '正式返却から、この日数で止めます' + (auto && x.days >= fd ? `<br><b>自由に受け取れる日のほうが先に来ます。その${x.before}日前で止まります</b>` : ''), stpd('extDays', x.days, '日', '出す期間', 7)) +
       rrow('次の新規の前に止める', `自動受け取りを使う区域では、自由に受け取れる日（${fd > 0 ? `返却から${fd}日` : 'まだ決めていません'}）のこの日数前で止めます`, stpd('extStopBefore', x.before, '日', '次の新規の前に止める日数', 7)) : '');
-  if (!x.on) return head;
+  if (!x.on) return { set: head, table: '' };
   const rows = D().territories.slice().sort(byNo).map(t => {
     const xs = extState(t); if (!xs) return '';
     const items = idx.get(t.id) || [], tc = triedOf(items);
@@ -9186,9 +9194,9 @@ function extAdminHtml(idx, rrow, stpd) {
     return `<tr><th>区域${esc(t.no)}</th><td>${items.length}軒</td><td>${tc == null ? '—' : tc + ' / ' + SLOTS.length}</td><td>${state}</td>
       <td>${lendMode(t) === 'stop' ? '<span class="muted">貸出中止</span>' : `<button type="button" class="btn small" data-extstop="${esc(t.id)}">${t.extStop ? '出す' : '止める'}</button>`}</td></tr>`;
   }).join('');
-  return head + `<p class="q" data-hqk="extList">返却後の区域</p>` + (rows
+  return { set: head, table: `<p class="q" data-hqk="extList">返却後の区域</p>` + (rows
     ? `<div class="scroll"><table class="slots narrow"><tr><th>区域</th><th>残りの家</th><th>区域で試した時間帯</th><th>状態</th><th></th></tr>${rows}</table></div>`
-    : '<p class="muted">今、返却後の区域はありません。</p>');
+    : '<p class="muted">今、返却後の区域はありません。</p>') };
 }
 /* 係の画面：返却後の留守宅カードを、区域ごとに止める／出す */
 function toggleExtStop(tid) {
@@ -9211,7 +9219,11 @@ function renderAwayAdmin() {
   const stpd = (key, val, unit, label, d) => `<div class="stepper"><button type="button" data-aset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${val}${unit}</output>
     <button type="button" data-aset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div>`;
   const dayOnly = Number(st.awayDayOnly) || 0;
-  $('#adAwaySet').innerHTML = `<p class="q"><b>留守宅訪問のルール</b></p>` +
+  // 留守宅の設定の行は、状況の右の「区域の決め」（kimari.js）に出す。左の「留守宅の状況」には、返却後の区域の表だけを出す
+  const awayBox = $('#krAway'), extBox = $('#krExt'), ex = extAdminHtml(idx, rrow, stpd);
+  if (extBox) extBox.innerHTML = ex.set;
+  $('#adAwaySet').innerHTML = ex.table;
+  if (awayBox) awayBox.innerHTML = `<p class="q"><b>留守宅訪問のルール</b></p>` +
     rrow('留守宅として訪ねる上限回数', '今回の巡回で留守だった日の数です（同じ日は1回）。届いた家は、次の巡回が始まるまで留守宅カードに入りません', stp('awayCap', rl.cap, '回', '上限回数')) +
     rrow('この日数以内に訪ねた家は、カードに入れない', '同じ家を次に訪ねるまでの最短の間隔です。0にすると、間隔をあけません', stp('awayRecentDays', rl.gap, '日', '最短間隔')) +
     rrow('同じ家に同じ時間帯を重ねない', 'オンのときは、同じ家を同じ時間帯（例：平日の朝）では訪ねません。10通りすべて試した家は、いちばん前に試した時間帯から順に戻ります', two('awayNoRepeat', rl.nr, [1, 'オン'], [0, 'オフ'])) +
@@ -9229,8 +9241,7 @@ function renderAwayAdmin() {
     <div class="setrow"><span>回り終えた記録がない区域（担当者なし）も使う<br><small class="hint">「使わない」は、回り終えた区域だけからカードを作ります</small></span>
       <div class="seg" role="group"><button type="button" data-sset="awayAllTerr" data-v="1" aria-pressed="${st.awayAllTerr === 1}">使う</button>
       <button type="button" data-sset="awayAllTerr" data-v="0" aria-pressed="${st.awayAllTerr !== 1}">使わない</button></div></div>` +
-    rrow('その日限りにする軒数', 'この軒数以下のカードは、受け取った日の終わりに自動で終わります（用事のついでに寄る人向け）。0にすると使いません', stpd('awayDayOnly', dayOnly, dayOnly ? '軒まで' : '（使わない）', 'その日限りにする軒数', 1)) +
-    extAdminHtml(idx, rrow, stpd);
+    rrow('その日限りにする軒数', 'この軒数以下のカードは、受け取った日の終わりに自動で終わります（用事のついでに寄る人向け）。0にすると使いません', stpd('awayDayOnly', dayOnly, dayOnly ? '軒まで' : '（使わない）', 'その日限りにする軒数', 1));
 
   const all = [...idx.values()].flat();
   const cnt = {};
@@ -10882,18 +10893,14 @@ function renderDataSet() {
     row('syncGroupSec', '一緒に回っているとき、ほかの人の記録を取りに行く間隔', '秒', 1, '短いほど早く反映されますが、サーバーが混みます。80人が同時に使っても、7秒なら余裕があります') +
     row('syncNormalSec', '区域カード・地図を見ているとき、取りに行く間隔', '秒', 5, 'ふだんの間隔です。混むときは長くしてください');
 }
-/* 「区域」タブの「貸し出しのきまり」：ボタンで開け閉めする。開いているかどうかは takeOpen に覚え、描き直しても変わらない */
-let takeOpen = false;
+/* 「区域」タブの「貸し出しのきまり」：状況の「区域の決め」（kimari.js）の「貸し出しと返却」を開く入り口。ボタンの下に今の決めを短く出す */
 function paintTakeTgl() {
-  const b = $('#adTakeTgl'), box = $('#adTakeSet'); if (!b || !box) return;
+  const b = $('#adTakeTgl'); if (!b) return;
   const st = D().settings;
   $('#adTakeSum').textContent = `自動受け取り ${Number(st.autoFree) === 1 ? '使う' : '使わない'}・目安 ${lendDays()}日・1人 ${st.holdMaxPersonal || 2}枚`;
-  b.setAttribute('aria-expanded', String(takeOpen));
-  box.hidden = !takeOpen;
   if (!b.dataset.bound) {
     b.dataset.bound = '1';
-    b.onclick = () => { takeOpen = !takeOpen; paintTakeTgl(); if (takeOpen) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
-    box.addEventListener('click', e => { if (e.target.closest('[data-takeclose]')) { takeOpen = false; paintTakeTgl(); b.scrollIntoView({ block: 'nearest' }); } });
+    b.onclick = () => { if (window.KR) KR.open('lend'); };
   }
 }
 /* 係の画面：開いているタブの中身だけを作る（3万件のとき、全部のタブを毎回作ると重いため） */
@@ -10922,7 +10929,7 @@ function renderAdmin() {
   }
   const outside = D().houses.filter(h => !h.terrId).length;
   const lent = ts.filter(isLent).length;
-  const over = ts.filter(t => t.holder && t.lentAt && daysSince(t.lentAt) > lendDays()).length;
+  const over = ts.filter(pastDue).length;
   const dncN = Object.keys(D().dnc).length;
   const provN = D().houses.filter(h => h.prov).length;
   const tile = (k, cls, num, label) => `<button type="button" class="tile${cls}" data-tl="${k}"><b>${num}</b>${label}<span class="tmore">内訳 ›</span></button>`;
@@ -10934,23 +10941,8 @@ function renderAdmin() {
     (provN ? tile('prov', ' alert', provN, 'まだ確かめていない仮の家') : '');
   if (!$('#adTiles').dataset.bound) { $('#adTiles').dataset.bound = '1'; $('#adTiles').addEventListener('click', e => { const b = e.target.closest('[data-tl]'); if (b) openStatList(b.dataset.tl); }); }
 
-  // 時間帯ごとの会えた割合
-  const cell = {}, cut180 = new Date(now - 180 * DAY).toISOString();
-  for (const v of D().visits) {
-    if (v.at < cut180) continue; // 日時の文字どうしで比べる（1件ずつ日付に直すより速い）
-    const key = slotOfVisit(v).replace('・', '');
-    cell[key] = cell[key] || { n: 0, m: 0 };
-    cell[key].n++; if (v.result === 'met') cell[key].m++;
-  }
-  let best = null, bestP = -1;
-  for (const [k, c] of Object.entries(cell)) { if (c.n >= 10 && c.m / c.n > bestP) { bestP = c.m / c.n; best = k; } }
-  $('#adSlots').innerHTML = `<tr><th></th>${BANDS.map(b => `<th>${b}<br><small>${BAND_HINT[b]}</small></th>`).join('')}</tr>` +
-    ['平日', '土日'].map(dt => `<tr><th>${dt}</th>${BANDS.map(b => {
-      const c = cell[dt + b];
-      if (!c) return '<td class="muted">記録なし</td>';
-      const p = Math.round(c.m / c.n * 100);
-      return `<td class="${best === dt + b ? 'best' : ''}"><b>${p}%</b><br><small>${c.n}件</small><div class="bar"><i style="width:${p}%"></i></div></td>`;
-    }).join('')}</tr>`).join('');
+  // 古い「時間帯ごとの会えた割合（直近180日）」の表は、新しい表（schedule.js の paintSlotBox）が隠して置きかえるので、作らない
+  // （前は毎回、直近180日の記録を全部数えてから隠していた。区域係の「状況」と設定を左右にする見直しで気づいた分）
 }
 /* 係の画面「区域」の一覧：1区域1行（番号・名前・持っている人か前回の返却日・状態）。行を押すとカルテが開く（改善案A4）。
    担当を変える・貸し出しのきまり・線を直す・番号と名前・字・条件・削除などの操作は、カルテにまとめてある。
@@ -11010,12 +11002,12 @@ function openStatList(key) {
     const freeT = ts.filter(t => !isLent(t) && !t.awayPoolAt && lendMode(t) !== 'stop');
     title = `区域の数 ${ts.length}`;
     body = `<div class="tlsum"><span>貸出中</span><b>${lentT.length}</b>${paperT.length ? `<span>紙の記録で貸出中</span><b>${paperT.length}</b>` : ''}<span>留守宅カードで回っている</span><b>${pool.length}</b><span>空いている</span><b>${freeT.length}</b><span>貸出中止</span><b>${stop.length}</b>${ts.some(isSpecial) ? `<span>そのうち特別区域</span><b>${ts.filter(isSpecial).length}</b>` : ''}</div>
-      ${lentT.length ? `<h3 class="sub">貸出中（${lentT.length}）</h3>${lentT.sort((a, b) => (a.lentAt < b.lentAt ? -1 : 1)).map(t => statRow(t, `${esc(uname(t.holder))}さん・${daysSince(t.lentAt)}日目`, daysSince(t.lentAt) > lendDays())).join('')}` : ''}
+      ${lentT.length ? `<h3 class="sub">貸出中（${lentT.length}）</h3>${lentT.sort((a, b) => (a.lentAt < b.lentAt ? -1 : 1)).map(t => statRow(t, `${esc(uname(t.holder))}さん・${daysSince(t.lentAt)}日目`, pastDue(t))).join('')}` : ''}
       ${paperT.length ? `<h3 class="sub">紙の記録で貸出中（${paperT.length}）</h3>${paperT.sort((a, b) => (a.paperLentAt < b.paperLentAt ? -1 : 1)).map(t => { const ph = paperHoldOf(t); return statRow(t, `${esc(ph.name || '名前なし')}・${daysSince(ph.a)}日目`, daysSince(ph.a) > lendDays()); }).join('')}` : ''}
       ${pool.length ? `<h3 class="sub">留守宅カードで回っている（${pool.length}）</h3>${pool.map(t => { const p = poolInfo(t); return statRow(t, p ? `訪ね直し ${p.done}/${p.n}（${p.pct}%）` : ''); }).join('')}` : ''}
       ${stop.length ? `<h3 class="sub">貸出中止（${stop.length}）</h3>${stop.map(t => statRow(t, '貸出中止')).join('')}` : ''}`;
   } else if (key === 'over') {
-    const list = ts.filter(t => t.holder && t.lentAt && daysSince(t.lentAt) > lendDays()).sort((a, b) => (a.lentAt < b.lentAt ? -1 : 1));
+    const list = ts.filter(pastDue).sort((a, b) => (a.lentAt < b.lentAt ? -1 : 1));
     title = `返却の目安をこえた貸出 ${list.length}`;
     hint = `受け取ってから${lendDays()}日（返却の目安）をこえている区域です。古い順です。`;
     body = list.length ? list.map(t => { const r = roundInfo(t.id, true); return statRow(t, `${esc(uname(t.holder))}さん・${daysSince(t.lentAt)}日目${r ? `・進み具合 約${r.pct}%${r.phase === 'away' ? '（留守宅を回る段階）' : ''}` : ''}`, true); }).join('') : '<div class="empty">ありません</div>';
@@ -13961,7 +13953,8 @@ function bindStatic() {
     Store.data = makeDemo(); Store.data.currentUser = cu; Store.save();
     fillWho(); updateTabs(); renderAll(); toast('試作データに戻しました');
   };
-  $('#view-admin').addEventListener('click', e => {
+  // 係の画面の押したときの処理。状況の「区域の決め」（kimari.js）をスマホで下から出す画面に出したときも、同じ処理を使う
+  const adminClick = e => {
     const q = sel => e.target.closest(sel);
     let x;
     if ((x = q('[data-recok]'))) { const st = D().settings; st.recoKinds = (Number(st.recoKinds) || 0) ^ Number(x.dataset.recok); Store.save(); renderAll(); }
@@ -14018,7 +14011,9 @@ function bindStatic() {
       st.selfTakeMax = Math.min(5, Math.max(1, st.selfTakeMax + Number(x.dataset.takemax)));
       Store.save(); renderAll(); toast('枚数を変えました');
     }
-  });
+  };
+  $('#view-admin').addEventListener('click', adminClick);
+  $('#sheet').addEventListener('click', e => { if (e.target.closest && e.target.closest('#adRules')) adminClick(e); });
   $('#view-admin').addEventListener('change', e => {
     const s = e.target, k = s.dataset.assign || s.dataset.reassign;
     if (!k || !s.value) return;
