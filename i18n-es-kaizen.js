@@ -165,4 +165,13 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "アイコンの絵は、ホーム画面に追加するときにえらびます。iPhoneでは、アイコンを作り直すと、このアイコンの中だけに保存している奉仕時間や自分の予定が消えることがあるので、今のアイコンのまま使うことをおすすめします。": "La imagen del ícono se elige al agregarlo a la pantalla de inicio. En iPhone, si vuelve a crear el ícono, se pueden borrar las horas de predicación y la agenda personal guardadas solo en este ícono, así que se recomienda seguir usando el ícono actual.",
 "アイコンの絵は、ホーム画面に追加するときにえらびます。変えたいときは、今のアイコンを長押しして削除し、Chromeで区域マップを開いて、もう一度「ホーム画面に追加」をします。": "La imagen del ícono se elige al agregarlo a la pantalla de inicio. Para cambiarla, mantenga presionado el ícono actual, bórrelo, abra el Mapa de Territorios en Chrome y vuelva a tocar «Agregar a la pantalla de inicio».",
 "ホーム画面のアイコンの絵は、設定ではなく「ホーム画面に追加」の手順の中でえらぶようにしました。追加したあとに設定で変えても、ホーム画面のアイコンは変わらなかったためです": "La imagen del ícono de la pantalla de inicio ahora se elige en los pasos de «Agregar a la pantalla de inicio», no en Ajustes, porque cambiarla en Ajustes después de agregarlo no cambiaba el ícono.",
+/* 2026.13.83：アパート・マンションに変える画面で、エレベーターと建物のメモを入れる（建物の編集のメモの文も） */
+"建物のメモ": "Nota del edificio",
+"例：1階は店、2階は駐車場。奥の階段からも入れる": "Ej.: el 1.er piso es una tienda y el 2.º, estacionamiento. También se entra por la escalera del fondo",
+"部屋を入力する画面の上に出ます。": "Aparece arriba en la pantalla para registrar los cuartos.",
+"住んでいる人の名前・国籍・年齢・病気などは書かないでください。": "No escriba el nombre, la nacionalidad, la edad, las enfermedades, etc., de los residentes.",
+"このまま保存しますか？": "¿Guardar así?",
+"メモに「{0}」とあります。建物のメモは、みんなが見ます。住んでいる人のこと（名前・国籍・年齢・病気など）が入っていなければ、このまま保存してください。": "La nota dice «{0}». Todos ven las notas del edificio. Si no contiene datos de los residentes (nombre, nacionalidad, edad, enfermedades, etc.), guárdela así.",
+"メモに「{0}」とあります。建物のメモは、くわしい表示の人みんなが見ます。住んでいる人のこと（名前・国籍・年齢・病気など）が入っていなければ、このまま保存してください。": "La nota dice «{0}». Todos los que usan la vista detallada ven las notas del edificio. Si no contiene datos de los residentes (nombre, nacionalidad, edad, enfermedades, etc.), guárdela así.",
+"家を「アパート・マンション」に変える画面でも、エレベーター（まだ確かめていない／あり／なし）と建物のメモを入れられるようにしました。部屋を入力する画面の上に出ます": "En la pantalla para convertir una casa en «apartamento/edificio» ahora también se puede indicar el ascensor (aún no confirmado / sí / no) y la nota del edificio. Aparecen arriba en la pantalla para registrar los cuartos.",
 });

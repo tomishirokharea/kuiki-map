@@ -3,12 +3,14 @@
 
    現場での流れ
      ① 家の画面の「アパートだった」→ 付近の候補（エクセルの建物）が近い順に出る
-        → 1つえらぶと、建物名・階数・1階の有無・オートロック・立入禁止が自動で入る
+        → 1つえらぶと、建物名・階数・1階の有無・オートロック・エレベーター・立入禁止・備考が自動で入る
         → えらんだ候補は「使った」ことになり、次からは候補に出ない（残りだけが並ぶ）
      ② 同じ画面で、階の数と部屋の入れ方をえらぶ
         ・階だけ入れる      ：「1階・2階…」の枠だけ作る（部屋は訪問しながら）
         ・部屋番号まで入れる：書き方（101／2-1／2A／A棟101）と1階の部屋数をえらぶと、まとめて作れる
           できた部屋は1つずつ「直す・消す」ができ、自由な書き方でも足せる
+        ・エレベーター（まだ確かめていない／あり／なし）と建物のメモも、この画面で入れられる（2026.13.83）
+          建物の編集と同じ項目・同じ書き方。メモは「建物のメモ」をひらいたときだけ出す
      ③ 登録すると、そのまま訪問の入力（openAptSeq）に進む。現場で全部入力して終えることもできる
    候補の置き場：区域ごとの territory.cands（エクセルから、アパートの登録画面で入れる）
    使った印    ：家の cid（候補の番号）。家を消すと、その候補はまた出る
@@ -74,7 +76,7 @@
   }
   const candCount = (tid) => { const t = terrById(tid); if (!t || !t.cands) return 0; const u = usedCids(); return t.cands.filter(c => !u.has(c.i)).length; };
   const dTxt = d => d < 20 ? 'すぐ近く' : d < 1000 ? `約${Math.round(d / 10) * 10}m` : `約${(d / 1000).toFixed(1)}km`;
-  const tags = c => `${c.r && c.r.length ? `<span class="aw-tag">部屋番号あり（${c.r.length}）</span>` : ''}${c.f ? `<span class="aw-tag">${c.f}階建て</span>` : '<span class="aw-tag warn">階数 不明</span>'}${c.g === 0 ? '<span class="aw-tag">1階に部屋なし</span>' : ''}${c.k ? '<span class="aw-tag">オートロック</span>' : ''}${c.b === 'no' ? '<span class="aw-tag ban">立入禁止</span>' : c.b === 'letter' ? '<span class="aw-tag ban">手紙のみ</span>' : ''}${c.ac === 'ev' ? '<span class="aw-tag">エレベーター</span>' : c.ac === 'st' ? '<span class="aw-tag">縦階段</span>' : ''}${c.p ? '<span class="aw-tag warn">場所はだいたい</span>' : ''}${c.m ? `<span style="font-size:14px;margin-top:4px">メモ：${esc(c.m.length > 40 ? c.m.slice(0, 40) + '…' : c.m)}</span>` : ''}`;
+  const tags = c => `${c.r && c.r.length ? `<span class="aw-tag">部屋番号あり（${c.r.length}）</span>` : ''}${c.f ? `<span class="aw-tag">${c.f}階建て</span>` : '<span class="aw-tag warn">階数 不明</span>'}${c.g === 0 ? '<span class="aw-tag">1階に部屋なし</span>' : ''}${c.k ? '<span class="aw-tag">オートロック</span>' : ''}${c.b === 'no' ? '<span class="aw-tag ban">立入禁止</span>' : c.b === 'letter' ? '<span class="aw-tag ban">手紙のみ</span>' : ''}${c.ac === 'ev' ? '<span class="aw-tag">エレベーター</span>' : c.ac === 'st' ? '<span class="aw-tag">縦階段</span>' : c.ac === 'no' ? '<span class="aw-tag">エレベーターなし</span>' : ''}${c.p ? '<span class="aw-tag warn">場所はだいたい</span>' : ''}${c.m ? `<span style="font-size:14px;margin-top:4px">メモ：${esc(c.m.length > 40 ? c.m.slice(0, 40) + '…' : c.m)}</span>` : ''}`;
 
   /* ---------- 部屋の名前 ---------- */
   const FMTS = [['n3', '101', '階＋番号'], ['dash', '2-1', '階－番号'], ['alpha', '2A', '階＋英字'], ['free', '自由', '自分で入力']];
@@ -131,6 +133,18 @@
   const labelOf = (s, u) => (s.ren[u] || (s.edit && s.h.ul && s.h.ul[u]) || (unknownFrame(s, u) ? u + '（部屋不明）' : u));
   const canDel = (s, u) => !hasRec(s, u) && (isAdmin() || !s.edit || !s.ex.includes(u) || FRAME.test(u));
 
+  /* ---------- 建物のこと：エレベーターと建物のメモ（2026.13.83） ----------
+     建物の編集（app.js openBuilding）と同じ項目・同じ文。部屋を入力する画面の上に出る */
+  const AC_OPTS = [['', 'まだ確かめていない'], ['ev', 'あり'], ['no', 'なし（階段だけ）'], ['st', 'なし（縦階段：階段ごとに上り下り）']];
+  const cleanMemo = v => String(v || '').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 200);
+  function buildingMore(s) {
+    return `<label class="field"><span>エレベーター</span><select id="awAc" class="big" aria-label="エレベーター">${AC_OPTS.map(o => `<option value="${o[0]}"${s.ac === o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select>
+        <small class="hint">分かったら直してください。高齢の方が回る建物をえらぶときに使います。</small></label>
+      <details class="more" id="awNoteBox"${s.noteOpen || s.bn ? ' open' : ''}><summary>建物のメモ</summary>
+        <label class="field bnote"><textarea id="awNote" maxlength="200" rows="3" aria-label="建物のメモ" placeholder="例：1階は店、2階は駐車場。奥の階段からも入れる">${esc(s.bn)}</textarea></label>
+        <p class="hint" style="margin-top:-6px">部屋を入力する画面の上に出ます。<b>住んでいる人の名前・国籍・年齢・病気などは書かないでください。</b></p></details>`;
+  }
+
   /* ---------- 入り口 ---------- */
   function openWizard(hid, opt) {
     opt = opt || {};
@@ -144,8 +158,10 @@
       h, hid, ll, tid, edit, step: edit ? 'form' : 'pick', cand: null, more: false,
       name: h ? (h.label || '') : '', floors: edit ? guessFloors(h) : 3, g1: true, lock: !!(h && h.lock), ban: (h && h.ban) || '',
       mode: edit ? 'keep' : 'floor', fmt: 'n3', prefix: '', cnt0: 4, same: true, cnt: [], ex: edit ? h.units.slice() : [],
-      extra: [], del: new Set(), ren: {}, sel: null, freeText: ''
+      extra: [], del: new Set(), ren: {}, sel: null, freeText: '',
+      ac: (h && h.ac) || '', bn: (h && h.bn) || '', noteOpen: false
     };
+    s.ac0 = s.ac; s.bn0 = s.bn;
     if (edit) s.g1 = !h.units.length || h.units.some(u => u === '1階' || /^\D*?1\d{2}$/.test(u) || /^\D*?1-\d+$/.test(u) || /^1[A-Za-z]$/.test(u));
     paint(s);
   }
@@ -172,6 +188,8 @@
       const c = f.c;
       s.cand = c; s.name = c.n || s.name; if (c.f) s.floors = Math.min(MAX_FLOORS, c.f);
       s.g1 = c.g !== 0; s.lock = !!c.k; s.ban = c.b || ''; s.step = 'form';
+      s.ac = c.ac || s.ac0;                                   // 一覧のエレベーター・縦階段
+      if (c.m && !s.bn) { s.bn = cleanMemo(c.m); s.noteOpen = true; } // 一覧の備考を、建物のメモに（見えるようにひらく）
       if (c.r && c.r.length && !s.edit) { s.mode = 'room'; s.fmt = 'free'; s.extra = c.r.slice(0, 300); s.del = new Set(); } // 旧区域カードの部屋（apt-heya.js）
       paint(s);
     });
@@ -206,6 +224,7 @@
       <div class="aw-row"><span>階の数</span>${stepper('data-fl="1"', s.floors, '階')}</div>
       <label class="check locrow"><input type="checkbox" id="awG1"${s.g1 ? ' checked' : ''}>1階に部屋がある</label>
       <label class="check locrow"><input type="checkbox" id="awLock"${s.lock ? ' checked' : ''}>オートロックの建物</label>
+      ${edit ? '' : buildingMore(s)}
       ${isAdmin() ? `<label class="field"><span>立ち入りについて</span><select id="awBan"><option value=""${!s.ban ? ' selected' : ''}>ふつう</option><option value="no"${s.ban === 'no' ? ' selected' : ''}>立入禁止</option><option value="letter"${s.ban === 'letter' ? ' selected' : ''}>手紙のみ</option></select></label>` : ''}
 
       <p class="q">部屋の入れ方</p>
@@ -247,6 +266,9 @@
     const pre = $('#awPre'); if (pre) pre.onchange = () => { s.prefix = cleanUnit(normNum(pre.value)).slice(0, 4); again(); };
     const g1 = $('#awG1'); if (g1) g1.onchange = () => { s.g1 = g1.checked; again(); };
     const lk = $('#awLock'); if (lk) lk.onchange = () => { s.lock = lk.checked; };
+    const ac = $('#awAc'); if (ac) ac.onchange = () => { s.ac = ac.value; };
+    const nt = $('#awNote'); if (nt) nt.oninput = () => { s.bn = nt.value; };
+    const nd = $('#awNoteBox'); if (nd) nd.ontoggle = () => { s.noteOpen = nd.open; };
     const bn = $('#awBan'); if (bn) bn.onchange = () => { s.ban = bn.value; };
     const sm = $('#awSame'); if (sm) sm.onchange = () => {
       s.same = !sm.checked;
@@ -277,15 +299,25 @@
     };
     if ($('#awAddOk')) $('#awAddOk').onclick = addOk;
     if (ad) ad.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); addOk(); } };
-    if ($('#awBack')) $('#awBack').onclick = () => { if (s.cand && s.cand.r && !s.edit) { s.extra = []; s.mode = 'floor'; s.fmt = 'n3'; } s.step = 'pick'; s.cand = null; paint(s); };
+    if ($('#awBack')) $('#awBack').onclick = () => {
+      if (s.cand && s.cand.r && !s.edit) { s.extra = []; s.mode = 'floor'; s.fmt = 'n3'; }
+      if (s.cand && s.ac === (s.cand.ac || s.ac0)) s.ac = s.ac0;                       // 候補から入ったものは、えらびなおすと元にもどす
+      if (s.cand && s.cand.m && s.bn === cleanMemo(s.cand.m)) { s.bn = s.bn0; s.noteOpen = false; }
+      s.step = 'pick'; s.cand = null; paint(s);
+    };
     if ($('#awClose')) $('#awClose').onclick = () => { closeSheet(); if (s.hid) (s.edit ? openBuilding : (id) => openTarget(id, '', false))(s.hid); };
     $('#awSave').onclick = () => save(s);
   }
 
   /* ---------- 登録 ---------- */
-  function save(s) {
+  async function save(s) {
     const us = finalUnits(s);
     if (!us.length) { toast('部屋（または階）を入れてください'); return; }
+    const bn = cleanMemo(s.bn);
+    if (bn && bn !== cleanMemo(s.bn0)) { // 建物の編集と同じ確かめ（apt-import.js の bldSens）
+      const w = window.bldSens ? window.bldSens(bn) : [];
+      if (w.length && !await ask(`メモに「${w.join('・')}」とあります。建物のメモは、みんなが見ます。住んでいる人のこと（名前・国籍・年齢・病気など）が入っていなければ、このまま保存してください。`, { title: 'このまま保存しますか？', body: `メモに「${w.join('・')}」とあります。建物のメモは、くわしい表示の人みんなが見ます。住んでいる人のこと（名前・国籍・年齢・病気など）が入っていなければ、このまま保存してください。`, ok: '保存する', danger: false })) return;
+    }
     const label = String(s.name || '').trim().slice(0, 30);
     const hid = s.hid || ('h' + uid());
     const lost = s.edit ? s.h.units.filter(u => !us.includes(u)).length : 0;
@@ -299,10 +331,10 @@
       if (s.lock) h.lock = true; else delete h.lock;
       if (isAdmin()) { if (s.ban) h.ban = s.ban; else delete h.ban; }
       else if (s.cand && s.cand.b) h.ban = s.cand.b; // 候補の立入禁止。サーバーも候補と照らして確かめる
-      if (s.cand) {
-        h.cid = s.cand.i;
-        if (s.cand.m && !h.bn) h.bn = s.cand.m;   // 一覧の備考を、建物のメモに
-        if (s.cand.ac && !h.ac) h.ac = s.cand.ac; // エレベーター・縦階段
+      if (s.cand) h.cid = s.cand.i;
+      if (!s.edit) { // エレベーターと建物のメモ（一覧の値は、えらんだときに画面に入っている）。部屋を直す画面では、建物の編集で直す
+        if (s.ac) h.ac = s.ac; else delete h.ac;
+        if (bn) h.bn = bn; else delete h.bn;
       }
       if (!s.edit) { delete h.prov; delete h.uk; } // 確かめた建物なので「仮の家」ではなくなる
       const ul = {};
