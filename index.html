@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.84"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE も合わせて上げる -->
+<meta name="app-version" content="2026.13.85"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE も合わせて上げる -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -654,6 +654,8 @@ body.strong .pin.st-plain{border-width:4px}
 .iconpick{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px}
 .iconpick button{min-height:52px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:24px}
 .iconpick button[aria-pressed="true"]{border-color:var(--brand);background:var(--terr-soft);box-shadow:0 0 0 2px var(--brand)}
+.iconown{margin-top:6px}
+.iconown #hgIc{font-size:24px}
 
 /* ===== 更新のお知らせ ===== */
 #news{position:fixed;inset:0;z-index:6500;background:var(--bg);overflow:auto;padding:calc(18px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom))}

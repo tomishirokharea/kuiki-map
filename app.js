@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.84';
+var APP_JS_VER = '2026.13.85';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -990,22 +990,29 @@ async function openHomeGuide() {
   const MORE_PIC = '<span class="hpic hmore" aria-hidden="true">…</span>';
   // アイコンの絵は、追加する直前にここでえらぶ（2026.13.82。以前は設定の中にあったが、追加したあとに変えても
   // ホーム画面のアイコンは変わらず、iPhoneではホーム画面のアプリとSafariで設定が別々なので、えらんだ絵が使われなかった）
-  const curIc = String(uiEff().icon || '区');
-  const pickIcons = ICONS.includes(curIc) ? ICONS : [curIc].concat(ICONS); // 以前に自分で入れた文字も残す
+  const curIc = String(uiEff().icon || '区'), curTx = String(uiEff().iconText || '');
+  const ownIc = !ICONS.includes(curIc); // 以前に自分で入れた絵は、下の「自分で入れる」欄に入れておく
+  // 好きな絵文字と文字は、たたんだ欄に入れる（ふだんは12個から押すだけ。絵文字はスマホの変換で出す・2026.13.85）
   const iconStep = `<p class="hstep">アイコンの絵をえらびます。</p>
     <div class="iconprev"><canvas id="hgPrev" width="180" height="180" aria-label="アイコンの見本"></canvas><p class="hint hint-must">えらばなくても、このまま進めてかまいません。</p></div>
-    <div class="iconpick" role="group" aria-label="アイコンの絵">${pickIcons.map(v => `<button type="button" data-hicon="${esc(v)}" data-notr aria-pressed="${v === curIc}">${esc(v)}</button>`).join('')}</div>`;
+    <div class="iconpick" role="group" aria-label="アイコンの絵">${ICONS.map(v => `<button type="button" data-hicon="${esc(v)}" data-notr aria-pressed="${v === curIc}">${esc(v)}</button>`).join('')}</div>
+    <details class="more iconown"${ownIc || curTx ? ' open' : ''}><summary>好きな絵文字や文字を入れる</summary>
+      <label class="field"><span>好きな絵文字</span><input type="text" id="hgIc" maxlength="16" value="${ownIc ? esc(curIc) : ''}" placeholder="例：❤️" autocomplete="off" autocapitalize="off" enterkeyhint="done"></label>
+      <p class="hint hint-must">「はーと」「さくら」などと打って変換すると、❤️ や 🌸 などの絵文字が出ます。</p>
+      <label class="field"><span>絵の下に入れる文字（4文字まで・なくてもかまいません）</span><input type="text" id="hgTx" maxlength="12" value="${esc(curTx)}" placeholder="例：りょう" autocomplete="off" enterkeyhint="done"></label>
+    </details>`;
+  const NAME_HINT = '<p class="hint hint-must">アイコンの下の名前は、この画面で好きな名前に変えられます。</p>';
   // 文は、スペイン語の辞書で1文ずつ置きかえられるよう、手順ごとに1つの文にする
   const iosStepsList = ios26 && !iPad ? [
       `<p class="hstep">画面の下の右にある「…」を押します。</p>${MORE_PIC}`,
       `<p class="hstep">「共有」を押します。</p><span class="hpic">${SHARE_SVG}共有</span>`,
       `<p class="hstep">「その他」を押して、「ホーム画面に追加」を押します。</p><span class="hpic">${ADDHOME_SVG}ホーム画面に追加</span><p class="hint hint-must">見つからないときは、出てきたメニューを上に動かします。</p>`,
-      `<p>右上の <b>「追加」</b> を押します。ホーム画面に「${appNm}」のアイコンができます。</p>`
+      `<p>右上の <b>「追加」</b> を押します。ホーム画面に「${appNm}」のアイコンができます。</p>${NAME_HINT}`
     ] : [
       `<p>画面の下（iPadは上）にある <b>共有ボタン</b> を押します。</p><span class="hpic">${SHARE_SVG}</span>
         <p class="hint hint-must">見つからないときは、画面の下の「…」を押すと出てきます。</p>`,
       `<p>出てきたメニューを上に動かして、<b>「ホーム画面に追加」</b>を押します。</p><span class="hpic">${ADDHOME_SVG}ホーム画面に追加</span>${ios26 ? '<p class="hint hint-must">「その他」の中にあることもあります。</p>' : ''}`,
-      `<p>右上の <b>「追加」</b> を押します。ホーム画面に「${appNm}」のアイコンができます。</p>`
+      `<p>右上の <b>「追加」</b> を押します。ホーム画面に「${appNm}」のアイコンができます。</p>${NAME_HINT}`
     ];
   iosStepsList.push(`<p>できたアイコンを押して開きます。<b>名前の登録はいりません。</b>そのまま使えます。</p>`);
   iosStepsList.unshift(iconStep);
@@ -1016,7 +1023,7 @@ async function openHomeGuide() {
     iconStep,
     '<p>画面の右上の <b>「︙」</b> を押します。</p>',
     '<p><b>「ホーム画面に追加」</b>（または「アプリをインストール」）を押します。</p>',
-    '<p><b>「追加」</b> を押します。ホーム画面にアイコンができます。</p>'
+    '<p><b>「追加」</b> を押します。ホーム画面にアイコンができます。</p>' + NAME_HINT
   ]);
   const pcSteps = '<p>パソコンでは、ブラウザの「ブックマーク（お気に入り）」に入れておくと、すぐ開けます。</p>';
   setSheet(headHtml(null, 'ホーム画面に追加する', 'アプリのように、アイコンから開けます') + note +
@@ -1026,10 +1033,30 @@ async function openHomeGuide() {
   const hp = $('#hgPrev');
   if (hp) {
     drawIcon(hp);
+    const icIn = $('#hgIc'), txIn = $('#hgTx');
+    let lastPick = ownIc ? UI_DEFAULT.icon : curIc; // 自分で入れた絵を消したときにもどす絵
+    const redraw = () => { uiSave(); applyIcon(); drawIcon(hp); }; // ページのアイコン（追加するときに使われる絵）も、その場で変える
+    const press = v => $$('[data-hicon]', $('#sheet')).forEach(x => x.setAttribute('aria-pressed', String(x.dataset.hicon === v)));
     $$('[data-hicon]', $('#sheet')).forEach(b => b.onclick = () => {
-      UI.icon = b.dataset.hicon; uiSave(); applyIcon(); drawIcon(hp); // ページのアイコン（追加するときに使われる絵）も、その場で変える
-      $$('[data-hicon]', $('#sheet')).forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      UI.icon = lastPick = b.dataset.hicon; if (icIn) icIn.value = '';
+      press(UI.icon); redraw();
     });
+    // 日本語の変換の途中（「はー」など）は見本を変えず、決まってから変える
+    // 入れられる数をこえたら、欄の中もその数までにする（見本と欄の文字をそろえる）
+    const cut = (el, n) => { const g = graphemes(el.value); if (g.length > n) el.value = g.slice(0, n).join(''); };
+    const onIc = ev => {
+      if (ev && ev.isComposing) return;
+      cut(icIn, 2);
+      const v = clipG(icIn.value, 2);
+      UI.icon = v || lastPick; press(UI.icon); redraw();
+    };
+    const onTx = ev => {
+      if (ev && ev.isComposing) return;
+      cut(txIn, 4);
+      UI.iconText = clipG(txIn.value, 4); redraw();
+    };
+    if (icIn) ['input', 'compositionend', 'change'].forEach(n => icIn.addEventListener(n, onIc));
+    if (txIn) ['input', 'compositionend', 'change'].forEach(n => txIn.addEventListener(n, onTx));
   }
 }
 /* ホーム画面のアイコンから、はじめて開いたとき：引きつぎの番号で使えるようにする */
@@ -2464,6 +2491,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.85', items: [
+    ['家', '「ホーム画面に追加」でアイコンの絵をえらぶとき、「好きな絵文字や文字を入れる」から、好きな絵文字（「はーと」と打って変換すると❤️）と、絵の下に入れる文字（4文字まで）をアイコンにできるようにしました']
+  ] },
   { v: '2026.13.84', items: [
     ['家', '「家を追加」のメニューを小さくしたとき、iPhoneの時刻の表示に重なって見えなくなっていたのを直しました。小さくしたままでも、となりの「追加を終わる」ですぐ終われます']
   ] },
@@ -9434,7 +9464,7 @@ function nameZoomSlider(key) {
     <p class="nzends"><span>← 縮めても出す</span><span>拡大したときだけ →</span></p></div>`;
 }
 const ICONS = ['区', '家', '図', '心', '🏠', '🗺️', '📖', '🚪', '✅', '⭐', '🚶', '☀️'];
-const UI_DEFAULT = { fTime: 'off', fTimer: 'on', hello: 'on', fFollow: 'off', todayOn: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', mapRot: 'on', mode: 'simple', size: 'normal', pct: 0, icon: '区', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
+const UI_DEFAULT = { fTime: 'off', fTimer: 'on', hello: 'on', fFollow: 'off', todayOn: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', mapRot: 'on', mode: 'simple', size: 'normal', pct: 0, icon: '区', iconText: '', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
 /* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
   standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
@@ -9529,7 +9559,7 @@ function uiEff() {
   const size = UI.size === 'small' ? 'normal' : UI.size;
   // かんたん表示で「とても大きく」にしたときは、地図の家の印も大きくする（指で押しやすく）
   // ホーム画面のアイコンの絵と名前は、どちらの表示でも、えらんだものを使う（「ホーム画面に追加」でえらぶため・2026.13.82）
-  return Object.assign({}, UI_DEFAULT, { size, pin: size === 'xlarge' ? 'large' : 'normal', icon: UI.icon || UI_DEFAULT.icon, appName: UI.appName || UI_DEFAULT.appName });
+  return Object.assign({}, UI_DEFAULT, { size, pin: size === 'xlarge' ? 'large' : 'normal', icon: UI.icon || UI_DEFAULT.icon, iconText: UI.iconText || '', appName: UI.appName || UI_DEFAULT.appName });
 }
 const accentColor = () => themeOf(uiEff())[1];
 /* 区域の線の色（各自の設定） */
@@ -9539,16 +9569,35 @@ const terrLineWidth = on => { const w = UI.terrWidth === 'thin' ? 2 : UI.terrWid
 /* くわしくモードでは、スライダーで決めた％（80〜160）を使う */
 const zoomOf = e => (UI.mode === 'detail' && e.pct ? e.pct / 100 : (SIZES[e.size] || SIZES.normal)[0]);
 /* ホーム画面のアイコンを、その場で作る（テーマの色＋えらんだ絵） */
+/* 文字を「見た目の1文字」ごとに分ける（❤️・👨‍👩‍👧 のような、いくつかの符号でできた絵文字も1文字に数える） */
+function graphemes(s) {
+  s = String(s || '');
+  try { return Array.from(new Intl.Segmenter('ja', { granularity: 'grapheme' }).segment(s), x => x.segment); }
+  catch (e) { return Array.from(s); }
+}
+/* 前後の空白を除いて、見た目で n 文字まで（ホーム画面のアイコンの絵・絵の下の文字） */
+const clipG = (s, n) => graphemes(String(s || '').replace(/\s+/g, ' ').trim()).slice(0, n).join('');
+const ICON_JP_FONT = '"BIZ UDPGothic","Hiragino Sans",sans-serif';
 function drawIcon(cv) {
-  const x = cv.getContext('2d'), th = themeOf(uiEff()), t = String(uiEff().icon || '区').slice(0, 2);
+  const e = uiEff(), x = cv.getContext('2d'), th = themeOf(e);
+  const t = clipG(e.icon, 2) || '区', sub = clipG(e.iconText, 4), tn = graphemes(t).length;
   const g = x.createLinearGradient(0, 0, 180, 180);
   g.addColorStop(0, th[0]); g.addColorStop(1, th[1]);
   x.clearRect(0, 0, 180, 180);
   x.fillStyle = g; x.fillRect(0, 0, 180, 180);
   x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  const emoji = /[^\u0000-\u30FF\u4E00-\u9FFF\uFF00-\uFFEF]/.test(t);
-  x.font = `700 ${t.length > 1 ? 74 : 100}px ${emoji ? 'sans-serif' : '"BIZ UDPGothic","Hiragino Sans",sans-serif'}`;
-  x.fillText(t, 90, 96);
+  const emoji = /[^\u0000-ヿ一-鿿＀-￯]/.test(t);
+  const fam = emoji ? 'sans-serif' : ICON_JP_FONT;
+  if (sub) { // 絵の下に文字を入れるとき：絵を少し上・小さめにし、下に文字（はみ出すときは横を縮める）
+    x.font = `700 ${tn > 1 ? 56 : 78}px ${fam}`;
+    x.fillText(t, 90, 70, 164);
+    const sn = graphemes(sub).length;
+    x.font = `700 ${sn <= 2 ? 40 : sn === 3 ? 36 : 31}px ${ICON_JP_FONT}`;
+    x.fillText(sub, 90, 140, 164);
+  } else {
+    x.font = `700 ${tn > 1 ? 74 : 100}px ${fam}`;
+    x.fillText(t, 90, 96, 168);
+  }
   return cv;
 }
 function applyIcon() {
@@ -9795,7 +9844,7 @@ function openUiSheet() {
     });
     $('#uiReset').onclick = async () => {
       if (!await ask('画面の見え方を、最初の状態にもどします（「使う機能」はそのままです）。よろしいですか？')) return;
-      UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fTimer: UI.fTimer, hello: UI.hello, fFollow: UI.fFollow, cProg: UI.cProg, cReco: UI.cReco, todayOn: UI.todayOn, icon: UI.icon, appName: UI.appName }); uiSave(); applyUi(); setBase('pale'); applyRotSetting(); // 使う機能・区域カードに出すもの・ホーム画面のアイコンはそのまま
+      UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fTimer: UI.fTimer, hello: UI.hello, fFollow: UI.fFollow, cProg: UI.cProg, cReco: UI.cReco, todayOn: UI.todayOn, icon: UI.icon, iconText: UI.iconText, appName: UI.appName }); uiSave(); applyUi(); setBase('pale'); applyRotSetting(); // 使う機能・区域カードに出すもの・ホーム画面のアイコンはそのまま
       toast('表示の設定を最初にもどしました');
       paint(false);
     };

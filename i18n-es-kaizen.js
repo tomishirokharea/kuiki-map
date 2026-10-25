@@ -176,4 +176,13 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "家を「アパート・マンション」に変える画面でも、エレベーター（まだ確かめていない／あり／なし）と建物のメモを入れられるようにしました。部屋を入力する画面の上に出ます": "En la pantalla para convertir una casa en «apartamento/edificio» ahora también se puede indicar el ascensor (aún no confirmado / sí / no) y la nota del edificio. Aparecen arriba en la pantalla para registrar los cuartos.",
 /* 2026.13.84：家を追加のメニューを小さくしたとき、iPhoneの時刻の下に入らない・となりに「追加を終わる」 */
 "「家を追加」のメニューを小さくしたとき、iPhoneの時刻の表示に重なって見えなくなっていたのを直しました。小さくしたままでも、となりの「追加を終わる」ですぐ終われます": "Al minimizar el menú de «Agregar casa», quedaba oculto debajo de la hora del iPhone; ya está corregido. Aun minimizado, puede terminar enseguida con «Terminar», que aparece al lado.",
+/* 2026.13.85：ホーム画面に追加するとき、好きな絵文字と絵の下の文字をアイコンに入れる */
+"好きな絵文字や文字を入れる": "Poner un emoji o texto a su gusto",
+"好きな絵文字": "Emoji a su gusto",
+"例：❤️": "Ej.: ❤️",
+"「はーと」「さくら」などと打って変換すると、❤️ や 🌸 などの絵文字が出ます。": "Con el teclado de emojis del teléfono puede elegir emojis como ❤️ o 🌸.",
+"絵の下に入れる文字（4文字まで・なくてもかまいません）": "Texto debajo de la imagen (hasta 4 letras; es opcional)",
+"例：りょう": "Ej.: Ana",
+"アイコンの下の名前は、この画面で好きな名前に変えられます。": "En esta pantalla puede cambiar el nombre que aparece debajo del ícono.",
+"「ホーム画面に追加」でアイコンの絵をえらぶとき、「好きな絵文字や文字を入れる」から、好きな絵文字（「はーと」と打って変換すると❤️）と、絵の下に入れる文字（4文字まで）をアイコンにできるようにしました": "Al elegir la imagen del ícono en «Agregar a la pantalla de inicio», ahora puede usar «Poner un emoji o texto a su gusto» para poner un emoji (por ejemplo ❤️) y un texto debajo (hasta 4 letras).",
 });
