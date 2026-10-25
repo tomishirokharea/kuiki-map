@@ -191,4 +191,6 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "カレンダーの日を押した画面で、奉仕時間を −／＋ だけでなく、数字を押して直接入れられるようにしました。「奉仕時間を保存する」を押すと、保存してホームにもどります。保存しないときは「やめる」を押します": "En la pantalla que se abre al tocar un día del calendario, ahora puede escribir las horas directamente, además de usar − / +. Al tocar «Guardar horas», se guardan y vuelve a Inicio. Si no quiere guardar, toque «Cancelar».",
 "その画面が左右に動いてしまうことがあったのを直しました": "Se corrigió que esa pantalla a veces se movía hacia los lados.",
 "例：〇〇さんと奉仕": "Ej.: predicar con un hermano",
+/* 2026.13.87：同じタブをもう一度押すと、はじめの状態にもどる */
+"下のタブを、いま見ている画面でもう一度押すと、その画面のいちばん上にもどるようにしました。地図のタブなら、えらんでいる区域の全体が見えるところにもどります": "Si vuelve a tocar, en la barra de abajo, la pestaña de la pantalla que está viendo, regresa al principio de esa pantalla. En la pestaña del mapa, vuelve a mostrar todo el territorio elegido.",
 });

@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.86';
+var APP_JS_VER = '2026.13.87';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2491,6 +2491,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.87', items: [
+    ['下', '下のタブを、いま見ている画面でもう一度押すと、その画面のいちばん上にもどるようにしました。地図のタブなら、えらんでいる区域の全体が見えるところにもどります']
+  ] },
   { v: '2026.13.86', items: [
     ['時', 'カレンダーの日を押した画面で、奉仕時間を −／＋ だけでなく、数字を押して直接入れられるようにしました。「奉仕時間を保存する」を押すと、保存してホームにもどります。保存しないときは「やめる」を押します'],
     ['左', 'その画面が左右に動いてしまうことがあったのを直しました']
@@ -13781,6 +13784,23 @@ function showView(name) {
     if (LIVE && !Store.queue.length) refresh(true).catch(() => {});
   }
 }
+/* 同じタブをもう一度押したとき：そのタブのはじめの状態にもどる（JW Library と同じ作法・2026.13.87）。
+   ・一覧の画面（ホーム・区域カード・再訪問・おすすめ・係の画面）：いちばん上へ。係の画面の中のタブはそのまま
+   ・地図：えらんでいる区域の全体が入るように（えらんでいなければ全部の区域）
+   ・地図で作業している間（線を引く・場所をえらぶ・拒否の家をえらぶ など）は何もしない。入れかけのものは消さない
+   この画面は .view の中だけが動くので、iPhone の「画面のいちばん上をタップすると上へ」が効かない。その代わりの帰り道 */
+function retapView(name) {
+  if (name === 'map') {
+    if (!map || mode !== 'normal' || draw || pickPlace || document.body.classList.contains('focusmode')) return;
+    const id = selTerrId(), t = id && terrById(id);
+    if (t && okPoly(t.polygon)) fitTerr(id); else fitAll();
+    return;
+  }
+  const v = $('#view-' + name);
+  if (!v || v.scrollTop <= 0) return;
+  const calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  try { v.scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' }); } catch (e) { v.scrollTop = 0; }
+}
 /* 係の画面の中のタブ（監督は「予定」と「人・グループ」だけ） */
 let adPane = 'inbox';
 function setAdPane(v) {
@@ -13866,7 +13886,12 @@ function openTerr(id) {
 
 /* ---------- ボタンの動き ---------- */
 function bindStatic() {
-  $$('#tabs button').forEach(b => b.onclick = () => showView(b.dataset.view));
+  // 同じタブをもう一度押したときは、描き直したうえで、そのタブのはじめの状態にもどる（retapView）
+  $$('#tabs button').forEach(b => b.onclick = () => {
+    const same = b.dataset.view === currentView;
+    showView(b.dataset.view);
+    if (same && currentView === b.dataset.view) retapView(currentView);
+  });
   const adTabClick = e => {
     const b = e.target.closest('[data-ap]'); if (!b) return;
     setAdPane(b.dataset.ap);
