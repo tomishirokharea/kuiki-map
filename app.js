@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.78';
+var APP_JS_VER = '2026.13.79';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -376,8 +376,24 @@ function scrubVisits() {
 let permLoading = false;
 function checkPermGain() {
   if (!LIVE || !Store.permSeen || isAdmin() || permLoading || Store.inactive) return;
+  // 自分の変更（区域を受け取る・再訪問を受け持つ など）がまだサーバーに届いていないあいだは頼まない。先に頼むと、サーバーはまだ
+  // 受け持ちを知らないので、年代などを外して返し、そのまま「受け取り済み」になってしまう。送り終えたとき（flush の最後）にもう一度確かめる
+  if (Store.queue.length || flushing) return;
   const ps = permSig();
-  const nt = ps.t.filter(x => !Store.permSeen.has('t:' + x)), nf = ps.f.filter(x => !Store.permSeen.has('f:' + x));
+  const nt = ps.t.filter(x => !Store.permSeen.has('t:' + x));
+  let nf = ps.f.filter(x => !Store.permSeen.has('f:' + x));
+  // 再訪問の家：ほかの人の記録が「留守」だけ（または記録がない）なら、受け取るものがない（年代・また訪ねたいかは「会えた」「拒否」の記録にしかない）ので、
+  // サーバーに頼まない（サーバーは1件のためにも記録を全部読むため・改善案C5①・点検③P9）
+  if (nf.length) {
+    const want = new Set(nf), need = new Set(), mine = Store.data.currentUser;
+    Store.data.visits.forEach(v => {
+      if (v.result === 'away' || v.by === mine) return;
+      const k = v.houseId + '|' + (v.unit || '');
+      if (want.has(k)) need.add(k);
+    });
+    nf.forEach(k => { if (!need.has(k)) Store.permSeen.add('f:' + k); });
+    nf = nf.filter(k => need.has(k));
+  }
   if (!nt.length && !nf.length) return;
   permLoading = true;
   api('load', { part: 'tv', terrs: nt, keys: nf }, { timeout: 120000 }).then(r => {
@@ -1690,6 +1706,7 @@ async function flush(force) {
     if (!fixed) Store.needFull = true;
   }
   applyInbox();
+  checkPermGain(); // 送り終えたので、新しく受け持った分の記録の詳細を受け取る（送る前には頼まない）
   if (!Store.queue.length && window.kmlAfterFlush) window.kmlAfterFlush(); // 区域をまとめて新しくしたあと：家の区域をサーバーで決め直す（kml-koushin.js）
   if (Store.needFull && !Store.queue.length) reloadAll(true).catch(() => {});
 }
@@ -1845,6 +1862,14 @@ const userById = id => D().users.find(u => u.id === id);
 /* 名前を隠す（係の画面の「名前をかくす」）：schedule.js が unameMask を入れる。入っていないときは、ふつうの名前 */
 let unameMask = null;
 const uname = id => (unameMask && unameMask(id)) || (userById(id) || { name: '不明' }).name;
+/* スペイン語などの画面で、文の中の人の名前・グループ名を訳さずに残すため、登録されている名前を i18n.js にわたす（改善案C4）。
+   人は名簿の名前と S-13 の紙の記録の名前（「グループ奉仕（山田）」のような紙の名前は、かっこの中の名前）。日本語の画面では使われない */
+if (window.KI && KI.nameSource) KI.nameSource(() => {
+  const d = Store.data;
+  if (!d) return null;
+  const paper = (d.s13 || []).map(x => x && x.name).filter(Boolean).map(n => { const m = /^(?:グループ奉仕|全体の集まり)（(.+)）$/.exec(n); return m ? m[1] : n; });
+  return { people: (d.users || []).map(u => u.name).concat(paper), groups: (d.users || []).map(u => u.group) };
+});
 function userOptions(sel, noneLabel) {
   return (noneLabel ? `<option value="">${noneLabel}</option>` : '') +
     D().users.map(u => `<option value="${esc(u.id)}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');

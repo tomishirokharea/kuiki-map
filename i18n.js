@@ -36,6 +36,48 @@
   var EXACT = new Map(), PATS = [], CACHE = new Map();
   var norm = function (s) { return String(s).replace(/\s+/g, ' ').trim(); };
 
+  /* ---------- 登録されている人の名前・グループ名（改善案C4） ----------
+     ・文の中の「○○さん」などの○○が、登録されている人の名前（名簿・S-13 の紙の名前）なら、訳さずにそのまま残す
+     ・「○○グループ」の○○は、辞書で訳せないときに、登録されているグループ名ならそのまま残す
+     ・「Aさん、Bさん」のような名前の一覧は、順番を変えずに「A, B」にする（前は、あいさつの文の形に当たって順番が入れかわった）
+     名前は、アプリの本体が KI.nameSource(関数) でわたす（関数は { people: [...], groups: [...] } を返す）。
+     同じ処理の中では1回だけ読む。名前が変わったときは、名前が分からずに訳せなかった文を、もう一度訳せるようにする */
+  var NAMESRC = null, PEOPLE = new Set(), GROUPS = new Set(), NSIG = null, nRead = false;
+  function names() {
+    if (!NAMESRC || nRead) return;
+    nRead = true;
+    Promise.resolve().then(function () { nRead = false; });
+    var o = null;
+    try { o = NAMESRC(); } catch (e) { o = null; }
+    if (!o) return;
+    var clean = function (a) { return (Array.isArray(a) ? a : []).filter(function (x) { return typeof x === 'string' && x.trim(); }).map(norm); };
+    var p = clean(o.people), g = clean(o.groups), sig = p.join('\u0001') + '\u0002' + g.join('\u0001');
+    if (sig === NSIG) return;
+    NSIG = sig; PEOPLE = new Set(p); GROUPS = new Set(g);
+    CACHE.forEach(function (v, k) { if (v === null) CACHE.delete(k); });
+  }
+  /* 名前の一覧（「Aさん、Bさん」「Aさん・Bさん」）なら「A, B」を返す。ちがうときは null。
+     bare：最後の「さん」が文の側にあるとき（「{0}さんに…」の {0} が「A・B」「Aさん、B」） */
+  function nameList(s, bare) {
+    var items = s.split(/さん[、・]/);
+    if (items.length > 1) {
+      if (!bare) {
+        var last = items[items.length - 1];
+        if (!/さん$/.test(last)) return null;
+        items[items.length - 1] = last.slice(0, -2);
+      }
+    } else if (bare) {
+      items = s.split(/[、・]/);
+      if (items.length < 2) return null;
+    } else return null;
+    for (var i = 0; i < items.length; i++) {
+      var x = items[i].trim();
+      if (!x || (JP.test(x) && !PEOPLE.has(x))) return null; // 日本語の字があるのは、登録されている名前だけ
+      items[i] = x;
+    }
+    return items.join(', ');
+  }
+
   function setLang(l) {
     try { localStorage.setItem(KEY, l); } catch (e) { /* 何もしない */ }
     var u = new URL(location.href);
@@ -76,7 +118,8 @@
   }, true);
 
   window.KI = { lang: lang, names: NAMES, set: setLang, picker: picker, missing: missingList,
-    t: function (s) { return lang === 'ja' ? s : (tr(s, 0) || s); } };
+    t: function (s) { return lang === 'ja' ? s : (tr(s, 0) || s); },
+    nameSource: function (fn) { NAMESRC = typeof fn === 'function' ? fn : null; NSIG = null; } };
 
   if (lang === 'ja') return; // 日本語のときは、ここまで（何も置きかえない）
 
@@ -88,20 +131,22 @@
     if (typeof v !== 'string') return;
     var nk = norm(k);
     if (!/\{\d+\}/.test(nk)) { EXACT.set(nk, v); return; }
-    var idx = [], lit = 0, parts = nk.split(/(\{\d+\})/);
+    var idx = [], kind = [], lit = 0, parts = nk.split(/(\{\d+\})/);
     var src = '^' + parts.map(function (p, j) {
       var m = /^\{(\d+)\}$/.exec(p);
       if (m) {
         idx.push(Number(m[1]));
         // すぐ後ろが「月・日・件・人」などの単位なら、入るのは数字だけ（日付の型が文全体を飲みこまないように）
-        var next = parts[j + 1] || '';
+        var next = parts[j + 1] || '', prev = parts[j - 1] || '';
+        // 入る中身の種類（改善案C4）：p＝「さん」の前（人の名前）・g＝「グループ」の前後（グループ名）
+        kind.push(/^」?さん/.test(next) ? 'p' : /^グループ/.test(next) || /グループ[：「 ]$/.test(prev) ? 'g' : '');
         return UNIT.test(next) ? '([0-9０-９.,:+\\-−–]+)' : '([\\s\\S]+?)';
       }
       lit += p.length;
       return reEsc(p);
     }).join('') + '$';
     if (!lit) return;
-    try { PATS.push({ re: new RegExp(src), v: v, idx: idx, lit: lit }); } catch (e) { /* 何もしない */ }
+    try { PATS.push({ re: new RegExp(src), v: v, idx: idx, kind: kind, lit: lit }); } catch (e) { /* 何もしない */ }
   });
   PATS.sort(function (a, b) { return b.lit - a.lit; }); // くわしいものから先に
 
@@ -112,7 +157,9 @@
     var r = EXACT.get(n);
     if (r === undefined) {
       r = null;
-      for (var i = 0; i < PATS.length; i++) {
+      // 名前の一覧（「Aさん、Bさん」）は、順番を変えずに「A, B」に（改善案C4）
+      if (/さん$/.test(n)) { names(); r = nameList(n, false); }
+      for (var i = 0; r === null && i < PATS.length; i++) {
         var p = PATS[i], m = p.re.exec(n);
         if (!m) continue;
         // 入る中身に日本語があるときは、その中身も訳せるときだけ使う（半分だけ訳された文を出さないため）
@@ -121,13 +168,23 @@
           var pos = p.idx.indexOf(Number(k));
           var cap = pos >= 0 ? m[pos + 1] : '';
           if (!JP.test(cap)) return cap;
+          var kd = pos >= 0 ? p.kind[pos] : '';
+          // 登録されている人の名前は訳さない。「さん」の前の名前の一覧は「A, B」に（改善案C4）
+          if (kd !== 'g') {
+            names();
+            if (PEOPLE.has(cap.trim())) return cap;
+            if (kd === 'p') { var L = nameList(cap, true); if (L !== null) return L; }
+          }
           var t = depth < 2 ? tr(cap, depth + 1) : null;
+          // グループ名：辞書で訳せないときは、登録されているグループ名ならそのまま
+          if (t === null && kd === 'g') { names(); if (GROUPS.has(cap.trim())) t = cap; }
           if (t === null) { ok = false; return cap; }
           return t;
         });
         if (ok) { r = out; break; }
       }
-      if (r === null && depth === 0 && n.length <= 300 && MISSING.size < 3000) MISSING.set(n, (MISSING.get(n) || 0) + 1);
+      // 登録されている名前だけの文字（例：一覧の名前の欄）は、訳がなくてよいので「翻訳されていない文字」に入れない
+      if (r === null && depth === 0 && n.length <= 300 && MISSING.size < 3000) { names(); if (!PEOPLE.has(n) && !GROUPS.has(n)) MISSING.set(n, (MISSING.get(n) || 0) + 1); }
     }
     if (CACHE.size > 30000) CACHE.clear();
     // 深さの上限で訳せなかった（null）ものは覚えない。あとでその文だけが出たときに訳せるように（例：時間帯「土日の朝（〜11時）」）
