@@ -91,7 +91,24 @@
     return MEMO.get(key);
   };
   const _buildIndex = window.buildIndex;
-  window.buildIndex = function () { MEMO.clear(); return _buildIndex.apply(this, arguments); };
+  window.buildIndex = function () { MEMO.clear(); TMEMO.clear(); TVER.clear(); return _buildIndex.apply(this, arguments); };
+  /* 区域ごとの計算（会えなかった家の割合・若い世代・家の数）は、その区域の記録が変わるまで取っておく（改善案B3）。
+     記録が1件ふえる・へると、その区域の「版」を上げる（ほかの区域の結果は捨てない）。索引を作り直したとき・10分たったときは全部捨てる。
+     会いやすさ（glob）は、全体の会えた割合も使うので、どこかの記録が変わるたびに作り直す（軽い計算なので、毎回でも待たされない） */
+  const TMEMO = new Map(), TVER = new Map();
+  let tmemoAt = 0, GVER = 0;
+  const tmemo = (kind, t, fn, glob) => {
+    if (Date.now() - tmemoAt > 600000) { TMEMO.clear(); tmemoAt = Date.now(); }
+    const key = kind + t.id, v = glob ? GVER : (TVER.get(t.id) || 0), hit = TMEMO.get(key);
+    if (hit && hit.v === v) return hit.val;
+    const val = fn();
+    TMEMO.set(key, { v, val });
+    return val;
+  };
+  const bumpT = v => { GVER++; const h = v && houseById(v.houseId); if (h && h.terrId) TVER.set(h.terrId, (TVER.get(h.terrId) || 0) + 1); };
+  const _idxAdd = window.idxAddVisit, _idxDel = window.idxDelVisit;
+  window.idxAddVisit = function (v) { bumpT(v); return _idxAdd.apply(this, arguments); };
+  window.idxDelVisit = function (v) { bumpT(v); return _idxDel.apply(this, arguments); };
 
   /* ---------- 日付 ---------- */
   const addDays = (s, n) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
@@ -117,7 +134,7 @@
   }
   /* 前回会えなかった家の割合（訪ねたことのある家のうち、まだ一度も会えていない家） */
   function awayRate(t) {
-    return memo('a' + t.id, () => {
+    return tmemo('a', t, () => {
       let n = 0, un = 0;
       housesOf(t.id).forEach(h => targets(h).forEach(u => {
         const k = K(h.id, u), s = sum(k);
@@ -127,15 +144,17 @@
       return n ? un / n : 0;
     });
   }
-  const youngPct = t => memo('y' + t.id, () => { const y = youngShare(t); return y && y.pct != null ? y.pct : null; });
+  const youngPct = t => tmemo('y', t, () => { const y = youngShare(t); return y && y.pct != null ? y.pct : null; });
+  /* 区域の家・部屋の数（特別区域で回る家は数えない。terrStats(t, 0).n と同じ数を、記録を見ずに数える） */
+  const unitN = t => tmemo('n', t, () => housesOf(t.id).reduce((a, h) => a + unitsIn(h, t).length, 0));
   /* 会いやすい時間帯の目安（年齢データと記録から。既存の meetChance を使う） */
   function meetLabel(t) {
-    return memo('m' + t.id, () => {
+    return tmemo('m', t, () => {
       if (typeof meetChance !== 'function' || typeof DAY_SLOTS === 'undefined') return '';
       const avg = list => list.reduce((a, s) => a + meetChance(t, s).p, 0) / list.length;
       const day = avg(DAY_SLOTS), eve = avg(EVE);
       return eve > day * 1.15 ? '夕方・土日向き' : day > eve * 1.15 ? '平日の昼も会いやすい' : '';
-    });
+    }, true);
   }
   /* おすすめ順：期限の近さ60点＋若い世代の多さ25点＋会えなかった家の多さ15点。期限まで60日以内は最上部
      grp（グループ奉仕の区域をもらうとき、そのグループの中心が置いてあるとき。guruchu.js）：
@@ -635,7 +654,7 @@ button.ktag{cursor:pointer}
     const GRP = G && reqUse !== 'all' && window.GC && GC.has(myGroup()) ? myGroup() : null;
     if (reqSort === 'near' && !myPos && !GRP) reqSort = 'reco';
     const sx = new Map(scoreList(free, GRP).map((x, i) => [x.t.id, Object.assign(x, { order: i })]));
-    const list = free.map(t => ({ t, last: lastBackOf(t), n: terrStats(t, 0).n,
+    const list = free.map(t => ({ t, last: lastBackOf(t), n: unitN(t),
       dist: GRP ? GC.dist(GRP, t) : myPos ? distM(myPos, center(t.polygon)) : null, yg: reqSort === 'young' ? youngShare(t) : null, sx: sx.get(t.id) }));
     const near = (a, b) => (a.dist == null ? Infinity : a.dist) - (b.dist == null ? Infinity : b.dist);
     // グループの中心からの距離は、並べ方にだけ使い、数字は出さない（係の配慮で置いた点なので、監督・司会者の画面には見せない）
@@ -2846,7 +2865,7 @@ body.duemode .terr-label:not(.duelab){display:none}
   }
 
   /* ほかの部品（kangaeru.js）が同じ計算を使うための窓口。写さずに、ここの関数をそのまま使ってもらう */
-  window.KM = { coverInfo, lastDone, dueInfo, eligible, PIN_DAYS, slotQuery, slotTableHtml, openKarte, SL_FEW, SL_BEST, memoClear: () => MEMO.clear() };
+  window.KM = { coverInfo, lastDone, dueInfo, eligible, PIN_DAYS, slotQuery, slotTableHtml, openKarte, SL_FEW, SL_BEST, memoClear: () => { MEMO.clear(); TMEMO.clear(); } };
 
   /* 試作版などで、この部品より先に画面ができていたときは描き直す */
   if (Store.data && typeof map !== 'undefined' && map) { try { renderAll(); } catch (e) { console.error(e); } }

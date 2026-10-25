@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.70"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.71"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -3598,7 +3598,7 @@ function buildIndex(only) {
 }
 /* その家（部屋）だけ、まとめを作り直す */
 function sumKey(k) {
-  RATE_CACHE = null;
+  // 会える見込みの集計（RATE_CACHE）は、ここでは捨てない。記録が1件ふえる・へるときは idxAddVisit・idxDelVisit で足し引きする（改善案B3）
   const a = IDX.get(k);
   if (!a || !a.length) { SUM.delete(k); IDX.delete(k); return; }
   a.sort((x, y) => (x.at < y.at ? 1 : -1)); // 新しい順
@@ -3624,13 +3624,14 @@ function idxAddVisit(v) {
   if (!IDX.has(k)) IDX.set(k, []);
   IDX.get(k).push(v);
   sumKey(k);
+  rateStep(v, 1);
   if (IDX_SRC === D().visits) IDX_LEN = D().visits.length; // 1件ずつ直したので、索引は今の記録と合っている
 }
 function idxDelVisit(v) {
   const k = K(v.houseId, v.unit), a = IDX.get(k);
   if (!a) return;
   const i = a.findIndex(x => x.id === v.id);
-  if (i >= 0) a.splice(i, 1);
+  if (i >= 0) { a.splice(i, 1); rateStep(v, -1); }
   sumKey(k);
 }
 const visitsOf = k => IDX.get(k) || [];
@@ -8941,7 +8942,9 @@ function openSpecialSheet(tid, keep) {
 /* ---------- 区域カード画面 ---------- */
 function renderToday() {
   const start = new Date(); start.setHours(0, 0, 0, 0);
-  const mine = D().visits.filter(v => v.by === me().id && Date.parse(v.at) >= start.getTime()).sort((a, b) => (a.at < b.at ? -1 : 1));
+  // 自分の id と今日のはじまりは1回だけ出して、日時は文字どうしで比べる（記録の数×人数の探し方をしない・改善案B4）
+  const myId = me().id, since = start.toISOString();
+  const mine = D().visits.filter(v => v.by === myId && v.at >= since).sort((a, b) => (a.at < b.at ? -1 : 1));
   let html = `<b>${esc(me().name)}さん</b>　`;
   if (!mine.length) html += '今日の記録はまだありません。';
   else {
@@ -11922,8 +11925,11 @@ function terrMix(t) {
 }
 const mixIdx = (mx, slot) => { const w = HOME_W[slot], s = (mx.y + mx.m + mx.o) || 1; return (mx.y * w[0] + mx.m * w[1] + mx.o * w[2]) / s; };
 /* 区域×時間帯の実際の記録（直近1年）と、全体の会えた割合 */
+/* 会える見込みの集計（区域×時間帯・この1年）。全部の記録を数えるのは、はじめて使うとき・索引を作り直したとき（家の区域が変わることがある）・
+   3時間たったときだけ。そのあいだに記録が1件ふえる・へるときは、rateStep で足し引きする（改善案B3。以前は記録が1件届くたびに全部を数え直していた） */
+const RATE_TTL = 3 * 3600000;
 function rateStats() {
-  if (RATE_CACHE) return RATE_CACHE;
+  if (RATE_CACHE && Date.now() - RATE_CACHE.at < RATE_TTL) return RATE_CACHE;
   const per = new Map(), cut = new Date(Date.now() - 365 * DAY).toISOString();
   let n = 0, m = 0;
   for (const v of D().visits) {
@@ -11937,8 +11943,20 @@ function rateStats() {
   }
   const am = ageMap(), all = am && am.get('__all');
   const meanIdx = all ? SLOTS.reduce((a, s) => a + mixIdx(all, s), 0) / SLOTS.length : 0.5;
-  RATE_CACHE = { per, R: n >= 30 ? m / n : 0.35, meanIdx };
+  RATE_CACHE = { per, n, m, R: n >= 30 ? m / n : 0.35, meanIdx, cut, at: Date.now() };
   return RATE_CACHE;
+}
+/* 記録1件を、会える見込みの集計に足す（d=1）・引く（d=-1）。集計をまだ作っていないときは何もしない（使うときに数える） */
+function rateStep(v, d) {
+  const rc = RATE_CACHE;
+  if (!rc || !v || !v.at || v.at < rc.cut) return;
+  const h = HID.get(v.houseId); if (!h || !h.terrId) return;
+  const key = h.terrId + '|' + slotOfVisit(v), met = v.result === 'met' ? d : 0;
+  const c = rc.per.get(key) || { n: 0, m: 0 };
+  c.n += d; c.m += met;
+  if (c.n <= 0) rc.per.delete(key); else rc.per.set(key, c);
+  rc.n += d; rc.m += met;
+  rc.R = rc.n >= 30 ? rc.m / rc.n : 0.35;
 }
 /* 会える見込み（0〜1）。p：見込み、n：その区域・時間帯の記録数 */
 function meetChance(t, slot) {
