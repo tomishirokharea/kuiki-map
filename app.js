@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.80';
+var APP_JS_VER = '2026.13.81';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -10934,7 +10934,7 @@ function renderAdmin() {
   const provN = D().houses.filter(h => h.prov).length;
   const tile = (k, cls, num, label) => `<button type="button" class="tile${cls}" data-tl="${k}"><b>${num}</b>${label}<span class="tmore">内訳 ›</span></button>`;
   $('#adTiles').innerHTML = tile('terr', '', ts.length, `区域（貸出中 ${lent}）`) +
-    tile('over', over ? ' alert' : '', over, `返却の目安（${lendDays()}日）をこえた貸出`) +
+    tile('over', over ? ' alert' : '', over, `返却の目安（${lendDays()}日）を過ぎた貸出`) +
     tile('units', '', targetsN, `家・部屋${outside ? `（区域外 ${outside}）` : ''}`) +
     tile('met', '', `${targetsN ? Math.round(met90 / targetsN * 100) : 0}%`, 'この90日で会えた家・部屋') +
     tile('dnc', '', dncN, '拒否の家・部屋') +
@@ -11008,7 +11008,7 @@ function openStatList(key) {
       ${stop.length ? `<h3 class="sub">貸出中止（${stop.length}）</h3>${stop.map(t => statRow(t, '貸出中止')).join('')}` : ''}`;
   } else if (key === 'over') {
     const list = ts.filter(pastDue).sort((a, b) => (a.lentAt < b.lentAt ? -1 : 1));
-    title = `返却の目安をこえた貸出 ${list.length}`;
+    title = `返却の目安を過ぎた貸出 ${list.length}`;
     hint = `受け取ってから${lendDays()}日（返却の目安）をこえている区域です。古い順です。`;
     body = list.length ? list.map(t => { const r = roundInfo(t.id, true); return statRow(t, `${esc(uname(t.holder))}さん・${daysSince(t.lentAt)}日目${r ? `・進み具合 約${r.pct}%${r.phase === 'away' ? '（留守宅を回る段階）' : ''}` : ''}`, true); }).join('') : '<div class="empty">ありません</div>';
   } else if (key === 'units') {

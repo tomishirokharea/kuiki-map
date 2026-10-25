@@ -62,7 +62,7 @@
   const ext = () => (typeof extSet === 'function' ? extSet() : { on: false });
   // s：札の短い名前（「：」まで）・t：設定の行の名前（下から出る画面の見出し・お知らせ）・v：今の値・w：効く状況
   const F = {
-    lendDays: { s: '返却の目安：', t: '返却の目安（受け取ってから）', v: () => `${lendDays()}日`, w: '期限の見張り（今月中に出したい区域・声かけ候補）・全体の状況（返却の目安をこえた貸出）' },
+    lendDays: { s: '返却の目安：', t: '返却の目安（受け取ってから）', v: () => `${lendDays()}日`, w: '期限の見張り（今月中に出したい区域・声かけ候補）・全体の状況（返却の目安を過ぎた貸出）' },
     awayRetPct: { s: '留守宅の目安：', t: '留守宅を回り終えたとみなす割合', v: () => `${awayRetPct()}%`, w: '期限の見張り（正式な返却になるか → 1年の期限）・全体の状況（留守宅カードで回っている区域）' },
     donePct: { s: '完了の目安：', t: '区域カードを「完了」にできる目安', v: () => `${st().donePct}%`, w: '期限の見張り（正式な返却になるか → 1年の期限）' },
     awayTries: { s: '留守宅を終える回数：', t: '留守宅を終える回数', v: () => `${tries()}回`, w: '手紙の候補・何度訪ねても会えない家・まだ試していない家の数' },
@@ -92,7 +92,7 @@
   const hardN = () => { try { return typeof unmetIndex === 'function' ? String([...unmetIndex().values()].flat().filter(x => x.hard).length) : null; } catch (e) { return null; } };
   const extN = () => { const t = document.querySelector('#adAwaySet table'); return t ? String(Math.max(0, t.querySelectorAll('tr').length - 1)) : (ext().on ? '0' : null); };
   const NOW = {
-    lendDays: () => [['声かけ候補', num('#adDue [data-duetl="pace"] b'), '件'], ['今月中に出したい区域', num('#adDue [data-duetl="need"] b'), '件'], ['返却の目安をこえた貸出', num('#adTiles [data-tl="over"] b'), '件']],
+    lendDays: () => [['声かけ候補', num('#adDue [data-duetl="pace"] b'), '件'], ['今月中に出したい区域', num('#adDue [data-duetl="need"] b'), '件'], ['返却の目安を過ぎた貸出', num('#adTiles [data-tl="over"] b'), '件']],
     awayRetPct: () => [['1年の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
     donePct: () => [['1年の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
     awayTries: () => [['手紙の候補', hardN(), '件']],
@@ -343,7 +343,7 @@
   const dueNum = k => num(`#adDue [data-duetl="${k}"] b`), tileNum = k => num(`#adTiles [data-tl="${k}"] b`);
   const SUMS = {
     due: () => [['1年の期限を過ぎた', dueNum('over')], ['期限まで60日以内', dueNum('warn')], ['今月中に出したい', dueNum('need')], ['声かけ候補', dueNum('pace')]],
-    tiles: () => [['区域の数', tileNum('terr')], ['返却の目安をこえた貸出', tileNum('over')], ['この90日で会えた', tileNum('met')]],
+    tiles: () => [['区域の数', tileNum('terr')], ['返却の目安を過ぎた貸出', tileNum('over')], ['この90日で会えた', tileNum('met')]],
     away: () => (ext().on ? [['返却後の区域', extN()]] : []),
     hard: () => [['手紙の候補', hardN()]]
   };
