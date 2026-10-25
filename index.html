@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.85"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE も合わせて上げる -->
+<meta name="app-version" content="2026.13.86"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE も合わせて上げる -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -186,7 +186,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 
 /* ===== 下から出る入力画面 ===== */
 #backdrop{position:fixed;inset:0;background:#00000066;z-index:2000}
-#sheet{position:fixed;left:0;right:0;bottom:0;z-index:2001;background:var(--paper);border-radius:20px 20px 0 0;max-height:calc(88vh / var(--z,1));max-height:calc(88dvh / var(--z,1));overflow:auto;padding:14px 16px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px #0003}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:2001;background:var(--paper);border-radius:20px 20px 0 0;max-height:calc(88vh / var(--z,1));max-height:calc(88dvh / var(--z,1));overflow:auto;overflow-x:hidden;overscroll-behavior-x:none;padding:14px 16px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px #0003}
 @media (min-width:760px){#sheet{left:calc(50% - 320px);right:auto;width:640px;bottom:16px;border-radius:20px}}
 .sheet-head{display:flex;align-items:center;gap:12px;margin-bottom:8px}
 .sheet-head h2{font-size:22px;outline:none}
@@ -224,7 +224,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .printpick input[type=month]{flex:1 1 9em;min-width:0;max-width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:17px;background:#fff;color:var(--ink);-webkit-appearance:none;appearance:none}
 .printpick .btn{flex:1 1 11em;min-width:0;white-space:normal;line-height:1.25;flex-direction:column}
 .printpick .btn small{display:block;font-size:13px;font-weight:400}
-.inline input{flex:1}
+.inline input{flex:1;min-width:0} /* 入りきらないときは縮む（下から出る画面が横に動かないように・2026.13.86） */
 .stepper{display:flex;align-items:center;gap:12px}
 .stepper button{width:60px;height:54px;border-radius:12px;border:2px solid var(--ink);background:#fff;font-size:28px;font-weight:700}
 .stepper output{min-width:52px;text-align:center;font-size:26px;font-weight:700}
@@ -238,6 +238,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .chip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
 .ritem{background:#fff;border:2px solid var(--line);border-left:10px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center}
 .ritem .rt{font-weight:700;font-size:19px}
+.ritem.evrow{grid-template-columns:1fr} /* 自分の予定：ボタンは予定の下に（予定の文字が縦に細くならない） */
 .k-handoff{border-left-color:var(--follow)}
 .f-s0{border-left-color:var(--follow)}
 .f-s1{border-left-color:var(--away);background:#FFFBEF}
@@ -1364,6 +1365,11 @@ h2,h3,.q{text-wrap:pretty}
 .mtoday{background:#fff;border:2px solid var(--line);border-radius:18px;padding:14px;text-align:center;margin:10px 0}
 .mtoday .q{margin:0 0 6px}
 .mtoday .stepper{justify-content:center}
+/* この日の奉仕時間：−／＋ と、数字を押して直接入れる欄（2026.13.86） */
+.dmin{display:flex;align-items:baseline;justify-content:center;gap:4px;flex:1 1 auto;min-width:0}
+.dmin input{width:56px;min-width:0;min-height:52px;border-radius:12px;border:2px solid var(--ink2);background:#fff;text-align:center;font-size:24px;font-weight:700;padding:0 2px;color:var(--ink)}
+.dmin input:focus{border-color:var(--brand);outline:2px solid var(--brand);outline-offset:1px}
+.dmin span{font-size:18px;font-weight:700;white-space:nowrap}
 .mtoday .row{margin:10px 0 2px}
 .cd.hol .dn{color:#C62828}
 .cd small.pl,.calkeys small.pl{color:var(--ink2);border:1px dashed var(--ink2);border-radius:5px;padding:0 3px}

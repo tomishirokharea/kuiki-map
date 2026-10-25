@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.85';
+var APP_JS_VER = '2026.13.86';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2491,6 +2491,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.86', items: [
+    ['時', 'カレンダーの日を押した画面で、奉仕時間を −／＋ だけでなく、数字を押して直接入れられるようにしました。「奉仕時間を保存する」を押すと、保存してホームにもどります。保存しないときは「やめる」を押します'],
+    ['左', 'その画面が左右に動いてしまうことがあったのを直しました']
+  ] },
   { v: '2026.13.85', items: [
     ['家', '「ホーム画面に追加」でアイコンの絵をえらぶとき、「好きな絵文字や文字を入れる」から、好きな絵文字（「はーと」と打って変換すると❤️）と、絵の下に入れる文字（4文字まで）をアイコンにできるようにしました']
   ] },
@@ -12123,10 +12127,21 @@ function schedListHtml() {
   if (!list.length) return '<div class="empty">これから60日の、奉仕の集まりの予定はありません。</div>';
   return swipeHint(list) + list.map(s => schedRow(s, true)).join('');
 }
+/* この日の奉仕時間：「時間」「分」の欄（数字を押すと直接入れられる）。−／＋は15分ずつ。1日は24時間まで（2026.13.86） */
+const DAY_MAX_MIN = 24 * 60;
+const dminUnits = () => (window.KI && KI.lang && KI.lang !== 'ja' ? ['h', 'min'] : ['時間', '分']);
+function dminHtml(min) {
+  const [uh, um] = dminUnits();
+  return `<div class="stepper" style="justify-content:center"><button type="button" data-dm="-15" aria-label="15分へらす">−</button>
+    <div class="dmin"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" id="dMinH" value="${Math.floor(min / 60)}" aria-label="時間（数字を入れる）" autocomplete="off"><span data-notr>${uh}</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" id="dMinM" value="${min % 60}" aria-label="分（数字を入れる）" autocomplete="off"><span data-notr>${um}</span></div>
+    <button type="button" data-dm="15" aria-label="15分ふやす">＋</button></div>`;
+}
 function openDay(date) {
+  let min = null; // 保存する前の時間（予定を足して画面を描き直しても、入れかけの時間を残す）
   const paint = () => {
     const o = myData(), sc = schedsOn(date), ev = o.events.filter(e => e.date === date).sort((a, b) => (a.time || '') < (b.time || '') ? -1 : 1);
-    let min = o.log[date] || 0;
+    if (min === null) min = o.log[date] || 0;
     setSheet(headHtml(null, fmtYmd(date), esc(holidayOf(date))) + `
       ${featTime() && o.plan[date] ? `<p class="gtoday">この日の計画 ${fmtMin(o.plan[date])}</p>` : ''}
       <h3 class="sub">奉仕の集まり</h3>
@@ -12134,7 +12149,7 @@ function openDay(date) {
         : '<p class="muted">この日の集まりはありません。</p>'}
       ${isOverseer() || isAdmin() ? `<button class="btn small" id="dAddSched">＋ この日に集まりを入れる</button>` : ''}
       <h3 class="sub">自分の予定 <span class="muted" style="font-size:14px">（このスマホだけ）</span></h3>
-      ${ev.length ? ev.map(e => `<article class="ritem k-young"><div><p class="rt">${e.time ? esc(e.time) + '　' : ''}${esc(e.title)}</p></div>
+      ${ev.length ? ev.map(e => `<article class="ritem k-young evrow"><div><p class="rt">${e.time ? esc(e.time) + '　' : ''}${esc(e.title)}</p></div>
         <span class="actions" style="margin:0"><a class="btn small" href="${gcalUrl(e.title, e.date, e.time, '', '', '')}" target="_blank" rel="noopener">Googleカレンダーへ</a>
         <button class="btn small danger" data-evdel="${esc(e.id)}">消す</button></span></article>`).join('') : '<p class="muted">予定はありません。</p>'}
       ${apptDayHtml(date)}
@@ -12142,14 +12157,35 @@ function openDay(date) {
         <input type="text" id="evTitle" maxlength="40" placeholder="例：〇〇さんと奉仕" style="min-height:52px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:18px"></div>
       <button class="btn block" id="evAdd">予定を入れる</button>
       ${featTime() ? `<h3 class="sub">この日の奉仕時間 <span class="muted" style="font-size:14px">（このスマホだけ）</span></h3>
-      <div class="stepper" style="justify-content:center"><button type="button" data-dm="-15" aria-label="15分へらす">−</button>
-        <output class="wide" style="min-width:160px" id="dMin">${fmtMin(min)}</output><button type="button" data-dm="15" aria-label="15分ふやす">＋</button></div>
+      ${dminHtml(min)}
       <button class="btn primary block" id="dMinSave">奉仕時間を保存する</button>` : ''}
-      <button class="btn block" data-close>閉じる</button>`);
+      <button class="btn block" data-close>${featTime() ? 'やめる' : '閉じる'}</button>`);
     dayCtx = date;
     const S = $('#sheet');
-    $$('[data-dm]', S).forEach(b => b.onclick = () => { min = Math.max(0, min + Number(b.dataset.dm)); $('#dMin').textContent = fmtMin(min); });
-    if ($('#dMinSave')) $('#dMinSave').onclick = () => { const x = myData(); if (min) x.log[date] = min; else delete x.log[date]; mySave(x); toast('奉仕時間を保存しました'); renderHome(); paint(); };
+    const iH = $('#dMinH'), iM = $('#dMinM');
+    const show = () => { if (iH) iH.value = Math.floor(min / 60); if (iM) iM.value = min % 60; };
+    const digits = el => { const v = String(el.value).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\D/g, ''); if (v !== el.value) el.value = v; return Number(v) || 0; };
+    const readIn = () => { min = Math.min(DAY_MAX_MIN, digits(iH) * 60 + digits(iM)); };
+    [iH, iM].forEach(el => {
+      if (!el) return;
+      el.oninput = readIn;
+      // 押したら数字を全部えらんで、そのまま打ちかえられるように（指をはなしたときに選びが外れないよう、最初の1回だけ止める）
+      let fresh = false;
+      const pickAll = () => { try { el.setSelectionRange(0, el.value.length); } catch (e) { /* 何もしない */ } };
+      el.onfocus = () => { fresh = true; setTimeout(() => { if (fresh) pickAll(); }, 0); };
+      el.onmouseup = e => { if (fresh) { e.preventDefault(); fresh = false; pickAll(); } };
+      el.onclick = () => { if (fresh) { fresh = false; pickAll(); } };
+      el.onblur = show; // 「90分」は「1時間30分」に直して見せる
+      el.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } };
+    });
+    $$('[data-dm]', S).forEach(b => b.onclick = () => { if (iH) readIn(); min = Math.min(DAY_MAX_MIN, Math.max(0, min + Number(b.dataset.dm))); show(); });
+    if ($('#dMinSave')) $('#dMinSave').onclick = () => {
+      readIn();
+      const x = myData(); if (min) x.log[date] = min; else delete x.log[date]; mySave(x);
+      closeSheet(); // 保存したらホームにもどる
+      if (currentView !== 'home') showView('home'); else renderHome();
+      toast('奉仕時間を保存しました');
+    };
     $('#evAdd').onclick = () => {
       const title = $('#evTitle').value.trim(); if (!title) { toast('予定の内容を入れてください'); return; }
       const x = myData(); x.events.push({ id: uid(), date, time: $('#evTime').value || '', title }); mySave(x); renderHome(); paint();

@@ -185,4 +185,10 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "例：りょう": "Ej.: Ana",
 "アイコンの下の名前は、この画面で好きな名前に変えられます。": "En esta pantalla puede cambiar el nombre que aparece debajo del ícono.",
 "「ホーム画面に追加」でアイコンの絵をえらぶとき、「好きな絵文字や文字を入れる」から、好きな絵文字（「はーと」と打って変換すると❤️）と、絵の下に入れる文字（4文字まで）をアイコンにできるようにしました": "Al elegir la imagen del ícono en «Agregar a la pantalla de inicio», ahora puede usar «Poner un emoji o texto a su gusto» para poner un emoji (por ejemplo ❤️) y un texto debajo (hasta 4 letras).",
+/* 2026.13.86：この日の奉仕時間を直接入れる・保存したらホームへ・「やめる」 */
+"時間（数字を入れる）": "Horas (escriba el número)",
+"分（数字を入れる）": "Minutos (escriba el número)",
+"カレンダーの日を押した画面で、奉仕時間を −／＋ だけでなく、数字を押して直接入れられるようにしました。「奉仕時間を保存する」を押すと、保存してホームにもどります。保存しないときは「やめる」を押します": "En la pantalla que se abre al tocar un día del calendario, ahora puede escribir las horas directamente, además de usar − / +. Al tocar «Guardar horas», se guardan y vuelve a Inicio. Si no quiere guardar, toque «Cancelar».",
+"その画面が左右に動いてしまうことがあったのを直しました": "Se corrigió que esa pantalla a veces se movía hacia los lados.",
+"例：〇〇さんと奉仕": "Ej.: predicar con un hermano",
 });
