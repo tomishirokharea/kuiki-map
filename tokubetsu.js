@@ -520,8 +520,8 @@
     const list = document.getElementById('adTerrs');
     if (!list) return;
     const seen = new Set();
-    $$('.trow', list).forEach(row => {
-      const o = row.querySelector('[data-open]'), t = o ? terrById(o.dataset.open) : null;
+    $$('.trow1', list).forEach(row => { // 一覧の1区域1行（改善案A4）
+      const t = row.dataset.tid ? terrById(row.dataset.tid) : null;
       if (!t || !isSpecial(t)) return;
       const key = grpOf(t) || t.id;
       if (seen.has(key)) return;

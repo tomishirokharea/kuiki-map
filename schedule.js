@@ -530,7 +530,6 @@
     try {
       if (isAdmin()) fixTabLabel();
       if (lkLocked() && currentView === 'admin') { const ls = document.getElementById('alockScr'); if (!ls || ls.hidden) showLockScreen(); return; }
-      if (isAdmin() && adPane === 'terr') paintKarteBtns();
       if (isAdmin() && adPane === 'set') { paintOps(); paintLockBox(); loadOps(false); }
       if (isAdmin() && adPane === 'status') {
         paintCand(); loadOps(false);
@@ -1520,9 +1519,15 @@ button.ktag{cursor:pointer}
       const ph = paperHoldOf(t), over = daysFrom(ph.a) > lendDays();
       cls = over ? 'cv-bad' : 'cv-ok'; mark = over ? '▲' : '✓'; word = over ? '紙の記録で貸出中（返却の目安を過ぎています）' : '紙の記録で貸出中';
       sub = `${ph.name ? esc(ph.name) + '・' : ''}${showDay(ph.a)}に割り当て（${daysFrom(ph.a)}日目）　返却したら、S-13で完了した日付を入れてください`;
-    } else if (t.awayPoolAt) { cls = 'cv-warn'; mark = '！'; word = '留守宅カードで回っています'; }
+    } else if (t.awayPoolAt) {
+      cls = 'cv-warn'; mark = '！'; word = '留守宅カードで回っています';
+      const pool = poolInfo(t); if (pool) sub = `留守宅の訪ね直し ${pool.done} / ${pool.n}（${pool.pct}%・目安 ${awayRetPct()}%）`;
+    }
     else if (lendMode(t) === 'stop') { word = '貸出中止にしています'; mark = '－'; }
     { const pi = !t.holder && partialInfo(t); if (pi) { word = '空いています（途中で返却）'; sub = `${fmtDay(pi.at)}に返却・${pi.none ? 'ほとんど回っていません' : '回ったのは約' + pi.pct + '%'}`; } }
+    // 以前は区域の一覧の行に出していた分（改善案A4）：今日一緒に回る人・記録が少ない返却を確かめる日
+    { const hp = typeof helpersOf === 'function' ? helpersOf(t) : []; if (hp.length) sub += `${sub ? '<br>' : ''}今日一緒に回る人：${hp.map(h => esc(uname(h.uid)) + 'さん').join('、')}`; }
+    { const lw = typeof lowWaitNote === 'function' ? lowWaitNote(t) : ''; if (lw) sub += `${sub ? '<br>' : ''}${lw.replace(/^（|）$/g, '')}`; }
     const dueTxt = di.left == null ? '前回の記録がありません' : di.left < 0 ? `1年の期限を${-di.left}日過ぎています` : `1年の期限まで あと${di.left}日`;
     // 4 時間帯の表 5 数字
     let table, nums = '';
@@ -1535,7 +1540,12 @@ button.ktag{cursor:pointer}
       nums = `<p>${periodLabel(per)}の記録 <b>${n}件</b>${n ? `：会えた <b>${p}%</b>（拒否を含む）・留守 <b>${100 - p}%</b>` : ''}</p><p>訪問を控える家・部屋（拒否）<b>${karteDnc(t)}</b>軒</p>${candCountFor(t) ? `<p>何度訪ねても会えない家・部屋 <b>${candCountFor(t)}</b>軒（「状況」タブの下で確かめられます）</p>` : ''}`;
     }
     const hist = karteHist(t);
-    const free = !isLent(t) && lendMode(t) !== 'stop';
+    // 紙の記録（S-13）で貸出中の区域も、アプリの担当にできる（以前の一覧の「担当」と同じ）
+    const free = (!isLent(t) && lendMode(t) !== 'stop') || paperLent(t);
+    // 数字：以前は区域の一覧の行に出していた分（1回目を回った日・90日以内に訪問・最終記録・字）
+    const s90 = terrStats(t, Date.now() - 90 * DAY), firstAt = t.holder ? t.firstDoneAt : paperLent(t) ? '' : t.lastFirstAt;
+    let aza = '';
+    try { if (AGE_ON) aza = azaText(t); } catch (e) { aza = ''; }
     const users = free ? D().users.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja')) : [];
     return headHtml(t, `区域${esc(t.no)}のカルテ`, esc(t.name || '')) + `
       <div class="cover ${cls}" role="status"><i aria-hidden="true">${mark}</i><div><b>${word}</b>${sub ? `<small>${sub}</small>` : ''}</div></div>
@@ -1547,12 +1557,16 @@ button.ktag{cursor:pointer}
       <p class="kq">曜日と時間帯ごとの「会えた」割合</p>
       ${table}
       <p class="kq">数字</p>
-      <p>家・部屋 <b>${homes}</b>軒</p>${nums}
+      <p>家・部屋 <b>${homes}</b>軒</p>
+      <p>1回目を回った日 <b>${firstAt ? fmtDay(firstAt) : '—'}</b></p>
+      <p>この90日に訪問した家・部屋 <b>${s90.visited}</b>軒</p>
+      <p>最終記録 <b>${s90.last ? fmtDate(s90.last) : 'なし'}</b></p>
+      ${aza ? `<p>字：${aza}</p>` : ''}${nums}
       <p class="kq">地域のようす</p>
       ${profLine(t, 'karte:' + t.id) || '<p class="muted">年齢データがないため、出せません。</p>'}
       <p class="kq">S-13の履歴（新しい順）</p>
       ${hist.length ? `<ul class="khist">${hist.map(h => `<li>${showDay(h.a)} 〜 ${h.c ? showDay(h.c) : h.cur ? '貸出中' : h.ret ? '返却 ' + showDay(h.ret) : ''}　${esc(h.name)}さん</li>`).join('')}</ul>` : '<p class="muted">記録がありません。</p>'}
-      ${free ? `<p class="kq">貸し出す</p><div class="klend"><select id="kLendSel" aria-label="貸し出す人をえらぶ"><option value="">人をえらんでください</option>${users.map(u => `<option value="${esc(u.id)}">${esc(u.name)}（今 ${heldCount(u.id)}枚）</option>`).join('')}</select>
+      ${free ? `<p class="kq">貸し出す</p>${paperLent(t) ? '<p class="hint">紙の記録（S-13）で貸出中です。アプリで回る人を担当にするときだけ使います。</p>' : ''}<div class="klend"><select id="kLendSel" aria-label="貸し出す人をえらぶ"><option value="">人をえらんでください</option>${users.map(u => `<option value="${esc(u.id)}">${esc(u.name)}（今 ${heldCount(u.id)}枚）</option>`).join('')}</select>
         <button type="button" class="btn primary" id="kLend">貸し出す</button></div>` : ''}
       <div class="kact"><button type="button" class="btn" data-kmap="${esc(t.id)}">地図で見る</button><button type="button" class="btn" data-ks12="${esc(t.id)}">S-12を印刷</button><button type="button" class="btn" data-kadj="${esc(t.id)}">区域の調整</button></div>
       ${karteOpsHtml(t)}
@@ -1580,20 +1594,6 @@ button.ktag{cursor:pointer}
         t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
       });
     });
-  }
-  let karteBound = false;
-  function paintKarteBtns() {
-    const list = document.getElementById('adTerrs');
-    if (!list) return;
-    $$('.trow', list).forEach(row => {
-      const act = row.querySelector('.actions'), o = row.querySelector('[data-open]');
-      if (!act || !o || act.querySelector('[data-karte]')) return;
-      act.insertAdjacentHTML('afterbegin', `<button type="button" class="btn small primary" data-karte="${o.dataset.open}">カルテ</button>`);
-    });
-    if (!karteBound) {
-      karteBound = true;
-      list.addEventListener('click', e => { const b = e.target.closest('[data-karte]'); if (b) openKarte(b.dataset.karte); });
-    }
   }
   const karteBtns = (ts, max) => ts.slice(0, max || 2).map(t => `<button type="button" class="btn small" data-tkarte="${esc(t.id)}">区域${esc(t.no)}のカルテ</button>`).join('');
 
@@ -2181,7 +2181,7 @@ body.duemode .terr-label:not(.duelab){display:none}
 .moreops>summary{cursor:pointer;min-height:44px;line-height:44px;font-weight:700;color:var(--ink2)}
 .moreops>div{display:flex;flex-wrap:wrap;gap:8px}
 .tfind{position:sticky;top:0;z-index:5;background:var(--bg,#F4F1EA);padding:6px 0 8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.tfind input{flex:1 1 14em;min-height:54px;font-size:19px;border:2px solid var(--ink);border-radius:12px;padding:0 12px;background:#fff}
+.tfind input{flex:1 1 14em;min-width:0;max-width:100%;box-sizing:border-box;min-height:54px;font-size:19px;border:2px solid var(--ink);border-radius:12px;padding:0 12px;background:#fff}
 .tfind output{font-size:16px;color:var(--ink2)}
 .tfind button{min-height:54px}
 .adtop{display:flex;justify-content:flex-end;margin:-6px 0 2px}
@@ -2221,8 +2221,8 @@ body.duemode .terr-label:not(.duelab){display:none}
         '貸し出す前に、ほかの区域係がもう対応していないかを自動で確かめます。ほかの係が対応したことは、いちばん下に出ます。'],
       ['毎日（奉仕に出る前）：このタブを開いて、出ているものに対応する', '毎週：「受け取られていない留守宅カード」が出ていたら、紙を印刷して集まりで紹介する']],
     terr: ['「区域」でやること',
-      ['上の欄に、番号（例：53）・名前・字・持っている人の名前を入れると、すぐ見つかります。',
-        '区域の操作は「カルテ」にまとめています（貸し出し・返却・貸出中止・線を直す・S-12の印刷など）。',
+      ['上の欄に、番号（例：53）・名前・字・持っている人の名前を入れると、すぐ見つかります。その下のボタンで、貸出中・空いている・期限が近い区域などに絞れます。',
+        '区域の行を押すと、その区域の「カルテ」が開きます。区域の操作はカルテにまとめています（貸し出し・担当を変える・返却・貸出中止・線を直す・S-12の印刷など）。',
         '「状況」で、期限・時間帯の表・留守宅のようすが見られます。「期限の地図」で、期限ごとに色分けした地図が見られます。',
         '自動受け取り・枚数・返却の目安などの決まりは、「貸し出しのきまり」を開くと変えられます。'],
       ['毎月：「状況」で、期限の近い区域と「何度訪ねても会えない家」を確かめる']],
@@ -2275,8 +2275,15 @@ body.duemode .terr-label:not(.duelab){display:none}
   const _showView6 = window.showView;
   window.showView = function () { const r = _showView6.apply(this, arguments); try { wideOn(); } catch (e) { /* 表示だけ */ } return r; };
 
-  /* ---------- （1）区域をさがす・一覧をすっきり ---------- */
-  let findQ = '';
+  /* ---------- （1）区域をさがす・絞り込む（一覧は1区域1行。行を押すとカルテ・改善案A4） ---------- */
+  let findQ = '', findChip = 'all';
+  const TCHIPS = [
+    ['all', 'すべて', () => true],
+    ['lent', '貸出中', t => isLent(t)],
+    ['free', '空いている', t => !isLent(t) && !t.awayPoolAt && lendMode(t) !== 'stop'], // 「状況」の区域の内訳と同じ数え方
+    ['due', '期限が近い・過ぎた', t => { const d = dueInfo(t); return d.st === 'over' || d.st === 'warn'; }], // 1年の期限（60日以内・過ぎた）
+    ['sp', '特別区域', t => isSpecial(t)]
+  ];
   function terrHay(t) {
     const h = userById(t.holder);
     let aza = '';
@@ -2292,16 +2299,45 @@ body.duemode .terr-label:not(.duelab){display:none}
   function applyFind() {
     const list = document.getElementById('adTerrs');
     if (!list) return [];
-    const q = N(findQ), hits = [];
-    $$('.trow', list).forEach(row => {
-      const o = row.querySelector('[data-open]'), t = o ? terrById(o.dataset.open) : null;
-      const ok = !t || terrHit(t, q);
+    const q = N(findQ), hits = [], chip = (TCHIPS.find(c => c[0] === findChip) || TCHIPS[0])[2];
+    $$('.trow1', list).forEach(row => {
+      const t = terrById(row.dataset.tid);
+      const ok = !t || (terrHit(t, q) && chip(t));
       row.hidden = !ok;
       if (ok && t) hits.push(t);
     });
+    // 見出し（親番号・特別区域の組）は、その下に出ている行がないときは隠す
+    const tl = list.querySelector('.tlist'), kids = tl ? [...tl.children] : [];
+    kids.forEach((el, i) => {
+      const isP = el.classList.contains('pgrp'), isS = el.classList.contains('spgrp');
+      if (!isP && !isS) return;
+      let any = false;
+      for (let j = i + 1; j < kids.length; j++) {
+        const k = kids[j];
+        if (k.classList.contains('pgrp') || (isS && k.classList.contains('spgrp'))) break;
+        if (k.classList.contains('trow1') && !k.hidden) { any = true; break; }
+      }
+      el.hidden = !any;
+    });
     const out = document.getElementById('adTerrQn');
-    if (out) out.textContent = q ? (hits.length ? `${hits.length}区域` : '見つかりません') : '';
+    if (out) out.textContent = q || findChip !== 'all' ? (hits.length ? `${hits.length}区域` : '見つかりません') : '';
     return hits;
+  }
+  /* 絞り込み：すべて／貸出中／空いている／期限が近い・過ぎた／特別区域（0件の絞り込みは出さない） */
+  function paintTerrChips() {
+    const list = document.getElementById('adTerrs');
+    if (!list) return;
+    let box = document.getElementById('adTerrChips');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'adTerrChips'; box.className = 'chips tchips';
+      box.setAttribute('role', 'group'); box.setAttribute('aria-label', '区域の絞り込み');
+      list.before(box);
+      box.addEventListener('click', e => { const b = e.target.closest('[data-tchip]'); if (!b) return; findChip = b.dataset.tchip; paintTerrChips(); applyFind(); });
+    }
+    const ts = D().territories, cnt = TCHIPS.map(c => ts.filter(c[2]).length);
+    if (findChip !== 'all' && !cnt[TCHIPS.findIndex(c => c[0] === findChip)]) findChip = 'all';
+    box.innerHTML = TCHIPS.map((c, i) => (c[0] === 'all' || cnt[i] ? `<button type="button" class="chip" data-tchip="${c[0]}" aria-pressed="${findChip === c[0]}">${c[1]} ${cnt[i]}</button>` : '')).join('');
   }
   function paintTerrFind() {
     const list = document.getElementById('adTerrs');
@@ -2321,21 +2357,7 @@ body.duemode .terr-label:not(.duelab){display:none}
         if (hits.length === 1) { inp.blur(); openKarte(hits[0].id); }
       });
     }
-    applyFind();
-  }
-  /* 一覧の各行：よく使う「カルテ・地図・担当・貸し出し」だけを出し、ほかは「そのほかの操作」にたたむ */
-  function foldRowOps() {
-    const list = document.getElementById('adTerrs');
-    if (!list) return;
-    $$('.trow .actions', list).forEach(act => {
-      if (act.querySelector('.moreops')) return;
-      const more = $$('[data-redraw],[data-rename],[data-azaedit],[data-spedit],[data-delterr]', act);
-      if (!more.length) return;
-      const d = document.createElement('details'); d.className = 'moreops';
-      d.innerHTML = '<summary>そのほかの操作</summary><div></div>';
-      more.forEach(b => d.lastChild.appendChild(b));
-      act.appendChild(d);
-    });
+    queueMicrotask(applyFind); // 特別区域の組の見出し（tokubetsu.js）が入ったあとで、さがす・絞り込みを当てる
   }
   /* 「区域」タブの上にある、貸し出しのきまり：開け閉めは index.html の「貸し出しのきまり」ボタン（paintTakeTgl）で行う（2026-10-21）。
      以前はここで details に包んでいたが、描き直しの順番によって包まれず、たためなくなることがあった */
@@ -2843,7 +2865,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       wideOn();
       paintTopBar();
       if (!isAdmin() || lkLocked()) return;
-      if (adPane === 'terr') { foldTakeSet(); foldRowOps(); paintTerrFind(); }
+      if (adPane === 'terr') { foldTakeSet(); paintTerrChips(); paintTerrFind(); }
       if (adPane === 'status') paintAchieve();
     } catch (e) { console.error(e); }
   };

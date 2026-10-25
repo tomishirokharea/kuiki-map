@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.74"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.75"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -317,6 +317,30 @@ button.tile:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
 .pick p{margin:0}
 @media (max-width:420px){.pick{grid-template-columns:auto 1fr}.pick .btn{grid-column:2;justify-self:start}}
 .trow .check{min-height:48px;font-size:16px;font-weight:700}
+/* 係の画面「区域」の一覧：1区域1行。押すとカルテ（改善案A4）。一覧の幅が広いとき（860px以上・パソコン）は、同じ行を表にする */
+.tlist{container:tlist/inline-size;background:#fff;border:2px solid var(--line);border-radius:12px;overflow:hidden}
+.tlhead{display:none}
+.trow1{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:2px 12px;width:100%;min-height:64px;margin:0;padding:10px 12px;border:0;border-top:1px solid var(--line);border-radius:0;background:#fff;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.tlist>.trow1:first-child,.tlist>.tlhead+.trow1{border-top:0}
+.trow1:hover{background:var(--terr-soft)}
+.trow1:focus-visible{outline:3px solid var(--terr);outline-offset:-3px}
+.trow1 .tl-n{min-width:0}
+.trow1 .tl-n b{display:block;overflow-wrap:anywhere}
+.trow1 .tl-n small{display:block;font-size:15px;color:var(--ink2);overflow-wrap:anywhere}
+.trow1 .tl-n small .lendtag{margin-left:4px}
+.trow1 .tl-st,.trow1 .tl-c{display:none}
+.trow1 .tl-go{font-size:26px;line-height:1;color:var(--ink2)}
+.trow1[hidden],.tlist>[hidden]{display:none}
+.tlist>.pgrp,.tlist>.spgrp{border-top:1px solid var(--line);margin:0;border-radius:0}
+@container tlist (min-width:860px){
+  .tlhead,.trow1{display:grid;grid-template-columns:64px minmax(140px,2fr) 150px minmax(110px,1.3fr) 104px 128px 140px 72px 24px;gap:0 10px;align-items:center}
+  .tlhead{padding:8px 12px;font-size:14px;font-weight:700;color:var(--ink2);background:#F4F6F8;border-bottom:1px solid var(--line)}
+  .tlhead .n{text-align:right}
+  .trow1{min-height:56px;padding:6px 12px}
+  .trow1 .tl-n small{display:none}
+  .trow1 .tl-st,.trow1 .tl-c{display:block;font-size:15px;overflow-wrap:anywhere;min-width:0}
+  .trow1 .tl-c.n{text-align:right}
+}
 .tcard.away{border-color:#F0C4AC}
 .tcard.away .progress>i{background:var(--draw)}
 .stamp.away{border-color:var(--draw);color:var(--draw)}
@@ -1227,9 +1251,9 @@ img,canvas,video{max-width:100%}
   .legend{right:auto;width:min(720px,calc(100% - 20px))}
   /* 区域カード・区域の一覧を2列に（お知らせなどは横いっぱい） */
   #view-cards .wrap,#view-admin .wrap{max-width:1180px}
-  #myCards,#allCards,#adTerrs{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:stretch}
-  #myCards>*,#allCards>*,#adTerrs>*{margin-bottom:0}
-  #myCards>:not(.tcard),#allCards>:not(.tcard),#adTerrs>:not(.trow){grid-column:1/-1}
+  #myCards,#allCards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:stretch}
+  #myCards>*,#allCards>*{margin-bottom:0}
+  #myCards>:not(.tcard),#allCards>:not(.tcard){grid-column:1/-1}
   /* 地図の上のボタンが横に並びきるように */
   .maptools select{max-width:320px}
 }
@@ -1285,7 +1309,7 @@ body:not(.f-follow) .refbtn{min-height:52px;font-size:16px;margin-top:18px;backg
   body:not(.f-time) .homegrid{grid-template-columns:1fr}
 }
 @media (min-width:1400px){
-  #myCards,#allCards,#adTerrs{grid-template-columns:repeat(3,1fr)}
+  #myCards,#allCards{grid-template-columns:repeat(3,1fr)}
 }
 
 /* ===== 文字を大きくしたとき（年配の方向け）の見せ方・押しやすさ ===== */
@@ -12615,9 +12639,8 @@ function renderAdmin() {
   if (adPane !== 'status' && adPane !== 'terr') return;
   const now = Date.now();
   const ts = D().territories.slice().sort(byNo);
+  if (adPane === 'terr') { renderTerrList(ts); return; } // 区域の一覧だけ（「状況」の数字・表は作らない）
   let targetsN = 0, met90 = 0;
-  const stats = new Map();
-  ts.forEach(t => { const s = terrStats(t, now - 90 * DAY); stats.set(t.id, s); });
   // 全体の数は家から直接数える（特別区域の家を2回数えないように。区域の外の家は別に出す）
   for (const h of D().houses) {
     if (!h.terrId) continue;
@@ -12654,52 +12677,47 @@ function renderAdmin() {
       const p = Math.round(c.m / c.n * 100);
       return `<td class="${best === dt + b ? 'best' : ''}"><b>${p}%</b><br><small>${c.n}件</small><div class="bar"><i style="width:${p}%"></i></div></td>`;
     }).join('')}</tr>`).join('');
-
-  // 区域一覧
-  const userOpts = (sel, ph) => `<option value="">${ph ? `（紙の記録：${esc(ph.name || '名前なし')}）` : '（だれも持っていない）'}</option>` +
-    D().users.map(u => `<option value="${esc(u.id)}"${u.id === sel ? ' selected' : ''}>${esc(u.name)}</option>`).join('');
+}
+/* 係の画面「区域」の一覧：1区域1行（番号・名前・持っている人か前回の返却日・状態）。行を押すとカルテが開く（改善案A4）。
+   担当を変える・貸し出しのきまり・線を直す・番号と名前・字・条件・削除などの操作は、カルテにまとめてある。
+   一覧の幅が広いとき（パソコン）は、同じ行を表にする（CSS の .tlist）。上の「さがす」と絞り込みは schedule.js */
+function renderTerrList(ts) {
   const pcount = new Map();
   ts.forEach(t => { if (t.pno) pcount.set(t.pno, (pcount.get(t.pno) || 0) + 1); });
+  const dueOfT = t => (window.KM && KM.dueInfo ? KM.dueInfo(t) : null);
+  const unitsN = t => housesOf(t.id).reduce((a, h) => a + unitsIn(h, t).length, 0); // 家・部屋の数（特別区域で回る家は、その特別区域で数える）
   let lastP = null;
-  $('#adTerrs').innerHTML = ts.map(t => {
+  const head = '<div class="tlhead" aria-hidden="true"><span>番号</span><span>名前</span><span>状態</span><span>持っている人</span><span>貸し出した日</span><span>返却の目安</span><span>前回回り終えた日</span><span class="n">家・部屋</span><span></span></div>';
+  $('#adTerrs').innerHTML = '<div class="tlist">' + head + ts.map(t => {
     // 親番号が変わるところに見出し（枝番の区域を親ごとにまとめて見せる）
     const ph = t.pno && t.pno !== lastP ? `<div class="pgrp"><span class="stamp sm${noCls(t.pno)}">${esc(t.pno)}</span><b>区域 ${esc(t.pno)}</b><span class="muted">${t.pnm ? esc(t.pnm) + '・' : ''}枝番 ${pcount.get(t.pno)}つ</span></div>` : '';
     lastP = t.pno || null;
-    return ph + trowOf(t);
-  }).join('');
-  function trowOf(t) {
-    const s = stats.get(t.id), d = t.lentAt ? daysSince(t.lentAt) : 0, due = dueOf(t), over = !!due && Date.parse(due) < Date.now();
-    const ph = paperHoldOf(t); // 紙の記録（S-13）で貸出中
-    const lent = t.holder ? t.lentAt : ph ? ph.a : t.lastLentAt, firstAt = t.holder ? t.firstDoneAt : ph ? '' : t.lastFirstAt;
-    const retAt = t.holder || ph || t.awayPoolAt ? '' : (t.completedAt && (!t.returnedAt || t.completedAt >= t.returnedAt) ? t.completedAt : '');
-    const pool = poolInfo(t);
-    return `<article class="trow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
-      <div><b>${esc(t.name)}</b>${t.group ? ` <span class="gbadge">${esc(useName(t))}</span>` : ''}${isSpecial(t) ? `<span class="spbadge">特別区域：${esc(specialKindsText(t))}</span>${evTag(t)}` : ''} ${lendTag(t)}<div class="meta">
-        <span>貸し出した日 ${lent ? fmtDay(lent) : '—'}</span><span>1回目を回った日 ${firstAt ? fmtDay(firstAt) : '—'}</span><span>正式に返却した日 ${retAt ? fmtDay(retAt) : (t.holder ? '貸出中' : ph ? '貸出中（紙の記録）' : pool ? '留守宅カードで回っています' : '—')}${lowWaitNote(t)}</span>
-        ${ph ? `<span>紙の記録で持っている：${esc(ph.name || '名前なし')}（貸出 ${daysSince(ph.a)}日）　返却したら、S-13で完了した日付を入れてください</span>` : ''}
-        ${pool ? `<span>留守宅の訪ね直し ${pool.done} / ${pool.n}（${pool.pct}%・目安 ${awayRetPct()}%）</span><button class="btn small" data-poolfin="${esc(t.id)}">正式に返却したことにする</button>` : ''}
-        ${t.holder ? `<span class="${over ? 'tag-warn' : ''}">返却の目安 ${fmtDay(due)}${over ? '（過ぎています）' : ''}</span>` : ''}
-        <span>家・部屋 ${s.n}</span><span>90日以内に訪問 ${s.visited}</span>
-        <span>前回回り終えた日 ${lastDoneTxt(t)}</span>
-        <span>最終記録 ${s.last ? fmtDate(s.last) : 'なし'}</span>
-        ${AGE_ON ? `<span>字：${azaText(t)}</span>` : ''}
-        ${t.holder ? `<span>貸出 ${d}日${t.firstDoneAt ? '・留守宅を回る段階' : ''}</span>` : ''}
-        ${helpersOf(t).length ? `<span>今日一緒に回る人：${helpersOf(t).map(h => esc(uname(h.uid)) + 'さん').join('、')}</span>` : ''}
-      </div></div>
-      <div class="actions">
-        <label>担当 <select data-holder="${esc(t.id)}">${userOpts(t.holder, ph)}</select></label>
-        <button class="btn small" data-open="${esc(t.id)}">地図</button>
-        <button class="btn small" data-redraw="${esc(t.id)}">線を直す</button>
-        <button class="btn small" data-rename="${esc(t.id)}">番号・名前</button>
-        ${AGE_ON ? `<button class="btn small" data-azaedit="${esc(t.id)}">字を直す</button>` : ''}
-        <button class="btn small danger" data-delterr="${esc(t.id)}">削除</button>
-        <label>貸し出し <select data-lend="${esc(t.id)}">
-          <option value="auto"${lendMode(t) === 'auto' ? ' selected' : ''}>きまりのとおり</option>
-          <option value="open"${lendMode(t) === 'open' ? ' selected' : ''}>貸出可能にする</option>
-          <option value="stop"${lendMode(t) === 'stop' ? ' selected' : ''}>貸出中止にする</option></select></label>
-        ${isSpecial(t) ? `<button class="btn small" data-spedit="${esc(t.id)}">条件を変える</button>` : ''}
-        ${useSelectHtml(t, 'data-grp')}
-      </div></article>`;
+    return ph + rowOf(t);
+  }).join('') + '</div>';
+  function rowOf(t) {
+    const pp = paperHoldOf(t), pool = !t.holder && !pp && t.awayPoolAt, due = t.holder && t.lentAt ? dueOf(t) : '';
+    const over = !!due && Date.parse(due) < Date.now();
+    const retAt = t.holder || pp || t.awayPoolAt ? '' : (t.completedAt && (!t.returnedAt || t.completedAt >= t.returnedAt) ? t.completedAt : '');
+    const di = dueOfT(t), late = di && (di.st === 'over' || di.st === 'warn');
+    const lateTag = late ? `<span class="tag-warn">${di.st === 'over' ? '1年の期限を過ぎています' : `1年の期限まで${di.left}日`}</span>` : '';
+    // スマホの2行目：持っている人、または前回の返却
+    const sub = t.holder ? `${esc(uname(t.holder))}さん${t.lentAt ? `・${daysSince(t.lentAt)}日目` : ''}${over ? '　<span class="tag-warn">返却の目安を過ぎています</span>' : ''}`
+      : pp ? `紙の記録：${esc(pp.name || '名前なし')}`
+      : pool ? '留守宅カードで回っています'
+      : retAt ? `返却 ${fmtDay(retAt)}${lowWaitNote(t)}` : `前回回り終えた日 ${lastDoneTxt(t)}`;
+    const who = t.holder ? `${esc(uname(t.holder))}さん` : pp ? `紙の記録：${esc(pp.name || '名前なし')}` : pool ? '留守宅カード' : '—';
+    const lentAt = t.holder ? t.lentAt : pp ? pp.a : '';
+    const badges = `${t.group ? ` <span class="gbadge">${esc(useName(t))}</span>` : ''}${isSpecial(t) ? ' <span class="spbadge">特別区域</span>' : ''}`;
+    return `<button type="button" class="trow1" data-karte="${esc(t.id)}" data-tid="${esc(t.id)}">
+      <span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span>
+      <span class="tl-n"><b>${esc(t.name)}${badges}</b><small>${sub}${lendTag(t)}${late ? ' ' + lateTag : ''}</small></span>
+      <span class="tl-st">${lendTag(t)}</span>
+      <span class="tl-c">${who}</span>
+      <span class="tl-c">${lentAt ? fmtDay(lentAt) : '—'}</span>
+      <span class="tl-c">${due ? `<span class="${over ? 'tag-warn' : ''}">${fmtDay(due)}</span>` : '—'}</span>
+      <span class="tl-c">${lastDoneTxt(t)}${late ? '<br>' + lateTag : ''}</span>
+      <span class="tl-c n">${unitsN(t)}</span>
+      <span class="tl-go" aria-hidden="true">›</span></button>`;
   }
 }
 /* 係の画面「状況」の「全体の状況」：数字を押すと、その内訳を下から出す（閉じると元の画面のまま）
@@ -15641,12 +15659,10 @@ function bindStatic() {
     e.target.value = '';
   };
   $('#adSpecial').onclick = () => openSpecialSheet(null);
-  $('#adTerrs').addEventListener('click', async e => {
-    const b = e.target.closest('[data-spedit]'); if (b) { openSpecialSheet(b.dataset.spedit); return; }
-    const f = e.target.closest('[data-poolfin]'); if (!f) return;
-    const t = terrById(f.dataset.poolfin), p = poolInfo(t); if (!t || !p) return;
-    if (!await ask(`区域${t.no}を、今日、正式に返却されたことにします（留守宅の訪ね直し ${p.pct}%）。よろしいですか？`, { ok: '記録する', danger: false })) return;
-    commit(`区域${t.no}を正式に返却されたことにしました`, () => poolFinish(t, new Date().toISOString(), p.pct));
+  // 区域の一覧の行を押すと、その区域のカルテ（改善案A4。返却・担当・貸し出しのきまりなどの操作は、カルテの中）
+  $('#adTerrs').addEventListener('click', e => {
+    const r = e.target.closest('[data-karte]'); if (!r) return;
+    if (window.KM && KM.openKarte) KM.openKarte(r.dataset.karte); else openTerr(r.dataset.karte);
   });
   $('#adXlsx').onchange = e => {
     const file = e.target.files && e.target.files[0];
@@ -15725,31 +15741,6 @@ function bindStatic() {
     if (cur && cur.by === s.value) return;
     const v = s.value;
     commitIn([], `${uname(v)}さんが再訪問を受け持ちます`, () => startFollow(k, v));
-  });
-  $('#adTerrs').addEventListener('change', e => {
-    const gp = e.target.closest('[data-grp]');
-    if (gp) {
-      const t = terrById(gp.dataset.grp);
-      if (t) setTerrUse(t, gp.value);
-      return;
-    }
-    const fr = e.target.closest('[data-lend]');
-    if (fr) {
-      const t = terrById(fr.dataset.lend), v = fr.value;
-      commit(v === 'stop' ? `区域${t.no}を貸出中止にしました` : v === 'open' ? `区域${t.no}を貸出可能にしました` : `区域${t.no}は、きまりのとおりに貸し出します`, () => { t.lend = v; delete t.free; });
-      return;
-    }
-    const s = e.target.closest('[data-holder]'); if (!s) return;
-    const t = terrById(s.dataset.holder), val = s.value;
-    if (!val) { renderAll(); openReturnSheet(t.id); return; } // 返却は「全部回ったか」を確認する
-    if (t.holder === val) return;
-    commit(`区域${t.no}を${uname(val)}さんに貸し出しました`, () => {
-      const now = new Date().toISOString();
-      recordHandover(t, now); // 前の担当者の行を S-13 に残す
-      t.holder = val;
-      t.lentAt = now;
-      t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
-    });
   });
 }
 
