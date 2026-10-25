@@ -193,4 +193,13 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "例：〇〇さんと奉仕": "Ej.: predicar con un hermano",
 /* 2026.13.87：同じタブをもう一度押すと、はじめの状態にもどる */
 "下のタブを、いま見ている画面でもう一度押すと、その画面のいちばん上にもどるようにしました。地図のタブなら、えらんでいる区域の全体が見えるところにもどります": "Si vuelve a tocar, en la barra de abajo, la pestaña de la pantalla que está viendo, regresa al principio de esa pantalla. En la pestaña del mapa, vuelve a mostrar todo el territorio elegido.",
+/* 2026.13.88：じぶんの色の明るさのバー・明るい色でも文字が読める */
+"明るい": "Claro",
+"暗い": "Oscuro",
+"明るさ": "Brillo",
+"白": "Blanco",
+"区域の線・番号": "Líneas y números de territorio",
+"円で色あいを、右のバーで明るさをえらびます。バーのいちばん上は白、いちばん下は黒です。帯やボタンの文字は、読みやすいように自動で白か黒になります。": "Elija el tono en el círculo y el brillo en la barra de la derecha. Arriba del todo es blanco y abajo del todo es negro. El texto de la barra superior y de los botones se pone en blanco o negro automáticamente para que se lea bien.",
+"テーマの「じぶんの色」に、明るさを変えるバーを付けました。円で色あいを、となりのバーで明るさをえらべます。明るい黄色や白・黒もえらべます": "Se agregó una barra de brillo a «Color propio». Elija el tono en el círculo y el brillo en la barra de al lado. También puede elegir amarillo claro, blanco o negro.",
+"明るい色をえらんだときは、上の帯やボタンの文字が自動で黒になり、どの色でも文字が読めるようにしました": "Cuando elige un color claro, el texto de la barra superior y de los botones se pone en negro automáticamente, para que se lea con cualquier color.",
 });

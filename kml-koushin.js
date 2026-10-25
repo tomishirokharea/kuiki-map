@@ -1082,7 +1082,7 @@
   .kk-part{display:inline-block;background:#FFF4D6;color:#6B4200;border-radius:6px;padding:0 6px;font-weight:700}
   .kk-memo{display:inline-block;background:#F1F3F5;color:var(--ink);border-radius:6px;padding:0 6px}
   .kk-sens{display:inline-block;background:#FDECEC;color:#8B1A1A;border-radius:6px;padding:0 6px;font-weight:700}
-  .kk-way .choice[aria-pressed=true]{border-color:var(--brand);background:#DCE8F7;box-shadow:inset 0 0 0 1px var(--brand)}
+  .kk-way .choice[aria-pressed=true]{border-color:var(--brand-ink);background:#DCE8F7;box-shadow:inset 0 0 0 1px var(--brand-ink)}
   .kk-folders{display:flex;flex-direction:column;gap:2px;margin:4px 0 10px}
   `;
   document.head.appendChild(css);

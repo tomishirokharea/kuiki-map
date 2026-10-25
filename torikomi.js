@@ -21,8 +21,8 @@
 .tk-sec{margin:14px 0 4px;font-size:15px;color:var(--ink2);font-weight:700}
 .tk-it{display:flex;align-items:center;gap:10px;width:100%;min-height:62px;border:2px solid var(--line);border-radius:12px;background:#fff;padding:8px 12px;margin:6px 0;text-align:left;font:inherit;color:var(--ink);cursor:pointer}
 .tk-it:active{background:#EEF3F8}
-.tk-it.primary{border-color:var(--brand)}
-.tk-it .ic{flex:none;width:34px;height:34px;border-radius:9px;background:#E3ECF6;color:var(--brand);display:grid;place-items:center;font-weight:700;font-size:18px}
+.tk-it.primary{border-color:var(--brand-ink)}
+.tk-it .ic{flex:none;width:34px;height:34px;border-radius:9px;background:#E3ECF6;color:var(--brand-ink);display:grid;place-items:center;font-weight:700;font-size:18px}
 .tk-it .tx{flex:1;min-width:0;line-height:1.35}
 .tk-it .tx b{display:block;font-size:16px}
 .tk-it .tx small{display:block;font-size:13px;color:var(--ink2)}

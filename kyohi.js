@@ -66,7 +66,7 @@
   .dnc-sum button{min-height:64px;border-radius:12px;border:2px solid var(--line);background:#fff;font:inherit;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.2;padding:4px}
   .dnc-sum button b{font-size:24px}
   .dnc-sum button span{font-size:14px;font-weight:700}
-  .dnc-sum button[aria-pressed="true"]{border-color:var(--brand);background:var(--terr-soft);box-shadow:inset 0 0 0 1px var(--brand)}
+  .dnc-sum button[aria-pressed="true"]{border-color:var(--brand-ink);background:var(--terr-soft);box-shadow:inset 0 0 0 1px var(--brand-ink)}
   .dnc-sum button.chk b{color:var(--draw)}
   .dnc-sum button.chk.zero b{color:var(--ink2)}
   .dnc-add{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -133,7 +133,7 @@
   .dx-list{border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 10px;margin:6px 0 10px}
   .dx-row{display:flex;gap:12px;align-items:flex-start;padding:10px 2px;border-bottom:1px solid #E6ECE9;min-height:56px;cursor:pointer}
   .dx-row:last-child{border-bottom:0}
-  .dx-row input{flex:none;width:26px;height:26px;margin:2px 0 0;accent-color:var(--brand)}
+  .dx-row input{flex:none;width:26px;height:26px;margin:2px 0 0;accent-color:var(--brand-ink)}
   .dx-row .tx{flex:1;min-width:0;line-height:1.35}
   .dx-row .tx b{display:block;font-size:16px;word-break:break-all}
   .dx-row .tx small{display:block;color:var(--ink2);font-size:13px;word-break:break-all}
@@ -143,7 +143,7 @@
   .dx-mode legend{font-weight:700;padding:0 4px}
   .dx-mode label.check{align-items:flex-start;padding:8px 0;border-bottom:1px solid #E6ECE9}
   .dx-mode label.check:last-child{border-bottom:0}
-  .dx-mode input{flex:none;width:24px;height:24px;margin-top:2px;accent-color:var(--brand)}
+  .dx-mode input{flex:none;width:24px;height:24px;margin-top:2px;accent-color:var(--brand-ink)}
   .dx-mode b{display:block}
   .dx-mode small{display:block;color:var(--ink2);font-size:14px;line-height:1.4}
   .dx-foot{position:sticky;bottom:0;background:var(--paper);padding:6px 0 2px;box-shadow:0 -8px 10px -8px #0002}

@@ -46,13 +46,13 @@
   .mk-chips.two{grid-template-columns:repeat(2,1fr)}
   .mk-chips button{min-height:58px;border-radius:12px;border:2px solid var(--line);background:#fff;font:inherit;font-weight:700;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;line-height:1.1}
   .mk-chips button .pin{width:26px;height:26px;font-size:14px;border-width:2px}
-  .mk-chips button[aria-pressed="true"]{border-color:var(--brand);background:var(--terr-soft);box-shadow:inset 0 0 0 1px var(--brand)}
+  .mk-chips button[aria-pressed="true"]{border-color:var(--brand-ink);background:var(--terr-soft);box-shadow:inset 0 0 0 1px var(--brand-ink)}
   .mk-chips button:disabled{opacity:.45}
   .mk-box textarea{width:100%;min-height:72px;font-size:17px;border:2px solid var(--line);border-radius:12px;padding:8px 10px;font-family:inherit;background:#fff;color:var(--ink)}
   .ch-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 10px}
   .ch-seg button{min-height:52px;border-radius:12px;border:2px solid var(--line);background:#fff;font:inherit;font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:center;gap:8px}
   .ch-seg button .pin{width:26px;height:26px;font-size:14px;border-width:2px}
-  .ch-seg button[aria-pressed="true"]{border-color:var(--brand);background:var(--terr-soft);box-shadow:inset 0 0 0 1px var(--brand)}
+  .ch-seg button[aria-pressed="true"]{border-color:var(--brand-ink);background:var(--terr-soft);box-shadow:inset 0 0 0 1px var(--brand-ink)}
   .chrow .tx b{white-space:normal}
   .chrow .note{display:block;color:#3F2D00;background:#FEF9C3;border-radius:6px;padding:1px 6px;margin:2px 0;font-size:14px;word-break:break-all}
   `;

@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.87';
+var APP_JS_VER = '2026.13.88';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2491,6 +2491,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.88', items: [
+    ['色', 'テーマの「じぶんの色」に、明るさを変えるバーを付けました。円で色あいを、となりのバーで明るさをえらべます。明るい黄色や白・黒もえらべます'],
+    ['字', '明るい色をえらんだときは、上の帯やボタンの文字が自動で黒になり、どの色でも文字が読めるようにしました']
+  ] },
   { v: '2026.13.87', items: [
     ['下', '下のタブを、いま見ている画面でもう一度押すと、その画面のいちばん上にもどるようにしました。地図のタブなら、えらんでいる区域の全体が見えるところにもどります']
   ] },
@@ -9491,16 +9495,58 @@ function lum(hex) {
   return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 }
 const onWhite = hex => 1.05 / (lum(hex) + 0.05); // 白い文字とのコントラスト
+const contrastOf = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+const INK_ON_LIGHT = '#000000'; // 明るいテーマの色の上に書く文字（黒。どの色でも 4.5 以上の見やすさになる）
+function mixHex(a, b, t) { // a の色に b の色を t の割合でまぜる（どちらも #rrggbb の形）
+  const p = (h, i) => parseInt(h.slice(i, i + 2), 16);
+  return '#' + [1, 3, 5].map(i => Math.round(p(a, i) * (1 - t) + p(b, i) * t).toString(16).padStart(2, '0')).join('');
+}
+/* じぶんの色の保存の形：「色あい,あざやかさ,明るさ」（明るさは 0＝黒〜100＝白）。
+   明るさのバーを入れる前の形「色あい,あざやかさ」は、これまでと同じ濃さ（白い文字が読める濃さ）として読む */
+function parseCustom(s) {
+  const m = String(s || '').match(/^(\d+),(\d+)(?:,(\d+))?$/);
+  if (!m) return null;
+  const h = (+m[1]) % 360, sat = Math.min(100, +m[2]);
+  let l = m[3] === undefined ? null : Math.min(100, +m[3]);
+  if (l === null) { l = 50; while (l > 8 && onWhite(hslHex(h, sat, l)) < 7) l -= 2; }
+  return { h, sat, l };
+}
+/* [上の帯の色（えらんだ色そのまま）, 区域の線・番号の色（白い地でも読める濃さ）, うすい色, 名前, 起動の画面の濃い色] */
 function customTheme(hs) {
-  const m = String(hs || '').match(/^(\d+),(\d+)$/);
-  if (!m) return THEMES.standard;
-  const h = +m[1], sat = +m[2];
-  let l = 50, accent, brand;
-  while (l > 12 && onWhite(accent = hslHex(h, sat, l)) < 3.2) l -= 2;
-  while (l > 8 && onWhite(brand = hslHex(h, sat, l)) < 7) l -= 2;
-  return [brand, accent, hslHex(h, Math.min(sat, 70), 94), 'じぶんの色'];
+  const c = parseCustom(hs);
+  if (!c) return THEMES.standard;
+  const { h, sat, l } = c;
+  let la = sat < 12 ? 35 : 50, accent, deep; // 白・黒・灰色は、線が濃いめの灰色になる
+  while (la > 4 && onWhite(accent = hslHex(h, sat, la)) < 4.5) la -= 1;
+  let ld = la;
+  while (ld > 3 && onWhite(deep = hslHex(h, sat, ld)) < 7) ld -= 1;
+  return [hslHex(h, sat, l), accent, hslHex(h, Math.min(sat, 70), 94), 'じぶんの色', deep];
 }
 const themeOf = e => (e.theme === 'custom' ? customTheme(e.custom) : THEMES[e.theme] || THEMES.standard);
+/* テーマの色から、画面で使う色の組を作る。
+   どの色をえらんでも文字が読めるように、上の帯やボタンの上の文字は白か黒の読みやすいほうにする（2026.13.88）。
+   標準などの決まった色は、これまでと同じ（白い文字・線の色とのグラデーション）になる */
+function themeSet(th) {
+  const brand = th[0], acc = th[1];
+  const w = onWhite(brand), k = contrastOf(brand, INK_ON_LIGHT);
+  const light = w < 4.5 && k > w; // 白い文字では読みにくい明るい色
+  const on = light ? INK_ON_LIGHT : '#ffffff';
+  let brand2 = acc; // 帯のグラデーションの相手（その上の文字が読めること）
+  if (light || contrastOf(acc, on) < 4.5) { // 明るい色は、同じ色の少し濃い・うすいほうと組み合わせる
+    brand2 = brand;
+    for (const [to, t] of [['#000000', 0.12], ['#000000', 0.07], ['#ffffff', 0.3], ['#ffffff', 0.15]]) {
+      const c = mixHex(brand, to, t);
+      if (contrastOf(c, on) >= 4.5) { brand2 = c; break; }
+    }
+  }
+  return {
+    brand, acc, soft: th[2], on, brand2,
+    onDim: light ? '#0000004d' : '#ffffff80', // 帯の上の枠線など
+    ink: w >= 4.5 ? brand : acc,               // 白い地の上の文字・枠線に使う色
+    deep: w >= 7 ? brand : (th[4] || acc),     // 起動のあいさつなど、白い文字をのせる濃い色
+    light
+  };
+}
 const SIZES = { small: [0.9, '小さめ'], normal: [1, '標準'], large: [1.15, '大きく'], xlarge: [1.3, 'とても大きく'] };
 /* 文字の種類：[Google Fontsの名前（なし＝読み込まない）, 表示名, 太さ, 分類] */
 const FONTS = {
@@ -9586,13 +9632,13 @@ function graphemes(s) {
 const clipG = (s, n) => graphemes(String(s || '').replace(/\s+/g, ' ').trim()).slice(0, n).join('');
 const ICON_JP_FONT = '"BIZ UDPGothic","Hiragino Sans",sans-serif';
 function drawIcon(cv) {
-  const e = uiEff(), x = cv.getContext('2d'), th = themeOf(e);
+  const e = uiEff(), x = cv.getContext('2d'), ts = themeSet(themeOf(e));
   const t = clipG(e.icon, 2) || '区', sub = clipG(e.iconText, 4), tn = graphemes(t).length;
   const g = x.createLinearGradient(0, 0, 180, 180);
-  g.addColorStop(0, th[0]); g.addColorStop(1, th[1]);
+  g.addColorStop(0, ts.brand); g.addColorStop(1, ts.brand2);
   x.clearRect(0, 0, 180, 180);
   x.fillStyle = g; x.fillRect(0, 0, 180, 180);
-  x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillStyle = ts.on; x.textAlign = 'center'; x.textBaseline = 'middle'; // 明るい色のときは、黒い文字
   const emoji = /[^\u0000-ヿ一-鿿＀-￯]/.test(t);
   const fam = emoji ? 'sans-serif' : ICON_JP_FONT;
   if (sub) { // 絵の下に文字を入れるとき：絵を少し上・小さめにし、下に文字（はみ出すときは横を縮める）
@@ -9617,10 +9663,15 @@ function applyIcon() {
   } catch (e) { /* 作れないときは、そのまま */ }
 }
 function setThemeVars(th) {
-  const r = document.documentElement.style;
-  r.setProperty('--brand', th[0]); r.setProperty('--terr', th[1]); r.setProperty('--terr-soft', th[2]);
+  const r = document.documentElement.style, ts = themeSet(th);
+  r.setProperty('--brand', ts.brand); r.setProperty('--terr', ts.acc); r.setProperty('--terr-soft', ts.soft);
+  r.setProperty('--on-brand', ts.on); r.setProperty('--on-brand-dim', ts.onDim); r.setProperty('--brand2', ts.brand2);
+  r.setProperty('--brand-ink', ts.ink); r.setProperty('--deep', ts.deep);
+  // iPhoneのホーム画面から開いたとき、時刻や電池の白い文字が明るい帯の上で見えなくならないように、その部分だけ濃い色にする
+  r.setProperty('--status-bg', ts.light ? ts.deep : ts.brand);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = th[0];
+  if (meta) meta.content = ts.brand;
+  return ts;
 }
 function applyUi() {
   const e = uiEff(), r = document.documentElement.style;
@@ -9640,32 +9691,69 @@ function applyUi() {
   document.body.classList.toggle('big', zoomOf(e) >= 1.14); // 文字を大きくしたとき（並べ方を変える）
   if (map) { renderTerrs(); setTimeout(() => map.invalidateSize(), 30); }
 }
-/* 円形のカラー：角度で色あい、中心からの距離であざやかさ */
+/* 円形のカラー：角度で色あい、中心からの距離であざやかさ。
+   となりのバー：明るさ（上ほど明るく、いちばん上は白・いちばん下は黒。2026.13.88） */
 function bindWheel() {
-  const w = $('#wheel'), dot = $('#wheelDot');
-  const show = (h, sat) => {
+  const w = $('#wheel'), dot = $('#wheelDot'), shade = $('#wheelShade'), bar = $('#lbar'), knob = $('#lbarDot');
+  const c0 = parseCustom(UI.custom || '200,70,35') || { h: 200, sat: 70, l: 35 };
+  let h = c0.h, sat = c0.sat, l = c0.l;
+  const PAD = 14; // バーの上下のはし（ここまで指を持っていけば、白・黒になる）
+  const show = () => {
     const R = w.clientWidth / 2, a = h * Math.PI / 180, d = R * sat / 100;
     dot.style.left = (R + Math.sin(a) * d) + 'px'; dot.style.top = (R - Math.cos(a) * d) + 'px';
-    const th = customTheme(`${h},${sat}`);
-    dot.style.background = th[1];
-    $('#wpBar').style.background = th[0];
+    // 円の見た目も、えらんだ明るさに近づける（色が分からなくならないよう、白・黒は 75% まで）
+    const t = Math.min(0.75, Math.abs(l - 50) / 50);
+    shade.style.background = l >= 50 ? '#fff' : '#000'; shade.style.opacity = String(t);
+    const th = customTheme(`${h},${sat},${l}`), ts = themeSet(th);
+    dot.style.background = th[0];
+    bar.style.background = `linear-gradient(to bottom,#fff,${hslHex(h, sat, 50)},#000)`;
+    knob.style.top = (PAD + (100 - l) / 100 * (bar.clientHeight - PAD * 2)) + 'px';
+    knob.style.background = th[0];
+    bar.setAttribute('aria-valuenow', String(l));
+    bar.setAttribute('aria-valuetext', l >= 97 ? '白' : l <= 3 ? '黒' : l >= 60 ? '明るい' : l <= 40 ? '暗い' : 'ふつう');
+    const pb = $('#wpBar'); pb.style.background = th[0]; pb.style.color = ts.on;
+    pb.style.boxShadow = ts.light ? `inset 0 0 0 2px ${ts.ink}` : '';
     $('#wpSoft').style.background = th[2];
+    $('#wpAcc').style.background = th[1];
     return th;
   };
-  const m = String(UI.custom || '200,70').split(',');
-  show(+m[0] || 0, +m[1] || 0);
-  let dragging = false;
-  const pick = e => {
+  const live = () => { UI.custom = `${h},${sat},${l}`; setThemeVars(show()); }; // なぞっている間は色だけ変える（軽く）
+  const done = () => { uiSave(); applyUi(); };
+  show();
+  // 円
+  let wDrag = false;
+  const pickW = e => {
     const r = w.getBoundingClientRect(), R = r.width / 2;
     const dx = e.clientX - r.left - R, dy = e.clientY - r.top - R;
-    const h = Math.round((Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360);
-    const sat = Math.round(Math.min(1, Math.hypot(dx, dy) / R) * 100);
-    UI.custom = `${h},${sat}`;
-    setThemeVars(show(h, sat)); // なぞっている間は色だけ変える（軽く）
+    h = Math.round((Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360);
+    sat = Math.round(Math.min(1, Math.hypot(dx, dy) / R) * 100);
+    live();
   };
-  w.onpointerdown = e => { dragging = true; w.setPointerCapture(e.pointerId); pick(e); };
-  w.onpointermove = e => { if (dragging) pick(e); };
-  w.onpointerup = w.onpointercancel = () => { if (!dragging) return; dragging = false; uiSave(); applyUi(); };
+  w.onpointerdown = e => {
+    wDrag = true; w.setPointerCapture(e.pointerId);
+    if (l >= 95 || l <= 5) l = 50; // 白・黒のときに円をさわったら、色が見える明るさにもどす
+    pickW(e);
+  };
+  w.onpointermove = e => { if (wDrag) pickW(e); };
+  w.onpointerup = w.onpointercancel = () => { if (!wDrag) return; wDrag = false; done(); };
+  // 明るさのバー
+  let bDrag = false;
+  const pickB = e => {
+    const r = bar.getBoundingClientRect();
+    const f = (e.clientY - r.top - PAD) / Math.max(1, r.height - PAD * 2);
+    l = Math.round(100 - Math.max(0, Math.min(1, f)) * 100);
+    live();
+  };
+  bar.onpointerdown = e => { bDrag = true; bar.setPointerCapture(e.pointerId); pickB(e); };
+  bar.onpointermove = e => { if (bDrag) pickB(e); };
+  bar.onpointerup = bar.onpointercancel = () => { if (!bDrag) return; bDrag = false; done(); };
+  bar.onkeydown = e => { // パソコンのキーでも動かせる
+    const step = { ArrowUp: 2, ArrowRight: 2, ArrowDown: -2, ArrowLeft: -2, PageUp: 10, PageDown: -10 }[e.key];
+    if (step === undefined && e.key !== 'Home' && e.key !== 'End') return;
+    e.preventDefault();
+    l = e.key === 'Home' ? 100 : e.key === 'End' ? 0 : Math.max(0, Math.min(100, l + step));
+    live(); done();
+  };
 }
 /* 表示の設定：いちばん上までスクロールした状態で下にスワイプすると、設定をそのまま残して閉じる */
 function bindSheetSwipe() {
@@ -9673,7 +9761,7 @@ function bindSheetSwipe() {
   let y0 = null, x0 = 0, dy = 0, on = false;
   s.addEventListener('touchstart', e => {
     // いちばん上までスクロールしているときだけ。色の輪・スライダー・入力欄・左右にスワイプする行の上では動かさない
-    if (s.scrollTop > 0 || e.touches.length !== 1 || e.target.closest('.wheel, input, textarea, select, .swipe-body')) { y0 = null; return; }
+    if (s.scrollTop > 0 || e.touches.length !== 1 || e.target.closest('.wheel, .lbar, input, textarea, select, .swipe-body')) { y0 = null; return; }
     y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; dy = 0; on = false;
   }, { passive: true });
   s.addEventListener('touchmove', e => {
@@ -9771,16 +9859,19 @@ function openUiSheet() {
     if (!det) {
       S_VIEW += S_TEXT + `<p class="q">はじめの案内（使い方の動画のお知らせなど）</p>${seg('guide', [['auto', '最初の数日だけ'], ['on', 'いつも出す'], ['off', '出さない']], UI.guide || 'auto')}<p class="hint">「くわしく」にすると、テーマの色・文字の種類・地図の印の大きさなども、自分の好みに変えられます。</p>`;
     } else {
-      const cm = String(UI.custom || '').match(/^(\d+),(\d+)$/), ch = cm ? +cm[1] : 200, cs = cm ? +cm[2] : 70;
       const S_COLOR = `<h3 class="sub">テーマの色</h3>
         <p class="hint">上の帯・ボタン・区域の線や番号など、画面ぜんぶの色が変わります。</p>
         <div class="swatches">${Object.entries(THEMES).map(([k, v]) =>
           `<button type="button" class="swatch" data-ui="theme" data-v="${k}" aria-pressed="${UI.theme === k}" style="--c:${v[1]}"><i style="background:linear-gradient(135deg,${v[0]} 50%,${v[1]} 50%)"></i>${v[3]}</button>`).join('')}
           <button type="button" class="swatch custom" data-ui="theme" data-v="custom" aria-pressed="${UI.theme === 'custom'}"><i></i>じぶんの色</button></div>
         ${UI.theme === 'custom' ? `<div class="wheelbox">
-          <div class="wheel" id="wheel" role="slider" aria-label="色をえらぶ円"><b id="wheelDot"></b></div>
+          <div class="wheelpair">
+            <div class="wheel" id="wheel" role="slider" aria-label="色をえらぶ円"><i id="wheelShade"></i><b id="wheelDot"></b></div>
+            <div class="lbarcol"><small>明るい</small><div class="lbar" id="lbar" role="slider" tabindex="0" aria-label="明るさ" aria-valuemin="0" aria-valuemax="100"><b id="lbarDot"></b></div><small>暗い</small></div>
+          </div>
           <div class="wheelprev"><div class="bar" id="wpBar">区域マップ</div><div class="soft" id="wpSoft">えらんでいる項目</div>
-            <p class="hint">円の中を指でなぞって色をえらびます。外側ほどあざやか、真ん中ほどおだやかな色です。白い文字が読める濃さに自動で調整します。</p></div>
+            <p class="wpacc"><i id="wpAcc"></i>区域の線・番号</p>
+            <p class="hint">円で色あいを、右のバーで明るさをえらびます。バーのいちばん上は白、いちばん下は黒です。帯やボタンの文字は、読みやすいように自動で白か黒になります。</p></div>
         </div>` : ''}
         <p class="hint">地図の緑のチェック（訪ねた家）と、会えた・留守・拒否の色は変わりません。</p>`;
       const S_SCREEN = `<h3 class="sub">画面</h3>
@@ -9839,7 +9930,7 @@ function openUiSheet() {
         return;
       }
       UI[k] = v;
-      if (k === 'theme' && v === 'custom' && !UI.custom) UI.custom = '200,70';
+      if (k === 'theme' && v === 'custom' && !UI.custom) UI.custom = '200,70,35';
       uiSave(); applyUi();
       if (k === 'base') setBase(v);
       if (k === 'cProg' || k === 'cReco') renderAll();

@@ -27,7 +27,7 @@
   const css = document.createElement('style');
   css.textContent = `.kgcard{margin:10px 0}
 .kgthanks{background:#E8F5E9;border:2px solid #2E7D32;border-radius:14px;padding:12px 14px}
-.kgbig{font-size:34px;font-weight:700;color:var(--brand);line-height:1.2}
+.kgbig{font-size:34px;font-weight:700;color:var(--brand-ink);line-height:1.2}
 .kgwhy{display:block;width:100%;min-height:44px;text-align:left;background:none;border:0;padding:8px 0;color:var(--ink2);font-size:16px;line-height:1.5} /* 押せる所は44px以上（改善案A9） */
 .kgwhy:after{content:' ›';font-weight:700}
 .kgsm{font-size:15px;color:var(--ink2)}
@@ -36,13 +36,13 @@
 .kgtbl td.kgmine,.kgtblbox td.kgmine{outline:4px solid #C2410C;outline-offset:-4px}
 .kgstat{font-size:17px;font-weight:700;margin:6px 0 4px}
 .kgorg{display:inline-flex;align-items:center;min-height:44px;border:2px solid var(--line);background:#fff;border-radius:22px;padding:0 14px;font-size:16px;color:var(--ink);margin:4px 0}
-.kgorg:after{content:'▾';margin-left:6px;color:var(--brand)}
+.kgorg:after{content:'▾';margin-left:6px;color:var(--brand-ink)}
 .kgsorts{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;-webkit-overflow-scrolling:touch}
 .kgsort{flex:none;min-height:46px;border:2px solid var(--line);background:#fff;border-radius:23px;padding:0 15px;font-size:16px;color:var(--ink);white-space:nowrap}
-.kgsort[aria-pressed=true],.kgcol.on{background:#DCE8F7;border-color:var(--brand);color:var(--brand);font-weight:700}
+.kgsort[aria-pressed=true],.kgcol.on{background:#DCE8F7;border-color:var(--brand-ink);color:var(--brand-ink);font-weight:700}
 .kgc{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0}
 .kgct{font-weight:700;font-size:17px;margin:0 0 6px;line-height:1.4}
-.kgbadge{display:inline-block;font-size:13px;font-weight:400;border-radius:9px;padding:0 8px;background:#E3ECF6;color:var(--brand);margin-left:6px;vertical-align:1px}
+.kgbadge{display:inline-block;font-size:13px;font-weight:400;border-radius:9px;padding:0 8px;background:#E3ECF6;color:var(--brand-ink);margin-left:6px;vertical-align:1px}
 .kgcols{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:6px 0}
 .kgcols.two{grid-template-columns:repeat(2,1fr);gap:8px}
 .kgcol{border:1.5px solid var(--line);border-radius:10px;background:#fff;padding:5px 2px;text-align:center;min-height:62px;color:var(--ink);font-size:15px;line-height:1.25}

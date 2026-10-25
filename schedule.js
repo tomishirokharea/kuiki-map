@@ -2183,7 +2183,7 @@ body.duemode .terr-label:not(.duelab){display:none}
 .tfind output{font-size:16px;color:var(--ink2)}
 .tfind button{min-height:54px}
 .adtop{display:flex;justify-content:flex-end;margin:-6px 0 2px}
-.adhelp{min-height:40px;border:0;background:none;color:var(--brand);font:inherit;font-size:15px;font-weight:700;padding:0 4px;text-decoration:underline;text-underline-offset:3px}
+.adhelp{min-height:40px;border:0;background:none;color:var(--brand-ink);font:inherit;font-size:15px;font-weight:700;padding:0 4px;text-decoration:underline;text-underline-offset:3px}
 .ahead{border:2px solid var(--line);background:#fff;border-radius:14px;padding:8px 12px;margin:-6px 0 14px;font-size:16px;line-height:1.6}
 .ahead p{margin:2px 0}.ahead b{font-size:18px}.ahead .hot{color:#B71C1C}
 .mfit{background:#fff;border:2px solid var(--line);border-left:10px solid #1565C0;border-radius:12px;padding:10px 12px;margin-bottom:8px}

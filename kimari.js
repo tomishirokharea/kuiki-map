@@ -40,8 +40,8 @@
 #view-admin .tile{position:relative}
 #view-admin .krdelta{position:absolute;top:8px;right:8px;padding:2px 8px;border-radius:999px;background:#fff;border:2px solid #B98F00;font-size:.8rem;font-weight:700;color:#3D3000;line-height:1.3;pointer-events:none}
 #view-admin .krfold-h{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;-webkit-tap-highlight-color:transparent}
-#view-admin .krfold-h .krfold-i{flex:none;font-size:.8rem;font-weight:700;color:var(--brand);border:2px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap;background:#fff}
-#view-admin .krfold-h:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+#view-admin .krfold-h .krfold-i{flex:none;font-size:.8rem;font-weight:700;color:var(--brand-ink);border:2px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap;background:#fff}
+#view-admin .krfold-h:focus-visible{outline:3px solid var(--brand-ink);outline-offset:2px}
 #view-admin .kr-folded{display:none!important}
 #view-admin .krfold-sum{margin:0 0 10px;font-size:.95rem;line-height:1.6;color:var(--ink)}
 #view-admin .krfold-sum .krn{white-space:nowrap;font-weight:700}
