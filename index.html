@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.73"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.74"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -2465,6 +2465,7 @@ const Store = {
      送信待ちがないときは、変わった家・記録だけを直す（3万件を調べ直さない）。
      戻り値 idxOk：記録の索引も1件ずつ直し終えたか（それなら、画面の作り直しで索引を作り直さなくてよい） */
   applyDelta(j) {
+    const vBefore = this.data.visits, idxWas = IDX_SRC === vBefore && IDX_LEN === vBefore.length; // 記録の索引が、今の記録と合っているか
     // 速い保存のあと：受け取った変更を重ねる前に、書きもらした変更を送信待ちに入れる。
     // ふだん（送信待ちがない）は、受け取った家に送っていない変更があるときだけ全部を比べる（自分の保存の返事のたびに比べない）
     if (this.scoped) {
@@ -2512,6 +2513,8 @@ const Store = {
       if (fp) fp[c].set(id, c === 'visits' ? 1 : JSON.stringify(loc));
     }
     Object.keys(dels).forEach(c => { if (dels[c].size) d[c] = d[c].filter(x => !dels[c].has(x.id)); });
+    // 記録の索引は1件ずつ直してあるので、消した記録をのぞいた新しい一覧とも合っている（家・区域が変わったときに、記録を分け直さないため・改善案B1）
+    if (inc && idxWas && d.visits !== vBefore) { IDX_SRC = d.visits; IDX_LEN = d.visits.length; }
     if (j.users) {
       const oldMe = (d.users || []).find(u => u.id === d.currentUser);
       const newMe = j.users.find(u => u.id === j.currentUser);
@@ -2530,7 +2533,7 @@ const Store = {
       this.reapplyQueue();
     }
     if (perm || !inc) scrubVisits();
-    return { idxOk: inc && idxOk };
+    return { idxOk: inc && idxOk, visOk: inc && idxWas }; // visOk：記録の索引は合っている（家・区域の索引だけを作り直せばよい）
   },
   cacheTimer: null,
   saveCacheSoon() {
@@ -3218,7 +3221,7 @@ function applyInbox() {
   if (!LIVE || !Store.inbox.length || isBusy() || flushing || Store.inactive) return;
   const list = Store.inbox;
   Store.inbox = [];
-  let any = false, full = false, idxOk = true;
+  let any = false, full = false, idxOk = true, visOk = true;
   list.forEach(j => {
     if (j.mode === 'full') { Store.setServer(j); Store.markAll(); full = true; any = true; return; }
     if (Store.trivial(j)) { // 何も変わっていない（ふだんの問い合わせのほとんど）
@@ -3228,13 +3231,15 @@ function applyInbox() {
     const r = Store.applyDelta(j);
     any = true;
     if (!r.idxOk) idxOk = false;
+    if (!r.visOk) visOk = false;
   });
   Store.saveCacheSoon();
   if (Store.needFull && !reloading) setTimeout(() => reloadAll(true).catch(() => {}), 0);
   else if (Store.needMeta) setTimeout(() => reloadMeta().catch(() => {}), 0);
   if (!any) return;
   updateTabs();
-  renderAll(!full && idxOk);
+  // 家・区域だけが変わったときは、家・区域の索引だけを作り直す（記録の分け直しはしない・改善案B1）
+  renderAll(full ? false : idxOk ? true : visOk ? 'houses' : false);
   checkPermGain();
   notifyNewPart();
 }
@@ -3682,7 +3687,42 @@ let IDX = new Map(), HBT = new Map(), SUM = new Map();
 const EMPTY_SUM = { n: 0, last: null, met: null, awayN: 0, slots: 0, metSlots: 0, awaySlots: 0, unmet: false, bestSlot: null };
 const sum = k => SUM.get(k) || EMPTY_SUM;
 const SLOT_MEMO = new WeakMap();
+/* 記録の「曜日・時間帯」を、日時の文字（2026-10-25T01:23:45.678Z の形）から直接出す（改善案B1-2。日時の部品を作らないので速い）。
+   使うのは、端末の時刻の地域が「夏時間がなく、1時間単位のずれ」のとき（日本など）だけ。読み込んだときに、今までの出し方と
+   1500通りほど比べて、1つでもちがえば使わない。形のちがう日時（+09:00 など）は、今までの出し方で出す */
+const SLOT_TXT = [['平日・朝', '平日・昼', '平日・午後', '平日・夕方', '平日・夜'], ['土日・朝', '土日・昼', '土日・午後', '土日・夕方', '土日・夜']];
+const BAND_OF_H = Array.from({ length: 24 }, (_, h) => (h < 11 ? 0 : h < 14 ? 1 : h < 17 ? 2 : h < 19 ? 3 : 4)); // bandOf と同じ区切り
+const WD_MEMO = new Map(); // 日付（UTC）→ 曜日
+let SLOT_OFF = null;       // 端末の時刻のずれ（時間）。null のときは、速い出し方を使わない
+function slotFast(s) {
+  if (typeof s !== 'string' || (s.length !== 24 && s.length !== 20) || s.charCodeAt(10) !== 84 || s.charCodeAt(s.length - 1) !== 90) return null; // T と Z
+  const a = s.charCodeAt(11) - 48, b = s.charCodeAt(12) - 48;
+  if (a < 0 || a > 2 || b < 0 || b > 9 || a * 10 + b > 23) return null;
+  let h = a * 10 + b + SLOT_OFF, sh = 0;
+  if (h >= 24) { h -= 24; sh = 1; } else if (h < 0) { h += 24; sh = -1; }
+  const ymd = s.slice(0, 10);
+  let w = WD_MEMO.get(ymd);
+  if (w === undefined) { const t = Date.parse(ymd + 'T00:00:00Z'); if (!isFinite(t)) return null; w = new Date(t).getUTCDay(); WD_MEMO.set(ymd, w); }
+  w = (w + sh + 7) % 7;
+  return SLOT_TXT[w === 0 || w === 6 ? 1 : 0][BAND_OF_H[h]];
+}
+(function () { // この端末で使えるかを確かめる
+  try {
+    const y = new Date().getFullYear(), offs = new Set();
+    for (let yy = y - 3; yy <= y + 1; yy++) for (let m = 0; m < 12; m++) offs.add(new Date(yy, m, 15, 12).getTimezoneOffset());
+    if (offs.size !== 1) return; // 夏時間がある
+    const off = -[...offs][0];
+    if (off % 60) return;        // 30分などのずれ
+    SLOT_OFF = off / 60;
+    const t0 = Date.UTC(y - 2, 0, 1), same = iso => slotFast(iso) === slotOf(new Date(iso)) && slotFast(iso.replace(/\.\d{3}Z$/, 'Z')) === slotOf(new Date(iso));
+    for (let i = 0; i < 1000; i++) if (!same(new Date(t0 + i * (7 * 3600000 + 61007)).toISOString())) { SLOT_OFF = null; return; }
+    for (let d = 0; d < 7; d++) for (let hh = 0; hh < 24; hh++) for (const ms of [0, 3599999]) {
+      if (!same(new Date(t0 + 500 * 86400000 + d * 86400000 + hh * 3600000 + ms).toISOString())) { SLOT_OFF = null; return; }
+    }
+  } catch (e) { SLOT_OFF = null; }
+})();
 function slotOfVisit(v) {
+  if (SLOT_OFF !== null) { const f = slotFast(v.at); if (f) return f; }
   let s = SLOT_MEMO.get(v);
   if (!s) { s = slotOf(new Date(v.at)); SLOT_MEMO.set(v, s); }
   return s;
@@ -15812,6 +15852,7 @@ async function init() {
   bindStatic();
   fillWho();
   updateTabs();
+  currentView = ''; // ここでは画面を描かない。すぐ下の showView で、はじめに見せる画面だけを1回描く（改善案B1：見えていない画面を描かない）
   renderAll();
   if (uiEff().base === 'photo') setBase('photo');
   showView(uiEff().start || 'cards');
