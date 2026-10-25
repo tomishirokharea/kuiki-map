@@ -696,7 +696,7 @@
         <div class="notice">${t.holder ? `今は${esc(uname(t.holder))}さんに貸し出し中です。貸し出しは、オレンジの区域にだけ残ります。<br>` : ''}
           訪問の記録は、家と一緒にそれぞれの区域に入ります。青の区域の割り当ての記録（S-13）は、これから始まります。</div>
         <button class="btn primary block" id="sOk">分ける</button>
-        <button class="btn block" data-close>もどる</button>`);
+        <button class="btn block" data-close>やめる</button>`);
       $('#sSwap').onclick = () => {
         const a = sp.a, na = sp.na; sp.a = sp.b; sp.na = sp.nb; sp.b = a; sp.nb = na;
         paintMap(); paintSheet();

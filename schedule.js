@@ -435,7 +435,7 @@
         <p><b>${esc(p.t.name || '')}</b></p><p class="muted">${esc(uname(p.t.holder))}さん・受け取ってから${daysSince(p.t.lentAt)}日・進み具合 約${p.prog}%</p><p class="tag-warn">${p.msg}</p></div>
         <div class="btns"><button type="button" class="btn small" data-tlmap="${esc(p.t.id)}">地図</button><button type="button" class="btn small primary" data-tlkarte="${esc(p.t.id)}">カルテ</button></div></div>`).join('');
     } else return;
-    setSheet(headHtml(null, title, '期限の見張り') + `<p class="hint">${hint}</p>` + (body || '<div class="empty">ありません</div>') + '<button class="btn block" data-close>もどる</button>');
+    setSheet(headHtml(null, title, '期限の見張り') + `<p class="hint">${hint}</p>` + (body || '<div class="empty">ありません</div>') + '<button class="btn block" data-close>閉じる</button>');
     const S = $('#sheet');
     $$('[data-tlmap]', S).forEach(b => b.onclick = () => { closeSheet(); openTerr(b.dataset.tlmap); });
     $$('[data-tlkarte]', S).forEach(b => b.onclick = () => openKarte(b.dataset.tlkarte, back));
@@ -500,7 +500,7 @@
           <button type="button" data-adjt="1" aria-label="増やす">＋</button></div></div>
         ${tries != null ? '<button type="button" class="btn small" id="adjTriesAll">全体の決めに合わせる</button>' : ''}
         <button class="btn block primary" id="adjTriesSave"${(tries == null ? null : tries) === (t.awayTries != null ? triesFor(t) : null) ? ' disabled' : ''}>回数を保存する</button>
-        <button class="btn block" data-close>もどる</button>`);
+        <button class="btn block" data-close>閉じる</button>`);
       const S = $('#sheet');
       $$('[data-adjt]', S).forEach(b => b.onclick = () => { tries = Math.max(2, Math.min(10, (tries == null ? triesAll() : tries) + Number(b.dataset.adjt))); paint(); });
       if ($('#adjTriesAll')) $('#adjTriesAll').onclick = () => { tries = null; paint(); };
@@ -759,7 +759,7 @@ button.ktag{cursor:pointer}
       ${rows || '<div class="empty">今、空いている区域はありません。</div>'}
       ${restN > 0 ? `<button type="button" class="btn block" id="reqMore">もっと見る（あと${restN}件）</button>` : ''}
       ${askOk ? '<button class="btn block primary" data-ask="">どこでもよいので係に頼む</button>' : ''}
-      <button class="btn block${full ? ' primary' : ''}" data-close>もどる</button>`);
+      <button class="btn block${full ? ' primary' : ''}" data-close>閉じる</button>`);
     const S = $('#sheet');
     sortTip(S);
     if ($('#reqNear')) $('#reqNear').onclick = () => locate(window.openRequestSheet);
@@ -1010,7 +1010,7 @@ button.ktag{cursor:pointer}
       $('#awayHint').innerHTML = (offToday() ? OFF_NOTE : '') + (reg
           ? `あなたの行ける時間（${slots.map(slotShort).join('、')}）に合うカードです。`
           : `今の時間帯（${slotShort(cur)}）に合うカードです。`) +
-        awayExpText() + '回り終えたら「返却する」を押します。' +
+        awayExpText() + '回り終えたら「返す」を押します。' +
         (mine ? `<br><b>受け取り中 ${mine}枚</b>（${st.awayMax}枚まで）。「区域カード」画面にあります。` : '');
       const list = withAway(awaySuggestions(u.id, slots).slice(0, 10), unmetIndex());
       $('#awayList').innerHTML = list.length ? list.map(x => awayItem(x, cur, full, 'data-awaytake')).join('') +
@@ -1069,8 +1069,8 @@ button.ktag{cursor:pointer}
           ${list.length ? list.slice(0, shown).map(x => (SIMPLE ? kAway(x) : awayItem(x, cur, full, 'data-awaytake2'))).join('') +
               (SIMPLE && !more && list.length > shown ? `<button type="button" class="btn block" id="apMore">もっと見る（あと${Math.min(list.length, 20) - shown}件）</button>` : '')
             : `<div class="empty">今、合う留守宅カードはありません。${G ? '<br>集まりの時間帯を変えると、ほかのカードが見つかることがあります。' : reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`}
-          ${SIMPLE ? '' : `<p class="hint">${awayExpText()}回り終えたら「返却する」を押します。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>`}
-          <button class="btn block" data-close>もどる</button>`);
+          ${SIMPLE ? '' : `<p class="hint">${awayExpText()}回り終えたら「返す」を押します。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>`}
+          <button class="btn block" data-close>閉じる</button>`);
         const S = $('#sheet');
         $$('[data-asort]', S).forEach(b => b.onclick = () => { lsSet(key, b.dataset.asort); paint(); });
         if ($('#apSlots')) $('#apSlots').onclick = openSlotSheet;

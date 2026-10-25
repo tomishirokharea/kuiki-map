@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.76"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.77"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -1354,9 +1354,9 @@ body.big .choice{font-size:17px}
 #sheet .sheet-head{position:static;margin:0 0 8px;padding:0;background:none;box-shadow:none} /* 帯にはしない（下にスワイプで閉じる） */
 /* コンパクト見出し（設定画面）：上下の余白を減らして、その分だけ本文を広く使えるようにする */
 #sheet .sheet-head.sheet-head-mini{padding:8px 16px 6px}
-/* 大きい文字では「×」に「もどる」の文字をそえる（×だけでは、もどるボタンだと分かりにくいため） */
+/* 大きい文字では「×」に「閉じる」の文字をそえる（×だけでは、閉じるボタンだと分かりにくいため・ことばは改善案A7にそろえる） */
 body.big .sheet-head .icon-btn[data-close]{width:auto;min-width:52px;padding:0 12px 0 10px;border-radius:26px;display:flex;align-items:center;gap:4px;font-size:26px}
-body.big .sheet-head .icon-btn[data-close]::after{content:'もどる';font-size:15px;font-weight:700}
+body.big .sheet-head .icon-btn[data-close]::after{content:'閉じる';font-size:15px;font-weight:700}
 /* 大きい文字では、1行目に区域の番号と「× もどる」、2行目に見出しを広く（見出しが1文字ずつ折り返さないように） */
 body.big .sheet-head{flex-wrap:wrap;row-gap:4px}
 body.big .sheet-head>div{flex:1 1 100%;order:3;min-width:0}
@@ -4175,6 +4175,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.77', items: [
+    ['返', 'くわしい表示の「返却する」ボタンを、かんたんな表示と同じ「返す」「途中で返す」にそろえました。下から出る画面のいちばん下のボタンは、閉じるだけのときは「閉じる」、入力をやめるときは「やめる」にそろえました']
+  ] },
   { v: '2026.13.70', items: [
     ['区', 'かんたんな表示の「区域カードをもう1枚」は、はじめに5件だけ出すようにしました。ほかの区域は「もっと見る」で見られます']
   ] },
@@ -5244,7 +5247,7 @@ function renderLegend() {
       <div class="row"><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=${center(mp2.poly)[0].toFixed(6)},${center(mp2.poly)[1].toFixed(6)}" target="_blank" rel="noopener">Googleマップでこの範囲へ</a></div>` : ''}
     ${(own || lead) && ps2.length ? `<p class="muted">今日わたした範囲：${ps2.map(p => esc(partName(p))).join(' ／ ')}</p>` : ''}
     ${body}
-    <div class="row">${(own || lead) && r.t.group ? '<button class="btn small" id="lgParts">回る範囲を分ける</button>' : ''}${first ? '<button class="btn small primary" id="lgList">おすすめの一覧</button>' : ''}${own ? '<button class="btn small" id="lgReturn">返却する</button>' : ''}${LIVE && (helpers || isHelper(r.t)) ? `<button class="btn small" id="barSync">最新にする</button><span class="muted" id="barAge"></span>` : ''}</div>`;
+    <div class="row">${(own || lead) && r.t.group ? '<button class="btn small" id="lgParts">回る範囲を分ける</button>' : ''}${first ? '<button class="btn small primary" id="lgList">おすすめの一覧</button>' : ''}${own ? '<button class="btn small" id="lgReturn">返す</button>' : ''}${LIVE && (helpers || isHelper(r.t)) ? `<button class="btn small" id="barSync">最新にする</button><span class="muted" id="barAge"></span>` : ''}</div>`;
   $$('[data-rmode]', box).forEach(x => x.onclick = () => { me().roundMode = x.dataset.rmode; Store.save(); renderHouses(); renderLegend(); });
   if ($('#lgParts')) $('#lgParts').onclick = () => { toggleLegend(false); startPartSplit(r.t.id); }; // 一覧を出さずに、すぐ地図で分ける
   if ($('#lgList')) $('#lgList').onclick = () => { toggleLegend(false); openPlanSheet(); };
@@ -5644,7 +5647,7 @@ async function onHouseTap(id) {
     if (!ks.length) return;
     if (ks.length === 1) { openMemo(ks[0]); return; }
     setSheet(headHtml(terrById(h.terrId), esc(h.label || '集合住宅'), '部屋をえらんでください') +
-      ks.map(k => `<button class="btn block" data-fk="${esc(k)}">${esc(unitTitle(h, parseKey(k)[1]))}</button>`).join('') + '<button class="btn block" data-close>もどる</button>');
+      ks.map(k => `<button class="btn block" data-fk="${esc(k)}">${esc(unitTitle(h, parseKey(k)[1]))}</button>`).join('') + '<button class="btn block" data-close>閉じる</button>');
     $$('[data-fk]', $('#sheet')).forEach(b => b.onclick = () => openMemo(b.dataset.fk));
     return;
   }
@@ -5849,7 +5852,7 @@ function openPartAssign() {
       ${others.length ? `<div class="hgrp"><b>ほかの人</b></div>${others.map(row).join('')}` : ''}
     </div>
     <button class="btn primary block" id="puSave">この範囲をわたす</button>
-    <button class="btn block" data-close>もどる</button>`);
+    <button class="btn block" data-close>やめる</button>`);
   $('#puQ').oninput = e => {
     const q = e.target.value.trim();
     $$('#puList [data-name]').forEach(l => { l.hidden = !!q && !l.dataset.name.includes(q); });
@@ -8212,7 +8215,7 @@ function openTerrForm({ pts = null, terr = null }) {
       <small class="hint">「53」「53-1」のように入力できます（ハイフンで枝番）。</small></label>
     <label class="field"><span>区域の名前（目印になる地名など）</span><input type="text" id="fName" maxlength="30" value="${terr ? esc(terr.name) : ''}" placeholder="例：〇〇公園の北側"></label>
     <button class="btn primary block" id="fSave">保存する</button>
-    <button class="btn block" data-close>もどる</button>`);
+    <button class="btn block" data-close>やめる</button>`);
   $('#fSave').onclick = () => {
     const no = normNo($('#fNo').value), name = $('#fName').value.trim();
     if (!terr && !okPoly(pts)) { closeSheet(); toast('区域の線がありません。線を引き直してください'); return; }
@@ -9168,7 +9171,7 @@ function cardHtml(t, own, helper) {
       `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${!t.group ? '区域' : isAllUse(t) ? '全体' : 'グループ'}</small>${esc(t.no)}</span>`,
       esc(t.name), (t.group ? `<span class="gbadge">${esc(useName(t))}の区域</span> ` : '') + who)}
     ${extra ? `<div class="tbody">${extra}</div>` : ''}
-    <div class="actions">${(own || lead) && groupOk ? `<button class="btn" data-helpers="${esc(t.id)}">${t.group ? '今日回る人をえらぶ' : '一緒に回る人'}</button>${t.group ? `<button class="btn primary" data-parts="${esc(t.id)}">回る範囲を分ける</button>` : ''}` : ''}${own ? `<button class="btn" data-return="${esc(t.id)}">返却する</button>` : ''}${lead ? `<button class="btn" data-leadquit="${esc(t.id)}">司会をやめる</button>` : ''}</div>
+    <div class="actions">${(own || lead) && groupOk ? `<button class="btn" data-helpers="${esc(t.id)}">${t.group ? '今日回る人をえらぶ' : '一緒に回る人'}</button>${t.group ? `<button class="btn primary" data-parts="${esc(t.id)}">回る範囲を分ける</button>` : ''}` : ''}${own ? `<button class="btn" data-return="${esc(t.id)}">返す</button>` : ''}${lead ? `<button class="btn" data-leadquit="${esc(t.id)}">司会をやめる</button>` : ''}</div>
   </article>`;
 }
 let cardTab = 'mine';
@@ -9425,7 +9428,7 @@ function openLeadPick() {
     <p class="hint">今日の司会は、今日回る人をえらぶ・回る範囲を分ける・今日の記録を直す、ができます。日付が変わると自動で終わります。</p>
     ${list.length > 6 ? `<label class="field"><span>番号・名前・担当者でさがす</span><input type="text" id="leadQ" placeholder="例：5-1、高安" autocomplete="off" value="${esc(leadQ)}"></label>` : ''}
     <div id="leadList">${rows || '<div class="empty">今、ほかの監督・司会者が持っている集まりで使う区域はありません。</div>'}</div>
-    <button class="btn block" data-close>もどる</button>`);
+    <button class="btn block" data-close>閉じる</button>`);
   const S = $('#sheet');
   const filt = () => {
     const q = leadQ.replace(/\s+/g, '');
@@ -9561,7 +9564,7 @@ function openRequestSheet(g) {
     ${reqSort === 'young' ? `<p class="hint">${AGE_ON && ageMap() ? '市の年齢データ（字ごとの20〜39歳の割合）から出しています。字が決まっていない区域は、「会えた」記録の年代から出します。' : '市の年齢データが入っていないので、これまでに「会えた」と記録したときの年代から出した目安です。'}</p>` : ''}
     ${rows || '<div class="empty">今、空いている区域はありません。</div>'}
     <button class="btn block primary" data-ask="">どこでもよいので係に頼む</button>
-    <button class="btn block" data-close>もどる</button>`);
+    <button class="btn block" data-close>閉じる</button>`);
   const S = $('#sheet');
   if ($('#reqNear')) $('#reqNear').onclick = () => locate(openRequestSheet);
   $$('[data-rsort]', S).forEach(x => x.onclick = () => {
@@ -9779,7 +9782,7 @@ async function declineReq(id) {
 }
 
 /* ---------- 区域の返却（回り終えた日の記録） ----------
-   「返却する」を押したら、区域係が決めた目安で、自動で決める（returnPlan）。奉仕者はえらばなくてよい
+   「返す」を押したら、区域係が決めた目安で、自動で決める（returnPlan）。奉仕者はえらばなくてよい
    ・1回目が目安に届いていない → 途中の返却（自動受け取りを使っていれば、すぐほかの人が受け取れる。続きから回れる）
    ・1回目が届いていて、留守宅も目安まで訪ね直した → 正式な返却（今日が S-13 の完了した日付）
    ・1回目は届いたが、留守宅が届いていない → 残りの留守宅を留守宅カードにして返す（留守宅カードの返却で目安に届いた日が正式な返却日）
@@ -9807,21 +9810,21 @@ function openReturnSheet(tid) {
        <p class="muted">${a.n}軒のうち ${a.done}軒（${a.pct}%）・目安 ${ret}%</p>`;
   const left = Math.max(0, a.n - a.done);
   const result = plan.kind === 'done'
-    ? `<p class="hint-strong ok">区域を回り終えました。返却すると、今日が区域を回り終えた日（S-13 の完了した日付）になります。</p>`
+    ? `<p class="hint-strong ok">区域を回り終えました。返すと、今日が区域を回り終えた日（S-13 の完了した日付）になります。</p>`
     : plan.kind === 'pool'
       ? `<p class="hint-strong">残りの留守宅 ${left}軒を、留守宅カードにして返します。</p>
          <p class="muted">だれでも受け取って、違う曜日・時間帯に訪ねられます。留守宅が目安（${ret}%）まで訪ね直されたときに、区域の返却が完了します。</p>`
       : `<p class="hint-strong">途中の返却になります。回った家が、目安（${th}%）に届いていません。</p>
          <p class="muted">${returnFreeText(t)}</p>
-         <p class="hint hint-must">まだ回るときは「もどる」を押して、続けて回ってください。</p>`;
+         <p class="hint hint-must">まだ回るときは「閉じる」を押して、続けて回ってください。</p>`;
   // 紙の区域カード（S-13）から引き継いだ区域：紙で回った家はアプリにないので、本人に回り終えたかを聞く
   const ph = paperHandOf(t) && plan.kind !== 'done';
   const phPart = !ph ? '' : `<p class="hint-strong">紙の区域カード（S-13）から引き継いだ区域です。</p>
     <p class="muted">紙のカードで回った家は、アプリの記録には入っていません。紙のカードで区域を回り終えたかどうかを、えらんでください。</p>
-    <button class="btn primary block wrap" data-phfin="1">回り終えたので返却する（今日が完了した日付）</button>
-    <button class="btn block wrap" data-phfin="0">まだ回っていない家がある（途中で返却する）</button>`;
+    <button class="btn primary block wrap" data-phfin="1">回り終えたので返す（今日が完了した日付）</button>
+    <button class="btn block wrap" data-phfin="0">まだ回っていない家がある（途中で返す）</button>`;
   const self = !ph && plan.kind === 'pool' && r.phase === 'first' && !simple
-    ? `<button class="btn block wrap" data-first>返却しないで、自分で留守宅を回る（カードを持ったまま）</button>` : '';
+    ? `<button class="btn block wrap" data-first>返さないで、自分で留守宅を回る（カードを持ったまま）</button>` : '';
   // 区域係の操作：目安に関係なく、今までどおりえらべる（記録の少ない返却の確かめも、今までどおり）
   const low = lowOnSet() && (r.phase === 'first' ? r.pct1 < th : (!t.firstLow && (lowP1(t, r) ?? 100) < th)) ? lowCheckHtml(th) : '';
   const admBox = !adm ? '' : `<details class="retadm"><summary>区域係の操作（目安に関係なく決める）</summary>
@@ -9831,11 +9834,11 @@ function openReturnSheet(tid) {
       ${r.phase === 'first' ? '<button class="btn block wrap" data-afirst>1回目を終えたことにして、本人が留守宅を回る</button>' : ''}
       <button class="btn block wrap" data-fin="0">途中で返却する（回り終えた記録はつけません）</button></details>`;
   // 目安に届いていない「途中の返却」は、ボタンを目立たせない（濃い色で返却をすすめない・点検④U5）
-  setSheet(headHtml(t, `区域${t.no}を返却します`, sub) + `
+  setSheet(headHtml(t, `区域${t.no}を返します`, sub) + `
     ${ph ? phPart : `${firstPart}${awayPart}${result}
-    ${plan.kind === 'partial' ? '<button class="btn block wrap" data-retgo>途中で返却する</button>' : '<button class="btn primary block wrap" data-retgo>返却する</button>'}`}
+    ${plan.kind === 'partial' ? '<button class="btn block wrap" data-retgo>途中で返す</button>' : '<button class="btn primary block wrap" data-retgo>返す</button>'}`}
     ${self}
-    <button class="btn block" data-close>もどる</button>
+    <button class="btn block" data-close>閉じる</button>
     ${admBox}`);
   const sh = $('#sheet'), on = (q, f) => { const e = $(q, sh); if (e) e.onclick = f; };
   on('[data-retgo]', () => {
@@ -10383,10 +10386,10 @@ async function endAwayCard(id) {
   const c = D().awayCards.find(x => x.id === id); if (!c) return;
   const t = terrById(c.terrId), pool = t && t.awayPoolAt && !t.holder ? poolInfo(t) : null;
   const reached = !!pool && pool.pct >= awayRetPct();
-  const msg = !pool ? 'この留守宅カードを返却します。訪ねていない家は、ほかの人のカードに戻ります。よろしいですか？'
-    : reached ? `この留守宅カードを返却します。区域${t.no}の留守宅は${pool.pct}%訪ね直されたので、今日が区域の正式な返却日（S-13 の完了した日付）になります。よろしいですか？`
-    : `この留守宅カードを返却します。区域${t.no}の留守宅は、まだ${pool.pct}%（目安${awayRetPct()}%）なので、残りの家は、また留守宅カードとして出ます。よろしいですか？`;
-  if (!await ask(msg, { ok: '返却する', danger: false })) return;
+  const msg = !pool ? 'この留守宅カードを返します。訪ねていない家は、ほかの人のカードに戻ります。よろしいですか？'
+    : reached ? `この留守宅カードを返します。区域${t.no}の留守宅は${pool.pct}%訪ね直されたので、今日が区域の正式な返却日（S-13 の完了した日付）になります。よろしいですか？`
+    : `この留守宅カードを返します。区域${t.no}の留守宅は、まだ${pool.pct}%（目安${awayRetPct()}%）なので、残りの家は、また留守宅カードとして出ます。よろしいですか？`;
+  if (!await ask(msg, { ok: '返す', danger: false })) return;
   if (focusCard === id) focusCard = null;
   commit(reached ? `留守宅カードを返却しました。区域${t.no}を回り終えました` : '留守宅カードを返却しました', () => {
     const now = new Date().toISOString();
@@ -10576,17 +10579,17 @@ function roundHint(t) {
   if (r.phase === 'away') {
     const head = `<p class="hint-strong">留守宅を回る段階です。1回目に会えなかった家 ${r.aw.n}軒のうち、${r.aw.done}軒を訪ね直しました（${r.aw.pct}%）。</p>`;
     const ok = r.aw.pct >= awayRetPct()
-      ? `<p class="hint-strong ok">留守宅を十分に訪ね直しました。${own ? '「返却する」から、区域を返却できます。' : ''}</p>`
-      : `<p class="muted">返却の目安：留守だった家の${awayRetPct()}%を訪ね直す（届かないまま「返却する」を押すと、残りの家は留守宅カードになります）</p>`;
+      ? `<p class="hint-strong ok">留守宅を十分に訪ね直しました。${own ? '「返す」から、区域を返せます。' : ''}</p>`
+      : `<p class="muted">返却の目安：留守だった家の${awayRetPct()}%を訪ね直す（届かないまま「返す」を押すと、残りの家は留守宅カードになります）</p>`;
     if (!r.c.todo) return head + ok;
     const plan = roundPlan(r);
     return head + ok + awayAdvice(r) + (plan.length ? `<p class="hint-strong">今（${slotShort(r.cur)}）のおすすめ ${plan.length}か所。地図をひらくと、番号順に回れます。</p>` : '');
   }
   if (!r.c.todo) return own
-    ? `<p class="hint-strong ok">すべての家に緑のチェックがつきました。「返却する」を押すと、会えなかった家は留守宅カードになります。</p>`
+    ? `<p class="hint-strong ok">すべての家に緑のチェックがつきました。「返す」を押すと、会えなかった家は留守宅カードになります。</p>`
     : `<p class="hint-strong ok">すべての家に緑のチェックがつきました。</p>`;
   const near = r.pct >= D().settings.donePct
-    ? `<p class="hint-strong ok">1回目をほぼ回り終えました（${r.pct}%）。${own ? '「返却する」を押すと、会えなかった家は留守宅カードになります。' : ''}</p>` : '';
+    ? `<p class="hint-strong ok">1回目をほぼ回り終えました（${r.pct}%）。${own ? '「返す」を押すと、会えなかった家は留守宅カードになります。' : ''}</p>` : '';
   const plan = roundPlan(r);
   if (!plan.length) return near;
   const intr = plan.filter(s => s.reasons.some(y => y.includes('★'))).length;
@@ -10703,7 +10706,7 @@ function openPlanSheet() {
           <p class="muted">${i === 0 ? (myPos ? `現在地から約${fmtDist(s.dist)}` : 'ここから始めます') : `前の家から約${fmtDist(s.dist)}`}</p></div>
         <button class="btn small" data-plan="${esc(s.h.id)}">地図で見る</button></li>`).join('')}</ol>`
       : '<div class="empty">今の時間帯のおすすめはありません。<br>「進み具合」に切りかえて、残りの家を回ってください。</div>'}
-    <button class="btn block" data-close>もどる</button>`);
+    <button class="btn block" data-close>閉じる</button>`);
   $('#planNear').onclick = () => locate(openPlanSheet);
   $$('[data-plan]', $('#sheet')).forEach(x => x.onclick = () => {
     const h = houseById(x.dataset.plan);
@@ -10761,7 +10764,7 @@ function poolLineHtml(c) {
   } else return '';
   const reached = !n || pct >= awayRetPct(); // 返却の画面（endAwayCard・roundHint）と同じ判定
   const msg = reached
-    ? `目安に届きました。${own ? '区域カードを返却すると' : 'このカードを返却すると'}、区域が完了します`
+    ? `目安に届きました。${own ? '区域カードを返すと' : 'このカードを返すと'}、区域が完了します`
     : `訪ね直し ${done} / ${n}軒（目安${awayRetPct()}%）　あと${Math.max(1, Math.ceil(n * awayRetPct() / 100) - done)}軒で区域が完了します`;
   return `<p class="muted">区域全体の留守宅：${msg}</p>`;
 }
@@ -10785,7 +10788,7 @@ function awayCardHtml(c, kind) {
       ${kind === 'gown' && c.group ? `<div class="seg" role="group" aria-label="回り方（分ける・シェア）"><button type="button" data-cmode="share" data-cid="${esc(c.id)}" aria-pressed="${c.mode !== 'split'}">シェア</button><button type="button" data-cmode="split" data-cid="${esc(c.id)}" aria-pressed="${c.mode === 'split'}">分ける</button></div>
         <p class="hint">${c.mode === 'split' ? '分ける：地図に線を引いて、人ごとに範囲を分けます。' : 'シェア：全員が同じ家の一覧を見ます。'}</p>
         ${c.mode === 'split' && partsOf(c).length ? `<p class="muted"><b>今日わたした範囲：</b>${partsOf(c).map(x => esc(partName(x))).join(' ／ ')}</p>` : ''}` : ''}</div>
-    ${kind === 'help' ? '' : `<div class="actions">${kind === 'gown' && D().settings.groupOn !== 0 ? `<button class="btn" data-chelpers="${esc(c.id)}">今日回る人をえらぶ</button>${c.mode === 'split' ? `<button class="btn primary" data-cparts="${esc(c.id)}">回る範囲を分ける</button>` : ''}` : ''}<button class="btn" data-awayend="${esc(c.id)}">返却する</button></div>`}
+    ${kind === 'help' ? '' : `<div class="actions">${kind === 'gown' && D().settings.groupOn !== 0 ? `<button class="btn" data-chelpers="${esc(c.id)}">今日回る人をえらぶ</button>${c.mode === 'split' ? `<button class="btn primary" data-cparts="${esc(c.id)}">回る範囲を分ける</button>` : ''}` : ''}<button class="btn" data-awayend="${esc(c.id)}">返す</button></div>`}
   </article>`;
 }
 function renderMyAwayCards() {
@@ -10839,8 +10842,8 @@ function openAwayPick(grp) {
           ${x.ext ? '<p class="muted">区域は回り終えています（残りの留守宅）</p>' : ''}
         </div><button class="btn small primary" data-awaytake2="${esc(x.t.id)}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`).join('')
         : `<div class="empty">今、合う留守宅カードはありません。${G ? '<br>集まりの時間帯を変えると、ほかのカードが見つかることがあります。' : reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`}
-      <p class="hint">${awayExpText()}回り終えたら「返却する」を押します。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>
-      <button class="btn block" data-close>もどる</button>`);
+      <p class="hint">${awayExpText()}回り終えたら「返す」を押します。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>
+      <button class="btn block" data-close>閉じる</button>`);
     const S = $('#sheet');
     $$('[data-asort]', S).forEach(b => b.onclick = () => { lsSet(key, b.dataset.asort); paint(); });
     if ($('#apSlots')) $('#apSlots').onclick = openSlotSheet;
@@ -10860,7 +10863,7 @@ function renderAwaySuggest() {
   $('#awayHint').innerHTML = (reg
       ? `あなたの行ける時間（${slots.map(slotShort).join('、')}）に合うカードです。`
       : `今の時間帯（${slotShort(cur)}）に合うカードです。`) +
-    awayExpText() + '回り終えたら「返却する」を押します。' +
+    awayExpText() + '回り終えたら「返す」を押します。' +
     (mine ? `<br><b>受け取り中 ${mine}枚</b>（${st.awayMax}枚まで）。「区域カード」画面にあります。` : '');
   const list = awaySuggestions(u.id, slots).slice(0, 10);
   $('#awayList').innerHTML = list.length ? list.map(x => `<article class="ritem k-away"><div>
@@ -10882,7 +10885,7 @@ function openSlotSheet() {
         return `<td><button class="slotbtn" data-s="${s}" aria-pressed="${sel.has(s)}" aria-label="${dt}の${b}">${sel.has(s) ? '✓' : ''}</button></td>`;
       }).join('')}</tr>`).join('')}</table>
       <button class="btn primary block" id="slotSave">保存する</button>
-      <button class="btn block" data-close>もどる</button>`);
+      <button class="btn block" data-close>やめる</button>`);
     $$('[data-s]', $('#sheet')).forEach(x => x.onclick = () => {
       const s = x.dataset.s; if (sel.has(s)) sel.delete(s); else sel.add(s); paint();
     });
@@ -12795,7 +12798,7 @@ function openStatList(key) {
     hint = '地図データから入れた仮の家です。奉仕しながら、家でない印を消したり直したりします。区域ごとの数です。';
     body = ts.filter(t => per.get(t.id)).sort((a, b) => per.get(b.id) - per.get(a.id)).map(t => statRow(t, `仮の家 ${per.get(t.id)}`)).join('') + (per.get('') ? `<p class="muted">区域の外：${per.get('')}</p>` : '');
   } else return;
-  setSheet(headHtml(null, title, '') + (hint ? `<p class="hint">${hint}</p>` : '') + body + '<button class="btn block" data-close>もどる</button>');
+  setSheet(headHtml(null, title, '') + (hint ? `<p class="hint">${hint}</p>` : '') + body + '<button class="btn block" data-close>閉じる</button>');
   const S = $('#sheet');
   $$('[data-tlmap]', S).forEach(b => b.onclick = () => { closeSheet(); openTerr(b.dataset.tlmap); });
   $$('[data-tlkarte]', S).forEach(b => b.onclick = () => KM.openKarte(b.dataset.tlkarte, back));
