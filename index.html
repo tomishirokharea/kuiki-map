@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.72"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
+<meta name="app-version" content="2026.13.73"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる） -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
 <meta name="theme-color" content="#17324D">
@@ -2068,6 +2068,9 @@ const nsKey = k => (NS ? NS + '::' + k : k);
 const lsGet = k => { try { return localStorage.getItem(nsKey(k)); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(nsKey(k), v); return true; } catch (e) { return false; } };
 const lsDel = k => { try { localStorage.removeItem(nsKey(k)); } catch (e) { /* 何もしない */ } };
+/* 速い保存（commitIn・改善案B2）の確かめ：テスト版（NS が test）・config.js の scopeCheck: true・この端末の kuiki_scope_check=1 のときは、
+   毎回「全部を比べる」も行い、書きもらしがあればエラーとして出す（そのうえで一緒に送る） */
+const SCOPE_CHECK = NS === 'test' || !!(window.KUIKI_CONFIG && window.KUIKI_CONFIG.scopeCheck) || lsGet('kuiki_scope_check') === '1';
 /* 練習モードの保存場所（名札 renshu）を空にする：開くたびに最初から練習できる。本番の保存場所には触らない */
 function renshuClear() {
   try { Object.keys(localStorage).filter(k => k.indexOf('renshu::') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) { /* 何もしない */ }
@@ -2279,12 +2282,28 @@ const Store = {
     fp.settings = JSON.stringify(this.data.settings);
     this.fp = fp;
   },
-  /* 控えと比べて、変わった分だけを取り出す（取り出した分は控えに入れる） */
-  collectChanges(skipVisits) {
+  /* 控えと比べて、変わった分だけを取り出す（取り出した分は控えに入れる）
+     only（家の id の Set）：速い保存（commitIn）のときは、家はその分だけを比べる。家のほかの部分（区域・印・受け持ち・設定など）は、いつも全部を比べる */
+  collectChanges(skipVisits, only) {
     const out = {}, d = this.data, fp = this.fp;
     ARR_COLS.forEach(c => {
       if (c === 'visits' && skipVisits) return; // 記録を変えていない編集では、数十万件の記録を調べない
       const f = fp[c], up = [], del = [], seen = new Set();
+      if (c === 'houses' && only) { // 家2〜3万件を文字にしない（改善案B2）。消した家は、控えにあって今はない家
+        for (const x of d.houses || []) {
+          if (!only.has(x.id)) continue;
+          seen.add(x.id);
+          const j = JSON.stringify(x), prevJ = f.get(x.id);
+          if (prevJ !== j) {
+            const y = JSON.parse(j);
+            const ub = unitsBase(prevJ, y); if (ub) y.ub = ub; // 部屋を変えたときは、もとの一覧も送る（点検②V4）
+            up.push(y); f.set(x.id, j);
+          }
+        }
+        only.forEach(id => { if (!seen.has(id) && f.has(id)) { del.push(id); f.delete(id); } });
+        if (up.length || del.length) out[c] = { up, del };
+        return;
+      }
       for (const x of d[c] || []) {
         seen.add(x.id);
         if (c === 'visits') { // 訪問記録は追加と削除だけ
@@ -2325,12 +2344,24 @@ const Store = {
     }
     return out;
   },
-  save(skipVisits) {
+  save(skipVisits, only) {
     if (!LIVE) {
       if (!lsSet(this.key, JSON.stringify(this.data))) toast('この端末に保存できませんでした');
       return;
     }
-    const ch = this.collectChanges(skipVisits);
+    const ch = this.collectChanges(skipVisits, only);
+    if (only) {
+      if (SCOPE_CHECK) { // 試験の写し：毎回、全部も比べて、書きもらしがないかを確かめる（あれば一緒に送る）
+        const ex = this.collectChanges(true);
+        if (Object.keys(ex).length) {
+          console.error('区域マップ（試験）：速い保存で書きもらした変更があります', JSON.stringify(Object.keys(ex).map(c => [c, ex[c].up ? ex[c].up.map(x => x.id || x) : ex[c], ex[c].del || []])));
+          Object.keys(ex).forEach(c => {
+            if (!ch[c] || !ex[c].up) { ch[c] = ex[c]; return; }
+            ch[c] = { up: ch[c].up.concat(ex[c].up), del: ch[c].del.concat(ex[c].del) };
+          });
+        }
+      } else { this.scoped = true; this.sweepSoon(); }
+    }
     if (!Object.keys(ch).length) return;
     Object.keys(ch).forEach(c => this.markCol(c));
     this.queue.push(ch);
@@ -2338,6 +2369,41 @@ const Store = {
     this.saveCacheSoon();
     checkPermGain();
     flush();
+  },
+  /* 速い保存（commitIn）のあとの守り：全部を比べて、書きもらした変更があれば送る（改善案B2）。
+     手が空いたとき（最後の保存から5秒）・ほかのアプリに切りかえるとき・閉じるとき・受け取った変更を重ねる前・読み直す前に行う */
+  scoped: false,
+  sweepTimer: null,
+  sweepSoon() {
+    clearTimeout(this.sweepTimer);
+    this.sweepTimer = setTimeout(() => {
+      this.sweepTimer = null;
+      if (mode === 'normal' && isBusy()) { this.sweepSoon(); return; } // 入力している間は待つ
+      if (window.requestIdleCallback) requestIdleCallback(() => this.sweep('idle'), { timeout: 5000 }); else this.sweep('idle'); // 地図を動かしている最中などは避ける
+    }, 5000);
+  },
+  /* 受け取った家（ids）に、手元でまだ送っていない変更があるか */
+  housesDiffer(ids) {
+    const f = this.fp && this.fp.houses; if (!f) return true;
+    for (const id of ids) {
+      const h = HID.get(id) || (this.data.houses || []).find(x => x.id === id);
+      if (h && JSON.stringify(h) !== f.get(id)) return true;
+    }
+    return false;
+  },
+  sweep(why) {
+    if (!this.scoped) return;
+    this.scoped = false;
+    clearTimeout(this.sweepTimer); this.sweepTimer = null;
+    if (!LIVE || this.inactive || !this.fp || !this.data) return;
+    const ch = this.collectChanges(true);
+    if (!Object.keys(ch).length) return;
+    console.warn('区域マップ：速い保存で書きもらした変更を送ります（' + why + '）', Object.keys(ch).join(','));
+    Object.keys(ch).forEach(c => this.markCol(c));
+    this.queue.push(ch);
+    this.persistQueue();
+    this.saveCacheSoon();
+    setTimeout(() => flush(), 0);
   },
   /* 家1件だけを、すぐ送信待ちに入れる */
   pushHouse(h, del) {
@@ -2373,6 +2439,7 @@ const Store = {
   },
   /* 全部を受け取ったとき */
   setServer(j) {
+    this.sweep('full'); // 書きもらした変更は、全部を受け取る前に送信待ちに入れる（入れたものは、受け取ったあとに重ね直す）
     const st = j.state;
     if (st.visitsC) {
       st.visits = st.visitsC.map(a => {
@@ -2398,6 +2465,12 @@ const Store = {
      送信待ちがないときは、変わった家・記録だけを直す（3万件を調べ直さない）。
      戻り値 idxOk：記録の索引も1件ずつ直し終えたか（それなら、画面の作り直しで索引を作り直さなくてよい） */
   applyDelta(j) {
+    // 速い保存のあと：受け取った変更を重ねる前に、書きもらした変更を送信待ちに入れる。
+    // ふだん（送信待ちがない）は、受け取った家に送っていない変更があるときだけ全部を比べる（自分の保存の返事のたびに比べない）
+    if (this.scoped) {
+      const hs = (j.changes || []).filter(x => x[0] === 'houses').map(x => x[1]);
+      if (this.queue.length || !this.fp || (hs.length && this.housesDiffer(hs))) this.sweep('delta');
+    }
     const d = this.data, inc = !this.queue.length && !!this.fp, fp = inc ? this.fp : null;
     const idx = {}, dels = {};
     const indexOf = c => idx[c] || (idx[c] = new Map(d[c].map((x, i) => [x.id, i])));
@@ -2423,17 +2496,20 @@ const Store = {
         if (fp) fp[c].delete(id);
         continue;
       }
+      let loc = v; // 手元に入った物（中身だけを書きかえたときは、もとの物）
       if (m.has(id)) {
         const old = d[c][m.get(id)];
         if (c === 'visits' || !old) d[c][m.get(id)] = v;
-        else refill(old, v); // 区域・家などは中身だけを書きかえる（開いている画面がつかんでいる物を古くしない）
+        else { refill(old, v); loc = old; } // 区域・家などは中身だけを書きかえる（開いている画面がつかんでいる物を古くしない）
         if (dels[c]) dels[c].delete(id);
         if (inc && c === 'visits') { if (old) idxDelVisit(old); idxAddVisit(v); }
       } else {
         m.set(id, d[c].push(v) - 1);
         if (inc && c === 'visits') idxAddVisit(v);
       }
-      if (fp) fp[c].set(id, c === 'visits' ? 1 : JSON.stringify(v));
+      // 控えは、手元の物の文字にする。中身だけを書きかえた物は、項目の並びがサーバーとちがうことがあり、
+      // サーバーの文字のままだと「変わった」と見て、次の保存のたびに同じ家を送り直していた（改善案B2の確かめで見つけた）
+      if (fp) fp[c].set(id, c === 'visits' ? 1 : JSON.stringify(loc));
     }
     Object.keys(dels).forEach(c => { if (dels[c].size) d[c] = d[c].filter(x => !dels[c].has(x.id)); });
     if (j.users) {
@@ -2705,6 +2781,7 @@ function restoreOrphan() {
   if (!cu) return;
   lsDel(ORPHAN_KEY);
   if (!Array.isArray(o.queue) || !o.queue.length || o.uid !== cu || !(daysSince(o.at) <= ORPHAN_DAYS)) return;
+  Store.sweep('orphan');
   Store.queue = o.queue.concat(Store.queue);
   Store.persistQueue();
   Store.reapplyQueue();
@@ -3088,6 +3165,7 @@ async function reloadMeta() {
   metaLoading = true;
   try {
     const r = await api('load', { part: 'meta' });
+    Store.sweep('meta'); // 読み直した分を入れる前に、書きもらした変更を送信待ちに入れる
     const st = r.state || {}, d = D();
     ['territories', 'requests', 'awayCards', 'returns', 'schedules', 's13', 'agedata'].forEach(c => {
       if (!Array.isArray(st[c])) return;
@@ -3381,6 +3459,7 @@ function openSyncSheet() {
     <button class="btn block" data-close>閉じる</button>`);
   if ($('#syNow')) $('#syNow').onclick = () => { flushFail = 0; flush(true).then(() => { closeSheet(); toast(Store.queue.length ? 'まだ送れていません。電波のよい場所でためしてください' : '送りました'); }); };
   if ($('#syRetry')) $('#syRetry').onclick = () => {
+    Store.sweep('retry');
     Store.queue = failedList().map(x => x.ch).filter(Boolean).concat(Store.queue);
     lsDel(FAILED_KEY); Store.persistQueue();
     headFail = 0; flushFail = 0; Store.reapplyQueue(); renderAll();
@@ -3533,6 +3612,36 @@ function commit(msg, fn, onUndo) {
   // ほとんどの編集（区域・家・予定など）は記録を変えない。そのときは記録の調べ直しと索引の作り直しをはぶく
   const vSame = D().visits === vArr && vArr.length === vLen;
   Store.save(vSame); renderAll(vSame ? 'houses' : undefined);
+  const postJson = snapOf(), postIds = vSame ? null : new Set(D().visits.map(v => v.id));
+  toast(msg, () => {
+    closeSheet();
+    if (onUndo) onUndo();
+    undoChange(JSON.parse(preJson), JSON.parse(postJson), preVisits, postIds);
+    Store.save(); renderAll(); toast('取り消しました');
+  });
+}
+/* よく使う直し（家の名前・建物と部屋・種別・家を足す・動かす・印・受け持ち）の commit（改善案B2）
+   hids：この操作で変える家の id（足す家は、fn の中で D().houses に push すれば、自動で入る）
+   ・家（2〜3万件）は、hids と足した家だけを、控え・比べ・送る。家のほかの部分（区域・印・受け持ち・設定など）は今までどおり全部を比べる
+   ・「取り消す」の働きは commit と同じ（この操作で変わった分だけをもどす）
+   ・書きもらしがあっても失わないよう、あとで全部を比べて、もれた変更も送る（Store.sweep）。テスト版では毎回確かめる（SCOPE_CHECK） */
+function commitIn(hids, msg, fn, onUndo) {
+  if (!LIVE || !Store.fp) return commit(msg, fn, onUndo); // 試作・練習モード、まだ読み込んでいないとき
+  const only = new Set((hids || []).filter(Boolean));
+  const hArr = D().houses, hLen = hArr.length;
+  const pick = () => { const a = []; if (only.size) for (const h of D().houses) if (only.has(h.id)) a.push(h); return a; };
+  const snapOf = () => JSON.stringify(Object.assign({}, D(), { visits: undefined, currentUser: undefined, houses: pick() }));
+  const preJson = snapOf(), vArr = D().visits, vLen = vArr.length, preVisits = vArr.slice();
+  fn();
+  const vSame = D().visits === vArr && vArr.length === vLen;
+  if (D().houses !== hArr || hArr.length < hLen) { // 家の一覧を置きかえた・家を消した（この関数を使わない操作）：全部を比べて送る
+    console.error('commitIn：家の一覧が置きかわりました。全部を比べて送ります', msg);
+    Store.save(vSame);
+  } else {
+    for (let i = hLen; i < hArr.length; i++) if (hArr[i] && hArr[i].id) only.add(hArr[i].id); // fn の中で足した家
+    Store.save(vSame, only);
+  }
+  renderAll(vSame ? 'houses' : undefined);
   const postJson = snapOf(), postIds = vSame ? null : new Set(D().visits.map(v => v.id));
   toast(msg, () => {
     closeSheet();
@@ -4791,7 +4900,7 @@ function kindChips(cur, attr) {
 /* 建物・家の種別を保存する */
 function setHouseKind(hid, kind, after) {
   const h = houseById(hid); if (!h) return;
-  commit(`種別を「${kindName(kind)}」にしました`, () => {
+  commitIn([hid], `種別を「${kindName(kind)}」にしました`, () => {
     if (kind === 'home') delete h.kind; else h.kind = kind;
   });
   if (after) after();
@@ -4799,7 +4908,7 @@ function setHouseKind(hid, kind, after) {
 /* 部屋ごとの種別を保存する */
 function setUnitKind(hid, unit, kind, after) {
   const h = houseById(hid); if (!h) return;
-  commit(`${unitTitle(h, unit)}を「${kindName(kind)}」にしました`, () => {
+  commitIn([hid], `${unitTitle(h, unit)}を「${kindName(kind)}」にしました`, () => {
     const m = Object.assign({}, h.uk || {});
     if (kind === 'home') delete m[unit]; else m[unit] = kind;
     if (Object.keys(m).length) h.uk = m; else delete h.uk;
@@ -4808,14 +4917,14 @@ function setUnitKind(hid, unit, kind, after) {
 }
 function setHouseLock(hid, on, after) {
   const h = houseById(hid); if (!h) return;
-  commit(on ? 'オートロックの建物にしました' : 'オートロックを外しました', () => {
+  commitIn([hid], on ? 'オートロックの建物にしました' : 'オートロックを外しました', () => {
     if (on) h.lock = true; else delete h.lock;
   });
   if (after) after();
 }
 function setHouseBan(hid, v, after) {
   const h = houseById(hid); if (!h || !isAdmin()) return;
-  commit(v === 'no' ? '立入禁止の建物にしました' : v === 'letter' ? '手紙のみの建物にしました' : '立ち入りの印を外しました', () => {
+  commitIn([hid], v === 'no' ? '立入禁止の建物にしました' : v === 'letter' ? '手紙のみの建物にしました' : '立ち入りの印を外しました', () => {
     if (v === 'no' || v === 'letter') h.ban = v; else delete h.ban;
   });
   if (after) after();
@@ -5820,7 +5929,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     $$('[data-back]', S).forEach(x => x.onclick = () => { st.step = x.dataset.back; paint(); });
     const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
     on('backBld', () => openBuilding(hid, unit));
-    on('unDnc', () => { commit('拒否マークを外しました', () => { delete D().dnc[k]; }); paint(); });
+    on('unDnc', () => { commitIn([hid], '拒否マークを外しました', () => { delete D().dnc[k]; }); paint(); });
     on('shRelease', async () => { await followAction('release', k); paint(); });
     on('shStop', () => openReleaseSheet(k, false));
     on('shMemo', () => openMemo(k, paint));
@@ -5832,7 +5941,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     if ($('#shAssign')) $('#shAssign').onchange = e => {
       const v = e.target.value;
       if (!v || v === f.by) return;
-      commit(`受け持ちを${uname(v)}さんに変えました`, () => startFollow(k, v));
+      commitIn([hid], `受け持ちを${uname(v)}さんに変えました`, () => startFollow(k, v));
       paint();
     };
     on('provDrop', () => dropProvHouse(hid));
@@ -5840,7 +5949,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     on('fMove', () => startMoveHouse(hid));
     on('fHNameSave', () => {
       const v = $('#fHName').value.trim();
-      commit(v ? `名前を「${v}」にしました` : '名前を消しました', () => { const h2 = houseById(hid); if (h2) h2.label = v; });
+      commitIn([hid], v ? `名前を「${v}」にしました` : '名前を消しました', () => { const h2 = houseById(hid); if (h2) h2.label = v; });
       st.editOpen = true; paint();
     });
     on('fRename', () => openUnitNames(hid, () => openTarget(hid, unit, fromBuilding))); // まちがえたら、下の「取り消す」でもどせる
@@ -5850,7 +5959,7 @@ function openTarget(hid, unit, fromBuilding, review) {
         window.chuiMark.keep(st.mk);
         const mk = st.mk;
         if (!window.chuiMark.changed(k, mk)) { toast('変わったところはありません'); return; }
-        commit(window.chuiMark.msg(mk), () => { const h2 = houseById(hid); if (h2) window.chuiMark.apply(h2, unit, mk); });
+        commitIn([hid], window.chuiMark.msg(mk), () => { const h2 = houseById(hid); if (h2) window.chuiMark.apply(h2, unit, mk); });
         st.mk = {}; paint();
       });
     }
@@ -6794,7 +6903,7 @@ function checkRestore(b) {
   $('#rsApply').onclick = () => {
     const revive = $('#rsRevive') && $('#rsRevive').checked ? free : [];
     closeSheet();
-    if (revive.length) commit(`再訪問を${revive.length}件もどしました`, () => { revive.forEach(k => { if (!D().follows[k]) startFollow(k, me().id); }); });
+    if (revive.length) commitIn([], `再訪問を${revive.length}件もどしました`, () => { revive.forEach(k => { if (!D().follows[k]) startFollow(k, me().id); }); });
     const f2 = D().follows || {}, ok = new Set(Object.keys(f2).filter(k => f2[k] && f2[k].by === me().id));
     const o = memoAll(), p = pinsAll();
     let n = 0;
@@ -6851,11 +6960,11 @@ async function followAction(act, k) {
   switch (act) {
     case 'continue':
       if (!fol(k)) return;
-      commit('受け持ちを続けます。期限を延ばしました', () => { D().follows[k].touchedAt = new Date().toISOString(); });
+      commitIn([], '受け持ちを続けます。期限を延ばしました', () => { D().follows[k].touchedAt = new Date().toISOString(); });
       break;
     case 'handoff':
       if (!await ask('この再訪問をほかの人に引き継ぎます。よろしいですか？')) return;
-      commit(RELEASE_MSG.handoff, () => releaseFollow(k, 'handoff'));
+      commitIn([], RELEASE_MSG.handoff, () => releaseFollow(k, 'handoff'));
       break;
     case 'stop':
       openReleaseSheet(k, true);
@@ -6865,7 +6974,7 @@ async function followAction(act, k) {
       break;
     case 'release':
       if (!await ask('この受け持ちを解除します。よろしいですか？')) return;
-      commit(RELEASE_MSG.admin, () => releaseFollow(k, 'admin'));
+      commitIn([], RELEASE_MSG.admin, () => releaseFollow(k, 'admin'));
       break;
     case 'memo':
       openMemo(k);
@@ -6877,7 +6986,7 @@ async function followAction(act, k) {
     }
     case 'take':
       if (fol(k)) { toast('すでに受け持ちがあります'); return; }
-      commit('再訪問を受け持ちます', () => startFollow(k, me().id));
+      commitIn([], '再訪問を受け持ちます', () => startFollow(k, me().id));
       break;
   }
 }
@@ -6896,7 +7005,7 @@ function openReleaseSheet(k, onlyStop) {
     const rel = x.dataset.rel;
     const memoBefore = memoOf(k), pinned = pinsAll().has(k);
     closeSheet();
-    commit(RELEASE_MSG[rel], () => releaseFollow(k, rel), () => {
+    commitIn([], RELEASE_MSG[rel], () => releaseFollow(k, rel), () => {
       if (memoBefore) { const o = memoAll(); o[k] = memoBefore; memoSaveAll(o); }
       if (pinned) { const p = pinsAll(); p.add(k); pinsSave(p); }
     });
@@ -7016,7 +7125,7 @@ function openBuilding(hid, startSel) {
   const st = { sel: startSel && h0.units.includes(startSel) ? startSel : null, ren: false };
   const again = () => { sheetKeep = true; paint(); };
   const reopen = () => setTimeout(() => openBuilding(hid), 30); // 取り消したあとも、この画面にもどる
-  const save = (msg, fn) => { commit(msg, () => { const h = houseById(hid); if (h) fn(h); }, reopen); again(); };
+  const save = (msg, fn) => { commitIn([hid], msg, () => { const h = houseById(hid); if (h) fn(h); }, reopen); again(); }; // この建物だけを比べて送る（改善案B2）
 
   const paint = () => {
     const h = houseById(hid); if (!h) { closeSheet(); return; }
@@ -7206,7 +7315,7 @@ function openUnitBulkDel(hid) {
       if (!us.length) return;
       if (us.length === h.units.length && !await ask('すべての部屋を削除します。建物は残ります。よろしいですか？')) return;
       if (us.length < h.units.length && !await ask(`${us.map(u => uName(h, u)).join('・')} の${us.length}部屋を削除します。よろしいですか？`)) return;
-      commit(`${us.length}部屋を削除しました`, () => {
+      commitIn([hid], `${us.length}部屋を削除しました`, () => {
         const h2 = houseById(hid); if (!h2) return; // いつも最新の家で消す
         const del = new Set(us);
         h2.units = h2.units.filter(x => !del.has(x));
@@ -7367,7 +7476,7 @@ function openConvertApt(hid) {
       if (!us.length) { toast('部屋の名前を入れてください'); return; }
       const label = f.label.trim();
       closeSheet();
-      commit(`${label || '建物'}をアパート・マンションにしました（${us.length}部屋）`, () => {
+      commitIn([hid], `${label || '建物'}をアパート・マンションにしました（${us.length}部屋）`, () => {
         h.type = 'apt'; h.units = us; h.label = label;
         if (f.lock) h.lock = true; else delete h.lock;
         delete h.prov; delete h.uk; delete h.ul; // 確かめた建物なので「仮の家」ではなくなる
@@ -7548,7 +7657,7 @@ function openUnitNames(hid, back) {
       const c2 = {}; fin.forEach(n => { c2[n] = (c2[n] || 0) + 1; });
       if (fin.some(n => !n || c2[n] > 1)) { sheetKeep = true; paint(); return; }
       const orig = h.units.slice();
-      commit(`部屋の名前を直しました（${fin.filter((n, i) => n !== cur[i]).length}部屋）`, () => {
+      commitIn([hid], `部屋の名前を直しました（${fin.filter((n, i) => n !== cur[i]).length}部屋）`, () => {
         const h2 = houseById(hid) || h, ul = {}; // いつも最新の家に書く
         orig.forEach((u, i) => { if (fin[i] !== u && h2.units.includes(u)) ul[u] = fin[i]; });
         if (Object.keys(ul).length) h2.ul = ul; else delete h2.ul;
@@ -7602,7 +7711,7 @@ function addAt(ll, inDraw) {
   if (inDraw ? drawTap === 'house' : addQuick()) {
     addCount++; updateAddBar();
     const note = !tid && addCount === 1 ? '。区域は線を完成すると決まります' : '';
-    commit(`一戸建てを追加しました（${addCount}件目）${note}`, () => {
+    commitIn([], `一戸建てを追加しました（${addCount}件目）${note}`, () => { // 足した家だけを送る（改善案B2）
       D().houses.push({ id: 'h' + uid(), terrId: tid, type: 'house', lat: ll.lat, lng: ll.lng, label: '', units: [], createdAt: new Date().toISOString(), createdBy: me().id });
     });
     return;
@@ -7710,7 +7819,7 @@ function openAddForm(ll, tid, editId) {
       closeSheet();
       const setCand = h => { if (f.type === 'apt' && f.cand) { h.cid = f.cand.i; if (f.ban) h.ban = f.ban; } }; // 選んだ候補は、次から出ない
       if (eh) {
-        commit(f.type === 'apt' ? `${label || '建物'}をアパート・マンションにしました（${us.length}部屋）` : '保存しました', () => {
+        commitIn([editId], f.type === 'apt' ? `${label || '建物'}をアパート・マンションにしました（${us.length}部屋）` : '保存しました', () => {
           const h = houseById(editId); if (!h) return;
           if (window.chuiMark) window.chuiMark.apply(h, '', f.mk); // この家の印（なし・！注意・拒否）
           h.label = label;
@@ -7726,7 +7835,7 @@ function openAddForm(ll, tid, editId) {
         return;
       }
       addCount++; updateAddBar();
-      commit(f.type === 'apt' ? `集合住宅を追加しました（${us.length}部屋）` : '一戸建てを追加しました', () => {
+      commitIn([], f.type === 'apt' ? `集合住宅を追加しました（${us.length}部屋）` : '一戸建てを追加しました', () => { // 足した家だけを送る（改善案B2）
         const nh = { id: 'h' + uid(), terrId: tid, type: f.type, lat: ll.lat, lng: ll.lng, label, units: us, createdAt: new Date().toISOString(), createdBy: me().id };
         if (f.kind !== 'home') nh.kind = f.kind;
         if (f.type === 'apt' && f.lock) nh.lock = true;
@@ -8888,7 +8997,7 @@ function moveHouseTo(ll) {
   const h = houseById(hid);
   if (!h) return;
   if (map.getZoom() < 16) { moveHid = hid; toast('場所がずれないように、もう少し地図を拡大してからタップしてください'); return; }
-  commit('家の場所を直しました', () => {
+  commitIn([hid], '家の場所を直しました', () => {
     const h2 = houseById(hid); if (!h2) return;
     h2.lat = Math.round(ll.lat * 1e6) / 1e6; h2.lng = Math.round(ll.lng * 1e6) / 1e6;
     const t = terrOf(h2.lat, h2.lng); if (t) h2.terrId = t; // 線の外に動かしたときは、今の区域のまま
@@ -15575,7 +15684,7 @@ function bindStatic() {
     const cur = fol(k);
     if (cur && cur.by === s.value) return;
     const v = s.value;
-    commit(`${uname(v)}さんが再訪問を受け持ちます`, () => startFollow(k, v));
+    commitIn([], `${uname(v)}さんが再訪問を受け持ちます`, () => startFollow(k, v));
   });
   $('#adTerrs').addEventListener('change', e => {
     const gp = e.target.closest('[data-grp]');
@@ -15741,10 +15850,10 @@ async function init() {
     window.addEventListener('offline', () => updateSyncBadge());
     document.addEventListener('visibilitychange', () => {
       // ほかのアプリに切りかえるときは、端末への保存と送信をすぐ行う（iPhoneはすぐ止まるため）
-      if (document.hidden) { Store.saveCacheNow(true); if (Store.queue.length && !flushing) flush(true); return; }
+      if (document.hidden) { Store.sweep('hide'); Store.saveCacheNow(true); if (Store.queue.length && !flushing) flush(true); return; }
       lastRefresh = 0; nextPollAt = 0; flushNextAt = 0; MemoSync.wake(); again();
     });
-    window.addEventListener('pagehide', () => Store.saveCacheNow(true));
+    window.addEventListener('pagehide', () => { Store.sweep('hide'); Store.saveCacheNow(true); });
     $('#syncState').onclick = openSyncSheet;
     $('#syncState').setAttribute('role', 'button');
     $('#syncState').tabIndex = 0;

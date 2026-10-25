@@ -23,6 +23,8 @@
    ========================================================= */
 (function () {
   'use strict';
+  /* 拒否・注意の印だけを変える保存は、家（2〜3万件）を比べない速い保存にする（改善案B2。印・受け持ち・区域などは今までどおり全部を比べる） */
+  const cmI = (msg, fn, onUndo) => (typeof commitIn === 'function' ? commitIn([], msg, fn, onUndo) : commit(msg, fn, onUndo));
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof isPinKey !== 'function') return;
 
   if (typeof CHANGELOG !== 'undefined' && !CHANGELOG.some(c => c.v === '2026.13.15')) {
@@ -354,7 +356,7 @@
     ai.oninput = () => { sv.hidden = ai.value.trim() === (e.v.a || ''); };
     sv.onclick = () => {
       const a = ai.value.trim().slice(0, 120);
-      commit(a ? '住所を保存しました' : '住所を消しました', () => {
+      cmI(a ? '住所を保存しました' : '住所を消しました', () => {
         const cur = D().dnc[k]; if (cur === undefined) return;
         const o = cur && typeof cur === 'object' ? Object.assign({}, cur) : {};
         if (a) o.a = a; else delete o.a;
@@ -370,7 +372,7 @@
       if (!await ask('注意（！）に変えますか？', { title: '注意（！）に変えますか？', body: '「拒」が「！」になり、訪ねてよい家になります。注意の文は、その家を訪ねる人みんなが見ます。次の画面で文を確かめてください。', ok: '注意に変える' })) return;
       closeSheet();
       let nk = k;
-      commit('注意（！）に変えました', () => {
+      cmI('注意（！）に変えました', () => {
         const v = D().dnc[k]; if (v === undefined) return;
         const o = typeof v === 'object' && v ? v : {};
         const cm = D().caution || (D().caution = {});
@@ -388,11 +390,11 @@
     on('ddDel', async () => {
       if (!await ask('この家の拒否を外しますか？', { title: 'この家の拒否を外しますか？', body: '地図の拒否の印も消えます。訪問の記録は残ります。まちがえたときは、お知らせの「取り消す」でもどせます。', ok: '外す' })) return;
       closeSheet();
-      commit('拒否を外しました', () => { delete D().dnc[k]; });
+      cmI('拒否を外しました', () => { delete D().dnc[k]; });
     });
   }
   function confirmAuto(k) {
-    commit('この家で確かめました', () => {
+    cmI('この家で確かめました', () => {
       const cur = D().dnc[k];
       if (cur && typeof cur === 'object') { const o = Object.assign({}, cur); delete o.auto; D().dnc[k] = o; }
     });
@@ -626,14 +628,14 @@
       const from = pick.cur;
       if (!from || !D().dnc[from]) { reviewNext(false); return; }
       if (from === k) { if (D().dnc[k].auto) confirmAuto(k); reviewNext(true); return; }
-      commit(`${name}を拒否の家にしました`, () => moveTo(from, h, unit));
+      cmI(`${name}を拒否の家にしました`, () => moveTo(from, h, unit));
       reviewNext(true);
       return;
     }
     // 追加
     if (D().dnc[k]) { toast('この家は、もう拒否になっています'); return; }
     askAddr(`${esc(name)}を拒否にしますか？`, pick.a, '拒否にする', a => {
-      commit(`${name}を拒否にしました`, () => {
+      cmI(`${name}を拒否にしました`, () => {
         D().dnc[k] = Object.assign({ s: 'adm', at: now(), lat: r6(h.lat), lng: r6(h.lng) }, a ? { a } : {});
         delete D().follows[k]; delete D().released[k];
       });
@@ -663,7 +665,7 @@
       const q = move ? '拒否の印を、ここに動かしますか？' : 'ここに、拒否の印を置きますか？';
       ask(q, { title: q, body: '家の印がない場所です。家の印があるときは、家の印をタップしてください。', ok: move ? 'ここに動かす' : 'ここに置く', danger: false }).then(yes => {
         if (!yes || !pick) return;
-        commit('拒否の印の場所を決めました', () => {
+        cmI('拒否の印の場所を決めました', () => {
           const src = D().dnc[from]; if (src === undefined) return;
           const o = Object.assign({}, src && typeof src === 'object' ? src : {}, { p: 1, lat, lng });
           delete o.appx; delete o.auto; delete o.no;
@@ -675,7 +677,7 @@
       return true;
     }
     askAddr('ここに拒否の印を置きますか？', pick.a, 'ここに置く', a => {
-      commit('拒否の印を置きました', () => {
+      cmI('拒否の印を置きました', () => {
         D().dnc['pin:' + uid()] = Object.assign({ p: 1, s: 'adm', at: now(), lat, lng }, terr ? { t: terr } : {}, a ? { a } : {});
       });
       afterAdd();
@@ -725,7 +727,7 @@
       if (onlyAddr) {
         const terr = pos ? terrOf(pos.lat, pos.lng) : null;
         closeSheet();
-        commit('拒否の住所を登録しました', () => {
+        cmI('拒否の住所を登録しました', () => {
           D().dnc['pin:' + uid()] = Object.assign({ p: 1, s: 'adm', at: now(), a }, pos ? { lat: r6(pos.lat), lng: r6(pos.lng) } : {}, pos && !pos.good ? { appx: 1 } : {}, terr ? { t: terr } : {});
         });
         renderDncAdmin();

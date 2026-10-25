@@ -269,7 +269,7 @@
     on('cdSave', () => {
       const n = $('#cdN').value.replace(/[\r\n]+/g, ' ').trim().slice(0, 80);
       closeSheet();
-      commit('注意を保存しました', () => { const cur = C()[k]; if (!cur) return; const o = Object.assign({}, cur, { at: now() }); if (n) o.n = n; else delete o.n; C()[k] = o; });
+      (typeof commitIn === 'function' ? commitIn.bind(null, []) : commit)('注意を保存しました', () => { const cur = C()[k]; if (!cur) return; const o = Object.assign({}, cur, { at: now() }); if (n) o.n = n; else delete o.n; C()[k] = o; });
       rerender();
     });
     on('cdMap', () => {
@@ -279,7 +279,7 @@
     on('cdDnc', async () => {
       if (!await ask('この注意を、拒否に変えますか？', { title: '拒否に変えますか？', body: '訪問しない家として地図に「拒」が出ます。注意の文は消えます。', ok: '拒否に変える' })) return;
       closeSheet();
-      commit('拒否に変えました', () => {
+      (typeof commitIn === 'function' ? commitIn.bind(null, []) : commit)('拒否に変えました', () => {
         const v = C()[k]; if (!v) return;
         delete C()[k];
         if (isPinK(k)) {
@@ -297,7 +297,7 @@
     on('cdDel', async () => {
       if (!await ask('この注意を外しますか？', { title: '注意を外しますか？', body: '地図の！の印も消えます。まちがえたときは、お知らせの「取り消す」でもどせます。', ok: '外す' })) return;
       closeSheet();
-      commit('注意を外しました', () => { delete C()[k]; });
+      (typeof commitIn === 'function' ? commitIn.bind(null, []) : commit)('注意を外しました', () => { delete C()[k]; });
       rerender();
     });
   }

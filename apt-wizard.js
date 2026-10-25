@@ -290,7 +290,7 @@
     const hid = s.hid || ('h' + uid());
     const lost = s.edit ? s.h.units.filter(u => !us.includes(u)).length : 0;
     closeSheet();
-    commit(`${label || '建物'}を${s.edit ? '保存' : '登録'}しました（${us.length}${s.mode === 'floor' ? '個の枠' : '部屋'}）`, () => {
+    (typeof commitIn === 'function' ? commitIn.bind(null, [hid]) : commit)(`${label || '建物'}を${s.edit ? '保存' : '登録'}しました（${us.length}${s.mode === 'floor' ? '個の枠' : '部屋'}）`, () => { // この建物だけを比べて送る（改善案B2）
       let h = s.h ? houseById(hid) : null;
       if (!h) {
         h = { id: hid, terrId: s.tid || null, type: 'apt', lat: s.ll.lat, lng: s.ll.lng, label, units: us, createdAt: new Date().toISOString(), createdBy: me().id };
