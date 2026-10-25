@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.88';
+var APP_JS_VER = '2026.13.89';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2491,6 +2491,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.89', items: [
+    ['時', '時間帯の「土日の夜」などを「週末の夜」と出すようにしました。土曜日だけのことではなく、土曜と日曜のどちらも入ります']
+  ] },
   { v: '2026.13.88', items: [
     ['色', 'テーマの「じぶんの色」に、明るさを変えるバーを付けました。円で色あいを、となりのバーで明るさをえらべます。明るい黄色や白・黒もえらべます'],
     ['字', '明るい色をえらんだときは、上の帯やボタンの文字が自動で黒になり、どの色でも文字が読めるようにしました']
@@ -8501,7 +8504,9 @@ function lowOld(tid) {
 let focusCard = null, roundTerr = null, roundNums = null, barMini = false, curTerr = null;
 let barHidden = false; // 下の案内を、押して隠したか（「?」を押すと、また出る）
 const slotText = s => { const [dt, b] = String(s || '').split('・'); return esc(`${dt}の${b}（${BAND_HINT[b] || ''}）`); }; // 時間帯の文字は画面にそのまま入るので、必ず esc する
-const slotShort = s => s.replace('・', 'の');
+/* 時間帯の見せ方。記録の値は「土日・夜」のまま変えず、画面では「週末の夜」と出す（「土日の夜」が土曜日と読まれやすいため。2026.13.89） */
+const dtName = dt => (dt === '土日' ? '週末' : dt);
+const slotShort = s => s.replace(/^土日・/, '週末・').replace('・', 'の');
 /* 返却後の留守宅カード（c.ext）は、その区域が区域カードとして受け取られたら終わる。受け取られた日（なければ、前の人の受け取り日）を返す。そうでなければ ''
    （区域カードの受け取りは担当者の lentAt、返却したあとは lastLentAt に残る。カードを受け取った日より前の日は、関係ない） */
 function extTakenAt(c) {
@@ -9227,9 +9232,9 @@ function openSlotSheet() {
     setSheet(headHtml(null, '行ける時間', '') + `
       <p class="hint">よく奉仕に行ける時間をタップしてください（いくつでも選べます）。</p>
       <table class="slotpick"><tr><th></th>${BANDS.map(b => `<th>${b}<br><small>${BAND_HINT[b]}</small></th>`).join('')}</tr>
-      ${['平日', '土日'].map(dt => `<tr><th>${dt}</th>${BANDS.map(b => {
+      ${['平日', '土日'].map(dt => `<tr><th>${dtName(dt)}</th>${BANDS.map(b => {
         const s = dt + '・' + b;
-        return `<td><button class="slotbtn" data-s="${s}" aria-pressed="${sel.has(s)}" aria-label="${dt}の${b}">${sel.has(s) ? '✓' : ''}</button></td>`;
+        return `<td><button class="slotbtn" data-s="${s}" aria-pressed="${sel.has(s)}" aria-label="${dtName(dt)}の${b}">${sel.has(s) ? '✓' : ''}</button></td>`;
       }).join('')}</tr>`).join('')}</table>
       <button class="btn primary block" id="slotSave">保存する</button>
       <button class="btn block" data-close>やめる</button>`);
@@ -9321,7 +9326,7 @@ function renderAwayAdmin() {
   all.forEach(x => { if (!x.hard) SLOTS.forEach(s => { if (!hasSlot(x.tried, s)) cnt[s] = (cnt[s] || 0) + 1; }); });
   const maxN = Math.max(0, ...Object.values(cnt));
   $('#adAwaySlots').innerHTML = `<tr><th></th>${BANDS.map(b => `<th>${b}<br><small>${BAND_HINT[b]}</small></th>`).join('')}</tr>` +
-    ['平日', '土日'].map(dt => `<tr><th>${dt}</th>${BANDS.map(b => {
+    ['平日', '土日'].map(dt => `<tr><th>${dtName(dt)}</th>${BANDS.map(b => {
       const n = cnt[dt + '・' + b] || 0;
       return `<td class="${n && n === maxN ? 'thin' : ''}"><b>${n}</b>軒</td>`;
     }).join('')}</tr>`).join('');
