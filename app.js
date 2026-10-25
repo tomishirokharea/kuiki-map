@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.81';
+var APP_JS_VER = '2026.13.82';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -955,7 +955,12 @@ const ADDHOME_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
            URLに入れた状態で追加してもらい、アイコンから開いたときに、その番号で使えるようにする（名前の登録はいらない）
    Android：Chromeと情報が同じなので、メニューから追加するだけ */
 async function openHomeGuide() {
-  if (isStandalone()) { infoSheet('ホーム画面から開いています', 'このアプリは、すでにホーム画面のアイコンから開いています。'); return; }
+  if (isStandalone()) { // すでにホーム画面から開いている：アイコンの絵は、追加するときにしかえらべない（2026.13.82）
+    infoSheet('ホーム画面から開いています', 'このアプリは、すでにホーム画面のアイコンから開いています。' +
+      (isIOS() ? '<br><br>アイコンの絵は、ホーム画面に追加するときにえらびます。iPhoneでは、アイコンを作り直すと、このアイコンの中だけに保存している奉仕時間や自分の予定が消えることがあるので、今のアイコンのまま使うことをおすすめします。'
+        : '<br><br>アイコンの絵は、ホーム画面に追加するときにえらびます。変えたいときは、今のアイコンを長押しして削除し、Chromeで区域マップを開いて、もう一度「ホーム画面に追加」をします。'));
+    return;
+  }
   const ios = isIOS(), android = /Android/.test(navigator.userAgent);
   let ready = !LIVE || !ios, note = '';
   if (LIVE && ios) {
@@ -983,6 +988,13 @@ async function openHomeGuide() {
   const iPad = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
   const appNm = esc(uiEff().appName || '区域マップ');
   const MORE_PIC = '<span class="hpic hmore" aria-hidden="true">…</span>';
+  // アイコンの絵は、追加する直前にここでえらぶ（2026.13.82。以前は設定の中にあったが、追加したあとに変えても
+  // ホーム画面のアイコンは変わらず、iPhoneではホーム画面のアプリとSafariで設定が別々なので、えらんだ絵が使われなかった）
+  const curIc = String(uiEff().icon || '区');
+  const pickIcons = ICONS.includes(curIc) ? ICONS : [curIc].concat(ICONS); // 以前に自分で入れた文字も残す
+  const iconStep = `<p class="hstep">アイコンの絵をえらびます。</p>
+    <div class="iconprev"><canvas id="hgPrev" width="180" height="180" aria-label="アイコンの見本"></canvas><p class="hint hint-must">えらばなくても、このまま進めてかまいません。</p></div>
+    <div class="iconpick" role="group" aria-label="アイコンの絵">${pickIcons.map(v => `<button type="button" data-hicon="${esc(v)}" data-notr aria-pressed="${v === curIc}">${esc(v)}</button>`).join('')}</div>`;
   // 文は、スペイン語の辞書で1文ずつ置きかえられるよう、手順ごとに1つの文にする
   const iosStepsList = ios26 && !iPad ? [
       `<p class="hstep">画面の下の右にある「…」を押します。</p>${MORE_PIC}`,
@@ -996,18 +1008,29 @@ async function openHomeGuide() {
       `<p>右上の <b>「追加」</b> を押します。ホーム画面に「${appNm}」のアイコンができます。</p>`
     ];
   iosStepsList.push(`<p>できたアイコンを押して開きます。<b>名前の登録はいりません。</b>そのまま使えます。</p>`);
-  const iosSteps = `<ol class="hsteps">${iosStepsList.map((x, i) => `<li><span class="hnum">${i + 1}</span><div>${x}</div></li>`).join('')}</ol>
-    ${ready ? '<div class="notice info">この画面は開いたままで、1から進めてください。15分以内にアイコンを作って開けば、そのまま使えます。</div>' : ''}`;
-  const androidSteps = `<ol class="hsteps">
-      <li><span class="hnum">1</span><div><p>画面の右上の <b>「︙」</b> を押します。</p></div></li>
-      <li><span class="hnum">2</span><div><p><b>「ホーム画面に追加」</b>（または「アプリをインストール」）を押します。</p></div></li>
-      <li><span class="hnum">3</span><div><p><b>「追加」</b> を押します。ホーム画面にアイコンができます。</p></div></li>
-    </ol>`;
+  iosStepsList.unshift(iconStep);
+  const stepsHtml = list => `<ol class="hsteps">${list.map((x, i) => `<li><span class="hnum">${i + 1}</span><div>${x}</div></li>`).join('')}</ol>`;
+  const iosSteps = stepsHtml(iosStepsList) +
+    (ready ? '<div class="notice info">この画面は開いたままで、1から進めてください。15分以内にアイコンを作って開けば、そのまま使えます。</div>' : '');
+  const androidSteps = stepsHtml([
+    iconStep,
+    '<p>画面の右上の <b>「︙」</b> を押します。</p>',
+    '<p><b>「ホーム画面に追加」</b>（または「アプリをインストール」）を押します。</p>',
+    '<p><b>「追加」</b> を押します。ホーム画面にアイコンができます。</p>'
+  ]);
   const pcSteps = '<p>パソコンでは、ブラウザの「ブックマーク（お気に入り）」に入れておくと、すぐ開けます。</p>';
   setSheet(headHtml(null, 'ホーム画面に追加する', 'アプリのように、アイコンから開けます') + note +
     (ios ? iosSteps : android ? androidSteps : pcSteps) +
     `<p class="hint">アイコンを押すと、ブラウザを開かずに区域マップが開きます。人に渡すスマホには追加しないでください。</p>
     <button class="btn primary block" data-close>閉じる</button>`);
+  const hp = $('#hgPrev');
+  if (hp) {
+    drawIcon(hp);
+    $$('[data-hicon]', $('#sheet')).forEach(b => b.onclick = () => {
+      UI.icon = b.dataset.hicon; uiSave(); applyIcon(); drawIcon(hp); // ページのアイコン（追加するときに使われる絵）も、その場で変える
+      $$('[data-hicon]', $('#sheet')).forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    });
+  }
 }
 /* ホーム画面のアイコンから、はじめて開いたとき：引きつぎの番号で使えるようにする */
 async function claimHome() {
@@ -2441,6 +2464,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.82', items: [
+    ['家', 'ホーム画面のアイコンの絵は、設定ではなく「ホーム画面に追加」の手順の中でえらぶようにしました。追加したあとに設定で変えても、ホーム画面のアイコンは変わらなかったためです']
+  ] },
   { v: '2026.13.77', items: [
     ['返', 'くわしい表示の「返却する」ボタンを、かんたんな表示と同じ「返す」「途中で返す」にそろえました。下から出る画面のいちばん下のボタンは、閉じるだけのときは「閉じる」、入力をやめるときは「やめる」にそろえました']
   ] },
@@ -9496,7 +9522,8 @@ function uiEff() {
   if (UI.mode === 'detail') return UI;
   const size = UI.size === 'small' ? 'normal' : UI.size;
   // かんたん表示で「とても大きく」にしたときは、地図の家の印も大きくする（指で押しやすく）
-  return Object.assign({}, UI_DEFAULT, { size, pin: size === 'xlarge' ? 'large' : 'normal' });
+  // ホーム画面のアイコンの絵と名前は、どちらの表示でも、えらんだものを使う（「ホーム画面に追加」でえらぶため・2026.13.82）
+  return Object.assign({}, UI_DEFAULT, { size, pin: size === 'xlarge' ? 'large' : 'normal', icon: UI.icon || UI_DEFAULT.icon, appName: UI.appName || UI_DEFAULT.appName });
 }
 const accentColor = () => themeOf(uiEff())[1];
 /* 区域の線の色（各自の設定） */
@@ -9694,13 +9721,6 @@ function openUiSheet() {
             <p class="hint">円の中を指でなぞって色をえらびます。外側ほどあざやか、真ん中ほどおだやかな色です。白い文字が読める濃さに自動で調整します。</p></div>
         </div>` : ''}
         <p class="hint">地図の緑のチェック（訪ねた家）と、会えた・留守・拒否の色は変わりません。</p>`;
-      const S_ICON = `<h3 class="sub">ホーム画面のアイコン</h3>
-        <div class="iconprev"><canvas id="icPrev" width="180" height="180" aria-label="アイコンの見本"></canvas>
-          <div><p class="muted">ホーム画面に追加したときの絵です。色はテーマの色になります。</p>
-            <p class="hint">追加したあとに変えたときは、アイコンを長押しして削除し、もう一度追加してください。端末によっては、えらんだ絵が使われないことがあります。</p></div></div>
-        <div class="iconpick">${ICONS.map(v => `<button type="button" data-ui="icon" data-v="${esc(v)}" aria-pressed="${UI.icon === v}">${esc(v)}</button>`).join('')}</div>
-        <label class="field"><span>自分で入れる（2文字まで）</span><span class="inline"><input type="text" id="icText" maxlength="2" value="${esc(ICONS.includes(UI.icon) ? '' : UI.icon)}" placeholder="例：区"><button class="btn small" id="icSet">これを使う</button></span></label>
-        <label class="field"><span>アイコンの名前（12文字まで）</span><span class="inline"><input type="text" id="icName" maxlength="12" value="${esc(UI.appName || '区域マップ')}"><button class="btn small" id="icNameSet">保存</button></span></label>`;
       const S_SCREEN = `<h3 class="sub">画面</h3>
         <p class="q">起動のあいさつ（「さぁ、奉仕に行こう！」）</p>${seg('splash', [['on', '出す'], ['off', '出さない']])}
         ${UI.splash !== 'off' ? `<div class="zoomrow"><input type="range" id="uiSplash" min="1" max="5" step="0.5" value="${UI.splashSec || 1.8}" aria-label="あいさつを出す時間（秒）"><output id="uiSplashOut">${UI.splashSec || 1.8}秒</output></div>
@@ -9712,7 +9732,8 @@ function openUiSheet() {
       const S_MAP = `<h3 class="sub">地図</h3>
         <p class="q">家の印の大きさ</p>${seg('pin', Object.entries(PINS).map(([k, v]) => [k, v[1]]))}
         <p class="q">自分の区域を回るときの表示</p>${seg('round', [['reco', 'おすすめ順'], ['progress', '進み具合']], me().roundMode || 'reco')}`;
-      S_VIEW += (tab === 'map' ? [S_MAP, S_TEXT, S_COLOR, S_SCREEN, S_ICON] : tab === 'reco' || tab === 'cards' ? [S_TEXT, S_COLOR, S_SCREEN, S_ICON, S_MAP] : [S_TEXT, S_SCREEN, S_COLOR, S_ICON, S_MAP]).join('');
+      // ホーム画面のアイコンの絵は「ホーム画面に追加」の案内の中でえらぶ（2026.13.82。設定で変えてもホーム画面のアイコンは変わらないため）
+      S_VIEW += (tab === 'map' ? [S_MAP, S_TEXT, S_COLOR, S_SCREEN] : tab === 'reco' || tab === 'cards' ? [S_TEXT, S_COLOR, S_SCREEN, S_MAP] : [S_TEXT, S_SCREEN, S_COLOR, S_MAP]).join('');
     }
     // 「画面の見え方」をいちばん上に（地図の画面では、地図の見た目のすぐ下）
     // ①の対応：説明文つきの通常の見出し（headHtml）ではなく、タイトルだけのコンパクトな見出しにして画面を広く使う。
@@ -9730,18 +9751,6 @@ function openUiSheet() {
       rs.oninput = () => { $('#uiSplashOut').textContent = rs.value + '秒'; };
       rs.onchange = () => { UI.splashSec = Number(rs.value); uiSave(); };
       $('#uiSplashTry').onclick = () => { closeSheet(); splashAgain(true); };
-    }
-    if ($('#icPrev')) {
-      drawIcon($('#icPrev'));
-      $('#icSet').onclick = () => {
-        const v = $('#icText').value.trim().slice(0, 2);
-        if (!v) { toast('文字か絵文字を入れてください'); return; }
-        UI.icon = v; uiSave(); applyUi(); paint(true); toast('アイコンを変えました');
-      };
-      $('#icNameSet').onclick = () => {
-        UI.appName = ($('#icName').value.trim() || '区域マップ').slice(0, 12);
-        uiSave(); applyUi(); toast('アイコンの名前を変えました');
-      };
     }
     $$('[data-nz]', $('#sheet')).forEach(r => {
       const k = r.dataset.nz;
@@ -9780,7 +9789,7 @@ function openUiSheet() {
     });
     $('#uiReset').onclick = async () => {
       if (!await ask('画面の見え方を、最初の状態にもどします（「使う機能」はそのままです）。よろしいですか？')) return;
-      UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fTimer: UI.fTimer, hello: UI.hello, fFollow: UI.fFollow, cProg: UI.cProg, cReco: UI.cReco, todayOn: UI.todayOn }); uiSave(); applyUi(); setBase('pale'); applyRotSetting(); // 使う機能・区域カードに出すものはそのまま
+      UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fTimer: UI.fTimer, hello: UI.hello, fFollow: UI.fFollow, cProg: UI.cProg, cReco: UI.cReco, todayOn: UI.todayOn, icon: UI.icon, appName: UI.appName }); uiSave(); applyUi(); setBase('pale'); applyRotSetting(); // 使う機能・区域カードに出すもの・ホーム画面のアイコンはそのまま
       toast('表示の設定を最初にもどしました');
       paint(false);
     };

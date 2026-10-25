@@ -158,4 +158,11 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "返却の目安（{0}日）を過ぎた貸出": "Asignaciones que pasaron el plazo ({0} días)",
 "自動受け取り・枚数・返却の目安などの決まりは、「貸し出しのきまり」を押すと、「状況」の「区域の決め」で変えられます。": "Las reglas como la recepción automática, los límites y el plazo de devolución se cambian en «Reglas de los territorios» de «Situación», tocando «Reglas de asignación».",
 "区域の決め（設定）：パソコンでは右に出ます。スマホでは「区域の決め（設定）を開く」で出ます。各見出しの下の「かかわる設定」を押すと、その設定に飛び、その場で変えられます。変えると、すぐ全員に効きます。": "Reglas de los territorios (ajustes): en la computadora aparecen a la derecha; en el teléfono, con «Abrir las reglas de los territorios (ajustes)». Al tocar «Ajustes relacionados» bajo cada título, se salta a ese ajuste y se puede cambiar allí mismo. Los cambios se aplican enseguida para todos.",
+/* 2026.13.82：ホーム画面のアイコンの絵を、設定から「ホーム画面に追加」の手順の中に移す */
+"アイコンの絵をえらびます。": "Elija la imagen del ícono.",
+"えらばなくても、このまま進めてかまいません。": "Si no elige ninguna, puede seguir igual.",
+"アイコンの絵": "Imagen del ícono",
+"アイコンの絵は、ホーム画面に追加するときにえらびます。iPhoneでは、アイコンを作り直すと、このアイコンの中だけに保存している奉仕時間や自分の予定が消えることがあるので、今のアイコンのまま使うことをおすすめします。": "La imagen del ícono se elige al agregarlo a la pantalla de inicio. En iPhone, si vuelve a crear el ícono, se pueden borrar las horas de predicación y la agenda personal guardadas solo en este ícono, así que se recomienda seguir usando el ícono actual.",
+"アイコンの絵は、ホーム画面に追加するときにえらびます。変えたいときは、今のアイコンを長押しして削除し、Chromeで区域マップを開いて、もう一度「ホーム画面に追加」をします。": "La imagen del ícono se elige al agregarlo a la pantalla de inicio. Para cambiarla, mantenga presionado el ícono actual, bórrelo, abra el Mapa de Territorios en Chrome y vuelva a tocar «Agregar a la pantalla de inicio».",
+"ホーム画面のアイコンの絵は、設定ではなく「ホーム画面に追加」の手順の中でえらぶようにしました。追加したあとに設定で変えても、ホーム画面のアイコンは変わらなかったためです": "La imagen del ícono de la pantalla de inicio ahora se elige en los pasos de «Agregar a la pantalla de inicio», no en Ajustes, porque cambiarla en Ajustes después de agregarlo no cambiaba el ícono.",
 });
