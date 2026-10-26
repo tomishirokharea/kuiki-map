@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.89"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE も合わせて上げる -->
+<meta name="app-version" content="2026.13.90"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE も合わせて上げる -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="config.js"></script><!-- GASのURLと、会衆ごとの設定はこのファイルに書きます（無ければ試作モード） -->
-<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><script src="i18n-es-guruchu.js"></script><script src="i18n-es-meibo.js"></script><script src="i18n-es-shikai.js"></script><script src="i18n-es-tenken.js"></script><script src="i18n-es-kaizen.js"></script><!-- スペイン語の辞書 / Diccionario español -->
+<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><script src="i18n-es-guruchu.js"></script><script src="i18n-es-meibo.js"></script><script src="i18n-es-shikai.js"></script><script src="i18n-es-tenken.js"></script><script src="i18n-es-kaizen.js"></script><script src="i18n-es-osusume.js"></script><!-- スペイン語の辞書 / Diccionario español -->
 <script src="i18n.js"></script><!-- 言語の切りかえ / Cambio de idioma -->
 <script src="app-head.js"></script>
 <style>
@@ -1688,7 +1688,7 @@ body.renshu #btnUpd{display:none!important}
         <div class="apane" data-apane="sched" hidden><div id="adSched"></div></div>
         <div class="apane" data-apane="people" hidden><div id="adPeople"></div></div>
         <!-- 区域係の「状況」と設定「区域の決め」を左右に（kimari.js）。パソコン（幅1,180px以上）は右の欄、スマホは下から出る画面に出す。
-             設定の行は app.js（貸し出しと返却・そのほか・留守宅カード・返却後）と schedule.js（手紙・提案）が、下の箱に描く -->
+             設定の行は app.js（貸し出しと返却・そのほか・留守宅カード・完了のあとの留守宅（おすすめ））と schedule.js（手紙・提案）が、下の箱に描く -->
         <div class="krwrap" id="krWrap">
         <div class="krmain">
         <div class="apane" data-apane="status" hidden>
@@ -1722,7 +1722,7 @@ body.renshu #btnUpd{display:none!important}
           <p class="hint">変えると、すぐ全員に効きます。左の状況もすぐ変わります。状況の「かかわる設定」を押すと、ここに飛びます。</p>
           <details class="krg" data-krg="lend" open><summary>貸し出しと返却</summary><div id="krLend" class="krbox"></div></details>
           <details class="krg" data-krg="away" open><summary>留守宅カード</summary><div id="krAway" class="krbox"></div></details>
-          <details class="krg" data-krg="ext" open><summary>返却後の留守宅カード</summary><div id="krExt" class="krbox"></div></details>
+          <details class="krg" data-krg="ext" open><summary>完了のあとの留守宅（おすすめ）</summary><div id="krExt" class="krbox"></div></details>
           <details class="krg" data-krg="tips"><summary>手紙・提案・おすすめの順</summary><div id="krTips" class="krbox"></div></details>
           <details class="krg" data-krg="etc"><summary>受け取れる枚数・一緒に回る など（状況には効かない設定）</summary><div id="krEtc" class="krbox"></div></details>
         </div>
