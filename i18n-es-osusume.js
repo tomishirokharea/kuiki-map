@@ -6,7 +6,7 @@
 window.KUIKI_I18N = window.KUIKI_I18N || {};
 window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 /* おすすめタブ */
-"回り終えた区域で、まだ会えていない家を、近くの数軒ずつ出しています。カードを受け取らなくても回れます。": "Casas de territorios ya completados donde aún no se encontró a nadie, unas pocas casas cercanas a la vez. Puede visitarlas sin recibir una tarjeta.",
+"回り終えた区域で、まだ訪ねていない家と、まだ会えていない家を、近くの数軒ずつ出しています。カードを受け取らなくても回れます。": "Casas de territorios ya completados que aún no se visitaron o donde aún no se encontró a nadie, unas pocas casas cercanas a la vez. Puede visitarlas sin recibir una tarjeta.",
 "いつ訪ねるか": "Cuándo visitar",
 "ほかの時間帯 ▾": "Otro horario ▾",
 "{0} ▾": "{0} ▾",
@@ -21,7 +21,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "雨の日なので、集合住宅の部屋です": "Como llueve, son apartamentos",
 "雨のため、集合住宅の部屋を先に出しています": "Como llueve, se muestran primero los apartamentos",
 "区域{0}の家 {1}軒": "Territorio {0}: {1} casas",
-"区域が完了すると、まだ会えていない家がここに出ます。": "Cuando un territorio se completa, aquí salen las casas donde aún no se encontró a nadie.",
+"区域が完了すると、まだ訪ねていない家や、まだ会えていない家がここに出ます。": "Cuando un territorio se completa, aquí salen las casas que aún no se visitaron o donde aún no se encontró a nadie.",
 "{0}に訪ねられる家は、今はありません。": "Por ahora no hay casas para visitar en {0}.",
 "「ほかの時間帯」をえらぶと、出ることがあります。": "Si elige «Otro horario», pueden salir algunas.",
 "今日の終わりまで": "Hasta el final de hoy",
@@ -88,7 +88,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "完了のあとの留守宅（おすすめ）": "Casas ausentes tras completar (recomendaciones)",
 "区域が完了した（S-13 に完了として記録した）あと、次に区域カードとして受け取られるまで、残りの留守宅を、留守宅カードにせず、全員の「おすすめ」タブに近くの数軒として出します。": "Después de que un territorio se completa (anotado como completado en el S-13) y hasta que alguien lo vuelva a tomar como tarjeta de territorio, las casas ausentes restantes no salen como tarjetas de ausentes, sino en la pestaña «Recomendaciones» de todos, unas pocas casas cercanas a la vez.",
 "完了してから、この日数はおすすめに出しません。家ごとにも、最後に訪ねてからこの日数は出しません": "Durante estos días después de completar no salen en recomendaciones. Tampoco sale una casa hasta estos días después de la última visita",
-"完了のあとに、同じ家を留守宅として訪ねる上限です（同じ日は1回）": "Máximo de visitas como ausente a la misma casa después de completar (el mismo día cuenta 1)",
+"完了のあとに、同じ家を留守宅として訪ねる上限です（同じ日は1回。回り残しの家は、はじめて訪ねた日を数えません）": "Máximo de visitas como ausente a la misma casa después de completar (el mismo día cuenta 1. En las casas sin visitar en la vuelta, no cuenta el día de la primera visita)",
 "おすすめに出す期間": "Período en recomendaciones",
 "完了してから、この日数で止めます": "Se detiene a estos días de completar",
 "おすすめに出す期間を減らす": "Reducir el período en recomendaciones",
@@ -150,5 +150,16 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "おすすめタブを新しくしました。回り終えた区域で、まだ会えていない家を、近くの数軒ずつ出します。カードを受け取らなくても、空いた時間に回れます": "Renovamos la pestaña de recomendaciones. Muestra, unas pocas casas cercanas a la vez, casas de territorios completados donde aún no se encontró a nadie. Puede visitarlas en un rato libre sin recibir una tarjeta",
 "「ほかの時間帯」をえらぶと、その時間帯にまだ訪ねていない家が出ます。「予定に入れる」と、その日の終わりまで、その家をほかの人のおすすめに出しません": "Si elige «Otro horario», salen las casas aún no visitadas en ese horario. Con «Agregar a mi agenda», esas casas no salen en las recomendaciones de otros hasta el final de ese día",
 "「今行く」「地図をひらく」を押すと、地図に区域の線と、回る家の番号が出ます": "Con «Ir ahora» o «Abrir mapa», el mapa muestra el límite del territorio y el número de cada casa que visitará",
-"留守宅カードは、区域が完了するまでになりました。完了したあとの残りの留守宅は、おすすめに出ます。区域係は、留守宅を「訪ね直した」と数える条件（別の日／別の日で、別の時間帯）を「区域の決め」でえらべます": "Las tarjetas de ausentes ahora son hasta que el territorio se completa. Después, las casas ausentes restantes salen en recomendaciones. El encargado puede elegir en «Reglas del territorio» cuándo cuenta como revisitada una casa ausente (otro día / otro día y otro horario)"
+"留守宅カードは、区域が完了するまでになりました。完了したあとの残りの留守宅は、おすすめに出ます。区域係は、留守宅を「訪ね直した」と数える条件（別の日／別の日で、別の時間帯）を「区域の決め」でえらべます": "Las tarjetas de ausentes ahora son hasta que el territorio se completa. Después, las casas ausentes restantes salen en recomendaciones. El encargado puede elegir en «Reglas del territorio» cuándo cuenta como revisitada una casa ausente (otro día / otro día y otro horario)",
+/* 回り残し・仮の家（2026.13.91） */
+"この巡回で、まだ一度も訪ねていない家です": "Casas que aún no se visitaron ni una vez en esta vuelta",
+"仮の家が{0}軒あります。家かどうか確かめてください（家でなければ、その場で消せます）": "Hay {0} casas provisionales. Confirme si son viviendas (si no lo son, puede borrarlas allí mismo)",
+"仮の家が{0}軒あります。家かどうか確かめてください。家でなければ、その家を押して「ここは家ではない（消す）」で消せます": "Hay {0} casas provisionales. Confirme si son viviendas. Si no lo son, toque la casa y bórrela con «Aquí no hay casa (borrar)»",
+"回り残しの家も出す": "Mostrar también casas que quedaron sin visitar",
+"完了した区域で、この巡回の中で一度も訪ねていない家（完了の目安に届いたので回らなかった家など）を、留守宅より先に出します。仮の家は、家かどうか確かめてもらい、家でなければ、その場で消せます": "En territorios completados, muestra antes que las casas ausentes las casas que no se visitaron ni una vez en esta vuelta (por ejemplo, porque ya se alcanzó el porcentaje para completar). Las casas provisionales se piden confirmar; si no son viviendas, se pueden borrar allí mismo",
+"残りの留守宅": "Ausentes restantes",
+"回り残し": "Sin visitar",
+"カードにしない（完了したので、おすすめに出す）": "Sin tarjeta (completado: sale en recomendaciones)",
+"おすすめに、回り終えた区域で一度も訪ねていない家（回り残し）も出すようにしました。留守宅より先に出ます。訪ねて留守だったときは、次からは留守宅として、時間をあけて出ます": "Ahora las recomendaciones también muestran casas de territorios completados que no se visitaron ni una vez (sin visitar). Salen antes que las casas ausentes. Si al visitarlas no hay nadie, después salen como casas ausentes, dejando pasar unos días",
+"おすすめに地図データから入れた「仮の家」が出たときは、家かどうか確かめてください。「今行く」「予定に入れる」で押さえた家なら、家でなければ、その場で消せます": "Si en recomendaciones sale una «casa provisional» añadida desde los datos del mapa, confirme si es una vivienda. Si la reservó con «Ir ahora» o «Agregar a mi agenda» y no es una vivienda, puede borrarla allí mismo"
 });
