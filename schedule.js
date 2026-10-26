@@ -2441,6 +2441,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       setSheet(headHtml(t, `区域${esc(t.no)}の留守宅カードを出す`, slotText(slot)) + `
         <p>この区域で、まだ会えていない家のうち、<b>${esc(slotShort(slot))}にまだ訪ねていない家が ${keys.length}軒</b>あります。</p>
         ${keys.length ? '' : '<div class="notice warn">今は、このカードに入れる家がありません（まだ1回目の訪問がすんでいない家は、区域カードで回ります）。重点にしておくと、留守の記録がついた家から入ります。</div>'}
+        ${typeof afterDone === 'function' && afterDone(t) ? '<div class="notice info">この区域は完了しています。残りの留守宅は留守宅カードにせず、おすすめタブに近くの数軒として出しています。重点にした時間帯は、おすすめで先に出します。</div>' : ''}
         ${t.holder ? `<div class="notice info">今は貸出中（${esc(uname(t.holder))}さん）なので、このカードは担当の人の「留守宅カード」の一覧にだけ、上の方に出ます。</div>`
           : '<p class="hint">全員の「留守宅カードをえらぶ」の一覧で、<b>「区域係のおすすめ」</b>として上に出ます。ふだん留守宅カードを出していない区域でも、この時間帯のカードだけは出ます。</p>'}
         <p class="q">いつまで出しますか</p>

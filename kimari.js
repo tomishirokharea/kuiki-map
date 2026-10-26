@@ -64,24 +64,24 @@
   const F = {
     lendDays: { s: '返却の目安：', t: '返却の目安（受け取ってから）', v: () => `${lendDays()}日`, w: '期限の見張り（今月中に出したい区域・声かけ候補）・全体の状況（返却の目安を過ぎた貸出）' },
     awayRetPct: { s: '留守宅の目安：', t: '留守宅を回り終えたとみなす割合', v: () => `${awayRetPct()}%`, w: '期限の見張り（正式な返却になるか → 1年の期限）・全体の状況（留守宅カードで回っている区域）' },
+    awayAgainSlot: { s: '訪ね直しの条件：', t: '留守宅を「訪ね直した」と数える条件', v: () => (typeof againSlot === 'function' && againSlot() ? '別の日・別の時間帯' : '別の日'), w: '期限の見張り（正式な返却になるか → 1年の期限）・全体の状況（留守宅カードで回っている区域）' },
     donePct: { s: '完了の目安：', t: '区域カードを「完了」にできる目安', v: () => `${st().donePct}%`, w: '期限の見張り（正式な返却になるか → 1年の期限）' },
     awayTries: { s: '留守宅を終える回数：', t: '留守宅を終える回数', v: () => `${tries()}回`, w: '手紙の候補・何度訪ねても会えない家・まだ試していない家の数' },
-    extOn: { s: '返却後の留守宅カード：', t: '返却後の留守宅カード', v: () => (ext().on ? '使う' : '使わない'), w: '留守宅の状況（返却後の区域）・まだ試していない家の数' },
-    extRest: { s: '寝かせる日数：', t: '寝かせる日数', v: () => `${ext().rest}日`, w: '留守宅の状況（返却後の区域の「寝かせ中」）', need: () => ext().on },
-    extDays: { s: '出す期間：', t: '出す期間', v: () => `${ext().days}日`, w: '留守宅の状況（返却後の区域の「期間が終わった」）', need: () => ext().on },
-    freeAfterDays: { s: '自由に受け取れるまで：', t: '正式に返却されてから、自動で受け取り可になるまで', v: () => `${Number(st().freeAfterDays) || 0}日`, w: '留守宅の状況（返却後の区域が止まる日）' },
+    extRest: { s: '寝かせる日数：', t: '寝かせる日数（完了のあと）', v: () => `${ext().rest}日`, w: '留守宅の状況（完了した区域の「寝かせ中」）' },
+    extDays: { s: 'おすすめに出す期間：', t: 'おすすめに出す期間', v: () => `${ext().days}日`, w: '留守宅の状況（完了した区域の「期間が終わった」）' },
+    freeAfterDays: { s: '自由に受け取れるまで：', t: '正式に返却されてから、自動で受け取り可になるまで', v: () => `${Number(st().freeAfterDays) || 0}日`, w: '留守宅の状況（完了した区域を、おすすめに出すのをやめる日）' },
     awayScope: { s: '試した時間帯の数え方：', t: '試した時間帯の数え方', v: () => (typeof awayRule === 'function' && awayRule().sc ? '前回の巡回も含める' : '今回の巡回だけ'), w: 'まだ試していない家の数・区域ごと' },
     keepMonths: { s: '記録を残す期間：', t: '訪問記録を残す期間', v: () => `${Number(st().keepMonths) || 24}か月`, w: '会えた成果（設定タブにあります）', tab: 'set' }
   };
   // 状況の見出し → 札に出す設定
   const prevH = (id, tag) => { const el = $id(id); let p = el && el.previousElementSibling; while (p && p.tagName !== tag) p = p.previousElementSibling; return p; };
   const BLOCKS = [
-    { h: () => document.querySelector('#adDue > h2'), keys: ['lendDays', 'awayRetPct', 'donePct', 'awayTries'] },
+    { h: () => document.querySelector('#adDue > h2'), keys: ['lendDays', 'awayRetPct', 'awayAgainSlot', 'donePct', 'awayTries'] },
     { h: () => prevH('adTiles', 'H2'), keys: ['lendDays', 'awayRetPct'] },
     { h: () => document.querySelector('#adAch > h2'), keys: ['keepMonths'] },
     { h: () => $id('adCandH'), keys: ['awayTries'] },
-    { h: () => prevH('adAwaySet', 'H2'), keys: ['extOn', 'extRest', 'extDays', 'freeAfterDays'] },
-    { h: () => { const s = $id('adAwaySlots'); return s ? prevHOf(s.closest('.scroll') || s, 'H3') : null; }, keys: ['awayScope', 'extOn', 'awayTries'] },
+    { h: () => prevH('adAwaySet', 'H2'), keys: ['extRest', 'extDays', 'freeAfterDays'] },
+    { h: () => { const s = $id('adAwaySlots'); return s ? prevHOf(s.closest('.scroll') || s, 'H3') : null; }, keys: ['awayScope', 'awayTries'] },
     { h: () => prevH('adAwayTerrs', 'H3'), keys: ['awayScope', 'awayTries'] },
     { h: () => $id('adHardH'), keys: ['awayTries'] }
   ];
@@ -90,16 +90,16 @@
   const num = sel => { const b = document.querySelector(sel); return b ? b.textContent.trim() : null; };
   // 手紙の候補の数（一覧と同じ数え方。一覧は30件まで出して「ほか○件」なので、数は留守宅の索引から数える）
   const hardN = () => { try { return typeof unmetIndex === 'function' ? String([...unmetIndex().values()].flat().filter(x => x.hard).length) : null; } catch (e) { return null; } };
-  const extN = () => { const t = document.querySelector('#adAwaySet table'); return t ? String(Math.max(0, t.querySelectorAll('tr').length - 1)) : (ext().on ? '0' : null); };
+  const extN = () => { const t = document.querySelector('#adAwaySet table'); return t ? String(Math.max(0, t.querySelectorAll('tr').length - 1)) : '0'; }; // 完了した区域の数
   const NOW = {
     lendDays: () => [['声かけ候補', num('#adDue [data-duetl="pace"] b'), '件'], ['今月中に出したい区域', num('#adDue [data-duetl="need"] b'), '件'], ['返却の目安を過ぎた貸出', num('#adTiles [data-tl="over"] b'), '件']],
     awayRetPct: () => [['1年の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
+    awayAgainSlot: () => [['1年の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
     donePct: () => [['1年の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
     awayTries: () => [['手紙の候補', hardN(), '件']],
-    extOn: () => [['返却後の区域', extN(), '区域']],
-    extRest: () => [['返却後の区域', extN(), '区域']],
-    extDays: () => [['返却後の区域', extN(), '区域']],
-    freeAfterDays: () => [['返却後の区域', extN(), '区域']]
+    extRest: () => [['完了した区域', extN(), '区域']],
+    extDays: () => [['完了した区域', extN(), '区域']],
+    freeAfterDays: () => [['完了した区域', extN(), '区域']]
   };
 
   /* ---------- 設定の行に、どの設定かの印（data-krk）を付ける（「？」の説明と同じ見つけ方） ---------- */
@@ -344,7 +344,7 @@
   const SUMS = {
     due: () => [['1年の期限を過ぎた', dueNum('over')], ['期限まで60日以内', dueNum('warn')], ['今月中に出したい', dueNum('need')], ['声かけ候補', dueNum('pace')]],
     tiles: () => [['区域の数', tileNum('terr')], ['返却の目安を過ぎた貸出', tileNum('over')], ['この90日で会えた', tileNum('met')]],
-    away: () => (ext().on ? [['返却後の区域', extN()]] : []),
+    away: () => [['完了した区域', extN()]],
     hard: () => [['手紙の候補', hardN()]]
   };
   const sumHtml = a => a.filter(x => x[1] != null).map(x => `<span class="krn">${esc(x[0])} ${esc(x[1])}</span>`).join('・');

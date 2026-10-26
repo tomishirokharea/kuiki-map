@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.89';
+var APP_JS_VER = '2026.13.90';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -321,7 +321,7 @@ const BIG_SAVE_GAP_MS = 10 * 60000; // 家・記録（大きい部分）を端�
 const FAILED_KEY = 'kuiki_failed'; // 何度送っても受け付けられなかった変更（捨てずに取っておく）
 const ORPHAN_KEY = 'kuiki_orphan', ORPHAN_DAYS = 7; // 合いことばが使えなくなったときの、まだ送っていない変更（同じ人として登録し直したら送る・点検②H-10）
 const metaSigOf = j => JSON.stringify([j.users || null, j.settings || null, j.currentUser || null]);
-const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'schedules', 'users', 's13', 'agedata'];
+const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'schedules', 'users', 's13', 'agedata', 'holds']; // holds＝おすすめの家の押さえ（今行く・予定に入れる。kangaeru.js・2026-10-26）
 const MAP_COLS = ['dnc', 'follows', 'released', 'caution']; // caution＝注意（！）の印（chui.js）
 const RES_NAME = { m: 'met', a: 'away', r: 'refused' };
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -556,9 +556,10 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {}; d.caution = d.caution || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, wxOn: 1, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, wxOn: 1, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7 }, d.settings || {});
     d.s13 = d.s13 || [];
     d.agedata = d.agedata || [];
+    d.holds = d.holds || [];
   },
   /* 控えを作り直す（訪問記録は件数が多いので、idだけ覚える） */
   buildFp() {
@@ -894,6 +895,7 @@ const Store = {
       const cu = (cache.state.users || []).find(u => u.id === cache.state.currentUser);
       if (cu && cu.role === 'admin' && !Array.isArray(cache.state.s13)) this.needMeta = true;
       if (!Array.isArray(cache.state.agedata)) this.needMeta = true; // 年齢データを持っていない保存（この版より前）
+      if (!Array.isArray(cache.state.holds)) this.needMeta = true; // おすすめの押さえを持っていない保存（2026.13.90 より前）
       this.setServer({ seq: cache.seq, state: cache.state }); // すぐ表示して、あとで差分を取りに行く
       this.diskSeq = { houses: cache.seq, visits: cache.seq }; this.bigAt = Date.now(); // 開いた直後に大きな書きこみをしない
       if (legacy) { this.markAll(); this.saveCacheSoon(); } // 新しい形で保存し直す
@@ -1506,7 +1508,7 @@ async function reloadMeta() {
     const r = await api('load', { part: 'meta' });
     Store.sweep('meta'); // 読み直した分を入れる前に、書きもらした変更を送信待ちに入れる
     const st = r.state || {}, d = D();
-    ['territories', 'requests', 'awayCards', 'returns', 'schedules', 's13', 'agedata'].forEach(c => {
+    ['territories', 'requests', 'awayCards', 'returns', 'schedules', 's13', 'agedata', 'holds'].forEach(c => {
       if (!Array.isArray(st[c])) return;
       const old = new Map((d[c] || []).map(x => [x.id, x]));
       d[c] = st[c].map(x => { const cur = old.get(x.id); return cur ? refill(cur, x) : x; }); // 同じ物は中身だけ書きかえる
@@ -2491,6 +2493,12 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.90', items: [
+    ['薦', 'おすすめタブを新しくしました。回り終えた区域で、まだ会えていない家を、近くの数軒ずつ出します。カードを受け取らなくても、空いた時間に回れます'],
+    ['時', '「ほかの時間帯」をえらぶと、その時間帯にまだ訪ねていない家が出ます。「予定に入れる」と、その日の終わりまで、その家をほかの人のおすすめに出しません'],
+    ['地', '「今行く」「地図をひらく」を押すと、地図に区域の線と、回る家の番号が出ます'],
+    ['留', '留守宅カードは、区域が完了するまでになりました。完了したあとの残りの留守宅は、おすすめに出ます。区域係は、留守宅を「訪ね直した」と数える条件（別の日／別の日で、別の時間帯）を「区域の決め」でえらべます']
+  ] },
   { v: '2026.13.89', items: [
     ['時', '時間帯の「土日の夜」などを「週末の夜」と出すようにしました。土曜日だけのことではなく、土曜と日曜のどちらも入ります']
   ] },
@@ -8031,6 +8039,10 @@ function renderInbox() {
     awayRetPct: `<div class="setrow">
       <span>留守宅を回り終えたとみなす割合<br><small class="hint">1回目に会えなかった家のうち、この割合を訪ね直すと、伝道者が返却できます</small></span>
       <div class="rng"><input type="range" min="0" max="100" step="5" value="${awayRetPct()}" data-range="awayRetPct" data-unit="%" aria-label="割合"><output>${awayRetPct()}%</output></div></div>`,
+    awayAgainSlot: `<div class="setrow" data-hk="awayAgainSlot">
+      <span>留守宅を「訪ね直した」と数える条件<br><small class="hint">上の割合を数えるときに、どう訪ねたら「訪ね直した」とするかです。会えた・拒否は、時間帯にかかわらず数えます</small></span>
+      <div class="seg" role="group" aria-label="訪ね直したと数える条件"><button type="button" data-sset="awayAgainSlot" data-v="0" aria-pressed="${!againSlot()}">別の日</button>
+      <button type="button" data-sset="awayAgainSlot" data-v="1" aria-pressed="${againSlot()}">別の日で、別の時間帯</button></div></div>`,
     lowOn: `<div class="setrow" data-hk="lowOn">
       <span>記録の少ない正式返却を、自動で確かめる<br><small class="hint">区域係が目安に届かないまま正式返却にしたとき、決めた日数のあとに記録を数え直し、届いていなければ途中の返却にします</small></span>
       <div class="seg" role="group" aria-label="記録の少ない正式返却を自動で確かめる"><button type="button" data-sset="lowOn" data-v="1" aria-pressed="${Number(st.lowOn) !== 0}">使う</button>
@@ -8106,7 +8118,7 @@ function renderInbox() {
         <button type="button" data-sset="memoSync" data-v="0" aria-pressed="${st.memoSync === 0}">使わない</button></div></div>`,
   };
   const lendBox = $('#krLend'), etcBox = $('#krEtc');
-  if (lendBox) lendBox.innerHTML = ['lendDays', 'donePct', 'awayRetPct', 'lowOn', 'lowWait', 'autoFree', 'freeAfterDays', 'skipDays', 'followSkipDays', 'skipDone'].map(k => R[k]).join('');
+  if (lendBox) lendBox.innerHTML = ['lendDays', 'donePct', 'awayRetPct', 'awayAgainSlot', 'lowOn', 'lowWait', 'autoFree', 'freeAfterDays', 'skipDays', 'followSkipDays', 'skipDone'].map(k => R[k]).join('');
   if (etcBox) etcBox.innerHTML = ['selfTakeMax', 'holdMaxPersonal', 'holdMaxGroup', 'reqMaxPersonal', 'reqMaxGroup', 'groupOn', 'groupMax', 'lockOthers', 'memoSync'].map(k => R[k]).join('');
 }
 function approveReq(id) {
@@ -8154,7 +8166,7 @@ function openReturnSheet(tid) {
     : `<p class="retlbl">1回目に訪ねた家</p>${bar(r.pct1, '1回目に訪ねた割合')}
        <p class="muted">${r.c.done} / ${total}軒（${r.pct1}%）・目安 ${th}%</p>`;
   const awayPart = plan.kind === 'partial' || !a.n ? ''
-    : `<p class="retlbl">留守だった家を、別の日に訪ね直した</p>${bar(a.pct, '留守宅を訪ね直した割合')}
+    : `<p class="retlbl">${againSlot() ? '留守だった家を、別の日・別の時間帯に訪ね直した' : '留守だった家を、別の日に訪ね直した'}</p>${bar(a.pct, '留守宅を訪ね直した割合')}
        <p class="muted">${a.n}軒のうち ${a.done}軒（${a.pct}%）・目安 ${ret}%</p>`;
   const left = Math.max(0, a.n - a.done);
   const result = plan.kind === 'done'
@@ -8303,10 +8315,12 @@ function poolInfo(t) {
         continue;
       }
       if (metBetween(k, since, first)) continue;
-      if (!visitsOf(k).some(v => v.at >= since && v.at <= first) && recentMet(k)) continue;
+      const vis1 = visitsOf(k).some(v => v.at >= since && v.at <= first);
+      if (!vis1 && recentMet(k)) continue;
       n++;
+      if (vis1) { const a = revisitAt(k, since, first); if (a) times.push(a); continue; } // 1回目に訪ねた家：訪ね直したと数える条件（係の設定）に合う、いちばん早い記録
       const after = visitsOf(k).filter(v => v.at > first);
-      if (after.length) times.push(after[after.length - 1].at); // いちばん早く訪ね直した日
+      if (after.length) times.push(after[after.length - 1].at); // 1回目に訪ねていなかった家：いちばん早く訪ねた日
     }
   }
   times.sort();
@@ -8575,6 +8589,21 @@ function extState(t) {
   return { open: why === 'open', why, until, end, using };
 }
 const extRl = () => { const r = awayRule(), x = extSet(); return Object.assign({}, r, { cap: x.cap, gap: Math.max(r.gap, x.rest) }); };
+/* 完了した区域（S-13 に完了として記録したあと、次に区域カードとして受け取られるまで）。
+   2026-10-26 から、残った留守宅は留守宅カードにせず、おすすめタブだけに出す（区域カードのタブの役目は、完了まで） */
+function afterDone(t) { return !!t && !t.holder && !t.awayPoolAt && !!t.completedAt && !t.dummy && !!roundBounds(t.id).ext; }
+/* 完了した区域の留守宅を、おすすめに出す期間（係の設定：寝かせる日数 extRest・出す期間 extDays・次の新規の前に止める extStopBefore）。
+   返り値：null（完了した区域でない）／{ open, why：'open' 出している・'rest' 寝かせ中・'over' 期間が終わった・'stop' 止めている, from, end } */
+function recoState(t) {
+  if (!afterDone(t)) return null;
+  const x = extSet(), comp = Date.parse(t.completedAt), now = Date.now();
+  let end = comp + x.days * DAY;
+  const fd = Number(D().settings.freeAfterDays) || 0;
+  if (Number(D().settings.autoFree) === 1 && lendMode(t) === 'auto' && fd > 0) end = Math.min(end, comp + (fd - x.before) * DAY);
+  const from = comp + x.rest * DAY;
+  const why = t.extStop || lendMode(t) === 'stop' ? 'stop' : now >= end ? 'over' : now < from ? 'rest' : 'open';
+  return { open: why === 'open', why, from, end };
+}
 const rlFor = t => (extState(t) ? extRl() : awayRule());
 /* その日限りのカード：家が awayDayOnly 軒以下（0＝使わない）。受け取るときの期限と、一覧の「今日だけ」の印に使う */
 const dayOnlyN = n => { const d = Number(D().settings.awayDayOnly) || 0; return d > 0 && n <= d; };
@@ -8617,53 +8646,83 @@ function awayOk(x, slot, rl, now) {
    （返却後の区域は、終わった巡回から続けて見る。awayN は正式返却の翌日からの留守の日の数。ext の説明は roundBounds）
    triedAll・first：これまでの全記録（「手紙の候補」「いつから会えていないか」の材料として残す） */
 let UM_MEMO = null; // 全体を調べた結果は、同じ画面の描きかえの間（同じ処理の中）だけ使い回す（3万件を何度も1周しない）
+/* 1つの家（部屋）を調べる。留守宅でなければ null。b は roundBounds の結果。
+   完了した区域（b.ext）は、終わった巡回から続けて見る（おすすめに出す留守宅。2026-10-26 から、係の設定 extOn にかかわらず） */
+function umItem(k, h, u, b, rl, now, gapMs) {
+  const s = sum(k);
+  if (!s.n) return null; // 一度も訪ねていない家は、留守宅ではない
+  // 完了した区域（e）：終わった巡回の始まり（e.from）から今までを見る。上限回数に数えるのは、正式返却の翌日（e.after）からの留守の日だけ
+  const e = b.ext;
+  const st0 = e ? e.from : b.start, capFrom = e ? e.after : b.start;
+  const sc = e ? (rl.sc ? e.prev : e.from) : (rl.sc ? b.prev : b.start), lo = sc < st0 ? sc : st0;
+  let tried = 0, other = false, seen = false; const days = new Set();
+  for (const v of visitsOf(k)) { // 新しい順
+    if (v.at < lo) break;
+    if (v.at >= st0) { if (v.result !== 'away') { other = true; break; } seen = true; if (v.at >= capFrom) days.add(ymd(new Date(v.at))); }
+    if (v.result === 'away' && v.at >= sc) tried |= SLOT_BIT[slotOfVisit(v)];
+  }
+  if (other || !(e ? seen : days.size)) return null; // 今回の巡回（完了した区域は終わった巡回から）で会えた家・留守の記録がない家は、対象外
+  let oldSlot = null;
+  if (tried === FULL_SLOTS) { // いちばん前に試した時間帯（最後に留守だった日がいちばん古い時間帯）
+    const at = {};
+    for (const v of visitsOf(k)) { if (v.result === 'away' && v.at >= sc) { const sl = slotOfVisit(v); if (!at[sl]) at[sl] = v.at; } }
+    oldSlot = SLOTS.reduce((a, sl) => (!a || at[sl] < at[a] ? sl : a), null);
+  }
+  const first = visitsOf(k)[visitsOf(k).length - 1]; // いちばん古い記録（いつから会えていないか）
+  return { k, h, u, tried, triedAll: s.slots, awayN: days.size, oldSlot, lastAt: s.last.at, first: first ? first.at : s.last.at,
+    recent: now - Date.parse(s.last.at) < gapMs, hard: slotCount(s.slots) >= SLOTS.length };
+}
 function unmetIndex(onlyTid, rlOv) {
   // onlyTid：1つの区域だけ調べるとき（区域のようすなど）。3万件を1周せず、その区域の家だけ見る。結果は全体を調べたときと同じ
   // rlOv：留守宅カードに控えたルール（そのカードの数え方で調べる）。なければ今の設定
-  const rl = rlOv || awayRule(), memoKey = D().visits.length + '|' + JSON.stringify(rl) + '|' + D().houses.length + '|' + (D().returns || []).length + '|' + D().settings.extOn;
+  const rl = rlOv || awayRule(), memoKey = D().visits.length + '|' + JSON.stringify(rl) + '|' + D().houses.length + '|' + (D().returns || []).length;
   if (!onlyTid && !rlOv && UM_MEMO && UM_MEMO.src === D().visits && UM_MEMO.key === memoKey) return UM_MEMO.m;
-  const m = new Map(), now = Date.now(), bm = new Map(), gapMs = rl.gap * DAY, extOn = Number(D().settings.extOn) !== 0;
+  const m = new Map(), now = Date.now(), bm = new Map(), gapMs = rl.gap * DAY;
   for (const h of (onlyTid ? (HBT.get(onlyTid) || []) : D().houses)) {
     if (!h.terrId) continue;
     for (const u of targets(h)) {
       const k = K(h.id, u);
       if (D().dnc[k] || D().follows[k] || relOf(k)) continue;
       if (coveredBySpecial(h, u)) continue; // 特別区域（コンビニなど）で回る家は、ふつうの区域の留守宅カードに入れない（2回訪ねないように）
-      const s = sum(k);
-      if (!s.n) continue; // 一度も訪ねていない家は、留守宅ではない
       let b = bm.get(h.terrId); if (!b) { b = roundBounds(h.terrId); bm.set(h.terrId, b); }
-      // 返却後の区域（e）：終わった巡回の始まり（e.from）から今までを見る。上限回数に数えるのは、正式返却の翌日（e.after）からの留守の日だけ
-      const e = extOn ? b.ext : null;
-      const st0 = e ? e.from : b.start, capFrom = e ? e.after : b.start;
-      const sc = e ? (rl.sc ? e.prev : e.from) : (rl.sc ? b.prev : b.start), lo = sc < st0 ? sc : st0;
-      let tried = 0, other = false, seen = false; const days = new Set();
-      for (const v of visitsOf(k)) { // 新しい順
-        if (v.at < lo) break;
-        if (v.at >= st0) { if (v.result !== 'away') { other = true; break; } seen = true; if (v.at >= capFrom) days.add(ymd(new Date(v.at))); }
-        if (v.result === 'away' && v.at >= sc) tried |= SLOT_BIT[slotOfVisit(v)];
-      }
-      if (other || !(e ? seen : days.size)) continue; // 今回の巡回（返却後は終わった巡回から）で会えた家・留守の記録がない家は、対象外
-      let oldSlot = null;
-      if (tried === FULL_SLOTS) { // いちばん前に試した時間帯（最後に留守だった日がいちばん古い時間帯）
-        const at = {};
-        for (const v of visitsOf(k)) { if (v.result === 'away' && v.at >= sc) { const sl = slotOfVisit(v); if (!at[sl]) at[sl] = v.at; } }
-        oldSlot = SLOTS.reduce((a, sl) => (!a || at[sl] < at[a] ? sl : a), null);
-      }
+      const x = umItem(k, h, u, b, rl, now, gapMs);
+      if (!x) continue;
       if (!m.has(h.terrId)) m.set(h.terrId, []);
-      const first = visitsOf(k)[visitsOf(k).length - 1]; // いちばん古い記録（いつから会えていないか）
-      m.get(h.terrId).push({ k, h, u, tried, triedAll: s.slots, awayN: days.size, oldSlot, lastAt: s.last.at, first: first ? first.at : s.last.at,
-        recent: now - Date.parse(s.last.at) < gapMs, hard: slotCount(s.slots) >= SLOTS.length });
+      m.get(h.terrId).push(x);
     }
   }
   if (!onlyTid && !rlOv) { UM_MEMO = { src: D().visits, key: memoKey, m }; Promise.resolve().then(() => { if (UM_MEMO && UM_MEMO.m === m) UM_MEMO = null; }); }
   return m;
+}
+/* 特別区域の「まだ会えていない家」（unmetIndex と同じ数え方）。完了した特別区域の留守宅を、おすすめに出すときに使う（2026-10-26） */
+function unmetOfSpecial(t, rlOv) {
+  const out = [];
+  if (!isSpecial(t)) return out;
+  const rl = rlOv || awayRule(), now = Date.now(), gapMs = rl.gap * DAY, b = roundBounds(t.id);
+  for (const h of housesOf(t.id)) {
+    for (const u of specialTargets(h, t)) {
+      const k = K(h.id, u);
+      if (D().dnc[k] || D().follows[k] || relOf(k)) continue;
+      const x = umItem(k, h, u, b, rl, now, gapMs);
+      if (x) out.push(x);
+    }
+  }
+  return out;
 }
 /* 区域の「試した時間帯」：まだ会えていない家で試した時間帯を、すべて合わせた数（分母は SLOTS.length）。
    「どこまで工夫したか」を見せる参考の数字で、区域の完了の条件ではない（完了の条件は poolInfo・roundInfo）。
    会えていない家がなければ null（出さない）。items は unmetIndex() の区域の項目（呼び出し側で1回だけ作ったものを使い回す） */
 const triedUnion = items => { let m = 0; for (const x of (items || [])) m |= x.tried; return m; };
 const triedOf = items => { const xs = (items || []).filter(x => !x.hard); return xs.length ? slotCount(triedUnion(xs)) : null; }; // 10通りすべて留守の家（hard）は、カード・um と同じく除く（入れると必ず 10/10 になる）
-function lockedKeys() { const s = new Set(); activeCards().forEach(c => c.keys.forEach(k => s.add(k))); return s; }
+function lockedKeys() { const s = new Set(); activeCards().forEach(c => c.keys.forEach(k => s.add(k))); liveHolds().forEach(h => (h.keys || []).forEach(k => s.add(k))); return s; }
+/* おすすめの押さえ（holds・kangaeru.js・2026-10-26）：完了した区域の留守宅を「今行く」（今日の終わりまで）・「予定に入れる」（予定の日の終わりまで）で押さえる。
+   押さえた家は、ほかの人のおすすめに出ない。その区域が次に区域カードとして受け取られたら（担当者・完了日が変わったら）効かない */
+function holdLive(h, now) {
+  if (!h || h.endedAt || !(Date.parse(h.until) > (now || Date.now()))) return false;
+  const t = terrById(h.terrId);
+  return !!t && !t.holder && !t.awayPoolAt && String(t.completedAt || '') === String(h.comp || '');
+}
+const liveHolds = () => { const now = Date.now(); return (D().holds || []).filter(h => holdLive(h, now)); };
 /* カードに入れる家：上限回数・最短間隔・時間帯のルール（rl。なければ今の設定）に合う家を、長く会えていない家から、上限の数まで */
 function cardKeys(items, slot, locked, rl) {
   rl = rl || awayRule();
@@ -8673,17 +8732,16 @@ function cardKeys(items, slot, locked, rl) {
   return max ? list.slice(0, max) : list;
 }
 function awaySuggestions(uid, slots) {
-  const idx = unmetIndex(), locked = lockedKeys(), res = [], xrl = extRl();
+  const idx = unmetIndex(), locked = lockedKeys(), res = [];
   for (const t of D().territories) {
     if (!awayEligibleTerr(t, uid) || !idx.has(t.id)) continue;
-    const xs = extState(t); // 返却後の区域は、寝かせ中・受け取り中・期間が終わった・止めているときは出さない（重点の時間帯があっても）
-    if (xs && !xs.open) continue;
+    if (afterDone(t)) continue; // 完了した区域の残りの留守宅は、留守宅カードにせず、おすすめだけに出す（2026-10-26。重点の時間帯があっても）
     const base = awayEligibleBase(t, uid), fs = focusSlots(t);
     for (const slot of slots) {
       const focus = fs.includes(slot);
       if (!base && !focus) continue; // 重点の時間帯だけで出している区域は、その時間帯だけ
-      const keys = cardKeys(idx.get(t.id), slot, locked, xs ? xrl : undefined);
-      if (keys.length) res.push({ t, slot, keys, focus, ext: !!xs, dist: myPos ? distM(myPos, center(t.polygon)) : null });
+      const keys = cardKeys(idx.get(t.id), slot, locked);
+      if (keys.length) res.push({ t, slot, keys, focus, ext: false, dist: myPos ? distM(myPos, center(t.polygon)) : null });
     }
   }
   res.sort(myPos ? (a, b) => a.dist - b.dist || b.keys.length - a.keys.length : (a, b) => b.keys.length - a.keys.length);
@@ -8700,21 +8758,18 @@ function takeAwayCard(tid, slot, grp) {
   }
   const t = terrById(tid);
   if (!t || !awayEligibleTerr(t, me().id) || (!awayEligibleBase(t, me().id) && !focusSlots(t).includes(slot))) { toast('このカードは受け取れません'); return; }
-  const xs = extState(t); // 返却後の区域：寝かせ中・ほかの人が受け取り中などのときは、受け取れない
-  if (xs && !xs.open) { toast('このカードは今は受け取れません'); renderAll(); return; }
-  const rl = xs ? extRl() : awayRule(); // 受け取った時点のルールを、カードに控える（あとで係が設定を変えても、このカードは変わらない）
+  if (afterDone(t)) { toast('この区域は回り終えています。残りの留守宅は、おすすめに出ています'); renderAll(); return; } // 完了した区域は、留守宅カードにしない（2026-10-26）
+  const rl = awayRule(); // 受け取った時点のルールを、カードに控える（あとで係が設定を変えても、このカードは変わらない）
   const keys = cardKeys(unmetIndex().get(tid) || [], slot, lockedKeys(), rl);
   if (!keys.length) { toast('このカードの家は、今はありません'); renderAll(); return; }
   const now = new Date();
   const eod = new Date(now); eod.setHours(23, 59, 59, 0); // 今日の終わり（端末の時刻）
   let exp = Date.parse(awayExpiry(t, now.getTime()));
-  if (xs) exp = Math.max(Math.min(exp, xs.end), eod.getTime()); // 返却後は出す期間の終わりまで（今日の終わりより前にはしない）
   // その日限り：家が少ないカード（awayDayOnly 軒以下。0＝使わない）は、受け取った日の終わりに自動で終わる。返却後に限らず、個人・グループのカードすべて
   const day = dayOnlyN(keys.length);
   if (day) exp = eod.getTime();
   const card = { id: 'c' + uid(), terrId: tid, slot, by: me().id, at: now.toISOString(),
     expiresAt: new Date(exp).toISOString(), keys, rl };
-  if (xs) card.ext = 1;
   if (day) card.day = 1;
   if (G) { card.group = myGroup(); card.helpers = []; card.mode = awayGroupMode === 'split' ? 'split' : 'share'; card.view = 'new'; card.parts = []; }
   if (G && reqUse === 'all') card.use = 'all'; // 全体の集まりで回る留守宅カード（2026-10-24）
@@ -8838,7 +8893,7 @@ function roundInfo(tid, anyHolder) {
         else if (!visitedSince(k, since) && recentMet(k)) st = 'recent';  // 最近会えていたので、とばした家
         else {
           aw.n++; aw.slots |= slotsBetween(k, since, first);
-          if (visitedSince(k, first)) { st = 'done'; aw.done++; }          // 1回目のあと、訪ね直した
+          if (againSlot() ? revisitAt(k, since, first) : visitedSince(k, first)) { st = 'done'; aw.done++; } // 1回目のあと、訪ね直した（数える条件は係の設定）
           else { st = 'todo'; items.push(Object.assign({ k, h, u }, scoreTarget(k, cur))); }
         }
       }
@@ -8862,18 +8917,39 @@ function roundInfo(tid, anyHolder) {
 }
 /* 1回目の段階の留守宅：回りはじめた日（since）から見て、最初に訪ねた日に会えなかった家（まだ訪ねていない家もふくむ）。
    返り値：null＝留守宅ではない（最初に訪ねた日に会えた）／''＝まだ別の日に訪ね直していない／日時＝別の日に訪ね直した最初の時刻
-   （同じ日に何回訪ねても1回。別の日に訪ねたら、会えても留守でも「訪ね直した」） */
+   （同じ日に何回訪ねても1回。別の日に訪ねたら「訪ね直した」。係が「別の日で、別の時間帯」にしているときは、留守なら時間帯もちがうときだけ。againOk） */
 function awayAgain(k, since) {
   const vs = visitsOf(k); // 新しい順
   let i = vs.length - 1;
   while (i >= 0 && vs[i].at < since) i--;
   if (i < 0) return '';
-  const d0 = ymd(new Date(vs[i].at));
+  const d0 = ymd(new Date(vs[i].at)), days0 = new Set([d0]);
+  let s0 = 0; // 最初に訪ねた日に試した時間帯
   for (; i >= 0; i--) { // 古い順にたどる
     const v = vs[i];
-    if (ymd(new Date(v.at)) !== d0) return v.at;
+    if (ymd(new Date(v.at)) !== d0) { if (againOk(v, days0, s0)) return v.at; continue; } // 別の日：数える条件に合わなければ、次の記録を見る
     if (v.result === 'met') return null;
+    s0 |= SLOT_BIT[slotOfVisit(v)];
   }
+  return '';
+}
+/* 訪ね直したと数える条件（係の設定 awayAgainSlot・2026-10-26。はじめは「別の日で、別の時間帯」）
+   ・0＝別の日：1回目に訪ねた日と別の日に訪ねれば、会えても留守でも「訪ね直した」（今までの決まり）
+   ・1＝別の日で、別の時間帯：さらに、1回目に訪ねた時間帯と別の時間帯で訪ねる。会えた・拒否は、時間帯にかかわらず数える */
+const againSlot = () => !Store.data || Number(D().settings.awayAgainSlot) !== 0;
+function againOk(v, days0, s0) {
+  if (days0.has(ymd(new Date(v.at)))) return false;
+  if (!againSlot() || v.result !== 'away') return true;
+  return !(s0 & SLOT_BIT[slotOfVisit(v)]);
+}
+/* 1回目の段階（a〜b）のあとで、訪ね直したと数える最初の記録の日時（なければ ''）。
+   別の日の決まりでは、今までどおり b のあとの記録なら何でも数える */
+function revisitAt(k, a, b) {
+  const vs = visitsOf(k); // 新しい順
+  if (!againSlot()) { for (let i = vs.length - 1; i >= 0; i--) if (vs[i].at > b) return vs[i].at; return ''; }
+  let s0 = 0; const days0 = new Set();
+  vs.forEach(v => { if (v.at >= a && v.at <= b) { s0 |= SLOT_BIT[slotOfVisit(v)]; days0.add(ymd(new Date(v.at))); } });
+  for (let i = vs.length - 1; i >= 0; i--) { const v = vs[i]; if (v.at > b && againOk(v, days0, s0)) return v.at; }
   return '';
 }
 /* 返却ボタンを押したときの決め方（区域係の設定の目安で、自動で決める）
@@ -9250,36 +9326,46 @@ function openSlotSheet() {
   paint();
 }
 
-/* 係：返却後の留守宅カード（区域＞状況の「留守宅カードの出し方」の下）。設定と、返却後の区域の一覧
-   一覧は renderAwayAdmin で作った idx（unmetIndex の結果）を使い回す（区域ごとに unmetIndex を呼ばない）。受け取り中の人の名前は係の画面だけ */
-/* 返却後の留守宅カード：set＝設定の行（状況の右の「区域の決め」に出す）・table＝返却後の区域の表（左の状況に出す） */
+/* 係：完了のあとの留守宅（おすすめ）（2026-10-26。前は「返却後の留守宅カード」）
+   完了した区域（S-13 に完了として記録したあと、次に区域カードとして受け取られるまで）の残りの留守宅は、留守宅カードにせず、
+   おすすめタブだけに出す。set＝設定の行（状況の右の「区域の決め」に出す）・table＝完了した区域の表（左の状況に出す）。
+   表は renderAwayAdmin で作った idx（unmetIndex の結果）を使い回す（区域ごとに unmetIndex を呼ばない） */
 function extAdminHtml(idx, rrow, stpd) {
   const x = extSet(), st = D().settings, fd = Number(st.freeAfterDays) || 0, auto = Number(st.autoFree) === 1 && fd > 0;
-  const head = rrow('返却後の留守宅カード', '区域が正式に返却されたあと、まだ会えていない家を、まだ試していない時間帯だけで、だれでも受け取れるカードにします',
-      `<div class="seg" role="group"><button type="button" data-sset="extOn" data-v="1" aria-pressed="${x.on}">使う</button>
-        <button type="button" data-sset="extOn" data-v="0" aria-pressed="${!x.on}">使わない</button></div>`) +
-    (x.on ? rrow('寝かせる日数', '正式返却から、また前のカードが終わってから、この日数は出しません。家ごとにも、最後に訪ねてからこの日数は入れません', stpd('extRest', x.rest, '日', '寝かせる日数', 1)) +
-      rrow('1軒あたりの回数', '返却後に、同じ家を訪ねる上限です（同じ日は1回）', stpd('extCap', x.cap, '回', '1軒あたりの回数', 1)) +
-      rrow('出す期間', '正式返却から、この日数で止めます' + (auto && x.days >= fd ? `<br><b>自由に受け取れる日のほうが先に来ます。その${x.before}日前で止まります</b>` : ''), stpd('extDays', x.days, '日', '出す期間', 7)) +
-      rrow('次の新規の前に止める', `自動受け取りを使う区域では、自由に受け取れる日（${fd > 0 ? `返却から${fd}日` : 'まだ決めていません'}）のこの日数前で止めます`, stpd('extStopBefore', x.before, '日', '次の新規の前に止める日数', 7)) : '');
-  if (!x.on) return { set: head, table: '' };
+  const om = Math.max(1, Math.min(5, Number(st.osaeMax) || 2)), od = Math.max(1, Math.min(14, Number(st.osaeDays) || 7)), rc = Math.max(1, Math.min(5, Number(st.recoCount) || 3));
+  const lockOn = Number(st.recoLock) === 1;
+  const set = `<p class="hint">区域が完了した（S-13 に完了として記録した）あと、次に区域カードとして受け取られるまで、残りの留守宅を、留守宅カードにせず、全員の「おすすめ」タブに近くの数軒として出します。</p>` +
+    rrow('寝かせる日数', '完了してから、この日数はおすすめに出しません。家ごとにも、最後に訪ねてからこの日数は出しません', stpd('extRest', x.rest, '日', '寝かせる日数', 1)) +
+    rrow('1軒あたりの回数', '完了のあとに、同じ家を留守宅として訪ねる上限です（同じ日は1回）', stpd('extCap', x.cap, '回', '1軒あたりの回数', 1)) +
+    rrow('おすすめに出す期間', '完了してから、この日数で止めます' + (auto && x.days >= fd ? `<br><b>自由に受け取れる日のほうが先に来ます。その${x.before}日前で止まります</b>` : ''), stpd('extDays', x.days, '日', 'おすすめに出す期間', 7)) +
+    rrow('次の新規の前に止める', `自動受け取りを使う区域では、自由に受け取れる日（${fd > 0 ? `完了から${fd}日` : 'まだ決めていません'}）のこの日数前で止めます。次に区域カードで回る人と重ならないようにするためです`, stpd('extStopBefore', x.before, '日', '次の新規の前に止める日数', 7)) +
+    `<div class="setrow"><span>1つのおすすめに入れる家の数<br><small class="hint">近い家どうしを、この軒数ずつまとめて出します</small></span><div class="stepper">
+      <button type="button" data-kset="recoCount" data-d="-1" aria-label="家の数を減らす">−</button><output class="wide">${rc}軒まで</output>
+      <button type="button" data-kset="recoCount" data-d="1" aria-label="家の数を増やす">＋</button></div></div>` +
+    rrow('オートロックの建物も出す', '住む人への配慮で、オートロックの建物は1回に訪ねるのを3〜4件までにしているため、はじめは出しません',
+      `<div class="seg" role="group"><button type="button" data-sset="recoLock" data-v="1" aria-pressed="${lockOn}">出す</button>
+        <button type="button" data-sset="recoLock" data-v="0" aria-pressed="${!lockOn}">出さない</button></div>`) +
+    rrow('1人が押さえられる予定の数', '「予定に入れる」をすると、その日の終わりまで、その家をほかの人のおすすめに出しません。同時にいくつまで押さえられるかです', stpd('osaeMax', om, 'つまで', '押さえられる予定の数', 1)) +
+    rrow('何日先まで予定に入れられるか', '先の予定ほど、家を長く押さえることになります。使わなかった家は、予定の日が終わると、またおすすめに出ます', stpd('osaeDays', od, '日先まで', '予定に入れられる日数', 1));
+  const live = liveHolds(), heldBy = new Map();
+  live.forEach(h => { heldBy.set(h.terrId, (heldBy.get(h.terrId) || 0) + (h.keys || []).length); });
   const rows = D().territories.slice().sort(byNo).map(t => {
-    const xs = extState(t); if (!xs) return '';
-    const items = idx.get(t.id) || [], tc = triedOf(items);
-    const state = xs.why === 'rest' ? `寝かせ中（${fmtDay(new Date(xs.until).toISOString())}から）` : xs.why === 'open' ? '出せる'
-      : xs.why === 'using' ? `受け取り中${xs.using && xs.using.by && xs.using.by !== 'x' ? `<span data-notr>（${esc(uname(xs.using.by))}さん）</span>` : ''}`
-      : xs.why === 'over' ? `期間が終わった（${fmtDay(new Date(xs.end - 1).toISOString())}まで）` : '止めている';
-    return `<tr><th>区域${esc(t.no)}</th><td>${items.length}軒</td><td>${tc == null ? '—' : tc + ' / ' + SLOTS.length}</td><td>${state}</td>
+    const rs = recoState(t); if (!rs) return '';
+    const items = isSpecial(t) ? unmetOfSpecial(t) : (idx.get(t.id) || []);
+    const state = rs.why === 'rest' ? `寝かせ中（${fmtDay(new Date(rs.from).toISOString())}から）` : rs.why === 'open' ? 'おすすめに出している'
+      : rs.why === 'over' ? `期間が終わった（${fmtDay(new Date(rs.end - 1).toISOString())}まで）` : '止めている';
+    const hn = heldBy.get(t.id) || 0;
+    return `<tr><th>区域${esc(t.no)}</th><td>${items.length}軒</td><td>${state}</td><td>${hn ? `${hn}軒` : '—'}</td>
       <td>${lendMode(t) === 'stop' ? '<span class="muted">貸出中止</span>' : `<button type="button" class="btn small" data-extstop="${esc(t.id)}">${t.extStop ? '出す' : '止める'}</button>`}</td></tr>`;
   }).join('');
-  return { set: head, table: `<p class="q" data-hqk="extList">返却後の区域</p>` + (rows
-    ? `<div class="scroll"><table class="slots narrow"><tr><th>区域</th><th>残りの家</th><th>区域で試した時間帯</th><th>状態</th><th></th></tr>${rows}</table></div>`
-    : '<p class="muted">今、返却後の区域はありません。</p>') };
+  return { set, table: `<p class="q" data-hqk="extList">完了した区域（残りの留守宅は、おすすめに出します）</p>` + (rows
+    ? `<div class="scroll"><table class="slots narrow"><tr><th>区域</th><th>残りの家</th><th>おすすめ</th><th>予定で押さえ中</th><th></th></tr>${rows}</table></div>`
+    : '<p class="muted">今、完了した区域はありません。</p>') };
 }
-/* 係の画面：返却後の留守宅カードを、区域ごとに止める／出す */
+/* 係の画面：完了した区域の残りの留守宅を、区域ごとにおすすめに出す／止める */
 function toggleExtStop(tid) {
   const t = terrById(tid); if (!t) return;
-  commit(t.extStop ? `区域${t.no}の返却後の留守宅カードを、出すようにしました` : `区域${t.no}の返却後の留守宅カードを、止めました`, () => { if (t.extStop) delete t.extStop; else t.extStop = true; });
+  commit(t.extStop ? `区域${t.no}の残りの留守宅を、おすすめに出すようにしました` : `区域${t.no}の残りの留守宅を、おすすめに出さないようにしました`, () => { if (t.extStop) delete t.extStop; else t.extStop = true; });
 }
 
 /* 係：留守宅の状況 */
@@ -9297,7 +9383,7 @@ function renderAwayAdmin() {
   const stpd = (key, val, unit, label, d) => `<div class="stepper"><button type="button" data-aset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${val}${unit}</output>
     <button type="button" data-aset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div>`;
   const dayOnly = Number(st.awayDayOnly) || 0;
-  // 留守宅の設定の行は、状況の右の「区域の決め」（kimari.js）に出す。左の「留守宅の状況」には、返却後の区域の表だけを出す
+  // 留守宅の設定の行は、状況の右の「区域の決め」（kimari.js）に出す。左の「留守宅の状況」には、完了した区域の表だけを出す
   const awayBox = $('#krAway'), extBox = $('#krExt'), ex = extAdminHtml(idx, rrow, stpd);
   if (extBox) extBox.innerHTML = ex.set;
   $('#adAwaySet').innerHTML = ex.table;
@@ -9307,7 +9393,8 @@ function renderAwayAdmin() {
     rrow('同じ家に同じ時間帯を重ねない', 'オンのときは、同じ家を同じ時間帯（例：平日の朝）では訪ねません。10通りすべて試した家は、いちばん前に試した時間帯から順に戻ります', two('awayNoRepeat', rl.nr, [1, 'オン'], [0, 'オフ'])) +
     rrow('試した時間帯の数え方', 'どの時間帯を「試した」とみなすかだけが変わります。留守宅になる家の範囲は変わりません（今回の巡回で会えていない家です）', two('awayScope', rl.sc, [0, '今回の巡回だけ'], [1, '前回の巡回も含める'])) +
     `<p class="hint">設定を変えても、今出ているカードには反映されません。次に受け取るカードから変わります。</p>
-    <p class="hint">巡回：正式返却のあと、次に区域カードとして受け取った日から、次の正式返却まで。返却後の留守宅カードの期間は、前の巡回の続きです。</p>
+    <p class="hint">巡回：正式返却のあと、次に区域カードとして受け取った日から、次の正式返却まで。完了のあと（おすすめに出す期間）は、前の巡回の続きです。</p>
+    <p class="hint">留守宅カードは、区域が完了する（S-13 に記録する）までです。完了のあとの残りの留守宅は、「完了のあとの留守宅（おすすめ）」の決めで、おすすめタブに出します。</p>
     <p class="q"><b>留守宅カードの出し方</b></p>` +
     `<div class="setrow"><span>留守宅カードが自動で終わるとき<br><small class="hint">「区域の返却の目安まで」は、区域を受け取った日から返却の目安（${lendDays()}日）までです。目安がない区域は、下の日数で終わります</small></span>
       <div class="seg" role="group"><button type="button" data-sset="awayExp" data-v="0" aria-pressed="${Number(st.awayExp) !== 1}">日数で</button>
@@ -12354,6 +12441,7 @@ const RECO_LIM = { recoCount: [1, 5], recoDist: [100, 3000], recoLongDays: [30, 
 const recoOn = () => !!Store.data && Number(D().settings.recoOn) !== 0;
 function recoLabel(src) {
   if (!src || String(src).indexOf('reco') !== 0) return '';
+  if (src === 'reco:after') return 'おすすめ（完了のあとの留守宅）';
   const r = RECO_KINDS2.find(x => 'reco:' + x[0] === src);
   return r ? r[2] : 'おすすめ';
 }
@@ -12472,40 +12560,28 @@ function maybeAutoLocate() {
 /* 係の画面：おすすめの設定と、種類ごとの会えた割合 */
 function renderRecoAdmin() {
   const box = $('#adReco'); if (!box) return;
-  const st = D().settings, bits = Number(st.recoKinds) || 0, on = Number(st.recoOn) !== 0;
-  const step = (key, label, val, d, hint) => `<div class="setrow"><span>${label}${hint ? `<br><small class="hint">${hint}</small>` : ''}</span><div class="stepper">
-    <button type="button" data-kset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${val}</output>
-    <button type="button" data-kset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div></div>`;
+  const st = D().settings, on = Number(st.recoOn) !== 0;
   const flag = (key, label, hint, a, b) => `<div class="setrow"><span>${label}<br><small class="hint">${hint}</small></span>
     <div class="seg" role="group" aria-label="${label}"><button type="button" data-sset="${key}" data-v="1" aria-pressed="${Number(st[key]) !== 0}">${a}</button><button type="button" data-sset="${key}" data-v="0" aria-pressed="${Number(st[key]) === 0}">${b}</button></div></div>`;
-  const since = Date.now() - 90 * DAY, stat = {};
+  // おすすめから訪ねた記録（直近90日）：2026-10-26 からは、完了のあとの留守宅（reco:after）だけ。前の種類の記録は「前の形のおすすめ」にまとめる
+  const since = Date.now() - 90 * DAY, stat = { after: { n: 0, m: 0 }, old: { n: 0, m: 0 } };
   D().visits.forEach(v => {
     if (!v.src || String(v.src).indexOf('reco') !== 0 || Date.parse(v.at) < since) return;
-    const rk = String(v.src).split(':')[1] || '?', s = stat[rk] || (stat[rk] = { n: 0, m: 0 });
+    const s = stat[String(v.src) === 'reco:after' ? 'after' : 'old'];
     s.n++; if (v.result === 'met') s.m++;
   });
-  const rows = RECO_KINDS2.filter(r => stat[r[0]]).map(r => {
+  const rows = [['after', '完了のあとの留守宅'], ['old', '前の形のおすすめ']].filter(r => stat[r[0]].n).map(r => {
     const s = stat[r[0]];
-    return `<tr><th>${r[2]}</th><td>${s.n}件</td><td>${s.m}件</td><td><b>${Math.round(s.m / s.n * 100)}%</b></td></tr>`;
+    return `<tr><th>${r[1]}</th><td>${s.n}件</td><td>${s.m}件</td><td><b>${Math.round(s.m / s.n * 100)}%</b></td></tr>`;
   }).join('');
   box.innerHTML = `<h2 class="sec">おすすめ</h2>
-    <p class="hint">カードを受け取らなくても、空いた時間に2〜3件回れる家を、全員の画面の下のタブ「おすすめ」に出します。</p>
+    <p class="hint">完了した区域（S-13 に完了として記録した区域）の残りの留守宅を、全員の画面の下のタブ「おすすめ」に、近くの数軒ずつ出します。カードを受け取らなくても、空いた時間に回れます。</p>
     ${flag('recoOn', 'おすすめを出す', '出さないにすると、全員の画面から「おすすめ」のタブが消えます', '出す', '出さない')}
-    ${flag('wxOn', '雨の日は、集合住宅の多い区域を先に出す', '雨のとき、全員の「区域をもらう」（おすすめ順）と「おすすめ」タブで、集合住宅の多い区域（団地・特別区域の集合住宅のカード）を自動で先に出します。奉仕者の操作はいりません', '出す', '出さない')}
+    ${on ? '<p class="hint">出す家・期間・予定で押さえる数などは、区域タブの「状況」の「区域の決め（設定）」の「完了のあとの留守宅（おすすめ）」で決めます。</p>' : ''}
+    ${flag('wxOn', '雨の日は、集合住宅を先に出す', '雨のとき、全員の「区域をもらう」（おすすめ順）では集合住宅の多い区域を、「おすすめ」タブでは集合住宅の部屋（エレベーターありが先）を、自動で先に出します。奉仕者の操作はいりません', '出す', '出さない')}
     ${on || Number(st.wxOn) !== 0 ? `<p class="hint">今の天気の判定：${!LIVE ? '試作モードでは調べません' : !WX ? 'まだ届いていません（数分後にもう一度開いてください）' : WX.off ? '夜は調べません' : WX.err ? '調べられませんでした（ふだんの並びで動いています）' : (WX.r === 1 ? '<b>雨</b>' : '雨ではない') + `（${fmtTime(new Date(WX.at))}に確認${WX.p != null ? `・2時間の降水確率 ${WX.p}%` : ''}）`}</p>` : ''}
-    ${on ? `<p class="q" data-hqk="recoKinds">出すおすすめの種類</p>
-    <div class="chips">${RECO_KINDS2.map(r => `<button type="button" class="chip" data-recok="${r[1]}" aria-pressed="${!!(bits & r[1])}">${r[2]}</button>`).join('')}</div>
-    <p class="hint">${RECO_KINDS2.map(r => `<b>${r[2]}</b>：${r[3]}`).join('<br>')}<br>えらんだ種類から、順番に1件ずつ出します。</p>
-    ${step('recoCount', '一度に出す件数', st.recoCount + '件', 1)}
-    ${step('recoDist', '「近く」とする距離', st.recoDist + 'm以内', 100)}
-    ${step('recoLongDays', '「長く会えていない」とする日数', st.recoLongDays + '日', 30)}
-    ${step('recoSkipDays', 'だれかが訪ねてから、おすすめに出さない日数', st.recoSkipDays ? st.recoSkipDays + '日' : '使わない', 1, '同じ家に、続けて何人も行かないように。<br>留守宅カードに入れる家は、『区域 ＞ 状況』の『この日数以内に訪ねた家は、カードに入れない』で決めます。')}
-    ${flag('recoOthers', 'ほかの人が担当している区域の家も出す', '出すと、担当者の地図にも緑のチェックが付きます（だれが行ったかは見せません）', '出す', '出さない')}
-    ${flag('recoCardOut', 'ほかの人の留守宅カードに入っている家', 'カードを持っている人の予定を崩さないように', '出さない', '出す')}
-    ${flag('recoCardBtn', '「この区域の留守宅カードを受け取る」ボタン', 'おすすめの家の区域に、今の時間帯の留守宅カードがあるときに出します', '出す', '出さない')}` : ''}
     <h3 class="sub">おすすめから訪ねた記録（直近90日）</h3>
-    ${rows ? `<div class="scroll"><table class="slots narrow"><tr><th>種類</th><th>訪ねた</th><th>会えた</th><th>会えた割合</th></tr>${rows}</table></div>
-      <p class="hint">会えた割合が高い種類を残すと、会えない人に会いやすくなります。</p>` : '<p class="muted">まだ記録はありません。</p>'}`;
+    ${rows ? `<div class="scroll"><table class="slots narrow"><tr><th>種類</th><th>訪ねた</th><th>会えた</th><th>会えた割合</th></tr>${rows}</table></div>` : '<p class="muted">まだ記録はありません。</p>'}`;
 }
 
 /* ---------- ホーム：今日やること ----------
@@ -14216,7 +14292,7 @@ function bindStatic() {
     }
     else if ((x = q('[data-aset]'))) {
       const st = D().settings, key = x.dataset.aset;
-      const EXT_LIM = { extRest: [7, 30, 7], extCap: [1, 5, 2], extDays: [14, 180, 60], extStopBefore: [0, 60, 14], awayDayOnly: [0, 10, 3] }; // 下限・上限・はじめの値
+      const EXT_LIM = { extRest: [7, 30, 7], extCap: [1, 5, 2], extDays: [14, 180, 60], extStopBefore: [0, 60, 14], awayDayOnly: [0, 10, 3], osaeMax: [1, 5, 2], osaeDays: [1, 14, 7] }; // 下限・上限・はじめの値
       const lim = EXT_LIM[key] || (key === 'awayDays' ? [3, 14] : key === 'awayRecentDays' ? [0, 30] : key === 'awayCardMax' ? [0, 50] : key === 'awayCap' ? [1, 15] : [1, 5]);
       const cur = st[key] == null || !isFinite(Number(st[key])) ? (EXT_LIM[key] ? EXT_LIM[key][2] : key === 'awayCap' || key === 'awayRecentDays' ? 3 : 1) : Number(st[key]);
       st[key] = Math.min(lim[1], Math.max(lim[0], cur + Number(x.dataset.d)));
