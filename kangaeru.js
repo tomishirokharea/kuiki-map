@@ -78,6 +78,10 @@
 .kgslots{grid-template-columns:repeat(4,1fr)}
 .kgslots .choice{min-height:56px;font-size:16px}
 .kglost{margin:8px 0}
+.kgprov{margin:2px 0 6px;padding:6px 10px;border-left:4px solid #B98F00;background:#FFFBE6;color:#3D3000;font-size:15px;line-height:1.5;border-radius:4px}
+.kgbadge.kgleft{background:#FFF1D6;color:#7A4A00}
+.kgbody.simple .kgbadge{font-size:16px;padding:1px 10px;margin-left:0}
+.kgbody.simple .kgprov{font-size:18px}
 .kgbody.simple .kgmin{font-size:17px}
 .kgbody.simple .kgevb .btn{min-height:52px;font-size:18px}`;
   document.head.appendChild(css);
@@ -581,18 +585,26 @@
     const st = D().settings;
     const tsig = D().territories.map(t => t.id + ':' + (t.holder || '') + ':' + (t.completedAt || '') + ':' + (t.awayPoolAt || '') + ':' + (t.extStop ? 1 : 0) + ':' + (t.lend || '') + ':' + (Array.isArray(t.focus) ? t.focus.length : 0)).join(',');
     const hsig = (D().holds || []).map(h => h.id + (h.endedAt ? 'e' : '')).join(',');
-    const ssig = [st.extRest, st.extCap, st.extDays, st.extStopBefore, st.recoLock, st.awayRecentDays, st.awayNoRepeat, st.awayScope, st.freeAfterDays, st.autoFree].join('|');
+    const ssig = [st.extRest, st.extCap, st.extDays, st.extStopBefore, st.recoLock, st.recoLeft, st.skipDays, st.awayRecentDays, st.awayNoRepeat, st.awayScope, st.freeAfterDays, st.autoFree].join('|');
     return memo(['kga', slot, vl(), D().houses.length, D().awayCards.length, Object.keys(D().dnc).length, tsig, hsig, ssig, me().id].join('|'), () => {
-      const rl = extRl(), now = Date.now(), lockOk = num(st.recoLock, 0) === 1;
+      const rl = extRl(), now = Date.now(), lockOk = num(st.recoLock, 0) === 1, leftOk = num(st.recoLeft, 1) !== 0;
       const locked = new Set(); activeCards().forEach(c => c.keys.forEach(k => locked.add(k)));
       const others = heldByOthers(), mine = myHeldKeys();
       const out = [], seen = new Set();
       for (const t of D().territories) {
         const rs = recoState(t); if (!rs || !rs.open) continue;
+        const fs = focusSlots(t).includes(slot); // 区域係が重点にした時間帯
+        const okHouse = h => isFinite(h.lat) && isFinite(h.lng) && !(h.type === 'apt' && (h.ban === 'no' || h.ban === 'letter' || (h.lock && !lockOk))); // 立入禁止・手紙のみ・オートロック（係の設定）
+        // 回り残し（巡回の中で一度も訪ねていない家）：どの時間帯にも出せる。留守宅より先に出す
+        if (leftOk) {
+          for (const x of leftOf(t)) {
+            if (seen.has(x.k) || !okHouse(x.h) || locked.has(x.k) || others.has(x.k) || mine.has(x.k)) continue;
+            seen.add(x.k);
+            out.push({ k: x.k, h: x.h, u: x.u, t, lastAt: x.lastAt, focus: fs, left: true });
+          }
+        }
         // おすすめに出している区域の家だけを調べる（3万件を1周しない）
         const items = isSpecial(t) ? unmetOfSpecial(t) : (unmetIndex(t.id).get(t.id) || []);
-        if (!items.length) continue;
-        const fs = focusSlots(t).includes(slot); // 区域係が重点にした時間帯
         for (const x of items) {
           const h = x.h;
           if (seen.has(x.k) || !isFinite(h.lat) || !isFinite(h.lng)) continue;
@@ -611,7 +623,7 @@
      近い家を recoN 軒まで。回る順は、起点から近い順につなぐ。雨の日は集合住宅の部屋から（エレベーターありが先） */
   function buildClusters(items, pos, rain) {
     const N = recoN(), byT = new Map(), out = [];
-    items.forEach(x => { if (!byT.has(x.t.id)) byT.set(x.t.id, []); byT.get(x.t.id).push(x); });
+    items.forEach(x => { const g = x.t.id + (x.left ? '|L' : '|A'); if (!byT.has(g)) byT.set(g, []); byT.get(g).push(x); }); // 区域ごと・回り残しと留守宅は別のまとまり
     byT.forEach(arr => {
       const stops = new Map();
       arr.forEach(x => {
@@ -645,7 +657,7 @@
       const keys = route.flatMap(s => s.xs.map(x => x.k));
       const last = route.reduce((a, s) => s.xs.reduce((b, x) => (x.lastAt < b ? x.lastAt : b), a), '9999');
       out.push({ kind: 'after', t: arr[0].t, stops: route, keys, n: keys.length, dist: pos ? route[0].leg : null, mins: ceil5(walk / 67 + 4 * keys.length),
-        last, rank: Math.max(...route.map(s => rainRank(s.h))), rain: !!rain, focus: arr[0].focus });
+        last, rank: Math.max(...route.map(s => rainRank(s.h))), rain: !!rain, focus: arr[0].focus, left: !!arr[0].left, prov: route.filter(s => s.h.prov).length });
     });
     out.forEach((c, i) => { c.i = i; });
     return out;
@@ -690,8 +702,8 @@
       long: (a, b) => (a.last < b.last ? -1 : a.last > b.last ? 1 : 0) || near(a, b),
       young: (a, b) => cmpN(youngOf(b.t), youngOf(a.t)) || near(a, b)
     }[key] || near;
-    // 雨の日は集合住宅を先に・区域係が重点にした時間帯の区域を先に。そのあとで、えらんだ並べ方
-    return list.slice().sort((a, b) => (a.rain ? cmpN(a.rank, b.rank) : 0) || cmpN(b.focus ? 1 : 0, a.focus ? 1 : 0) || f(a, b) || cmpN(a.i, b.i));
+    // 雨の日は集合住宅を先に・回り残しを留守宅より先に・区域係が重点にした時間帯の区域を先に。そのあとで、えらんだ並べ方
+    return list.slice().sort((a, b) => (a.rain ? cmpN(a.rank, b.rank) : 0) || cmpN(b.left ? 1 : 0, a.left ? 1 : 0) || cmpN(b.focus ? 1 : 0, a.focus ? 1 : 0) || f(a, b) || cmpN(a.i, b.i));
   }
   function getList(slot) {
     const pos = orgPos(), rain = rainy();
@@ -717,13 +729,14 @@
     const d = c.last && c.last !== '9999' ? Math.max(0, daysSince(c.last)) : null;
     return {
       near: c.dist == null ? '―' : fmtDist(c.dist),
-      long: d == null ? '―' : d === 0 ? '今日' : `${d}日前`,
+      long: c.last === '' ? 'なし' : d == null ? '―' : d === 0 ? '今日' : `${d}日前`, // なし＝一度も訪ねていない家
       young: ['―', 'ふつう', '多'][youngOf(c.t)]
     };
   }
   /* 理由（1行）。押すと「区域のようす」 */
   function reasonFor(c, slot) {
     if (c.rain && c.rank < 2) return `雨の日なので、集合住宅の部屋です${c.rank === 0 ? '（エレベーターあり）' : ''}`;
+    if (c.left) return 'この巡回で、まだ一度も訪ねていない家です';
     if (c.focus) return `${slotShort(slot)}は、区域係が重点にしている時間帯です`;
     if (c.dist != null && c.dist <= num(D().settings.recoDist, 500)) {
       const mn = Math.max(1, Math.round(c.dist / 67));
@@ -785,7 +798,7 @@
       `<button type="button" class="kgcol${sk === k ? ' on' : ''}" data-kgs="${k}" aria-pressed="${sk === k}">${ic}<small>${lab}</small><b>${esc(v[k])}</b></button>`).join('');
     c.reason = reasonFor(c, slot); c.slot = slot; c.now = nv; c.col = slotCol(slot); c.bi = slotBand(slot);
     c.title = `区域${c.t.no}の家 ${c.n}軒`;
-    const badges = (c.focus ? '<span class="kgbadge">区域係のおすすめ</span>' : '') + (c.rain && c.rank === 0 ? '<span class="kgbadge">エレベーターあり</span>' : c.rain && c.rank === 1 ? '<span class="kgbadge">集合住宅</span>' : '');
+    const badges = (c.left ? '<span class="kgbadge kgleft">まだ訪ねていない家</span>' : '') + (c.focus ? '<span class="kgbadge">区域係のおすすめ</span>' : '') + (c.rain && c.rank === 0 ? '<span class="kgbadge">エレベーターあり</span>' : c.rain && c.rank === 1 ? '<span class="kgbadge">集合住宅</span>' : '');
     let acts;
     if (simple) {
       acts = nv ? `<button type="button" class="btn primary block" data-kggo="${i}">今行く</button><button type="button" class="btn small kgplan" data-kgplan="${i}">予定に入れる</button>`
@@ -797,6 +810,7 @@
     return `<article class="kgc"><p class="kgct">${esc(c.title)}<span class="kgmin">約${c.mins}分</span>${badges}</p>
       <div class="kgcols${simple ? ' two' : ' three'}" role="group" aria-label="並べかえる欄">${cols}</div>
       <button type="button" class="kgwhy" data-kginfo="${i}">${esc(c.reason)}</button>
+      ${c.prov ? `<p class="kgprov">${c.prov === 1 ? '仮の家が1軒' : `仮の家が${c.prov}軒`}あります。家かどうか確かめてください（家でなければ、その場で消せます）</p>` : ''}
       <div class="actions">${acts}</div></article>`;
   }
   function paintList() {
@@ -810,7 +824,7 @@
     h += show.map((c, i) => cardHtml(c, i, simple, sk, slot, nv)).join('');
     if (!show.length) {
       h = !D().territories.some(t => { const r = recoState(t); return r && r.open; })
-        ? '<div class="empty">今出せるおすすめはありません。<br>区域が完了すると、まだ会えていない家がここに出ます。</div>'
+        ? '<div class="empty">今出せるおすすめはありません。<br>区域が完了すると、まだ訪ねていない家や、まだ会えていない家がここに出ます。</div>'
         : `<div class="empty">${esc(slotShort(slot))}に訪ねられる家は、今はありません。${simple ? '' : '<br>「ほかの時間帯」をえらぶと、出ることがあります。'}</div>`;
     }
     if (VIEW.order.length > show.length) h += `<button type="button" class="btn block" data-kgmore>もっと見る</button>`;
@@ -834,7 +848,7 @@
     box.innerHTML = `<div class="kgbody${simple ? ' simple' : ''}">
       <div id="kgMine"></div>
       <h2 class="sec">おすすめ</h2>
-      ${simple ? '' : '<p class="kgsm">回り終えた区域で、まだ会えていない家を、近くの数軒ずつ出しています。カードを受け取らなくても回れます。</p>'}
+      ${simple ? '' : '<p class="kgsm">回り終えた区域で、まだ訪ねていない家と、まだ会えていない家を、近くの数軒ずつ出しています。カードを受け取らなくても回れます。</p>'}
       <div id="kgWhen"></div><div id="kgOrg"></div>
       <div id="kgSorts"></div>
       <div id="kgList"><p class="muted">さがしています…</p></div>
@@ -1011,7 +1025,8 @@
     const bar = $('#cardBar'); if (!bar || !KF) return;
     $('#legendBtn').classList.toggle('hasbar', barHidden);
     if (barHidden) { bar.hidden = true; return; }
-    const t = terrById(KF.tid), keys = [...KF.keys], done = keys.filter(k => visitedSince(k, KF.since)).length;
+    const t = terrById(KF.tid), keys = [...KF.keys].filter(k => houseById(keyHid(k))), done = keys.filter(k => visitedSince(k, KF.since)).length; // 消した仮の家は数えない
+    const prov = new Set(keys.map(keyHid).filter(id => { const hh = houseById(id); return hh && hh.prov; })).size;
     const h = KF.hold ? holdById(KF.hold) : null, live = !!h && holdLive(h);
     const when = !h ? '見るだけです（まだ予定に入れていません）' : !live ? 'この予定の押さえは、もう終わっています'
       : h.kind === 'plan' ? `${fmtYmd(h.date)}の予定です（その日の終わりまで、ほかの人のおすすめに出しません）` : '今日の終わりまで、あなたの予定です（ほかの人のおすすめに出しません）';
@@ -1020,6 +1035,7 @@
     bar.innerHTML = `<p><b>おすすめの家　区域${esc(t ? t.no : '-')}</b>　${keys.length}軒・番号の順に回れます</p>
       <p class="keys">${key(' hl', '', `まだの家 ${keys.length - done}`)}${key(' done', '<u>✓</u>', `訪ねた家 ${done}`)}</p>
       <p class="muted">${esc(when)}</p>
+      ${prov ? `<p class="kgprov">仮の家が${prov}軒あります。家かどうか確かめてください。家でなければ、その家を押して「ここは家ではない（消す）」で消せます</p>` : ''}
       ${keys.length && done === keys.length ? '<p class="okmsg"><b>すべて訪ねました。</b>おつかれさまでした。</p>' : ''}
       <div class="row"><button class="btn small" id="kfClose">表示を戻す</button>${live ? '<button class="btn small" id="kfEnd">この予定をやめる</button>' : ''}${!h && $('#view-reco') ? '<button class="btn small" id="kfBack">おすすめにもどる</button>' : ''}</div>`;
     $('#kfClose').onclick = () => { KF = null; renderTerrs(); renderHouses(); syncTerrJump(); };
