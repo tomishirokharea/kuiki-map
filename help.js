@@ -21,7 +21,7 @@
       awayCap: 3, awayRecentDays: 3, awayNoRepeat: 1, awayScope: 0, awayExp: 0, awayDays: 7, awayMax: 2, awayCardMax: 15,
       awayAllTerr: 0, awayDayOnly: 3, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7, recoLeft: 1,
       recoOn: 1, wxOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1,
-      mapStd: 0, keepMonths: 12, cacheDays: 30, syncGroupSec: 7, syncNormalSec: 20, remindDays: 21, escalateDays: 42
+      mapStd: 0, keepMonths: 12, cacheDays: 30, syncGroupSec: 7, syncNormalSec: 20, remindDays: 21, escalateDays: 42, s21On: 0
     },
 
     ui: {
@@ -32,6 +32,12 @@
     },
 
     ja: {
+      /* ---- 設定・データ＞奉仕報告（houkoku.js・s21.gs） ---- */
+      s21On: { t: '奉仕報告を S21 に送る', dt: '使わない',
+        what: '「奉仕時間」を使っている人が、月末の奉仕報告の画面から、そのまま会衆の報告システム（S21）に報告できるようにします。本人は、URLの貼り付けや登録をしなくてかまいません。区域マップに登録している名前と、S21 の名簿の名前が同じ人は、自動でつながります。',
+        change: '「使う」にすると、奉仕時間を使っている人の報告の画面が、S-4 と同じ並び（伝道した・聖書研究・補助開拓・時間など）になり、「会衆に報告する」で送れます。奉仕時間を使っていない人の画面は変わりません。「使わない」にすると、今までどおり LINE などで送る画面にもどります。報告の中身は区域マップのサーバーには残りません。',
+        ex: '開拓者の人は、記録した時間が最初から入っているので、確かめて「会衆に報告する」を押すだけです。5日の締切をすぎて送ると、翌月の会衆の報告に加えられます。',
+        tip: '使い始める前に、URLと連携キーを入れて「接続テスト」→「名前の対応を見る」で、見つからない人がいないか確かめてください。そのあと「試しに送ってみる」で、記録を変えずに送れるかを試せます。' },
       /* ---- 人＞グループの中心（guruchu.js） ---- */
       groupPts: { t: 'グループの中心',
         what: 'グループの人が、だいたい住んでいるあたりの場所です。区域係が地図に置きます（1グループ2つまで）。人の名前や住所は使わず、「このあたり」という点だけを保存します。伝道者の地図には出ません。',
@@ -373,6 +379,11 @@
     },
 
     es: {
+      s21On: { t: 'Enviar el informe de predicación a S21', dt: 'No usar',
+        what: 'Quienes usan «Tiempo de predicación» pueden enviar su informe del mes directamente al sistema de informes de la congregación (S21) desde la pantalla del informe. No tienen que pegar ninguna URL ni registrarse. Si el nombre en el Mapa y en la lista de S21 es igual, se conectan solos.',
+        change: 'Con «Usar», la pantalla del informe sigue el orden del S-4 (predicó, cursos bíblicos, precursor auxiliar, horas…) y se envía con «Informar a la congregación». La pantalla de quien no usa el tiempo no cambia. Con «No usar», vuelve la pantalla de enviar por LINE. El contenido del informe no se guarda en el servidor del Mapa.',
+        ex: 'Un precursor ya ve sus horas registradas; solo las revisa y pulsa «Informar a la congregación». Si lo envía después del día 5, se suma al informe de la congregación del mes siguiente.',
+        tip: 'Antes de empezar, ponga la URL y la clave, pulse «Probar conexión» y luego «Ver nombres» para revisar si falta alguien. Con «Enviar una prueba» puede probar sin cambiar el registro.' },
       groupPts: { t: 'Centro del grupo',
         what: 'Es la zona donde viven, más o menos, las personas del grupo. La pone el encargado en el mapa (hasta 2 por grupo). No se usan nombres ni direcciones: solo se guarda un punto «por aquí». No aparece en el mapa de los publicadores.',
         change: 'Si se pone, cuando el superintendente o el conductor del grupo ve los territorios para la predicación en grupo en «Pedir territorio», «Más cercanos» se ordena por la distancia a este punto y «Recomendados» también tiene en cuenta la cercanía. Los territorios «urgentes» (fecha límite cercana) siguen arriba sin importar la distancia. En «Territorios para la reunión» de la reunión general, se muestran un poco antes los territorios lejos de todos los grupos. Si no se pone, todo sigue como antes (cercanía al lugar donde está).',

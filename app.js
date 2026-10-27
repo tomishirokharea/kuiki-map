@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.91';
+var APP_JS_VER = '2026.13.92';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -1280,6 +1280,7 @@ async function api(action, extra, opt) {
   if (!j.ok) {
     if (j.error === 'auth') authLost();
     const e = Object.assign(new Error(j.error || 'error'), { code: j.error, retry: j.error === 'server' || j.error === 'busy' });
+    if (j.msg) e.msg = String(j.msg).slice(0, 120); // 奉仕報告（S21）が断った理由（houkoku.js）
     if (j.error !== 'auth') noteError(action, e);
     throw e;
   }
@@ -11164,6 +11165,7 @@ function renderDataSet() {
   renderDummy();
   renderRecoAdmin();
   renderAgeAdmin();
+  if (window.S21R) S21R.renderAdmin(); // 奉仕報告（S21）のつなぎ方（houkoku.js）
   const st = D().settings;
   const row = (key, label, unit, d, hint) => `<div class="setrow"><span>${label}<br><small class="hint">${hint}</small></span><div class="stepper">
     <button type="button" data-kset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${st[key]}${unit}</output>
@@ -11949,7 +11951,8 @@ function monthEndHtml(o) {
   if (!m && !g) return '';
   return `<div class="notice info homecard"><b style="font-size:19px">${label}</b><br>
     奉仕時間 <b>${fmtMin(m)}</b>（${monthDays(o, ym)}日）${g ? `　目標 ${fmtMin(g)}（${Math.round(m / g * 100)}%）` : ''}
-    ${rep ? `<br><span class="muted">報告しました：時間 ${rep.h}時間・レッスン ${rep.les}</span>` : ''}
+    ${rep ? `<br><span class="muted">${rep.how === 's21' ? `会衆に報告しました：${rep.h ? `時間 ${rep.h}時間・` : ''}聖書研究 ${rep.les}件` : `報告しました：時間 ${rep.h}時間・レッスン ${rep.les}`}</span>`
+      : window.S21R && S21R.use() && now.getDate() <= 5 ? '<br><span class="muted">報告の締切は5日です</span>' : ''}
     <span class="actions"><button class="btn small${rep ? '' : ' primary'}" data-report="${ym}">${rep ? '報告の内容を見る' : '奉仕報告をする'}</button>
       <button class="btn small" id="monthHist">月ごとの記録を見る</button></span></div>`;
 }
@@ -11960,10 +11963,11 @@ function openMonthHist() {
     ? `<table class="slots narrow"><tr><th>月</th><th>時間</th><th>日数</th><th>目標</th><th>報告</th></tr>${yms.map(ym => {
         const m = monthMin(o, ym), g = o.goals[ym] || 0, r = o.reports[ym];
         return `<tr><th>${Number(ym.slice(0, 4))}年${Number(ym.slice(5))}月</th><td><b>${fmtMin(m)}</b></td><td>${monthDays(o, ym)}日</td><td>${g ? `${fmtMin(g)}（${Math.round(m / g * 100)}%）` : '—'}</td>
-          <td><button type="button" class="btn small" data-report="${ym}">${r ? `${r.h}時間` : '報告する'}</button></td></tr>`;
+          <td><button type="button" class="btn small" data-report="${ym}">${r ? (r.how === 's21' ? '会衆に報告済み' : `${r.h}時間`) : '報告する'}</button></td></tr>`;
       }).join('')}</table>`
     : '<div class="empty">まだ記録はありません。</div>') + '<button class="btn block" data-close>閉じる</button>');
   $$('[data-report]', $('#sheet')).forEach(b => b.onclick = () => openReportSheet(b.dataset.report));
+  if (window.S21R) S21R.markHist($('#sheet')); // 会衆の報告システムで報告済みの月（ほかの端末やS21の画面から送った分も）
 }
 
 /* ---- 奉仕報告 ----
@@ -11981,17 +11985,23 @@ function praiseLine(done, goal) {
   return '今月も、おつかれさまでした。';
 }
 const reportText = (ym, h, les) => `${Number(ym.slice(5))}月の奉仕報告です。\n時間:${h}時間\nレッスン:${les}`;
+/* 係の設定で「奉仕報告を S21 に送る」が「使う」なら、会衆の報告システムに送る画面（houkoku.js）。そうでなければ、LINEで送る画面 */
 function openReportSheet(ym, opt) {
+  if (window.S21R && S21R.use()) { S21R.open(ym, opt || {}); return; }
+  openReportLine(ym, opt);
+}
+function openReportLine(ym, opt) {
   opt = opt || {};
   const o0 = myData(), done = monthMin(o0, ym), goal = o0.goals[ym] || 0, M = Number(ym.slice(5));
   const rep0 = o0.reports[ym];
-  let h = rep0 ? rep0.h : Math.floor(done / 60), les = rep0 ? rep0.les : (o0.lastLes || 0);
+  let h = opt.h != null ? opt.h : rep0 && rep0.how !== 's21' ? rep0.h : Math.floor(done / 60), les = opt.les != null ? opt.les : rep0 ? rep0.les : (o0.lastLes || 0);
   const mark = how => {
     const x = myData(); x.reports[ym] = { h, les, at: new Date().toISOString(), how }; x.lastLes = les; mySave(x); renderHome();
   };
   const paint = () => {
     const rep = myData().reports[ym], text = reportText(ym, h, les);
     setSheet(headHtml(null, opt.auto ? 'おつかれさまでした！' : `${M}月の奉仕報告`, opt.auto ? `${M}月の奉仕報告` : '') + `
+      ${opt.note ? `<div class="notice warn">${esc(opt.note)}</div>` : ''}
       <p class="praise">${esc(praiseLine(done, goal))}</p>
       <div class="rpbox"><p class="muted" style="margin:0">${M}月に記録した時間（${monthDays(o0, ym)}日）</p><p class="big">${fmtMin(done)}</p>
         ${goal ? (done >= goal ? `<p class="gdiff ahead">目標 ${fmtMin(goal)} を達成${done > goal ? `（＋${fmtMin(done - goal)}）` : ''}</p>` : `<p class="gdiff behind">目標 ${fmtMin(goal)} まで、あと ${fmtMin(goal - done)}</p>`) : ''}</div>
