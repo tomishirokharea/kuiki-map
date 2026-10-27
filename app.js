@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.92';
+var APP_JS_VER = '2026.13.93';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -11695,6 +11695,27 @@ function planDiff(o, ym) {
   return monthMin(o, ym) - (before + Math.min(o.plan[today] || 0, o.log[today] || 0));
 }
 const isLastDayStr = s => { const d = parseYmd(s); return d.getDate() === new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); };
+/* ---- 奉仕報告の入口（ホームの「○月の奉仕」のカード）----
+   ・奉仕時間を使う人には、いつでも「奉仕報告」ボタン（新しい設定は作らない）
+   ・報告の時期（月末の日〜翌月5日）にまだ送っていなければ、目立つ色にして「○月の報告がまだです」
+   ・押すと、報告の画面（先月｜今月を切りかえられる）。はじめの月は、1〜5日は先月、それ以外は今月 */
+const prevYm = d => ymOf(new Date(d.getFullYear(), d.getMonth() - 1, 1));
+function reportYmNow() { const d = new Date(); return d.getDate() <= 5 ? prevYm(d) : ymOf(d); }
+function reportSeasonYm() { const d = new Date(); return isLastDayStr(ymd(d)) ? ymOf(d) : d.getDate() <= 5 ? prevYm(d) : null; }
+function reportLineHtml(o) {
+  const ym = reportSeasonYm(), due = ym && !o.reports[ym];
+  const st = !ym ? '' : due ? `<b>${Number(ym.slice(5))}月の報告がまだです</b>` : `<span class="muted">${Number(ym.slice(5))}月は報告済みです</span>`;
+  return `<div class="rpentry">${st ? `<span>${st}</span>` : ''}<button class="btn small${due ? ' primary' : ''}" id="goalReport">奉仕報告</button></div>`;
+}
+/* 報告の画面のいちばん上：先月｜今月の切りかえ（ボタンから開いたときだけ） */
+function reportPickHtml(ym) {
+  const d = new Date(), a = prevYm(d), b = ymOf(d);
+  return `<div class="seg rppick" role="group" aria-label="報告する月">${[[a, '先月'], [b, '今月']].map(([v, l]) =>
+    `<button type="button" data-rpym="${v}" aria-pressed="${v === ym}">${l}（${Number(v.slice(5))}月）</button>`).join('')}</div>`;
+}
+function bindReportPick(opt) {
+  $$('[data-rpym]', $('#sheet')).forEach(b => b.onclick = () => { if (b.getAttribute('aria-pressed') !== 'true') openReportSheet(b.dataset.rpym, { pick: true }); });
+}
 function goalHtml(o) {
   const now = new Date(), ym = ymOf(now), today = ymd(now), goal = o.goals[ym] || 0, done = monthMin(o, ym);
   const plan = planMin(o, ym), tp = o.plan[today] || 0, td = o.log[today] || 0;
@@ -11721,7 +11742,7 @@ function goalHtml(o) {
     body += `<p class="hint-strong">「目標と計画」で、どの日に何時間するかを決めると、目標に届くかがひと目で分かります。</p>
       <p class="muted">今日をふくめて残り${left}日です。</p>`;
   }
-  return `<div class="today homecard">${body}</div>`;
+  return `<div class="today homecard">${body}${reportLineHtml(o)}</div>`;
 }
 /* 目標と計画の画面（openGoalPlan。区域の「おすすめの回り方」の openPlanSheet とは別）：月の目標と、カレンダーで日ごとの時間をえらぶ（えらぶとすぐ保存）
    ・日にちを押すと、画面の下に「時間のダイヤル」が出る。上下にスワイプして、15分ごとに時間をえらぶ
@@ -11953,8 +11974,7 @@ function monthEndHtml(o) {
     奉仕時間 <b>${fmtMin(m)}</b>（${monthDays(o, ym)}日）${g ? `　目標 ${fmtMin(g)}（${Math.round(m / g * 100)}%）` : ''}
     ${rep ? `<br><span class="muted">${rep.how === 's21' ? `会衆に報告しました：${rep.h ? `時間 ${rep.h}時間・` : ''}聖書研究 ${rep.les}件` : `報告しました：時間 ${rep.h}時間・レッスン ${rep.les}`}</span>`
       : window.S21R && S21R.use() && now.getDate() <= 5 ? '<br><span class="muted">報告の締切は5日です</span>' : ''}
-    <span class="actions"><button class="btn small${rep ? '' : ' primary'}" data-report="${ym}">${rep ? '報告の内容を見る' : '奉仕報告をする'}</button>
-      <button class="btn small" id="monthHist">月ごとの記録を見る</button></span></div>`;
+    <span class="actions"><button class="btn small" id="monthHist">月ごとの記録を見る</button></span></div>`; // 奉仕報告のボタンは「○月の奉仕」のカードに（同じ入口を2つ出さない）
 }
 function openMonthHist() {
   const o = myData();
@@ -12001,6 +12021,7 @@ function openReportLine(ym, opt) {
   const paint = () => {
     const rep = myData().reports[ym], text = reportText(ym, h, les);
     setSheet(headHtml(null, opt.auto ? 'おつかれさまでした！' : `${M}月の奉仕報告`, opt.auto ? `${M}月の奉仕報告` : '') + `
+      ${opt.pick ? reportPickHtml(ym) : ''}
       ${opt.note ? `<div class="notice warn">${esc(opt.note)}</div>` : ''}
       <p class="praise">${esc(praiseLine(done, goal))}</p>
       <div class="rpbox"><p class="muted" style="margin:0">${M}月に記録した時間（${monthDays(o0, ym)}日）</p><p class="big">${fmtMin(done)}</p>
@@ -12033,6 +12054,7 @@ function openReportLine(ym, opt) {
       mark('copy'); paint(); toast('コピーしました。LINEなどに貼りつけて送ってください');
     };
     if ($('#rpDone')) $('#rpDone').onclick = () => { mark('done'); closeSheet(); toast('報告したことにしました'); };
+    if (opt.pick) bindReportPick(opt);
   };
   paint();
 }
@@ -12817,6 +12839,7 @@ function bindHome() {
     else if ((x = q('[data-mt]'))) addToday(Number(x.dataset.mt));
     else if ((x = q('[data-report]'))) openReportSheet(x.dataset.report);
     else if (q('#goalEdit')) openGoalPlan();
+    else if (q('#goalReport')) openReportSheet(reportYmNow(), { pick: true });
     else if (q('#monthHist')) openMonthHist();
     else if ((x = q('[data-cm]'))) { const b = calMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1); calMonth = new Date(b.getFullYear(), b.getMonth() + Number(x.dataset.cm), 1); renderHome(); }
     else if ((x = q('[data-day]'))) openDay(x.dataset.day);

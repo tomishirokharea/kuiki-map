@@ -50,8 +50,9 @@
     const o0 = myData(), done = monthMin(o0, ym), goal = (o0.goals || {})[ym] || 0;
     const title = dry ? `${Mo(ym)}月の奉仕報告（試し）` : opt.auto ? 'おつかれさまでした！' : `${Mo(ym)}月の奉仕報告`;
     setSheet(headHtml(null, title, dry ? '試しに送ります（会衆の記録は変わりません）' : opt.auto ? `${Mo(ym)}月の奉仕報告` : '') +
-      '<div class="notice info" role="status">会衆の報告を確かめています…<br><small>はじめは数秒かかることがあります</small></div>' +
+      (opt.pick ? reportPickHtml(ym) : '') + '<div class="notice info" role="status">会衆の報告を確かめています…<br><small>はじめは数秒かかることがあります</small></div>' +
       '<button class="btn block" data-close>閉じる</button>');
+    if (opt.pick) bindReportPick(opt);
     api('s21_me', { ym }, { timeout: 45000 }).then(r => {
       remember(o => { o.s21p = { name: r.person.name, pioneer: !!r.person.pioneer }; });
       paint(ym, opt, { person: r.person, report: r.report && !r.report.empty ? r.report : null, done, goal });
@@ -92,6 +93,7 @@
       const head = dry ? `${Mo(ym)}月の奉仕報告（試し）` : opt.auto ? 'おつかれさまでした！' : `${Mo(ym)}月の奉仕報告`;
       const sub = dry ? '試しに送ります（会衆の記録は変わりません）' : opt.auto ? `${Mo(ym)}月の奉仕報告` : '';
       setSheet(headHtml(null, head, sub) + `
+        ${opt.pick ? reportPickHtml(ym) : ''}
         ${opt.auto ? `<p class="praise">${esc(praiseLine(ctx.done, ctx.goal))}</p>` : ''}
         ${ctx.done ? `<div class="rpbox"><p class="muted" style="margin:0">${Mo(ym)}月に記録した時間（${monthDays(o, ym)}日）</p><p class="big">${fmtMin(ctx.done)}</p></div>` : ''}
         <p class="muted" style="margin:6px 0 2px">${esc(ctx.person.name || '')}さんの報告</p>
@@ -122,6 +124,7 @@
       $$('[data-s21aux]', S).forEach(b => b.onclick = () => { read(); state.aux = b.dataset.s21aux === '1'; draw(); });
       if ($('#s21Line', S)) $('#s21Line', S).onclick = () => openReportLine(ym, Object.assign({}, opt, { h: pio || state.aux ? read().hours : fromRec, les: read().studies }));
       $('#s21Send', S).onclick = () => send(ym, opt, ctx, read());
+      if (opt.pick) bindReportPick(opt);
     };
     draw();
   }

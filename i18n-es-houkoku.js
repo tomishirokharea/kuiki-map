@@ -68,5 +68,12 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "S21 の名簿を読み直す": "Volver a leer la lista de S21",
 "名前の対応を保存しました": "Se guardó la correspondencia de nombres",
 "S21 の名簿と照らし合わせています…": "Comparando con la lista de S21…",
+/* ホームの入口・月の切りかえ（2026.13.93） */
+"奉仕報告": "Informe de predicación",
+"{0}月の報告がまだです": "Falta el informe de {0}",
+"{0}月は報告済みです": "El informe de {0} ya se envió",
+"先月（{0}月）": "Mes pasado ({0})",
+"今月（{0}月）": "Este mes ({0})",
+"報告する月": "Mes del informe",
 "名前が同じ人は、自動でつながっています。見つからない人だけ、S21 の名前をえらんでください。「奉仕時間」を使っていない人は、そのままでもかまいません。": "Las personas con el mismo nombre se conectan solas. Elija el nombre en S21 solo para quienes no se encontraron. Quienes no usan «Tiempo de predicación» pueden quedar así."
 });

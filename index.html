@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.92"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE も合わせて上げる -->
+<meta name="app-version" content="2026.13.93"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE も合わせて上げる -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -1430,6 +1430,10 @@ h2,h3,.q{text-wrap:pretty}
 .check.big{min-height:60px;font-size:19px;font-weight:700;margin:6px 0}
 .check.big input{width:34px;height:34px;flex:none}
 .s21sel{min-height:48px;font-size:17px;max-width:100%;border-radius:10px;border:2px solid var(--ink2);background:#fff;padding:0 8px}
+.rpentry{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.rpentry span{font-size:16px}
+.rppick{display:flex;width:100%;margin:2px 0 10px}
+.rppick button{flex:1 1 0}
 .rpline{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:10px 0 4px}
 .rptext{white-space:pre-wrap;background:#F7F9F8;border:2px dashed var(--line);border-radius:12px;padding:10px 14px;font-size:18px;margin:8px 0;line-height:1.7;-webkit-user-select:text;user-select:text}
 .btn.line{background:#06C755;border-color:#06C755;color:#fff}
