@@ -23,14 +23,16 @@ concurrency:
 
 jobs:
   save:
-    runs-on: ubuntu-latest
+    # ubuntu-latest は 2026年10月から順に Ubuntu 26.04 に切りかわり、
+    # 見えないブラウザ（Playwright 1.56）が動かなくなるため、24.04 に固定する
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
 
       - name: 日本語の文字を入れる
         run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk
