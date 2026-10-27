@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.95';
+var APP_JS_VER = '2026.13.96';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -11631,13 +11631,62 @@ function openTimerStop(warn) {
   paint();
 }
 /* タイマーを使わない人：今日の時間を＋−で入れる（押すとすぐ保存） */
+/* ---- 今日の奉仕時間（タイマーを使わない人）：時間と分のダイヤル（2026.13.96）----
+   ・左が時間（0〜16）、右が分（5分ごと）。上下にスワイプして止まったところで、すぐ保存（このスマホだけ）
+   ・数字を押してもその値に合わせる。上下の矢印キーでも動かせる
+   ・保存したときは、ダイヤルは描き直さず、下の「○月の奉仕」のカードだけを新しくする（回している途中で戻らないように） */
+const TD_H = Array.from({ length: 17 }, (_, i) => i);
+const tdMins = cur => { const a = Array.from({ length: 12 }, (_, i) => i * 5); if (!a.includes(cur)) a.push(cur); return a.sort((x, y) => x - y); };
 function manualTodayHtml(o) {
-  const d = ymd(new Date()), m = o.log[d] || 0, p = o.plan[d] || 0;
+  const d = ymd(new Date()), m = o.log[d] || 0, p = o.plan[d] || 0, H = Math.floor(m / 60), Mi = m % 60;
+  const col = (k, vals, cur, unit, label) => `<div class="wheel2 tcol"><div class="wband" aria-hidden="true"></div>
+    <div class="wlist" data-tdial="${k}" role="listbox" tabindex="0" aria-label="${label}（上下にスワイプ）"><div class="wpad"></div>${vals.map(v =>
+      `<div class="witem${v === cur ? ' on' : ''}" role="option" data-tdv="${v}" aria-selected="${v === cur}">${v}${unit}</div>`).join('')}<div class="wpad"></div></div></div>`;
   return `<div class="mtoday"><p class="q">今日の奉仕時間</p>
-    <div class="stepper"><button type="button" data-mt="-15" aria-label="15分へらす">−</button><output class="wide" style="min-width:170px">${fmtMin(m)}</output><button type="button" data-mt="15" aria-label="15分ふやす">＋</button></div>
-    <div class="row" style="justify-content:center">${[30, 60, 120].map(x => `<button type="button" class="btn small" data-mt="${x}">＋${fmtMin(x)}</button>`).join('')}</div>
-    ${p ? `<p class="muted">今日の計画：${fmtMin(p)}${m >= p ? '　✓ 達成しました' : ''}</p>` : ''}
-    <p class="hint">押すとすぐ保存されます（このスマホだけ）。ほかの日は、下のカレンダーの日にちを押して入れられます。</p></div>`;
+    <div class="tdial">${col('h', TD_H, H, '時間', '時間')}${col('m', tdMins(Mi), Mi, '分', '分')}</div>
+    <p class="muted" id="tdSum">${m ? `今日 ${fmtMin(m)}` : 'まだ入れていません'}${p ? `　今日の計画 ${fmtMin(p)}${m >= p ? '　✓ 達成しました' : ''}` : ''}</p>
+    <p class="hint">上下にスワイプして合わせると、すぐ保存されます（このスマホだけ）。ほかの日は、下のカレンダーの日にちを押して入れられます。</p></div>`;
+}
+function bindTodayDial() {
+  const box = $('#homeTimer .tdial'); if (!box) return;
+  const lists = $$('[data-tdial]', box);
+  const ih = l => { const it = $$('.witem', l); return it.length > 1 ? it[1].offsetTop - it[0].offsetTop : 42; };
+  const idx = l => Math.max(0, Math.min($$('.witem', l).length - 1, Math.round(l.scrollTop / ih(l))));
+  const valOf = l => Number($$('.witem', l)[idx(l)].dataset.tdv);
+  const mark = l => { const i = idx(l); $$('.witem', l).forEach((x, j) => { x.classList.toggle('on', j === i); x.setAttribute('aria-selected', j === i ? 'true' : 'false'); }); };
+  let busy = true;
+  const save = () => {
+    const h = valOf(lists[0]), mi = valOf(lists[1]), x = myData(), d = ymd(new Date()), before = x.log[d] || 0, v = Math.min(16 * 60, h * 60 + mi);
+    if (v === before) return;
+    if (v) x.log[d] = v; else delete x.log[d];
+    mySave(x);
+    // ダイヤルは描き直さない：まわりの表示だけ新しくする
+    const p = x.plan[d] || 0, sum = $('#tdSum');
+    if (sum) sum.textContent = `${v ? `今日 ${fmtMin(v)}` : 'まだ入れていません'}${p ? `　今日の計画 ${fmtMin(p)}${v >= p ? '　✓ 達成しました' : ''}` : ''}`;
+    if ($('#homeGoal')) $('#homeGoal').innerHTML = goalHtml(x);
+    if ($('#homeMonthEnd')) $('#homeMonthEnd').innerHTML = monthEndHtml(x);
+    if (p && before < p && v >= p) toast(`今日の計画 ${fmtMin(p)} を達成しました！ ${praiseShort()}`);
+    else toast(`保存しました（今日 ${v ? fmtMin(v) : '0分'}）`);
+  };
+  lists.forEach(l => {
+    const on = $$('.witem', l).findIndex(x => x.classList.contains('on'));
+    l.scrollTop = Math.max(0, on) * ih(l);
+    let t = 0;
+    l.addEventListener('scroll', () => {
+      if (busy) return;
+      mark(l); clearTimeout(t); t = setTimeout(save, 220);
+    }, { passive: true });
+    l.addEventListener('click', e => {
+      const it = e.target.closest('[data-tdv]'); if (!it) return;
+      l.scrollTo({ top: $$('.witem', l).indexOf(it) * ih(l), behavior: 'smooth' });
+    });
+    l.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      l.scrollTo({ top: Math.max(0, Math.min($$('.witem', l).length - 1, idx(l) + (e.key === 'ArrowDown' ? 1 : -1))) * ih(l), behavior: 'smooth' });
+    });
+  });
+  setTimeout(() => { busy = false; }, 80); // はじめの位置合わせでは保存しない
 }
 function addToday(dm) {
   const x = myData(), d = ymd(new Date()), before = x.log[d] || 0, v = Math.max(0, Math.min(16 * 60, before + dm));
@@ -12768,7 +12817,7 @@ function renderHome() {
     $('#homeTimer').innerHTML = ''; $('#homeGoal').innerHTML = ''; $('#homeMonthEnd').innerHTML = '';
   } else {
   const ms = timerMs(t);
-  if (UI.fTimer === 'off' && !t) $('#homeTimer').innerHTML = manualTodayHtml(o);
+  if (UI.fTimer === 'off' && !t) { $('#homeTimer').innerHTML = manualTodayHtml(o); bindTodayDial(); }
   else $('#homeTimer').innerHTML = `<div class="timer ${t ? t.state : 'idle'}">
     <p class="tlabel">${!t ? '奉仕の時間をはかる' : t.state === 'run' ? '奉仕中' : '一時停止中'}</p>
     <p class="tclock" id="tClock">${fmtHM(ms)}</p>
