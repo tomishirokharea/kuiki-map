@@ -75,5 +75,11 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "先月（{0}月）": "Mes pasado ({0})",
 "今月（{0}月）": "Este mes ({0})",
 "報告する月": "Mes del informe",
+/* LINEで送る画面の報告の種類（2026.13.94） */
+"報告の種類": "Tipo de informe",
+"伝道者": "Publicador",
+"補助開拓": "Precursor auxiliar",
+"開拓者": "Precursor",
+"報告済み": "Informado",
 "名前が同じ人は、自動でつながっています。見つからない人だけ、S21 の名前をえらんでください。「奉仕時間」を使っていない人は、そのままでもかまいません。": "Las personas con el mismo nombre se conectan solas. Elija el nombre en S21 solo para quienes no se encontraron. Quienes no usan «Tiempo de predicación» pueden quedar así."
 });

@@ -34,9 +34,10 @@
 
   /* ---- この端末に残すもの（本人のスマホの中だけ） ---- */
   function remember(fn) { const o = myData(); o.s21q = o.s21q || {}; o.s21p = o.s21p || null; fn(o); mySave(o); }
-  function markSent(ym, v, late) {
+  // kind：'pub'（伝道者）・'aux'（補助開拓）・'rp'（開拓者）。ホームの「報告済み」の文に使う
+  function markSent(ym, v, late, kind) {
     remember(o => {
-      o.reports[ym] = { h: v.hours || 0, les: v.studies || 0, at: new Date().toISOString(), how: 's21', late: late ? 1 : 0 };
+      o.reports[ym] = { kind: kind || (v.aux ? 'aux' : v.hours ? 'rp' : 'pub'), pre: !!v.preached || v.hours > 0 || v.studies > 0, h: v.hours || 0, les: v.studies || 0, at: new Date().toISOString(), how: 's21', late: late ? 1 : 0 };
       o.lastLes = v.studies || 0;
       delete o.s21q[ym];
     });
@@ -122,7 +123,7 @@
         el.onblur = () => { el.value = clampInt(el.value, el.dataset.s21n === 'studies' ? S_MAX : H_MAX); };
       });
       $$('[data-s21aux]', S).forEach(b => b.onclick = () => { read(); state.aux = b.dataset.s21aux === '1'; draw(); });
-      if ($('#s21Line', S)) $('#s21Line', S).onclick = () => openReportLine(ym, Object.assign({}, opt, { h: pio || state.aux ? read().hours : fromRec, les: read().studies }));
+      if ($('#s21Line', S)) $('#s21Line', S).onclick = () => { const v = read(); openReportLine(ym, Object.assign({}, opt, { kind: pio ? 'rp' : v.aux ? 'aux' : 'pub', pre: v.preached, h: pio || v.aux ? v.hours : fromRec, les: v.studies })); };
       $('#s21Send', S).onclick = () => send(ym, opt, ctx, read());
       if (opt.pick) bindReportPick(opt);
     };
@@ -139,14 +140,14 @@
     const btn = $('#s21Send'); if (btn) { btn.disabled = true; btn.textContent = '送っています…'; }
     try {
       const r = await api('s21_send', body, { timeout: 45000 });
-      if (!dry) markSent(ym, body, r.late);
+      if (!dry) markSent(ym, body, r.late, ctx.person.pioneer ? 'rp' : body.aux ? 'aux' : 'pub');
       done(ym, opt, body, r);
     } catch (e) {
       const c = e && (e.code || e.message);
       if (c === 'auth') return;
       if (btn) { btn.disabled = false; btn.textContent = dry ? '試しに送る' : '会衆に報告する'; }
       if (!dry && isRetry(e) && c !== 'slow') {
-        remember(o => { o.s21q[ym] = { v: body, at: new Date().toISOString() }; });
+        remember(o => { o.s21q[ym] = { v: body, kind: ctx.person.pioneer ? 'rp' : body.aux ? 'aux' : 'pub', at: new Date().toISOString() }; });
         setSheet(headHtml(null, `${Mo(ym)}月の奉仕報告`, '') + `<div class="notice warn">${esc(errText(e))}<br>入力した内容はこのスマホに残しました。電波が戻ったら、自動で送ります。</div>
           <button class="btn block" data-close>閉じる</button>`);
         renderHome();
@@ -182,7 +183,7 @@
           const sub = m.report && !m.report.empty ? Date.parse(m.report.submitted) : NaN;
           if (isFinite(sub) && sub > Date.parse(item.at)) { remember(o => { delete o.s21q[ym]; }); continue; }
           const r = await api('s21_send', item.v, { timeout: 45000 });
-          markSent(ym, item.v, r.late);
+          markSent(ym, item.v, r.late, item.kind);
           toast(`${Mo(ym)}月の奉仕報告を送りました${r.late ? '（締切後のため、翌月の会衆の報告に加えられます）' : ''}`);
         } catch (e) {
           if (isRetry(e)) break; // まだつながらない：次の機会に

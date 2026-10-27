@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.93';
+var APP_JS_VER = '2026.13.94';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -11972,7 +11972,7 @@ function monthEndHtml(o) {
   if (!m && !g) return '';
   return `<div class="notice info homecard"><b style="font-size:19px">${label}</b><br>
     奉仕時間 <b>${fmtMin(m)}</b>（${monthDays(o, ym)}日）${g ? `　目標 ${fmtMin(g)}（${Math.round(m / g * 100)}%）` : ''}
-    ${rep ? `<br><span class="muted">${rep.how === 's21' ? `会衆に報告しました：${rep.h ? `時間 ${rep.h}時間・` : ''}聖書研究 ${rep.les}件` : `報告しました：時間 ${rep.h}時間・レッスン ${rep.les}`}</span>`
+    ${rep ? `<br><span class="muted">${rep.how === 's21' ? '会衆に報告しました' : '報告しました'}：${esc(repSummary(rep))}</span>`
       : window.S21R && S21R.use() && now.getDate() <= 5 ? '<br><span class="muted">報告の締切は5日です</span>' : ''}
     <span class="actions"><button class="btn small" id="monthHist">月ごとの記録を見る</button></span></div>`; // 奉仕報告のボタンは「○月の奉仕」のカードに（同じ入口を2つ出さない）
 }
@@ -11983,7 +11983,7 @@ function openMonthHist() {
     ? `<table class="slots narrow"><tr><th>月</th><th>時間</th><th>日数</th><th>目標</th><th>報告</th></tr>${yms.map(ym => {
         const m = monthMin(o, ym), g = o.goals[ym] || 0, r = o.reports[ym];
         return `<tr><th>${Number(ym.slice(0, 4))}年${Number(ym.slice(5))}月</th><td><b>${fmtMin(m)}</b></td><td>${monthDays(o, ym)}日</td><td>${g ? `${fmtMin(g)}（${Math.round(m / g * 100)}%）` : '—'}</td>
-          <td><button type="button" class="btn small" data-report="${ym}">${r ? (r.how === 's21' ? '会衆に報告済み' : `${r.h}時間`) : '報告する'}</button></td></tr>`;
+          <td><button type="button" class="btn small" data-report="${ym}">${r ? (r.how === 's21' ? '会衆に報告済み' : hoursKind(r.kind) || (!r.kind && r.h) ? `${r.h}時間` : '報告済み') : '報告する'}</button></td></tr>`;
       }).join('')}</table>`
     : '<div class="empty">まだ記録はありません。</div>') + '<button class="btn block" data-close>閉じる</button>');
   $$('[data-report]', $('#sheet')).forEach(b => b.onclick = () => openReportSheet(b.dataset.report));
@@ -12004,42 +12004,68 @@ function praiseLine(done, goal) {
   if (done > 0) return '今月も、おつかれさまでした。一軒一軒の訪問が、大切な一歩です。';
   return '今月も、おつかれさまでした。';
 }
-const reportText = (ym, h, les) => `${Number(ym.slice(5))}月の奉仕報告です。\n時間:${h}時間\nレッスン:${les}`;
+/* 報告の種類（S-4 と同じ）：伝道者は「伝道したか」とレッスンだけ。補助開拓・開拓者は時間も報告する
+   kind：'pub'（伝道者）・'aux'（補助開拓）・'rp'（正規開拓者など） */
+const REP_KINDS = [['pub', '伝道者'], ['aux', '補助開拓'], ['rp', '開拓者']];
+const hoursKind = k => k === 'aux' || k === 'rp';
+function reportText(ym, kind, pre, h, les) {
+  const head = `${Number(ym.slice(5))}月の奉仕報告です。`;
+  if (kind === 'aux') return `${head}\n補助開拓者として奉仕しました\n時間:${h}時間\nレッスン:${les}`;
+  if (kind === 'rp') return `${head}\n時間:${h}時間\nレッスン:${les}`;
+  return `${head}\n伝道:${pre ? 'しました' : 'していません'}\nレッスン:${les}`;
+}
+/* 送った報告の短い文（ホームの月のまとめ・月ごとの記録）。kind のない古い記録は時間の報告として出す */
+function repSummary(r) {
+  if (!r) return '';
+  if (r.kind === 'pub' || (r.how === 's21' && !r.h && r.kind !== 'rp' && r.kind !== 'aux')) return `${r.pre === false ? '伝道していない' : '伝道した'}・レッスン ${r.les}`;
+  return `時間 ${r.h}時間・レッスン ${r.les}`;
+}
 /* 係の設定で「奉仕報告を S21 に送る」が「使う」なら、会衆の報告システムに送る画面（houkoku.js）。そうでなければ、LINEで送る画面 */
 function openReportSheet(ym, opt) {
   if (window.S21R && S21R.use()) { S21R.open(ym, opt || {}); return; }
   openReportLine(ym, opt);
 }
+/* LINEなどで送る画面。報告の種類は、S21 で確かめた開拓者の印 → 前にえらんだ種類 → 前に時間を報告していたら開拓者 → 伝道者 の順で決め、画面で切りかえられる */
 function openReportLine(ym, opt) {
   opt = opt || {};
   const o0 = myData(), done = monthMin(o0, ym), goal = o0.goals[ym] || 0, M = Number(ym.slice(5));
   const rep0 = o0.reports[ym];
-  let h = opt.h != null ? opt.h : rep0 && rep0.how !== 's21' ? rep0.h : Math.floor(done / 60), les = opt.les != null ? opt.les : rep0 ? rep0.les : (o0.lastLes || 0);
+  const pastHours = Object.values(o0.reports || {}).some(r => r && !r.kind && r.how !== 's21' && r.h > 0);
+  let kind = opt.kind || (rep0 && rep0.kind) || (o0.s21p && o0.s21p.pioneer ? 'rp' : '') || o0.rpKind || (pastHours ? 'rp' : 'pub');
+  let h = opt.h != null ? opt.h : rep0 && rep0.how !== 's21' && rep0.h ? rep0.h : Math.floor(done / 60);
+  let les = opt.les != null ? opt.les : rep0 ? rep0.les : (o0.lastLes || 0);
+  let pre = opt.pre != null ? !!opt.pre : rep0 && rep0.pre != null ? !!rep0.pre : done > 0 || les > 0;
   const mark = how => {
-    const x = myData(); x.reports[ym] = { h, les, at: new Date().toISOString(), how }; x.lastLes = les; mySave(x); renderHome();
+    const hk = hoursKind(kind);
+    const x = myData(); x.reports[ym] = { kind, pre: hk || pre, h: hk ? h : 0, les, at: new Date().toISOString(), how }; x.lastLes = les; mySave(x); renderHome();
   };
   const paint = () => {
-    const rep = myData().reports[ym], text = reportText(ym, h, les);
+    const rep = myData().reports[ym], hk = hoursKind(kind), text = reportText(ym, kind, pre, h, les);
     setSheet(headHtml(null, opt.auto ? 'おつかれさまでした！' : `${M}月の奉仕報告`, opt.auto ? `${M}月の奉仕報告` : '') + `
       ${opt.pick ? reportPickHtml(ym) : ''}
       ${opt.note ? `<div class="notice warn">${esc(opt.note)}</div>` : ''}
       <p class="praise">${esc(praiseLine(done, goal))}</p>
-      <div class="rpbox"><p class="muted" style="margin:0">${M}月に記録した時間（${monthDays(o0, ym)}日）</p><p class="big">${fmtMin(done)}</p>
-        ${goal ? (done >= goal ? `<p class="gdiff ahead">目標 ${fmtMin(goal)} を達成${done > goal ? `（＋${fmtMin(done - goal)}）` : ''}</p>` : `<p class="gdiff behind">目標 ${fmtMin(goal)} まで、あと ${fmtMin(goal - done)}</p>`) : ''}</div>
-      <div class="rpline"><p class="q" style="margin:0">時間</p><div class="stepper"><button type="button" data-rh="-1" aria-label="1時間へらす">−</button><output class="wide">${h}時間</output><button type="button" data-rh="1" aria-label="1時間ふやす">＋</button></div></div>
-      ${done % 60 ? `<p class="hint">記録は${fmtMin(done)}です。報告は1時間ごとの数にしています（＋−で直せます）。</p>` : ''}
+      ${done || goal ? `<div class="rpbox"><p class="muted" style="margin:0">${M}月に記録した時間（${monthDays(o0, ym)}日）</p><p class="big">${fmtMin(done)}</p>
+        ${goal ? (done >= goal ? `<p class="gdiff ahead">目標 ${fmtMin(goal)} を達成${done > goal ? `（＋${fmtMin(done - goal)}）` : ''}</p>` : `<p class="gdiff behind">目標 ${fmtMin(goal)} まで、あと ${fmtMin(goal - done)}</p>`) : ''}</div>` : ''}
+      <p class="q" style="margin:10px 0 0">報告の種類</p>
+      <div class="seg rppick" role="group" aria-label="報告の種類">${REP_KINDS.map(([k, l]) => `<button type="button" data-rk="${k}" aria-pressed="${kind === k}">${l}</button>`).join('')}</div>
+      ${hk ? `<div class="rpline"><p class="q" style="margin:0">時間</p><div class="stepper"><button type="button" data-rh="-1" aria-label="1時間へらす">−</button><output class="wide">${h}時間</output><button type="button" data-rh="1" aria-label="1時間ふやす">＋</button></div></div>
+      ${done % 60 ? `<p class="hint">記録は${fmtMin(done)}です。報告は1時間ごとの数にしています（＋−で直せます）。</p>` : ''}`
+        : `<label class="check big"><input type="checkbox" id="rpPre"${pre ? ' checked' : ''}>1カ月間に何らかの形で伝道した</label>`}
       <div class="rpline"><p class="q" style="margin:0">レッスン</p><div class="stepper"><button type="button" data-rl="-1" aria-label="1へらす">−</button><output class="wide">${les}</output><button type="button" data-rl="1" aria-label="1ふやす">＋</button></div></div>
       <p class="q">送る文</p><div class="rptext">${esc(text)}</div>
       <a class="btn line block" id="rpLine" href="https://line.me/R/share?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">LINEで送る</a>
       ${navigator.share ? '<button class="btn block" id="rpShare">ほかのアプリで送る（メールなど）</button>' : ''}
       <button class="btn block" id="rpCopy">文をコピーする</button>
-      <p class="hint">送る相手は、グループのトークではなく、報告を受け取る人との個別のトークがおすすめです。時間とレッスンの数は、このスマホの中だけに保存され、区域係やサーバーには送られません。</p>
-      ${rep ? `<p class="okmsg">${fmtDate(rep.at)}に報告しました（時間 ${rep.h}時間・レッスン ${rep.les}）。直したときは、もう一度送ってください。</p>`
+      <p class="hint">送る相手は、グループのトークではなく、報告を受け取る人との個別のトークがおすすめです。${hk ? '時間とレッスンの数' : '報告の内容'}は、このスマホの中だけに保存され、区域係やサーバーには送られません。</p>
+      ${rep ? `<p class="okmsg">${fmtDate(rep.at)}に報告しました（${esc(repSummary(rep))}）。直したときは、もう一度送ってください。</p>`
         : '<button class="btn block" id="rpDone">もう報告した（送らずに閉じる）</button>'}
       <button class="btn block" data-close>${rep ? '閉じる' : 'あとで'}</button>`);
     const S = $('#sheet');
+    $$('[data-rk]', S).forEach(b => b.onclick = () => { kind = b.dataset.rk; const x = myData(); x.rpKind = kind; mySave(x); paint(); });
+    if ($('#rpPre', S)) $('#rpPre', S).onchange = e => { pre = e.target.checked; paint(); };
     $$('[data-rh]', S).forEach(b => b.onclick = () => { h = Math.max(0, Math.min(300, h + Number(b.dataset.rh))); paint(); });
-    $$('[data-rl]', S).forEach(b => b.onclick = () => { les = Math.max(0, Math.min(99, les + Number(b.dataset.rl))); paint(); });
+    $$('[data-rl]', S).forEach(b => b.onclick = () => { les = Math.max(0, Math.min(99, les + Number(b.dataset.rl))); if (les > 0) pre = true; paint(); });
     $('#rpLine').onclick = () => { mark('line'); setTimeout(paint, 600); }; // LINEが開く（リンクはそのまま開く）
     if ($('#rpShare')) $('#rpShare').onclick = () => {
       navigator.share({ text }).then(() => { mark('share'); paint(); toast('報告を送りました。おつかれさまでした！'); }, () => {});
