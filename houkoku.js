@@ -10,6 +10,10 @@
    ・送れなかったときは、この端末に下書き（o.s21q）を残し、電波が戻ったら送り直す。送れたら消す。
      報告の中身は区域マップのサーバーにも残らない。この端末には、今までどおり「送った月・数・日時」（o.reports）だけが残る。
    ・区域係の画面「設定・データ」に、つなぎ方（URL・連携キー・接続テスト・名前の対応・試しに送る）。
+   ・締切後のロック（S21 v23・2026-10-27）：締切（翌月5日）を過ぎた月で、すでに出した報告は変えられない（直すのは書記）。
+     変えられるかは report.locked で決める（締切後に出した報告は、加えた月の締切まで送り直せる）。
+     変えられない報告は見るだけ。まだ出していない月は送れる（翌月の会衆の報告に加えられる）。
+     送って s21_locked が返ったら、下書きは残さない。
    ========================================================= */
 (function () {
   'use strict';
@@ -22,8 +26,9 @@
   const subDate = s => { const t = Date.parse(s); return isFinite(t) ? fmtDate(new Date(t).toISOString()) : esc(s || ''); };
   const RETRY = ['timeout', 'network', 'nonjson', 'busy', 'server', 's21_net', 's21_busy', 's21_server', 'slow'];
   const isRetry = e => RETRY.indexOf(e && (e.code || e.message)) >= 0 || /^http/.test(String(e && (e.code || e.message)));
-  const errText = e => {
+  const errText = (e, ym) => {
     const c = e && (e.code || e.message);
+    if (c === 's21_locked') return `${ym ? Mo(ym) + '月' : 'この月'}の報告は締切を過ぎたため、変更できません。直す必要があるときは、グループの監督か書記に伝えてください。`;
     if (c === 's21_noperson') return '会衆の報告システムで、名前が見つかりませんでした。区域係に伝えてください。';
     if (c === 's21_inactive') return '会衆の報告システムで、報告の対象になっていません。区域係か書記に伝えてください。';
     if (c === 's21_key' || c === 's21_nocfg' || c === 's21_off') return '会衆の報告システムにつながっていません。区域係に伝えてください。';
@@ -131,10 +136,12 @@
     if (opt.pick) bindReportPick(opt);
     api('s21_me', { ym }, { timeout: 45000 }).then(r => {
       remember(o => { o.s21p = { name: r.person.name, pioneer: !!r.person.pioneer }; });
-      paint(ym, opt, { person: r.person, report: r.report && !r.report.empty ? r.report : null, done, goal });
+      paint(ym, opt, { person: r.person, report: r.report && !r.report.empty ? r.report : null, locked: !!r.locked, deadline: r.deadline || 5, done, goal });
     }, e => {
       const c = e && (e.code || e.message);
       if (c === 'auth') return;
+      // 締切後で送れなかったあと、確かめ直せなかった：案内だけ（入力の画面には戻さない）
+      if (opt.lockedNow) { infoSheet('送れませんでした', esc(errText({ code: 's21_locked' }, ym))); return; }
       if (!dry && (c === 's21_noperson' || c === 's21_inactive' || c === 's21_off' || c === 's21_nocfg' || c === 's21_key')) {
         openReportLine(ym, Object.assign({}, opt, { note: errText(e) + '下の方法で送ることもできます。' }));
         return;
@@ -145,7 +152,37 @@
     });
   }
 
+  /* 送った・出した報告の中身（1行ずつ。ことばの切りかえで訳せるように） */
+  function sumHtml(b) {
+    const L = [b.preached ? '伝道した' : '伝道していない'];
+    if (b.preached) L.push(`聖書研究 ${b.studies || 0}件`);
+    if (b.aux) { const a = splitRemarks(b.remarks).aux; L.push(a ? auxTag(a) : '補助開拓'); }
+    if (b.hours) L.push(`時間 ${b.hours}時間`);
+    if (b.actHours) L.push(`承認された活動 ${b.actHours}時間`);
+    return L.map(esc).join('<br>');
+  }
+  /* 締切を過ぎて変えられない報告：見るだけ（入力・送る・LINE はなし。案内と閉じるだけ） */
+  function paintLocked(ym, opt, ctx, justNow) {
+    const rep = ctx.report, pio = !!ctx.person.pioneer;
+    const head = opt.dry ? `${Mo(ym)}月の奉仕報告（試し）` : `${Mo(ym)}月の奉仕報告`;
+    setSheet(headHtml(null, head, '') + `
+      ${opt.pick ? reportPickHtml(ym) : ''}
+      <p class="muted" style="margin:6px 0 2px">${esc(ctx.person.name || '')}さんの報告${pio ? '（開拓者）' : ''}</p>
+      <p class="okmsg">${rep.submitted ? subDate(rep.submitted) + 'に' : ''}会衆に報告しました。</p>
+      <div class="rpbox">${sumHtml(rep)}</div>
+      <div class="notice ${justNow ? 'warn' : 'info'}" role="status">${esc(errText({ code: 's21_locked' }, ym))}</div>
+      <button class="btn primary block" data-close>閉じる</button>`);
+    if (opt.pick) bindReportPick(opt);
+  }
+
   function paint(ym, opt, ctx) {
+    const justNow = !!opt.lockedNow; // 送ったら締切後で断られた（案内を目立たせる）
+    if (justNow) { opt = Object.assign({}, opt); delete opt.lockedNow; }
+    if (ctx.report && ctx.report.locked) {
+      if ((myData().s21q || {})[ym]) { remember(o => { delete o.s21q[ym]; }); renderHome(); } // 送れない下書きは残さない
+      paintLocked(ym, opt, ctx, justNow);
+      return;
+    }
     const dry = !!opt.dry;
     const o = myData(), draft = (o.s21q || {})[ym], rep = ctx.report, pio = !!ctx.person.pioneer;
     const fromRec = Math.floor(ctx.done / 60);
@@ -162,9 +199,11 @@
         ${ctx.done ? `<div class="rpbox"><p class="muted" style="margin:0">${Mo(ym)}月に記録した時間（${monthDays(o, ym)}日）</p><p class="big">${fmtMin(ctx.done)}</p></div>` : ''}
         <p class="muted" style="margin:6px 0 2px">${esc(ctx.person.name || '')}さんの報告${pio ? '（開拓者）' : ''}</p>
         ${ctx.offline ? `<div class="notice warn">${esc(errText(ctx.err))}${ctx.unknown ? '<br>入力しておくと、つながったときに送ります（開拓者の人は、つながってから時間を確かめてください）。' : '<br>入力して「会衆に報告する」を押すと、電波が戻ったときに自動で送ります。'}</div>` : ''}
+        ${justNow ? `<div class="notice warn" role="status">${esc(errText({ code: 's21_locked' }, ym))}</div>` : ''}
         ${draft ? `<div class="notice warn">まだ送れていない報告があります（${fmtDate(draft.at)}に入力）。「会衆に報告する」を押すと、もう一度送ります。</div>` : ''}
         ${rep && !draft ? `<p class="okmsg">${rep.submitted ? subDate(rep.submitted) + 'に' : ''}会衆に報告しました。直して送ると、上書きされます。</p>` : ''}
         ${formHtml(st, { pio, done: ctx.done, act: true, rem: true })}
+        ${ctx.locked ? '<div class="notice info">締切を過ぎているので、翌月の会衆の報告に加えられます。</div>' : ''}
         <button class="btn primary block" id="s21Send">${dry ? '試しに送る' : '会衆に報告する'}</button>
         <p class="hint">報告は会衆の報告システム（S21）に送られます。区域マップのサーバーには残りません。締切（5日）をすぎて送ると、翌月の会衆の報告に加えられます。</p>
         ${dry ? '' : '<details class="more"><summary>ほかの方法で送る（LINE・コピー）</summary><button class="btn block" id="s21Line">LINEなどで送る画面を開く</button></details>'}
@@ -190,6 +229,11 @@
     } catch (e) {
       const c = e && (e.code || e.message);
       if (c === 'auth') return;
+      if (c === 's21_locked') { // 締切を過ぎて、すでに報告がある：下書きは残さず、その月を見るだけで開き直す
+        if ((myData().s21q || {})[ym]) { remember(o => { delete o.s21q[ym]; }); renderHome(); }
+        open(ym, Object.assign({}, opt, { lockedNow: true }));
+        return;
+      }
       if (btn) { btn.disabled = false; btn.textContent = dry ? '試しに送る' : '会衆に報告する'; }
       if (!dry && isRetry(e) && c !== 'slow') {
         remember(o => { o.s21q[ym] = { v: body, kind: pio ? 'rp' : body.aux ? 'aux' : 'pub', auxH: st.aux, at: new Date().toISOString() }; });
@@ -206,7 +250,7 @@
     const dry = !!opt.dry;
     setSheet(headHtml(null, dry ? '試しに送れました' : '報告しました', `${Mo(ym)}月の奉仕報告`) + `
       <p class="praise">${dry ? '会衆の報告システムにつながっています（記録は変わっていません）。' : 'おつかれさまでした！'}</p>
-      <div class="rpbox">${body.preached ? '伝道した' : '伝道していない'}${body.preached ? `・聖書研究 ${body.studies}件` : ''}${body.aux ? `・${esc(splitRemarks(body.remarks).aux ? auxTag(splitRemarks(body.remarks).aux) : '補助開拓')}` : ''}${body.hours ? `・時間 ${body.hours}時間` : ''}${body.actHours ? `・承認された活動 ${body.actHours}時間` : ''}</div>
+      <div class="rpbox">${sumHtml(body)}</div>
       ${r.late ? '<div class="notice info">締切（5日）をすぎたため、翌月の会衆の報告に加えられます。</div>' : ''}
       <button class="btn primary block" data-close>閉じる</button>`);
     if (!dry) toast('奉仕報告を送りました');
@@ -227,12 +271,18 @@
           const m = await api('s21_me', { ym }, { timeout: 45000 });
           const sub = m.report && !m.report.empty ? Date.parse(m.report.submitted) : NaN;
           if (isFinite(sub) && sub > Date.parse(item.at)) { remember(o => { delete o.s21q[ym]; }); continue; }
+          if (m.report && !m.report.empty && m.report.locked) { // 締切を過ぎて、すでに報告がある：送れないので下書きを消す
+            remember(o => { delete o.s21q[ym]; }); renderHome();
+            toast(errText({ code: 's21_locked' }, ym));
+            continue;
+          }
           const r = await api('s21_send', item.v, { timeout: 45000 });
           markSent(ym, item.v, r.late, item.kind, item.auxH);
           toast(`${Mo(ym)}月の奉仕報告を送りました${r.late ? '（締切後のため、翌月の会衆の報告に加えられます）' : ''}`);
         } catch (e) {
           if (isRetry(e)) break; // まだつながらない：次の機会に
           remember(o => { delete o.s21q[ym]; });
+          if (e && (e.code || e.message) === 's21_locked') { renderHome(); toast(errText(e, ym)); continue; } // 締切後で変えられない
           toast(`${Mo(ym)}月の奉仕報告を送れませんでした。月のまとめから、もう一度送ってください`);
         }
       }
@@ -294,7 +344,7 @@
     };
     $('#s21Match').onclick = () => openMatch(false);
     $('#s21Dry').onclick = () => {
-      const d = new Date(), ym = d.getDate() <= 10 ? ymOf(new Date(d.getFullYear(), d.getMonth() - 1, 1)) : ymOf(d);
+      const d = new Date(), ym = d.getDate() <= 5 ? ymOf(new Date(d.getFullYear(), d.getMonth() - 1, 1)) : ymOf(d); // 締切（5日）を過ぎた先月は見るだけになるため
       open(ym, { dry: true });
     };
   }

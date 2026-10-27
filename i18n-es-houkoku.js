@@ -92,5 +92,17 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "{0}さんの報告（開拓者）": "Informe de {0} (precursor)",
 "「1カ月間に何らかの形で伝道した」の「はい」か「いいえ」を選ぶと、送れるようになります。": "Elija «Sí» o «No» en «Participé en alguna faceta de la predicación» para poder enviar.",
 "「1カ月間に何らかの形で伝道した」の「はい」か「いいえ」を選んでください": "Elija «Sí» o «No» en «Participé en alguna faceta de la predicación»",
-"名前が同じ人は、自動でつながっています。見つからない人だけ、S21 の名前をえらんでください。「奉仕時間」を使っていない人は、そのままでもかまいません。": "Las personas con el mismo nombre se conectan solas. Elija el nombre en S21 solo para quienes no se encontraron. Quienes no usan «Tiempo de predicación» pueden quedar así."
+"名前が同じ人は、自動でつながっています。見つからない人だけ、S21 の名前をえらんでください。「奉仕時間」を使っていない人は、そのままでもかまいません。": "Las personas con el mismo nombre se conectan solas. Elija el nombre en S21 solo para quienes no se encontraron. Quienes no usan «Tiempo de predicación» pueden quedar así.",
+/* 締切後のロック（2026.13.97） */
+"{0}月の報告は締切を過ぎたため、変更できません。直す必要があるときは、グループの監督か書記に伝えてください。": "El informe del mes {0} ya pasó la fecha límite y no se puede cambiar. Si hay que corregirlo, avise al superintendente de grupo o al secretario.",
+"この月の報告は締切を過ぎたため、変更できません。直す必要があるときは、グループの監督か書記に伝えてください。": "El informe de este mes ya pasó la fecha límite y no se puede cambiar. Si hay que corregirlo, avise al superintendente de grupo o al secretario.",
+"締切を過ぎているので、翌月の会衆の報告に加えられます。": "Como ya pasó la fecha límite, se sumará al informe de la congregación del mes siguiente.",
+"{0}に会衆に報告しました。": "Lo informó a la congregación el {0}.",
+"会衆に報告しました。": "Ya lo informó a la congregación.",
+"伝道した": "Predicó",
+"伝道していない": "No predicó",
+"聖書研究 {0}件": "Cursos bíblicos: {0}",
+"時間 {0}時間": "Horas: {0}",
+"承認された活動 {0}時間": "Actividades aprobadas: {0} h",
+"補助開拓（{0}時間）": "Precursor auxiliar ({0} h)"
 });
