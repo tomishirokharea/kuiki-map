@@ -81,5 +81,16 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "補助開拓": "Precursor auxiliar",
 "開拓者": "Precursor",
 "報告済み": "Informado",
+/* S-4 どおりの入力（2026.13.95） */
+"はい": "Sí",
+"いいえ": "No",
+"補助 15時間": "Auxiliar 15 h",
+"補助 30時間": "Auxiliar 30 h",
+"備考に「{0}」と入れて送ります": "Se enviará «{0}» en los comentarios",
+"報告する人": "Quién informa",
+"伝道者・補助開拓者": "Publicador / precursor auxiliar",
+"{0}さんの報告（開拓者）": "Informe de {0} (precursor)",
+"「1カ月間に何らかの形で伝道した」の「はい」か「いいえ」を選ぶと、送れるようになります。": "Elija «Sí» o «No» en «Participé en alguna faceta de la predicación» para poder enviar.",
+"「1カ月間に何らかの形で伝道した」の「はい」か「いいえ」を選んでください": "Elija «Sí» o «No» en «Participé en alguna faceta de la predicación»",
 "名前が同じ人は、自動でつながっています。見つからない人だけ、S21 の名前をえらんでください。「奉仕時間」を使っていない人は、そのままでもかまいません。": "Las personas con el mismo nombre se conectan solas. Elija el nombre en S21 solo para quienes no se encontraron. Quienes no usan «Tiempo de predicación» pueden quedar así."
 });

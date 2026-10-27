@@ -35,14 +35,89 @@
   /* ---- この端末に残すもの（本人のスマホの中だけ） ---- */
   function remember(fn) { const o = myData(); o.s21q = o.s21q || {}; o.s21p = o.s21p || null; fn(o); mySave(o); }
   // kind：'pub'（伝道者）・'aux'（補助開拓）・'rp'（開拓者）。ホームの「報告済み」の文に使う
-  function markSent(ym, v, late, kind) {
+  function markSent(ym, v, late, kind, auxH) {
     remember(o => {
-      o.reports[ym] = { kind: kind || (v.aux ? 'aux' : v.hours ? 'rp' : 'pub'), pre: !!v.preached || v.hours > 0 || v.studies > 0, h: v.hours || 0, les: v.studies || 0, at: new Date().toISOString(), how: 's21', late: late ? 1 : 0 };
+      o.reports[ym] = { kind: kind || (v.aux ? 'aux' : v.hours ? 'rp' : 'pub'), pre: !!v.preached || v.hours > 0 || v.studies > 0, h: v.hours || 0, les: v.studies || 0, auxH: auxH || 0, at: new Date().toISOString(), how: 's21', late: late ? 1 : 0 };
       o.lastLes = v.studies || 0;
       delete o.s21q[ym];
     });
     renderHome();
   }
+
+  /* ---- 報告の入力（S-4 の並び）：S21 に送る画面と、LINE で送る画面（app.js の openReportLine）で同じものを使う ----
+     状態 st = { pre: true|false|null（伝道した：はい・いいえ・まだ）, studies, aux: 0|15|30（補助開拓の時間の目安）, hours, actHours, remarks（本人の備考） }
+     ・伝道者：「伝道した」を「はい｜いいえ」。はいなら研究の数・補助開拓（していない｜15時間｜30時間）、補助なら時間。いいえなら、ほかは出さない
+     ・開拓者：「伝道した」は聞かない（時間か研究が1以上なら伝道した）。研究の数・時間・承認された活動の時間
+     ・補助開拓の時間（15・30）は、備考の頭に「補助開拓（15時間）」と入れて送る（S21 の補助開拓の印は aux） */
+  const AUX_RE = /^補助開拓（(15|30)時間）[ 　]?/;
+  const auxTag = n => `補助開拓（${n}時間）`;
+  function splitRemarks(r) { const m = AUX_RE.exec(r || ''); return m ? { aux: Number(m[1]), rest: String(r).slice(m[0].length) } : { aux: 0, rest: String(r || '') }; }
+  function joinRemarks(aux, rest) { return ((aux ? auxTag(aux) + (rest ? '　' : '') : '') + (rest || '')).slice(0, 200); }
+  /* S21 の報告（または送った内容）から、入力の状態を作る */
+  function stFromReport(r, pio) {
+    const sp = splitRemarks(r.remarks);
+    return { pre: pio ? true : !!r.preached, studies: r.studies || 0, aux: !pio && r.aux ? (sp.aux || 30) : 0, hours: r.hours || 0, actHours: r.actHours || 0, remarks: sp.rest };
+  }
+  /* 送る内容（S21 の項目）にする */
+  function toBody(st, pio) {
+    if (pio) return { preached: st.hours > 0 || st.studies > 0, studies: st.studies, aux: false, hours: st.hours, actHours: st.actHours || 0, remarks: (st.remarks || '').slice(0, 200) };
+    if (st.pre !== true) return { preached: false, studies: 0, aux: false, hours: 0, actHours: 0, remarks: (st.remarks || '').slice(0, 200) };
+    return { preached: true, studies: st.studies, aux: st.aux > 0, hours: st.aux > 0 ? st.hours : 0, actHours: 0, remarks: joinRemarks(st.aux, st.remarks) };
+  }
+  /* 送る前の確かめ。止めるときは false */
+  async function checkSt(st, pio, ym) {
+    if (!pio && st.pre == null) { toast('「1カ月間に何らかの形で伝道した」の「はい」か「いいえ」を選んでください'); return false; }
+    if (pio && !st.hours && !st.studies && !await ask(`時間も研究も0です。このまま${Mo(ym)}月の報告を送りますか？`, { ok: '送る', danger: false })) return false;
+    if (!pio && st.pre && st.aux && !st.hours && !await ask(`補助開拓で、時間が0です。このまま${Mo(ym)}月の報告を送りますか？`, { ok: '送る', danger: false })) return false;
+    return true;
+  }
+  const numRow = (st, k, label, unit, max, hint) => `<div class="rpline"><p class="q" style="margin:0">${label}${hint ? `<br><small class="muted">${hint}</small>` : ''}</p>
+    <div class="stepper"><button type="button" data-rfd="${k}" data-d="-1" aria-label="${label}を1へらす">−</button>
+      <div class="dmin"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="${String(max).length}" data-rfn="${k}" value="${st[k]}" aria-label="${label}（数字を入れる）" autocomplete="off"><span>${unit}</span></div>
+      <button type="button" data-rfd="${k}" data-d="1" aria-label="${label}を1ふやす">＋</button></div></div>`;
+  /* o = { pio, done（その月に記録した分）, act（承認された活動を出す）, rem（備考を出す） } */
+  function formHtml(st, o) {
+    const pio = !!o.pio, yes = st.pre === true, showH = pio || (yes && st.aux > 0);
+    const hHint = o.done % 60 ? `記録は${fmtMin(o.done)}です（1時間に満たない分は入れていません）` : '';
+    return `<div class="rform">
+      ${pio ? '' : `<p class="q" style="margin:10px 0 0">1カ月間に何らかの形で伝道した</p>
+        <div class="seg rppick big" role="group" aria-label="1カ月間に何らかの形で伝道した"><button type="button" data-keep data-rfpre="1" aria-pressed="${yes}">はい</button><button type="button" data-keep data-rfpre="0" aria-pressed="${st.pre === false}">いいえ</button></div>`}
+      ${pio || yes ? numRow(st, 'studies', '司会した聖書研究（レッスン）の数', '件', S_MAX, '') : ''}
+      ${!pio && yes ? `<p class="q" style="margin:10px 0 0">補助開拓者として奉仕した</p>
+        <div class="seg rppick" role="group" aria-label="補助開拓者として奉仕した">${[[0, 'していない'], [15, '補助 15時間'], [30, '補助 30時間']].map(([v, l]) =>
+          `<button type="button" data-keep data-rfaux="${v}" aria-pressed="${st.aux === v}">${l}</button>`).join('')}</div>
+        ${st.aux ? `<p class="muted" style="margin:2px 0 0">備考に「${auxTag(st.aux)}」と入れて送ります</p>` : ''}` : ''}
+      ${showH ? numRow(st, 'hours', '時間', '時間', H_MAX, hHint) : ''}
+      ${pio && o.act ? `<details class="more"${st.actHours ? ' open' : ''}><summary>承認された活動の時間を入れる</summary>${numRow(st, 'actHours', '承認された活動の時間', '時間', H_MAX, '報告の時間には加えません')}</details>` : ''}
+      ${o.rem ? `<details class="more"${st.remarks ? ' open' : ''}><summary>備考を書く</summary>
+        <div class="field"><textarea id="rfRem" rows="3" maxlength="${st.aux ? 190 : 200}" aria-label="備考">${esc(st.remarks)}</textarea></div></details>` : ''}
+    </div>`;
+  }
+  function formRead(st) {
+    const S = $('#sheet');
+    const n = k => { const el = $(`[data-rfn="${k}"]`, S); return el ? clampInt(el.value, k === 'studies' ? S_MAX : H_MAX) : st[k]; };
+    const rm = $('#rfRem', S);
+    Object.assign(st, { studies: n('studies'), hours: n('hours'), actHours: n('actHours'), remarks: rm ? rm.value.slice(0, 200) : st.remarks });
+    return st;
+  }
+  /* redraw：選んだものが変わったとき（はい・いいえ・補助）。change：数字や文が変わったとき（LINE の文を直すため） */
+  function formBind(st, redraw, change) {
+    const S = $('#sheet');
+    $$('[data-rfd]', S).forEach(b => b.onclick = () => {
+      const k = b.dataset.rfd, el = $(`[data-rfn="${k}"]`, S), max = k === 'studies' ? S_MAX : H_MAX;
+      el.value = Math.max(0, Math.min(max, clampInt(el.value, max) + Number(b.dataset.d)));
+      formRead(st); if (change) change();
+    });
+    $$('[data-rfn]', S).forEach(el => {
+      el.onfocus = () => setTimeout(() => { try { el.select(); } catch (x) { /* 何もしない */ } }, 0);
+      el.onblur = () => { el.value = clampInt(el.value, el.dataset.rfn === 'studies' ? S_MAX : H_MAX); formRead(st); if (change) change(); };
+      el.oninput = () => { formRead(st); if (change) change(); };
+    });
+    if ($('#rfRem', S)) $('#rfRem', S).oninput = () => { formRead(st); if (change) change(); };
+    $$('[data-rfpre]', S).forEach(b => b.onclick = () => { formRead(st); st.pre = b.dataset.rfpre === '1'; redraw(); });
+    $$('[data-rfaux]', S).forEach(b => b.onclick = () => { formRead(st); st.aux = Number(b.dataset.rfaux); redraw(); });
+  }
+  window.RepForm = { html: formHtml, read: formRead, bind: formBind, check: checkSt, toBody, fromReport: stFromReport, auxTag };
 
   /* ---- 報告の画面 ---- */
   function open(ym, opt) {
@@ -74,80 +149,50 @@
     const dry = !!opt.dry;
     const o = myData(), draft = (o.s21q || {})[ym], rep = ctx.report, pio = !!ctx.person.pioneer;
     const fromRec = Math.floor(ctx.done / 60);
-    const v = draft ? Object.assign({}, draft.v)
-      : rep ? { preached: !!rep.preached, studies: rep.studies || 0, aux: !!rep.aux, hours: rep.hours || 0, actHours: rep.actHours || 0, remarks: rep.remarks || '' }
-        : { preached: ctx.done > 0, studies: o.lastLes || 0, aux: false, hours: fromRec, actHours: 0, remarks: '' };
-    let state = v;
-    const read = () => {
-      const S = $('#sheet');
-      const n = k => { const el = $(`[data-s21n="${k}"]`, S); return el ? clampInt(el.value, k === 'studies' ? S_MAX : H_MAX) : state[k]; };
-      const pr = $('#s21Pre', S), rm = $('#s21Rem', S);
-      state = Object.assign({}, state, { preached: pr ? pr.checked : state.preached, studies: n('studies'), hours: n('hours'), actHours: n('actHours'), remarks: rm ? rm.value.slice(0, 200) : state.remarks });
-      return state;
-    };
-    const numRow = (k, label, unit, max, hint) => `<div class="rpline"><p class="q" style="margin:0">${label}${hint ? `<br><small class="hint">${hint}</small>` : ''}</p>
-      <div class="stepper"><button type="button" data-s21d="${k}" data-d="-1" aria-label="${label}を1へらす">−</button>
-        <div class="dmin"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="${String(max).length}" data-s21n="${k}" value="${state[k]}" aria-label="${label}（数字を入れる）" autocomplete="off"><span>${unit}</span></div>
-        <button type="button" data-s21d="${k}" data-d="1" aria-label="${label}を1ふやす">＋</button></div></div>`;
+    const st = draft ? stFromReport(draft.v, pio)
+      : rep ? stFromReport(rep, pio)
+        : { pre: pio || ctx.done > 0 ? true : null, studies: o.lastLes || 0, aux: 0, hours: fromRec, actHours: 0, remarks: '' };
+    if (draft && !pio && !draft.v.preached) st.pre = false;
     const draw = () => {
-      const s = state, showH = pio || s.aux;
       const head = dry ? `${Mo(ym)}月の奉仕報告（試し）` : opt.auto ? 'おつかれさまでした！' : `${Mo(ym)}月の奉仕報告`;
       const sub = dry ? '試しに送ります（会衆の記録は変わりません）' : opt.auto ? `${Mo(ym)}月の奉仕報告` : '';
       setSheet(headHtml(null, head, sub) + `
         ${opt.pick ? reportPickHtml(ym) : ''}
         ${opt.auto ? `<p class="praise">${esc(praiseLine(ctx.done, ctx.goal))}</p>` : ''}
         ${ctx.done ? `<div class="rpbox"><p class="muted" style="margin:0">${Mo(ym)}月に記録した時間（${monthDays(o, ym)}日）</p><p class="big">${fmtMin(ctx.done)}</p></div>` : ''}
-        <p class="muted" style="margin:6px 0 2px">${esc(ctx.person.name || '')}さんの報告</p>
+        <p class="muted" style="margin:6px 0 2px">${esc(ctx.person.name || '')}さんの報告${pio ? '（開拓者）' : ''}</p>
         ${ctx.offline ? `<div class="notice warn">${esc(errText(ctx.err))}${ctx.unknown ? '<br>入力しておくと、つながったときに送ります（開拓者の人は、つながってから時間を確かめてください）。' : '<br>入力して「会衆に報告する」を押すと、電波が戻ったときに自動で送ります。'}</div>` : ''}
         ${draft ? `<div class="notice warn">まだ送れていない報告があります（${fmtDate(draft.at)}に入力）。「会衆に報告する」を押すと、もう一度送ります。</div>` : ''}
         ${rep && !draft ? `<p class="okmsg">${rep.submitted ? subDate(rep.submitted) + 'に' : ''}会衆に報告しました。直して送ると、上書きされます。</p>` : ''}
-        <label class="check big"><input type="checkbox" id="s21Pre"${s.preached ? ' checked' : ''}>1カ月間に何らかの形で伝道した</label>
-        ${numRow('studies', '司会した聖書研究（レッスン）の数', '件', S_MAX, '')}
-        ${pio ? '' : `<div class="rpline"><p class="q" style="margin:0">補助開拓者として奉仕した</p>
-          <div class="seg" role="group" aria-label="補助開拓者として奉仕した"><button type="button" data-s21aux="1" data-keep aria-pressed="${s.aux}">した</button><button type="button" data-s21aux="0" data-keep aria-pressed="${!s.aux}">していない</button></div></div>`}
-        ${showH ? numRow('hours', '時間', '時間', H_MAX, ctx.done % 60 ? `記録は${fmtMin(ctx.done)}です（1時間に満たない分は入れていません）` : '') : ''}
-        ${pio ? `<details class="more"${s.actHours ? ' open' : ''}><summary>承認された活動の時間を入れる</summary>${numRow('actHours', '承認された活動の時間', '時間', H_MAX, '報告の時間には加えません')}</details>` : ''}
-        <details class="more"${s.remarks ? ' open' : ''}><summary>備考を書く</summary>
-          <div class="field"><textarea id="s21Rem" rows="3" maxlength="200" aria-label="備考（200文字まで）">${esc(s.remarks)}</textarea></div></details>
+        ${formHtml(st, { pio, done: ctx.done, act: true, rem: true })}
         <button class="btn primary block" id="s21Send">${dry ? '試しに送る' : '会衆に報告する'}</button>
         <p class="hint">報告は会衆の報告システム（S21）に送られます。区域マップのサーバーには残りません。締切（5日）をすぎて送ると、翌月の会衆の報告に加えられます。</p>
         ${dry ? '' : '<details class="more"><summary>ほかの方法で送る（LINE・コピー）</summary><button class="btn block" id="s21Line">LINEなどで送る画面を開く</button></details>'}
         <button class="btn block" data-close>${rep ? '閉じる' : 'あとで'}</button>`);
       const S = $('#sheet');
-      $$('[data-s21d]', S).forEach(b => b.onclick = () => {
-        const k = b.dataset.s21d, el = $(`[data-s21n="${k}"]`, S), max = k === 'studies' ? S_MAX : H_MAX;
-        el.value = Math.max(0, Math.min(max, clampInt(el.value, max) + Number(b.dataset.d)));
-      });
-      $$('[data-s21n]', S).forEach(el => {
-        el.onfocus = () => setTimeout(() => { try { el.select(); } catch (x) { /* 何もしない */ } }, 0);
-        el.onblur = () => { el.value = clampInt(el.value, el.dataset.s21n === 'studies' ? S_MAX : H_MAX); };
-      });
-      $$('[data-s21aux]', S).forEach(b => b.onclick = () => { read(); state.aux = b.dataset.s21aux === '1'; draw(); });
-      if ($('#s21Line', S)) $('#s21Line', S).onclick = () => { const v = read(); openReportLine(ym, Object.assign({}, opt, { kind: pio ? 'rp' : v.aux ? 'aux' : 'pub', pre: v.preached, h: pio || v.aux ? v.hours : fromRec, les: v.studies })); };
-      $('#s21Send', S).onclick = () => send(ym, opt, ctx, read());
+      formBind(st, draw);
+      if ($('#s21Line', S)) $('#s21Line', S).onclick = () => { formRead(st); openReportLine(ym, Object.assign({}, opt, { kind: pio ? 'rp' : 'pub', st: Object.assign({}, st) })); };
+      $('#s21Send', S).onclick = async () => { formRead(st); if (await checkSt(st, pio, ym)) send(ym, opt, ctx, st); };
       if (opt.pick) bindReportPick(opt);
     };
     draw();
   }
 
-  async function send(ym, opt, ctx, v) {
-    const dry = !!opt.dry, showH = !!ctx.person.pioneer || v.aux;
-    const body = { ym, preached: !!v.preached, studies: v.studies, aux: !ctx.person.pioneer && !!v.aux, hours: showH ? v.hours : 0, actHours: ctx.person.pioneer ? v.actHours : 0, remarks: v.remarks || '' };
-    if (!body.preached && !body.studies && !body.hours) {
-      if (!await ask(`伝道したにチェックがなく、研究も時間も0です。このまま${Mo(ym)}月の報告を送りますか？`, { ok: '送る', danger: false })) return;
-    }
+  async function send(ym, opt, ctx, st) {
+    const dry = !!opt.dry, pio = !!ctx.person.pioneer;
+    const body = Object.assign({ ym }, toBody(st, pio));
     if (dry) body.dryRun = true;
     const btn = $('#s21Send'); if (btn) { btn.disabled = true; btn.textContent = '送っています…'; }
     try {
       const r = await api('s21_send', body, { timeout: 45000 });
-      if (!dry) markSent(ym, body, r.late, ctx.person.pioneer ? 'rp' : body.aux ? 'aux' : 'pub');
+      if (!dry) markSent(ym, body, r.late, pio ? 'rp' : body.aux ? 'aux' : 'pub', st.aux);
       done(ym, opt, body, r);
     } catch (e) {
       const c = e && (e.code || e.message);
       if (c === 'auth') return;
       if (btn) { btn.disabled = false; btn.textContent = dry ? '試しに送る' : '会衆に報告する'; }
       if (!dry && isRetry(e) && c !== 'slow') {
-        remember(o => { o.s21q[ym] = { v: body, kind: ctx.person.pioneer ? 'rp' : body.aux ? 'aux' : 'pub', at: new Date().toISOString() }; });
+        remember(o => { o.s21q[ym] = { v: body, kind: pio ? 'rp' : body.aux ? 'aux' : 'pub', auxH: st.aux, at: new Date().toISOString() }; });
         setSheet(headHtml(null, `${Mo(ym)}月の奉仕報告`, '') + `<div class="notice warn">${esc(errText(e))}<br>入力した内容はこのスマホに残しました。電波が戻ったら、自動で送ります。</div>
           <button class="btn block" data-close>閉じる</button>`);
         renderHome();
@@ -161,7 +206,7 @@
     const dry = !!opt.dry;
     setSheet(headHtml(null, dry ? '試しに送れました' : '報告しました', `${Mo(ym)}月の奉仕報告`) + `
       <p class="praise">${dry ? '会衆の報告システムにつながっています（記録は変わっていません）。' : 'おつかれさまでした！'}</p>
-      <div class="rpbox">${body.preached ? '伝道した・' : ''}聖書研究 ${body.studies}件${body.hours ? `・時間 ${body.hours}時間` : ''}${body.aux ? '・補助開拓' : ''}${body.actHours ? `・承認された活動 ${body.actHours}時間` : ''}</div>
+      <div class="rpbox">${body.preached ? '伝道した' : '伝道していない'}${body.preached ? `・聖書研究 ${body.studies}件` : ''}${body.aux ? `・${esc(splitRemarks(body.remarks).aux ? auxTag(splitRemarks(body.remarks).aux) : '補助開拓')}` : ''}${body.hours ? `・時間 ${body.hours}時間` : ''}${body.actHours ? `・承認された活動 ${body.actHours}時間` : ''}</div>
       ${r.late ? '<div class="notice info">締切（5日）をすぎたため、翌月の会衆の報告に加えられます。</div>' : ''}
       <button class="btn primary block" data-close>閉じる</button>`);
     if (!dry) toast('奉仕報告を送りました');
@@ -183,7 +228,7 @@
           const sub = m.report && !m.report.empty ? Date.parse(m.report.submitted) : NaN;
           if (isFinite(sub) && sub > Date.parse(item.at)) { remember(o => { delete o.s21q[ym]; }); continue; }
           const r = await api('s21_send', item.v, { timeout: 45000 });
-          markSent(ym, item.v, r.late, item.kind);
+          markSent(ym, item.v, r.late, item.kind, item.auxH);
           toast(`${Mo(ym)}月の奉仕報告を送りました${r.late ? '（締切後のため、翌月の会衆の報告に加えられます）' : ''}`);
         } catch (e) {
           if (isRetry(e)) break; // まだつながらない：次の機会に
