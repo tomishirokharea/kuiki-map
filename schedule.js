@@ -2619,7 +2619,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     return decide(id, async r => {
       const h = houseById(r.houseId);
       const name = h ? (h.type === 'apt' ? `${h.label || '集合住宅'}（${h.units.length}部屋）` : (h.label || '家')) : '';
-      if (h && !await ask(`${uname(r.by)}さんの申請で「${name}」を消します。訪問の記録も一緒に消えます。よろしいですか？`)) return;
+      if (h && !await ask(`${uname(r.by)}さんの申請で「${name}」を消します。${(typeof houseRecText === 'function' && houseRecText(h)) || ''}よろしいですか？`)) return; // 件数つき（H8）
       commit(h ? `「${name}」を削除しました` : '申請を閉じました', () => {
         if (h) deleteHouseData(h.id);
         Object.assign(r, { status: 'approved', decidedAt: new Date().toISOString(), decidedBy: me().id, seen: false });

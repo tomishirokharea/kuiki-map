@@ -2179,7 +2179,7 @@ function dncDrop(k, h, keepPlain) {
   // 場所だけの印は区域係しか作れない（サーバーも止める）ので、係以外の画面では今までどおり（住所のある拒否だけ）。
   // 部屋を消す・印を注意に変えるなど、家を消さないときは今までどおり
   const plain = !v || typeof v !== 'object' || !(v.a || v.s);
-  if (plain && !(keepPlain && isAdmin() && h && isFinite(Number(h.lat)) && isFinite(Number(h.lng)))) return;
+  if (plain && !(keepPlain && isAdmin() && h && h.lat != null && h.lng != null && Number.isFinite(+h.lat) && Number.isFinite(+h.lng))) return; // 位置のない家は作らない（サーバーが削除を止める）
   const o = Object.assign({}, v && typeof v === 'object' ? v : {}, { p: 1, dk: k });
   delete o.auto;
   if (!o.s) o.s = 'del';
@@ -4688,7 +4688,7 @@ async function approveDel(id) {
   const r = D().requests.find(x => x.id === id); if (!r) return;
   const h = houseById(r.houseId);
   const name = h ? (h.type === 'apt' ? `${h.label || '集合住宅'}（${h.units.length}部屋）` : (h.label || '家')) : '';
-  if (h && !await ask(`${uname(r.by)}さんの申請で「${name}」を消します。訪問の記録も一緒に消えます。よろしいですか？`)) return;
+  if (h && !await ask(`${uname(r.by)}さんの申請で「${name}」を消します。${(typeof houseRecText === 'function' && houseRecText(h)) || ''}よろしいですか？`)) return; // 件数つき（H8）
   commit(h ? `「${name}」を削除しました` : '申請を閉じました', () => {
     if (h) deleteHouseData(h.id);
     Object.assign(r, { status: 'approved', decidedAt: new Date().toISOString(), seen: false });
@@ -8241,7 +8241,7 @@ function openReturnSheet(tid) {
     ? `<button class="btn block wrap" data-first>返さないで、自分で留守宅を回る（カードを持ったまま）</button>` : '';
   // 区域係の操作：目安に関係なく、今までどおりえらべる（記録の少ない返却の確かめも、今までどおり）
   // 紙の区域カード（S-13 で渡した区域）は、紙で回った家がアプリにないので、記録での確かめはしない（えらぶ欄も出さない。返すと ph で完了）
-  const low = !paperHandOf(t) && lowOnSet() && (r.phase === 'first' ? r.pct1 < th : (!t.firstLow && (lowP1(t, r) ?? 100) < th)) ? lowCheckHtml(th, r.phase === 'first' ? r.pct1 : lowP1(t, r)) : '';
+  const low = !paperHandOf(t) && lowOnSet() && (r.phase === 'first' ? r.pct1 < th : (!lowFirstPicked(t) && (lowP1(t, r) ?? 100) < th)) ? lowCheckHtml(th, r.phase === 'first' ? r.pct1 : lowP1(t, r)) : '';
   const admBox = !adm ? '' : `<details class="retadm"><summary>区域係の操作（目安に関係なく決める）</summary>
       ${low}
       <button class="btn block wrap" data-fin="1">正式に返却する（区域を回り終えた）</button>
@@ -8285,7 +8285,7 @@ function firstDone(tid, lowOk) {
   commit(`区域${t.no}の1回目を回り終えました（${pct}%）。留守宅を回る段階です`, () => {
     t.firstDoneAt = new Date().toISOString(); t.firstDonePct = pct;
     // 係が目安未満のまま進めたときは、あとの正式返却で「記録の少ない返却」として確かめるために印を残す
-    if (lowOnSet() && isAdmin() && pct != null && pct < D().settings.donePct) t.firstLow = lowOk ? 'ok' : 1;
+    if (lowOnSet() && isAdmin() && pct != null && pct < D().settings.donePct) t.firstLow = lowOk ? 'ok' : 'wait'; // えらんだ確かめ方（H1。以前の 1 は、えらんでいない古い値）
     else delete t.firstLow;
     if (t.firstLow === 'ok') t.recLess = 1; // 紙や口頭で確かめた：このあと本人が返しても、回り残しを出さない（H2）
   });
@@ -8308,7 +8308,7 @@ function finishTerr(tid, done, lowOk) {
       t.completedAt = now; t.completedPct = null;
       t.recLess = 1; // 紙で回った家はアプリにないので、おすすめに回り残しを出さない（H2）
     } else if (done) {
-      lowMark(rec, t, lowP1(t, r), t.firstLow ? t.firstLow === 'ok' : lowOk); // 印は、t.completedAt を書きかえる前に付ける
+      lowMark(rec, t, lowP1(t, r), lowFirstPicked(t) ? t.firstLow === 'ok' : lowOk); // 印は、t.completedAt を書きかえる前に付ける
       t.completedAt = now; t.completedPct = r && r.phase === 'away' ? r.pct1 : pct;
     }
     delete t.paperHand;
@@ -8323,6 +8323,8 @@ const lowWaitDays = () => Math.max(3, Math.min(30, Number(D().settings.lowWait) 
 /* 1回目の割合：1回目を終えたときの値（firstLow があればそれ）／1回目の段階なら今の割合 */
 const lowP1 = (t, r) => (t.firstLow && t.firstDonePct != null ? t.firstDonePct : (r && r.phase === 'away' ? (t.firstDonePct != null ? t.firstDonePct : r.pct1) : (r ? r.pct1 : null)));
 /* 係が目安未満で完了にするとき、確かめ方を必ずえらぶ（H1・2026-10-29。はじめは、どちらもえらんでいない） */
+/* 1回目を終えたときに、係が確かめ方をえらんだか（'ok'＝紙や口頭・'wait'＝アプリの記録）。以前の 1 は、えらぶ欄がなかったころの値なので「えらんでいない」として扱う */
+const lowFirstPicked = t => !!t && (t.firstLow === 'ok' || t.firstLow === 'wait');
 const lowPicked = () => { const x = $('input[name="lowpick"]:checked', $('#sheet')); return x ? x.value : ''; };
 const lowChecked = () => lowPicked() === 'ok';
 const lowCheckHtml = (th, p1) => `<fieldset class="lowpick" data-lowpickset>
@@ -8359,7 +8361,7 @@ function poolReturn(tid, lowOk) {
     if (isAllUse(t)) rec.ga = 1;
     delete t.paperHand;
     D().returns.push(rec);
-    lowMark(rec, t, lowP1(t, r), t.firstLow ? t.firstLow === 'ok' : lowOk); // まだ正式返却ではない。あとで留守宅カードが完了したとき、この印がそのまま使われる
+    lowMark(rec, t, lowP1(t, r), lowFirstPicked(t) ? t.firstLow === 'ok' : lowOk); // まだ正式返却ではない。あとで留守宅カードが完了したとき、この印がそのまま使われる
     t.lastLentAt = t.lentAt; t.lastFirstAt = first; t.awayPoolAt = now; t.poolRetId = rid;
     t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
   });

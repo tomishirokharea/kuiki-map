@@ -416,7 +416,7 @@
       on('duUndo', () => undoDuplex(hid));
       on('duDel', async () => {
         if (!isAdmin()) { closeSheet(); openDelRequest(h); return; }
-        if (!await ask('この二世帯住宅と、すべての世帯の記録を削除します。よろしいですか？')) return;
+        if (!await ask(`この二世帯住宅と、すべての世帯の記録を削除します。${(typeof houseRecText === 'function' && houseRecText(houseById(hid))) || ''}よろしいですか？`)) return; // 件数つき（H8）
         closeSheet(); deleteHouse(hid);
       });
     };
