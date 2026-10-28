@@ -10,10 +10,11 @@
    ・送れなかったときは、この端末に下書き（o.s21q）を残し、電波が戻ったら送り直す。送れたら消す。
      報告の中身は区域マップのサーバーにも残らない。この端末には、今までどおり「送った月・数・日時」（o.reports）だけが残る。
    ・区域係の画面「設定・データ」に、つなぎ方（URL・連携キー・接続テスト・名前の対応・試しに送る）。
-   ・締切後のロック（S21 v23・2026-10-27）：締切（翌月5日）を過ぎた月で、すでに出した報告は変えられない（直すのは書記）。
-     変えられるかは report.locked で決める（締切後に出した報告は、加えた月の締切まで送り直せる）。
-     変えられない報告は見るだけ。まだ出していない月は送れる（翌月の会衆の報告に加えられる）。
-     送って s21_locked が返ったら、下書きは残さない。
+   ・締切（S21 v37・2026-10-28 から。以前は v23 の翌月5日）：締切は翌月10日（S21 の設定。s21_me の deadline）。
+     締切を過ぎた月（s21_me の locked）は、まだ出していなくても、ここからは送れない・直せない。書記に伝えてもらう（書記が入力する）。
+     その月は見るだけ：出した報告があれば中身、なければ「まだ会衆に届いていません」と、記録した時間（書記に伝えるとき用）。
+     送って s21_locked が返ったら・送り直しで締切を過ぎていたら、下書きは残さない（送り直しのときは、画面で知らせる）。
+     電波がなく確かめられないときも、この端末の時計で締切を過ぎていれば、入力の画面を出さない（送れない下書きを作らない）。
    ========================================================= */
 (function () {
   'use strict';
@@ -26,9 +27,14 @@
   const subDate = s => { const t = Date.parse(s); return isFinite(t) ? fmtDate(new Date(t).toISOString()) : esc(s || ''); };
   const RETRY = ['timeout', 'network', 'nonjson', 'busy', 'server', 's21_net', 's21_busy', 's21_server', 'slow'];
   const isRetry = e => RETRY.indexOf(e && (e.code || e.message)) >= 0 || /^http/.test(String(e && (e.code || e.message)));
+  /* 締切：その月の翌月の締切日（S21 の deadline。わからないときは app.js の reportDl()＝この端末に覚えた値か10日）の終わりまで */
+  const dlOf = dl => { const n = Number(dl); return n >= 1 && n <= 28 && Math.floor(n) === n ? n : reportDl(); };
+  const dlDate = (ym, dl) => `${Mo(ym) === 12 ? 1 : Mo(ym) + 1}月${dlOf(dl)}日`; // 例：10月の報告 → 「11月10日」
+  const pastDl = (ym, dl) => Date.now() >= new Date(Number(String(ym).slice(0, 4)), Mo(ym), dlOf(dl) + 1).getTime(); // 締切日の翌日0時から
   const errText = (e, ym) => {
     const c = e && (e.code || e.message);
-    if (c === 's21_locked') return `${ym ? Mo(ym) + '月' : 'この月'}の報告は締切を過ぎたため、変更できません。直す必要があるときは、グループの監督か書記に伝えてください。`;
+    if (c === 's21_locked') return ym ? `${Mo(ym)}月の報告は締切（${dlDate(ym)}）を過ぎたため、ここからは送ることも直すこともできません。書記に伝えてください（書記が入力します）。`
+      : 'この月の報告は締切を過ぎたため、ここからは送ることも直すこともできません。書記に伝えてください（書記が入力します）。';
     if (c === 's21_noperson') return '会衆の報告システムで、名前が見つかりませんでした。区域係に伝えてください。';
     if (c === 's21_inactive') return '会衆の報告システムで、報告の対象になっていません。区域係か書記に伝えてください。';
     if (c === 's21_key' || c === 's21_nocfg' || c === 's21_off') return '会衆の報告システムにつながっていません。区域係に伝えてください。';
@@ -135,8 +141,9 @@
       '<button class="btn block" data-close>閉じる</button>');
     if (opt.pick) bindReportPick(opt);
     api('s21_me', { ym }, { timeout: 45000 }).then(r => {
-      remember(o => { o.s21p = { name: r.person.name, pioneer: !!r.person.pioneer }; });
-      paint(ym, opt, { person: r.person, report: r.report && !r.report.empty ? r.report : null, locked: !!r.locked, deadline: r.deadline || 5, done, goal });
+      const dl = dlOf(r.deadline);
+      remember(o => { o.s21p = { name: r.person.name, pioneer: !!r.person.pioneer, dl }; }); // dl：締切日（ホームの「報告の時期」にも使う）
+      paint(ym, opt, { person: r.person, report: r.report && !r.report.empty ? r.report : null, locked: !!r.locked, deadline: dl, done, goal });
     }, e => {
       const c = e && (e.code || e.message);
       if (c === 'auth') return;
@@ -148,7 +155,7 @@
       }
       // つながらない：前に確かめた本人の情報で入力だけできるようにし、送るのはつながったとき
       const p = myData().s21p;
-      paint(ym, opt, { person: p || { name: me().name, pioneer: false }, report: null, done, goal, offline: true, unknown: !p, err: e });
+      paint(ym, opt, { person: p || { name: me().name, pioneer: false }, report: null, deadline: dlOf(p && p.dl), done, goal, offline: true, unknown: !p, err: e });
     });
   }
 
@@ -161,16 +168,23 @@
     if (b.actHours) L.push(`承認された活動 ${b.actHours}時間`);
     return L.map(esc).join('<br>');
   }
-  /* 締切を過ぎて変えられない報告：見るだけ（入力・送る・LINE はなし。案内と閉じるだけ） */
+  /* 締切を過ぎた月：見るだけ（入力・送る・LINE はなし。案内と閉じるだけ）
+     ・出した報告がある：中身と「ここからは直せません。直すときは書記に」
+     ・まだ出していない：「まだ会衆に届いていません。ここからは送れません。書記に」と、書記に伝えるときのための記録した時間
+     ・電波がなく確かめられない（この端末の時計で締切を過ぎている）：送ることも直すこともできない、書記に */
   function paintLocked(ym, opt, ctx, justNow) {
-    const rep = ctx.report, pio = !!ctx.person.pioneer;
+    const rep = ctx.report, pio = !!ctx.person.pioneer, D = dlDate(ym, ctx.deadline);
     const head = opt.dry ? `${Mo(ym)}月の奉仕報告（試し）` : `${Mo(ym)}月の奉仕報告`;
+    const rec = ctx.done ? `<div class="rpbox"><p class="muted" style="margin:0">${Mo(ym)}月に記録した時間（${monthDays(myData(), ym)}日）</p><p class="big">${fmtMin(ctx.done)}</p></div>` : '';
+    const body = rep ? `<p class="okmsg">${rep.submitted ? subDate(rep.submitted) + 'に' : ''}会衆に報告しました。</p>
+        <div class="rpbox">${sumHtml(rep)}</div>
+        <div class="notice ${justNow ? 'warn' : 'info'}" role="status">${Mo(ym)}月の報告は締切（${D}）を過ぎたため、ここからは直せません。直す必要があるときは、書記に伝えてください（書記が入力します）。</div>`
+      : ctx.offline ? `<div class="notice warn" role="status">${esc(errText({ code: 's21_locked' }, ym))}</div>${rec}`
+        : `<div class="notice warn" role="status">${Mo(ym)}月の報告は、まだ会衆に届いていません。<br>締切（${D}）を過ぎたため、ここからは送れません。書記に伝えてください（書記が入力します）。</div>${rec}`;
     setSheet(headHtml(null, head, '') + `
       ${opt.pick ? reportPickHtml(ym) : ''}
       <p class="muted" style="margin:6px 0 2px">${esc(ctx.person.name || '')}さんの報告${pio ? '（開拓者）' : ''}</p>
-      <p class="okmsg">${rep.submitted ? subDate(rep.submitted) + 'に' : ''}会衆に報告しました。</p>
-      <div class="rpbox">${sumHtml(rep)}</div>
-      <div class="notice ${justNow ? 'warn' : 'info'}" role="status">${esc(errText({ code: 's21_locked' }, ym))}</div>
+      ${body}
       <button class="btn primary block" data-close>閉じる</button>`);
     if (opt.pick) bindReportPick(opt);
   }
@@ -178,7 +192,8 @@
   function paint(ym, opt, ctx) {
     const justNow = !!opt.lockedNow; // 送ったら締切後で断られた（案内を目立たせる）
     if (justNow) { opt = Object.assign({}, opt); delete opt.lockedNow; }
-    if (ctx.report && ctx.report.locked) {
+    // 締切を過ぎた月（S21 の locked。まだ出していなくても）・変えられない報告・電波がなくてもこの端末の時計で締切を過ぎた月
+    if (ctx.locked || (ctx.report && ctx.report.locked) || (ctx.offline && pastDl(ym, ctx.deadline))) {
       if ((myData().s21q || {})[ym]) { remember(o => { delete o.s21q[ym]; }); renderHome(); } // 送れない下書きは残さない
       paintLocked(ym, opt, ctx, justNow);
       return;
@@ -203,9 +218,8 @@
         ${draft ? `<div class="notice warn">まだ送れていない報告があります（${fmtDate(draft.at)}に入力）。「会衆に報告する」を押すと、もう一度送ります。</div>` : ''}
         ${rep && !draft ? `<p class="okmsg">${rep.submitted ? subDate(rep.submitted) + 'に' : ''}会衆に報告しました。直して送ると、上書きされます。</p>` : ''}
         ${formHtml(st, { pio, done: ctx.done, act: true, rem: true })}
-        ${ctx.locked ? '<div class="notice info">締切を過ぎているので、翌月の会衆の報告に加えられます。</div>' : ''}
         <button class="btn primary block" id="s21Send">${dry ? '試しに送る' : '会衆に報告する'}</button>
-        <p class="hint">報告は会衆の報告システム（S21）に送られます。区域マップのサーバーには残りません。締切（5日）をすぎて送ると、翌月の会衆の報告に加えられます。</p>
+        <p class="hint">報告は会衆の報告システム（S21）に送られます。区域マップのサーバーには残りません。締切（${dlDate(ym, ctx.deadline)}）までは、直して送り直せます。</p>
         ${dry ? '' : '<details class="more"><summary>ほかの方法で送る（LINE・コピー）</summary><button class="btn block" id="s21Line">LINEなどで送る画面を開く</button></details>'}
         <button class="btn block" data-close>${rep ? '閉じる' : 'あとで'}</button>`);
       const S = $('#sheet');
@@ -251,13 +265,19 @@
     setSheet(headHtml(null, dry ? '試しに送れました' : '報告しました', `${Mo(ym)}月の奉仕報告`) + `
       <p class="praise">${dry ? '会衆の報告システムにつながっています（記録は変わっていません）。' : 'おつかれさまでした！'}</p>
       <div class="rpbox">${sumHtml(body)}</div>
-      ${r.late ? '<div class="notice info">締切（5日）をすぎたため、翌月の会衆の報告に加えられます。</div>' : ''}
+      ${r.late ? '<div class="notice info">翌月の会衆の報告に加えられます。</div>' : ''}
       <button class="btn primary block" data-close>閉じる</button>`);
     if (!dry) toast('奉仕報告を送りました');
   }
 
   /* ---- 送れなかった報告を、電波が戻ったら送り直す ----
-     ほかの端末で、あとから送り直していたら（S21 の提出日時のほうが新しければ）、古い下書きは送らずに消す */
+     ほかの端末で、あとから送り直していたら（S21 の提出日時のほうが新しければ）、古い下書きは送らずに消す。
+     締切を過ぎていたら、下書きを消して知らせる（「電波が戻ったら送ります」と伝えてあるので、トーストだけにしない。
+     ほかの画面が開いているときは、じゃまをしないようトースト） */
+  function lostNotice(ym, dl) {
+    const msg = `${Mo(ym)}月の奉仕報告は、送れないまま締切（${dlDate(ym, dl)}）を過ぎました。書記に伝えてください（書記が入力します）。`;
+    if (typeof overlayOpen === 'function' && !overlayOpen()) infoSheet('奉仕報告を送れませんでした', esc(msg)); else toast(msg);
+  }
   let flushing = false;
   async function flushQueue() {
     if (flushing || !use() || !navigator.onLine) return;
@@ -271,18 +291,18 @@
           const m = await api('s21_me', { ym }, { timeout: 45000 });
           const sub = m.report && !m.report.empty ? Date.parse(m.report.submitted) : NaN;
           if (isFinite(sub) && sub > Date.parse(item.at)) { remember(o => { delete o.s21q[ym]; }); continue; }
-          if (m.report && !m.report.empty && m.report.locked) { // 締切を過ぎて、すでに報告がある：送れないので下書きを消す
+          if (m.locked || (m.report && !m.report.empty && m.report.locked)) { // 締切を過ぎた月（まだ出していなくても）：送れないので下書きを消す
             remember(o => { delete o.s21q[ym]; }); renderHome();
-            toast(errText({ code: 's21_locked' }, ym));
+            lostNotice(ym, m.deadline);
             continue;
           }
           const r = await api('s21_send', item.v, { timeout: 45000 });
           markSent(ym, item.v, r.late, item.kind, item.auxH);
-          toast(`${Mo(ym)}月の奉仕報告を送りました${r.late ? '（締切後のため、翌月の会衆の報告に加えられます）' : ''}`);
+          toast(`${Mo(ym)}月の奉仕報告を送りました${r.late ? '（翌月の会衆の報告に加えられます）' : ''}`);
         } catch (e) {
           if (isRetry(e)) break; // まだつながらない：次の機会に
           remember(o => { delete o.s21q[ym]; });
-          if (e && (e.code || e.message) === 's21_locked') { renderHome(); toast(errText(e, ym)); continue; } // 締切後で変えられない
+          if (e && (e.code || e.message) === 's21_locked') { renderHome(); lostNotice(ym); continue; } // 締切を過ぎた
           toast(`${Mo(ym)}月の奉仕報告を送れませんでした。月のまとめから、もう一度送ってください`);
         }
       }
@@ -344,8 +364,7 @@
     };
     $('#s21Match').onclick = () => openMatch(false);
     $('#s21Dry').onclick = () => {
-      const d = new Date(), ym = d.getDate() <= 5 ? ymOf(new Date(d.getFullYear(), d.getMonth() - 1, 1)) : ymOf(d); // 締切（5日）を過ぎた先月は見るだけになるため
-      open(ym, { dry: true });
+      open(reportYmNow(), { dry: true }); // 締切日までは先月、過ぎたら今月（締切を過ぎた先月は見るだけになるため。app.js と同じ決め方）
     };
   }
   async function openMatch(fresh) {

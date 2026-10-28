@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.97';
+var APP_JS_VER = '2026.13.98';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -11746,11 +11746,18 @@ function planDiff(o, ym) {
 const isLastDayStr = s => { const d = parseYmd(s); return d.getDate() === new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); };
 /* ---- 奉仕報告の入口（ホームの「○月の奉仕」のカード）----
    ・奉仕時間を使う人には、いつでも「奉仕報告」ボタン（新しい設定は作らない）
-   ・報告の時期（月末の日〜翌月5日）にまだ送っていなければ、目立つ色にして「○月の報告がまだです」
-   ・押すと、報告の画面（先月｜今月を切りかえられる）。はじめの月は、1〜5日は先月、それ以外は今月 */
+   ・報告の時期（月末の日〜翌月の締切日）にまだ送っていなければ、目立つ色にして「○月の報告がまだです」
+   ・押すと、報告の画面（先月｜今月を切りかえられる）。はじめの月は、1日〜締切日は先月、それ以外は今月
+   ・締切日：翌月10日（S21 v37・2026-10-28 から。以前は5日）。S21 に送る人は、S21 が返した締切日（この端末の o.s21p.dl）を使う */
+const REPORT_DL = 10;
+function reportDl() {
+  let n = NaN;
+  try { const p = Store.data ? myData().s21p : null; n = p ? Number(p.dl) : NaN; } catch (e) { n = NaN; }
+  return n >= 1 && n <= 28 && Math.floor(n) === n ? n : REPORT_DL;
+}
 const prevYm = d => ymOf(new Date(d.getFullYear(), d.getMonth() - 1, 1));
-function reportYmNow() { const d = new Date(); return d.getDate() <= 5 ? prevYm(d) : ymOf(d); }
-function reportSeasonYm() { const d = new Date(); return isLastDayStr(ymd(d)) ? ymOf(d) : d.getDate() <= 5 ? prevYm(d) : null; }
+function reportYmNow() { const d = new Date(); return d.getDate() <= reportDl() ? prevYm(d) : ymOf(d); }
+function reportSeasonYm() { const d = new Date(); return isLastDayStr(ymd(d)) ? ymOf(d) : d.getDate() <= reportDl() ? prevYm(d) : null; }
 function reportLineHtml(o) {
   const ym = reportSeasonYm(), due = ym && !o.reports[ym];
   const st = !ym ? '' : due ? `<b>${Number(ym.slice(5))}月の報告がまだです</b>` : `<span class="muted">${Number(ym.slice(5))}月は報告済みです</span>`;
@@ -12022,7 +12029,7 @@ function monthEndHtml(o) {
   return `<div class="notice info homecard"><b style="font-size:19px">${label}</b><br>
     奉仕時間 <b>${fmtMin(m)}</b>（${monthDays(o, ym)}日）${g ? `　目標 ${fmtMin(g)}（${Math.round(m / g * 100)}%）` : ''}
     ${rep ? `<br><span class="muted">${rep.how === 's21' ? '会衆に報告しました' : '報告しました'}：${esc(repSummary(rep))}</span>`
-      : window.S21R && S21R.use() && now.getDate() <= 5 ? '<br><span class="muted">報告の締切は5日です</span>' : ''}
+      : window.S21R && S21R.use() && now.getDate() <= reportDl() ? `<br><span class="muted">報告の締切は${reportDl()}日です</span>` : ''}
     <span class="actions"><button class="btn small" id="monthHist">月ごとの記録を見る</button></span></div>`; // 奉仕報告のボタンは「○月の奉仕」のカードに（同じ入口を2つ出さない）
 }
 function openMonthHist() {
@@ -12148,7 +12155,7 @@ function reportDueYm() {
   if (o.timer) return null; // 奉仕中は出さない
   let ym = null;
   if (isLastDayStr(today) && now.getHours() >= 20) ym = ymOf(now);
-  else if (now.getDate() <= 10) ym = ymOf(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  else if (now.getDate() <= reportDl()) ym = ymOf(new Date(now.getFullYear(), now.getMonth() - 1, 1)); // 締切日（10日）まで
   if (!ym || o.reports[ym] || o.repAsk[ym] === today || !monthMin(o, ym)) return null;
   return ym;
 }

@@ -36,7 +36,7 @@
       s21On: { t: '奉仕報告を S21 に送る', dt: '使わない',
         what: '「奉仕時間」を使っている人が、月末の奉仕報告の画面から、そのまま会衆の報告システム（S21）に報告できるようにします。本人は、URLの貼り付けや登録をしなくてかまいません。区域マップに登録している名前と、S21 の名簿の名前が同じ人は、自動でつながります。',
         change: '「使う」にすると、奉仕時間を使っている人の報告の画面が、S-4 と同じ並び（伝道した・聖書研究・補助開拓・時間など）になり、「会衆に報告する」で送れます。奉仕時間を使っていない人の画面は変わりません。「使わない」にすると、今までどおり LINE などで送る画面にもどります。報告の中身は区域マップのサーバーには残りません。',
-        ex: '開拓者の人は、記録した時間が最初から入っているので、確かめて「会衆に報告する」を押すだけです。5日の締切をすぎて送ると、翌月の会衆の報告に加えられます。',
+        ex: '開拓者の人は、記録した時間が最初から入っているので、確かめて「会衆に報告する」を押すだけです。締切（翌月10日）までは、直して送り直せます。締切を過ぎた月は送れないので、書記に伝えてもらいます（書記が入力します）。',
         tip: '使い始める前に、URLと連携キーを入れて「接続テスト」→「名前の対応を見る」で、見つからない人がいないか確かめてください。そのあと「試しに送ってみる」で、記録を変えずに送れるかを試せます。' },
       /* ---- 人＞グループの中心（guruchu.js） ---- */
       groupPts: { t: 'グループの中心',
@@ -382,7 +382,7 @@
       s21On: { t: 'Enviar el informe de predicación a S21', dt: 'No usar',
         what: 'Quienes usan «Tiempo de predicación» pueden enviar su informe del mes directamente al sistema de informes de la congregación (S21) desde la pantalla del informe. No tienen que pegar ninguna URL ni registrarse. Si el nombre en el Mapa y en la lista de S21 es igual, se conectan solos.',
         change: 'Con «Usar», la pantalla del informe sigue el orden del S-4 (predicó, cursos bíblicos, precursor auxiliar, horas…) y se envía con «Informar a la congregación». La pantalla de quien no usa el tiempo no cambia. Con «No usar», vuelve la pantalla de enviar por LINE. El contenido del informe no se guarda en el servidor del Mapa.',
-        ex: 'Un precursor ya ve sus horas registradas; solo las revisa y pulsa «Informar a la congregación». Si lo envía después del día 5, se suma al informe de la congregación del mes siguiente.',
+        ex: 'Un precursor ya ve sus horas registradas; solo las revisa y pulsa «Informar a la congregación». Hasta la fecha límite (día 10 del mes siguiente) puede corregirlo y volver a enviarlo. Después ya no se puede enviar ese mes: hay que avisar al secretario (él lo anota).',
         tip: 'Antes de empezar, ponga la URL y la clave, pulse «Probar conexión» y luego «Ver nombres» para revisar si falta alguien. Con «Enviar una prueba» puede probar sin cambiar el registro.' },
       groupPts: { t: 'Centro del grupo',
         what: 'Es la zona donde viven, más o menos, las personas del grupo. La pone el encargado en el mapa (hasta 2 por grupo). No se usan nombres ni direcciones: solo se guarda un punto «por aquí». No aparece en el mapa de los publicadores.',
