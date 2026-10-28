@@ -2506,7 +2506,7 @@ const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).c
 const CHANGELOG = [
   { v: '2026.13.99', items: [
     ['消', '記録・拒否・注意・再訪問のある家は、「ここは家ではない（消す）」で消せなくなりました。家ではないときは、区域係に削除を申請してください'],
-    ['係', '区域係の画面：目安に届かない区域を完了にするときは、「紙や口頭で確かめた」か「アプリの記録で確かめる」を、かならずえらぶようにしました']
+    ['係', '区域係の画面：目安に届かない区域を完了にするときは、「紙や口頭で確かめた」か「アプリの記録で確かめる」を、かならずえらぶようにしました。紙の区域カードの区域では、「留守宅カードにして返す」「1回目を終えたことにする」は出ません']
   ] },
   { v: '2026.13.91', items: [
     ['残', 'おすすめに、回り終えた区域で一度も訪ねていない家（回り残し）も出すようにしました。留守宅より先に出ます。訪ねて留守だったときは、次からは留守宅として、時間をあけて出ます'],
@@ -8244,11 +8244,14 @@ function openReturnSheet(tid) {
   // 区域係の操作：目安に関係なく、今までどおりえらべる（記録の少ない返却の確かめも、今までどおり）
   // 紙の区域カード（S-13 で渡した区域）は、紙で回った家がアプリにないので、記録での確かめはしない（えらぶ欄も出さない。返すと ph で完了）
   const low = !paperHandOf(t) && lowOnSet() && (r.phase === 'first' ? r.pct1 < th : (!lowFirstPicked(t) && (lowP1(t, r) ?? 100) < th)) ? lowCheckHtml(th, r.phase === 'first' ? r.pct1 : lowP1(t, r)) : '';
+  // 紙の区域カード（S-13 で渡した区域）は、紙で回った家がアプリにないので、留守宅カードにしない・1回目を終えたことにしない
+  // （本人の画面と同じく「回り終えた」か「途中」で返す。監査P3・M2 2026-10-29）
+  const paperT = !!paperHandOf(t);
   const admBox = !adm ? '' : `<details class="retadm"><summary>区域係の操作（目安に関係なく決める）</summary>
       ${low}
       <button class="btn block wrap" data-fin="1">正式に返却する（区域を回り終えた）</button>
-      <button class="btn block wrap" data-pool>留守宅カードにして返す（だれでも受け取れる）</button>
-      ${r.phase === 'first' ? '<button class="btn block wrap" data-afirst>1回目を終えたことにして、本人が留守宅を回る</button>' : ''}
+      ${paperT ? '' : '<button class="btn block wrap" data-pool>留守宅カードにして返す（だれでも受け取れる）</button>'}
+      ${r.phase === 'first' && !paperT ? '<button class="btn block wrap" data-afirst>1回目を終えたことにして、本人が留守宅を回る</button>' : ''}
       <button class="btn block wrap" data-fin="0">途中で返却する（回り終えた記録はつけません）</button></details>`;
   // 目安に届いていない「途中の返却」は、ボタンを目立たせない（濃い色で返却をすすめない・点検④U5）
   setSheet(headHtml(t, `区域${t.no}を返します`, sub) + `
@@ -8280,8 +8283,15 @@ function openReturnSheet(tid) {
   $$('[data-fin]', sh).forEach(x => x.onclick = () => { if (x.dataset.fin === '1' && needPick()) return; finishTerr(tid, x.dataset.fin === '1', lowChecked()); });
 }
 /* 1回目を回り終えた（カードは本人が持ったまま、留守宅を回る段階になる） */
+/* 紙の区域カード（S-13 で渡した区域）は、留守宅カードにしない・1回目を終えたことにしない（監査P3・M2）。どこから呼ばれても止める */
+function paperStop(t) {
+  if (!paperHandOf(t)) return false;
+  toast('紙の区域カードの区域は、「回り終えたので返す」か「途中で返す」で返してください');
+  return true;
+}
 function firstDone(tid, lowOk) {
   const t = terrById(tid); if (!t) return;
+  if (paperStop(t)) return;
   const r = roundInfo(tid, true), pct = r ? r.pct : null;
   closeSheet();
   commit(`区域${t.no}の1回目を回り終えました（${pct}%）。留守宅を回る段階です`, () => {
@@ -8353,6 +8363,7 @@ function recordHandover(t, now) {
    決めた割合まで訪ね直された日が、正式な返却日（S-13 の完了した日付）になる（区域係のスマホが自動で記録する） */
 function poolReturn(tid, lowOk) {
   const t = terrById(tid); if (!t) return;
+  if (paperStop(t)) return;
   const r = roundInfo(tid, true);
   closeSheet();
   if (roundTerr === tid) roundTerr = null;
