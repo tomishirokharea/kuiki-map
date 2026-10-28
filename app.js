@@ -8282,13 +8282,13 @@ function openReturnSheet(tid) {
   on('[data-pool]', () => { if (!needPick()) poolReturn(tid, lowChecked()); });
   $$('[data-fin]', sh).forEach(x => x.onclick = () => { if (x.dataset.fin === '1' && needPick()) return; finishTerr(tid, x.dataset.fin === '1', lowChecked()); });
 }
-/* 1回目を回り終えた（カードは本人が持ったまま、留守宅を回る段階になる） */
 /* 紙の区域カード（S-13 で渡した区域）は、留守宅カードにしない・1回目を終えたことにしない（監査P3・M2）。どこから呼ばれても止める */
 function paperStop(t) {
   if (!paperHandOf(t)) return false;
   toast('紙の区域カードの区域は、「回り終えたので返す」か「途中で返す」で返してください');
   return true;
 }
+/* 1回目を回り終えた（カードは本人が持ったまま、留守宅を回る段階になる） */
 function firstDone(tid, lowOk) {
   const t = terrById(tid); if (!t) return;
   if (paperStop(t)) return;
