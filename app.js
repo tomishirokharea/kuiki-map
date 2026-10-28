@@ -2186,7 +2186,9 @@ function dncDrop(k, h, keepPlain) {
   if (!o.at) o.at = new Date().toISOString();
   const unit = parseKey(k)[1];
   if (unit && !o.room) o.room = unit;
-  if (h) { o.lat = h.lat; o.lng = h.lng; if (h.terrId) o.t = h.terrId; }
+  // 位置は家の位置。家の位置がないときは、拒否にある位置のまま（位置のない印は、サーバーが受け付けない）
+  if (h && h.lat != null && h.lng != null && Number.isFinite(+h.lat) && Number.isFinite(+h.lng)) { o.lat = h.lat; o.lng = h.lng; }
+  if (h && h.terrId) o.t = h.terrId;
   m['pin:' + uid()] = o;
 }
 /* 部屋の「表示名」：部屋には変わらない中の番号（units）があり、名前だけを ul で変えられる。
