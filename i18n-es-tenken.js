@@ -58,5 +58,23 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "最近会えた家": "Casa con contacto reciente",
 "右下の「?」を押すと、印の見かたと「返す」ボタンが出ます": "Toque «?» abajo a la derecha para ver el significado de las marcas y el botón «Devolver»",
 "かんたんな表示のホームに、次の集まりと「あなたの区域カード」を大きく出すようにしました。カレンダーは「カレンダーで見る」で開きます": "En la vista sencilla, el inicio ahora muestra en grande la próxima reunión y «Su tarjeta de territorio». El calendario se abre con «Ver en el calendario»",
-"かんたんな表示の地図に「区域○　あと○軒」の帯を出し、地図は回らないようにしました。留守宅カードをえらぶ画面も見やすくしました": "En la vista sencilla, el mapa muestra una franja «Territorio ○ · Faltan ○ casas» y ya no gira. También se simplificó la pantalla para elegir tarjetas de casas ausentes"
+"かんたんな表示の地図に「区域○　あと○軒」の帯を出し、地図は回らないようにしました。留守宅カードをえらぶ画面も見やすくしました": "En la vista sencilla, el mapa muestra una franja «Territorio ○ · Faltan ○ casas» y ya no gira. También se simplificó la pantalla para elegir tarjetas de casas ausentes",
+/* ---- 致命的な3件の直し（2026-10-29・2026.13.99） ---- */
+"記録が目安（{0}%）に届いていません（いま {1}%）。どちらかをえらんでください": "Los registros no llegan al porcentaje indicado ({0}%) (ahora {1}%). Elija una opción",
+"記録が目安（{0}%）に届いていません。どちらかをえらんでください": "Los registros no llegan al porcentaje indicado ({0}%). Elija una opción",
+"このまま完了にします。あとで自動で途中の返却にはしません。おすすめに「まだ訪ねていない家」を出しません。": "Se da por terminado así. Después no pasará automáticamente a devolución parcial. En Recomendadas no aparecerán «casas aún no visitadas».",
+"アプリの記録で確かめる": "Comprobar con los registros de la aplicación",
+"{0}日後に記録を数え直し、目安に届いていなければ、自動で途中の返却にします（S-13 の完了の日付も、前回の日付にもどります）。": "A los {0} días se volverán a contar los registros y, si no llegan al porcentaje indicado, pasará automáticamente a devolución parcial (la fecha de terminado del S-13 también vuelve a la anterior).",
+"↑ どちらかをえらぶと、下のボタンを押せます": "↑ Al elegir una opción, podrá tocar los botones de abajo",
+"確かめ方を、どちらかえらんでください": "Elija cómo comprobarlo",
+"この家には、訪問の記録・拒否・注意・再訪問のどれかがあるため、ここでは消せません。家ではないときは、区域係に削除を申請してください。": "Esta casa tiene registros de visita, «No visitar», avisos o revisitas, así que no se puede borrar aquí. Si no es una casa, pida al encargado que la borre.",
+"記録や拒否・注意・再訪問のある家は、ここでは消せません。家ではないときは、区域係に削除を申請してください": "Las casas con registros, «No visitar», avisos o revisitas no se pueden borrar aquí. Si no es una casa, pida al encargado que la borre",
+"記録や拒否・注意・再訪問のある家は、区域係だけが消せます。削除の申請をしてください": "Solo el encargado puede borrar casas con registros, «No visitar», avisos o revisitas. Envíe una solicitud de borrado",
+"一緒に消えるもの：訪問の記録 {0}件、拒否 {1}件、注意 {2}件、再訪問の受け持ち {3}件。": "También se borrará: registros de visita {0}, «No visitar» {1}, avisos {2}, revisitas asignadas {3}.",
+"一緒に消えるもの：訪問の記録 {0}件、拒否 {1}件、注意 {2}件、再訪問の受け持ち {3}件。拒否は、場所だけの印として残します。": "También se borrará: registros de visita {0}, «No visitar» {1}, avisos {2}, revisitas asignadas {3}. Las marcas «No visitar» se conservarán como marcas de solo ubicación.",
+"一緒に消えるもの：訪問の記録 {0}件、拒否 {1}件、注意 {2}件、再訪問の受け持ち {3}件。消したあとの「取り消す」で戻せます。": "También se borrará: registros de visita {0}, «No visitar» {1}, avisos {2}, revisitas asignadas {3}. Puede recuperarlo con «Deshacer» después de borrar.",
+"一緒に消えるもの：訪問の記録 {0}件、拒否 {1}件、注意 {2}件、再訪問の受け持ち {3}件。拒否は、場所だけの印として残します。消したあとの「取り消す」で戻せます。": "También se borrará: registros de visita {0}, «No visitar» {1}, avisos {2}, revisitas asignadas {3}. Las marcas «No visitar» se conservarán como marcas de solo ubicación. Puede recuperarlo con «Deshacer» después de borrar.",
+"区域係の画面：目安に届かない区域を完了にするときは、「紙や口頭で確かめた」か「アプリの記録で確かめる」を、かならずえらぶようにしました": "Pantalla del encargado: al dar por terminado un territorio que no llega al porcentaje indicado, ahora hay que elegir «Comprobé en papel o de palabra» o «Comprobar con los registros de la aplicación»",
+"記録・拒否・注意・再訪問のある家は、「ここは家ではない（消す）」で消せなくなりました。家ではないときは、区域係に削除を申請してください": "Las casas con registros, «No visitar», avisos o revisitas ya no se pueden borrar con «Aquí no hay casa (borrar)». Si no es una casa, pida al encargado que la borre",
+"紙の区域カードで回り終えた区域は、おすすめに「まだ一度も訪ねていない家」を出さないようにしました": "En los territorios terminados con la tarjeta de papel, Recomendadas ya no muestra «casas nunca visitadas»"
 });
