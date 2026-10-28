@@ -1589,7 +1589,7 @@ button.ktag{cursor:pointer}
       closeSheet();
       commit(`区域${t.no}を${uname(v)}さんに貸し出しました`, () => {
         t.holder = v; t.lentAt = new Date().toISOString();
-        t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
+        t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; delete t.recLess; t.awayPoolAt = null; t.poolRetId = null;
       });
     });
   }
@@ -2391,7 +2391,7 @@ body.duemode .terr-label:not(.duelab){display:none}
         const now = new Date().toISOString();
         recordHandover(t, now); // 前の担当者の行を S-13 に残す
         t.holder = v; t.lentAt = now;
-        t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
+        t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; delete t.recLess; t.awayPoolAt = null; t.poolRetId = null;
       });
     });
     on('[data-kgrp]', 'onchange', e => setTerrUse(t, e.target.value));
@@ -2603,7 +2603,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       if (t.holder) { toast(`区域${t.no}は、${uname(t.holder)}さんがすでに持っています。ほかの区域をえらんでください`); renderAll(); return; }
       commit(`区域${t.no}を${uname(r.by)}さんに貸し出しました`, () => {
         const now = new Date().toISOString();
-        t.holder = r.by; t.lentAt = now; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
+        t.holder = r.by; t.lentAt = now; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; delete t.recLess; t.awayPoolAt = null; t.poolRetId = null;
         t.group = r.forGroup || null;
         if (t.group && r.use === 'all') t.use = 'all'; else delete t.use;
         Object.assign(r, { status: 'approved', terrId: t.id, decidedAt: now, decidedBy: me().id, seen: false });
@@ -2708,7 +2708,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       commit(`区域${t.no}を${uname(v)}さんに${all ? '（全体の集まりの区域として）' : g ? `（${g}グループの区域として）` : ''}貸し出しました`, () => {
         t.holder = v; t.lentAt = new Date().toISOString();
         if (all) t.use = 'all'; else delete t.use;
-        t.helpers = []; t.group = g; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
+        t.helpers = []; t.group = g; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; delete t.recLess; t.awayPoolAt = null; t.poolRetId = null;
       });
     });
   }
