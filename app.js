@@ -2170,14 +2170,22 @@ function dncPins() { // 場所だけの拒否（地図に出せるもの）
   return out;
 }
 /* 家や部屋を消すとき：住所のある拒否（取り込み・係が追加したもの）は、場所だけの拒否にして残す。訪問で記録した拒否は消す */
-function dncDrop(k, h) {
+function dncDrop(k, h, keepPlain) {
   const m = D().dnc, v = m[k];
   if (v === undefined) return;
   delete m[k];
-  if (!v || typeof v !== 'object' || !(v.a || v.s)) return;
   h = h || houseById(parseKey(k)[0]);
-  const o = Object.assign({}, v, { p: 1 });
+  // 住所のない拒否（伝道者が付けた true など）も、区域係が家を消すとき（keepPlain）は、家の位置に場所だけの印として残す（H8・D5）。
+  // 場所だけの印は区域係しか作れない（サーバーも止める）ので、係以外の画面では今までどおり（住所のある拒否だけ）。
+  // 部屋を消す・印を注意に変えるなど、家を消さないときは今までどおり
+  const plain = !v || typeof v !== 'object' || !(v.a || v.s);
+  if (plain && !(keepPlain && isAdmin() && h && isFinite(Number(h.lat)) && isFinite(Number(h.lng)))) return;
+  const o = Object.assign({}, v && typeof v === 'object' ? v : {}, { p: 1, dk: k });
   delete o.auto;
+  if (!o.s) o.s = 'del';
+  if (!o.at) o.at = new Date().toISOString();
+  const unit = parseKey(k)[1];
+  if (unit && !o.room) o.room = unit;
   if (h) { o.lat = h.lat; o.lng = h.lng; if (h.terrId) o.t = h.terrId; }
   m['pin:' + uid()] = o;
 }
@@ -3987,12 +3995,12 @@ async function onHouseTap(id) {
   if (mode === 'draw') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
   if (mode === 'add') {
     if (addMode !== 'del') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
-    const n = targets(h).reduce((a, u) => a + sum(K(h.id, u)).n, 0);
-    // 仮の家（記録なし）は、確認なしですぐ消す。まちがえたら、下の「取り消す」でもどせる
-    if (h.prov && !n && (isAdmin() || myTerr(terrById(h.terrId)))) { delCount++; updateAddBar(); dropProvHouse(h.id, true); return; }
-    if (!isAdmin()) { openDelRequest(h); return; } // 伝道者は申請になる
+    const rec = houseRecText(h);
+    // 仮の家（記録・拒否・注意・再訪問のどれもない）は、確認なしですぐ消す。まちがえたら、下の「取り消す」でもどせる（H8）
+    if (h.prov && !rec && (isAdmin() || myTerr(terrById(h.terrId)))) { delCount++; updateAddBar(); dropProvHouse(h.id, true); return; }
+    if (!isAdmin()) { if (h.prov && rec) toast('記録や拒否・注意・再訪問のある家は、区域係だけが消せます。削除の申請をしてください'); openDelRequest(h); return; } // 伝道者は申請になる
     const name = h.type === 'apt' ? `${h.label || '集合住宅'}（${h.units.length}部屋）` : (h.label || 'この家');
-    if (n && !await ask(`「${name}」を消します。訪問の記録 ${n}件も一緒に消えます。よろしいですか？`)) return; // 記録のある家だけ確かめる
+    if (rec && !await ask(`「${name}」を消します。${rec}よろしいですか？`)) return; // 記録・印のある家だけ確かめる（H8）
     delCount++; updateAddBar();
     deleteHouse(h.id);
     return;
@@ -4293,7 +4301,11 @@ function openTarget(hid, unit, fromBuilding, review) {
       }
     }
 
-    if (h.prov) b += `<div class="notice warn"><b>この家は、地図のデータから自動で入れた「仮の家」です。</b>ほんとうに家があるか確かめてください。記録をつけると、ふつうの家になります。
+    if (h.prov) b += houseHasRec(h)
+      // 記録・拒否・注意・再訪問のある仮の家は、ここでは消せない（H8。係以外はサーバーも止める）
+      ? `<div class="notice warn"><b>この家は、地図のデータから自動で入れた「仮の家」です。</b>この家には、訪問の記録・拒否・注意・再訪問のどれかがあるため、ここでは消せません。家ではないときは、区域係に削除を申請してください。
+        <span class="actions"><button class="btn small" id="provAsk">${isAdmin() ? 'この家を削除する' : 'この家の削除を申請する'}</button></span></div>`
+      : `<div class="notice warn"><b>この家は、地図のデータから自動で入れた「仮の家」です。</b>ほんとうに家があるか確かめてください。記録をつけると、ふつうの家になります。
       <span class="actions"><button class="btn small danger" id="provDrop">ここは家ではない（消す）</button></span></div>`;
     if (recentMet(k)) b += `<div class="notice info"><b>最近（${daysSince(sum(k).met.at)}日前）会えた家です。</b>区域を回るときは、とばしてかまいません。</div>`;
     if (isUnmet(k) && UI.cSlot !== 'off') b += `<div class="notice info">これまで留守だった時間帯：${slotList(triedSlots(k)).map(slotShort).join('、')}<br>ほかの時間帯に訪ねてみてください。</div>`;
@@ -4372,6 +4384,12 @@ function openTarget(hid, unit, fromBuilding, review) {
       paint();
     };
     on('provDrop', () => dropProvHouse(hid));
+    on('provAsk', async () => { // H8：記録・印のある仮の家（係は確かめて削除・係以外は申請）
+      const h2 = houseById(hid); if (!h2) return;
+      if (!isAdmin()) { closeSheet(); openDelRequest(h2); return; }
+      if (!await ask(`この家と、その記録をすべて削除します。${houseRecText(h2)}よろしいですか？`)) return;
+      closeSheet(); deleteHouse(hid);
+    });
     on('fEditHouse', () => openAddForm(null, null, hid));
     on('fMove', () => startMoveHouse(hid));
     on('fHNameSave', () => {
@@ -4403,7 +4421,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     });
     on('fDel', async () => {
       if (!isAdmin()) { closeSheet(); openDelRequest(h); return; }
-      if (!await ask('この家と、その記録をすべて削除します。よろしいですか？')) return;
+      if (!await ask(`この家と、その記録をすべて削除します。${houseRecText(houseById(hid))}よろしいですか？`)) return;
       closeSheet(); deleteHouse(hid);
     });
   };
@@ -4530,10 +4548,36 @@ function confirmProv(hid) {
   delete h.prov;
   Store.pushHouse(h, false);
 }
+/* その家の、訪問の記録・拒否・注意・再訪問の受け持ち・引き継ぎの印の数（どの部屋でも。集合住宅は建物ぜんたい '' も。H8・2026-10-29）
+   引き継ぎの印は、サーバーと同じく「印があれば」数える（relOf は使わない） */
+function houseRecCounts(h) {
+  const c = { v: 0, dnc: 0, cau: 0, fol: 0, rel: 0 };
+  if (!h) return c;
+  const cau = D().caution || {};
+  targets(h).concat(h.type === 'apt' ? [''] : []).forEach(u => {
+    const k = K(h.id, u);
+    c.v += sum(k).n;
+    if (D().dnc[k]) c.dnc++;
+    if (cau[k]) c.cau++;
+    if (D().follows[k]) c.fol++;
+    if (D().released[k]) c.rel++;
+  });
+  return c;
+}
+/* 記録・印のある家か（係以外は消せない。サーバーも止める） */
+const houseHasRec = h => { const c = houseRecCounts(h); return !!(c.v || c.dnc || c.cau || c.fol || c.rel); };
+/* 区域係が家を消すときの確認に添える文（何が一緒に消えるか） */
+function houseRecText(h) {
+  const c = houseRecCounts(h);
+  if (!c.v && !c.dnc && !c.cau && !c.fol && !c.rel) return '';
+  // 文の形はいつも同じにする（スペイン語の辞書で1つの形で訳せるように）
+  return `一緒に消えるもの：訪問の記録 ${c.v}件、拒否 ${c.dnc}件、注意 ${c.cau}件、再訪問の受け持ち ${c.fol + c.rel}件。${c.dnc ? '拒否は、場所だけの印として残します。' : ''}`;
+}
 /* 仮の家を、その場で消す（地図に出ているだけで、実際には家がないとき） */
 function dropProvHouse(hid, inMode) {
   const h = houseById(hid);
   if (!h || !h.prov) return;
+  if (houseHasRec(h)) { toast('記録や拒否・注意・再訪問のある家は、ここでは消せません。家ではないときは、区域係に削除を申請してください'); return; } // H8
   const copy = clone(h);
   deleteHouseData(hid);
   Store.pushHouse(copy, true);
@@ -4587,6 +4631,7 @@ function saveVisit(hid, unit, result, extra, keepOpen, onUndo) {
     if (f && f.by === me().id) f.touchedAt = now; // 受け持ち本人の記録で期限を延ばす
     if (follow) startFollow(k, me().id);
     if (extra.dnc) { D().dnc[k] = D().dnc[k] || true; delete D().follows[k]; delete D().released[k]; } // 係が入れた住所は残す
+    const hp = houseById(hid); if (hp && hp.prov) delete hp.prov; // 拒否・再訪問つきの記録でも、仮の家は「ある家」になる（H8。会えた・留守と同じ）
   }, onUndo);
 }
 /* かんたんモードでは、家の追加・削除をさせない（ボタンを隠すだけでなく、処理でも止める） */
@@ -4603,7 +4648,7 @@ function deleteHouse(hid) {
 }
 function deleteHouseData(hid) {
   const h = houseById(hid);
-  if (h) targets(h).concat(h.type === 'apt' ? [''] : []).forEach(u => dncDrop(K(hid, u), h)); // 住所のある拒否は、場所だけの拒否として残す
+  if (h) targets(h).concat(h.type === 'apt' ? [''] : []).forEach(u => dncDrop(K(hid, u), h, true)); // 拒否は、場所だけの拒否として残す（住所のない拒否も・係だけ。H8・D5）
   D().houses = D().houses.filter(x => x.id !== hid);
   D().visits = D().visits.filter(v => v.houseId !== hid);
   if (h) targets(h).forEach(u => { const k = K(hid, u); delete D().follows[k]; delete D().released[k]; });
@@ -5702,7 +5747,7 @@ function openBuilding(hid, startSel) {
     on('fDel', async () => {
       const h2 = houseById(hid); if (!h2) return;
       if (!isAdmin()) { closeSheet(); openDelRequest(h2); return; }
-      if (!await ask(`「${h2.label || '集合住宅'}」と、すべての部屋の記録を削除します。よろしいですか？`)) return;
+      if (!await ask(`「${h2.label || '集合住宅'}」と、すべての部屋の記録を削除します。${houseRecText(h2)}よろしいですか？`)) return;
       closeSheet(); deleteHouse(hid);
     });
   };
@@ -6235,7 +6280,7 @@ function openAddForm(ll, tid, editId) {
     if ($('#fMove')) $('#fMove').onclick = () => startMoveHouse(editId);
     if ($('#fDel')) $('#fDel').onclick = async () => {
       if (!isAdmin()) { closeSheet(); openDelRequest(eh); return; }
-      if (!await ask('この家と、その記録をすべて削除します。よろしいですか？')) return;
+      if (!await ask(`この家と、その記録をすべて削除します。${houseRecText(eh)}よろしいですか？`)) return;
       closeSheet(); deleteHouse(editId);
     };
     $('#fSave').onclick = () => {
@@ -11394,7 +11439,7 @@ function deleteTerrData(tid, withHouses) {
   {
     if (withHouses) {
       const set = new Set(ids);
-      Object.keys(D().dnc).forEach(k => { if (!isPinKey(k) && set.has(k.split('|')[0])) dncDrop(k); }); // 住所のある拒否は残す（家を消す前に）
+      Object.keys(D().dnc).forEach(k => { if (!isPinKey(k) && set.has(k.split('|')[0])) dncDrop(k, null, true); }); // 拒否は残す（家を消す前に。住所のない拒否も・H8・D5）
       D().houses = D().houses.filter(h => !set.has(h.id));
       D().visits = D().visits.filter(v => !set.has(v.houseId));
       [D().dnc, D().follows, D().released].forEach(m => Object.keys(m).forEach(k => { if (set.has(k.split('|')[0])) delete m[k]; }));

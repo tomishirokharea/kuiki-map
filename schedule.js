@@ -1774,7 +1774,7 @@ button.ktag{cursor:pointer}
           toast('候補から外しました（半年は出しません）'); paintCand();
         } else if ((x = q('[data-cgone]'))) {
           const h = houseById(x.dataset.cgone);
-          if (h && await ask(`「${h.label || '目印なし'}」を消します。訪問の記録も一緒に消えます（消したあとの「取り消す」で戻せます）。よろしいですか？`)) deleteHouse(h.id);
+          if (h && await ask(`「${h.label || '目印なし'}」を消します。${(typeof houseRecText === 'function' && houseRecText(h)) || '訪問の記録も一緒に消えます。'}消したあとの「取り消す」で戻せます。よろしいですか？`)) deleteHouse(h.id);
         }
       });
     }
