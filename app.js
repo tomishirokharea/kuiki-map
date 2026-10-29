@@ -13945,8 +13945,8 @@ const s13RoundBy = t => (t.holder ? t.holder : t.awayPoolAt && t.poolRetId ? ((D
    ほかの人の紙の割り当ては消さない（中-A） */
 const s13RoundPaper = t => {
   const d = s13RoundDay(t), by = s13RoundBy(t); if (!d || !by) return [];
-  const nm = s13Norm(uname(by));
-  const same = x => { if (s13Norm(x.name) === nm) return true; const g = s13GroupOf(x.name); return !!(g && (g.user ? g.user.id === by : s13Norm(g.name) === nm)); };
+  const nf = v => s13Norm(String(v || '').normalize('NFKC')), nm = nf(uname(by)); // 全角・半角のちがいも同じ名前とみなす（比べるときだけ）
+  const same = x => { if (nf(x.name) === nm) return true; const g = s13GroupOf(String(x.name || '').normalize('NFKC')); return !!(g && (g.user ? g.user.id === by : nf(g.name) === nm)); };
   return (D().s13 || []).filter(x => x && x.kind === 'a' && x.terrId === t.id && (String(x.a || '') >= d || (x.c && String(x.c) >= d)) && same(x));
 };
 let s13FinBusy = false;
@@ -13960,7 +13960,7 @@ async function s13Finish(tid) {
   if (!t.holder && !pool) return;
   const before = snap(t), day = s13Fmt(ymd(new Date())), th = D().settings.donePct, ph = paperHandOf(t), papers = s13RoundPaper(t);
   const r = t.holder && !ph ? roundInfo(tid, true) : null, p1 = r ? lowP1(t, r) : null; // 1回目の割合（返却の画面・自動の確かめと同じ数え方）
-  const cards = pool ? D().awayCards.filter(c => c.terrId === t.id && !c.endedAt && Date.parse(c.expiresAt) > Date.now()).length : 0;
+  const cards = pool ? activeCards().filter(c => c.terrId === t.id).length : 0;
   const body = J([
     t.holder ? T(`${uname(t.holder)}さんの区域カードから外れ、S-13 の完了した日付が今日（${day}）になります。`)
       : T(`留守宅カードで回るのを終えて、S-13 の完了した日付が今日（${day}）になります。`),
