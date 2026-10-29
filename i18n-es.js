@@ -1390,7 +1390,7 @@ window.KUIKI_I18N.es = {
 "毎日はじめのひと言": "Frase al empezar el día",
 "タイマー": "Temporizador",
 "使う：「奉仕スタート」「奉仕終了」を押すだけで時間を記録します。月末の夜8時すぎには、奉仕報告の画面を出します。": "Usar: anota el tiempo solo con tocar «Empezar» y «Terminar». A fin de mes, después de las 8 p. m., aparece la pantalla del informe.",
-"使わない：ホームで、今日の時間を＋−で入れます": "No usar: en Inicio anota las horas de hoy con ＋ y −",
+"使わない：ホームで、今日の時間を時間と分のダイヤルで入れます": "No usar: en Inicio anota el tiempo de hoy con las ruedas de horas y minutos",
 "このスマホの中だけ": "solo en este teléfono",
 "暗号化して、同じ人のほかの端末とも同じになります": "cifrada y igual en sus otros dispositivos",
 "出さない": "No mostrar",

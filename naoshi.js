@@ -433,7 +433,11 @@
     if (typeof simpleBlock === 'function' && simpleBlock('二世帯住宅に変えることは')) return;
     const h = houseById(hid); if (!h || h.type !== 'house') return;
     const t = terrById(h.terrId), k0 = K(hid, '');
-    const fixable = visitsOf(k0).filter(v => isToday(v.at) && v.by === me().id && canFixVisit(v));
+    // 世帯に分ける記録：今日の自分の記録（直せる記録は移す）と、受け取ってから（今の巡回）の自分の記録（写す）。
+    // 以前は今日の記録だけで、回っている途中で変えると、前の日の記録が残らず両方の世帯が「まだ」になった（総点検 L14・2026.13.105）
+    const s0 = t && t.holder ? (t.roundFrom || t.lentAt || '') : '', d39 = new Date(Date.now() - 39 * 864e5).toISOString();
+    const since = s0 && !isAdmin() && s0 < d39 ? d39 : s0; // サーバーは40日より前の日付の記録を受け付けないので、係以外は39日まで
+    const fixable = visitsOf(k0).filter(v => v.by === me().id && ((isToday(v.at) && canFixVisit(v)) || (since && v.at >= since)));
     const st = { lay: null, assign: {} };
     const paint = () => {
       let b = headHtml(t, '二世帯住宅にする', esc(h.label || '一戸建て'));
@@ -445,10 +449,10 @@
           <button class="btn block" id="dcBack">もどる</button>`;
       } else {
         const L0 = LAYS[st.lay];
-        b += `<p class="q">今日の記録は、どの世帯の記録ですか？</p>`;
+        b += `<p class="q">${fixable.some(v => !isToday(v.at)) ? 'これまでの記録は' : '今日の記録は'}、どの世帯の記録ですか？</p>`;
         fixable.forEach(v => {
           const cur = st.assign[v.id] || '';
-          b += `<p><b>今日 ${hhmm(v.at)}　${RESULT_LABEL[v.result]}</b></p>
+          b += `<p><b>${isToday(v.at) ? '今日 ' + hhmm(v.at) : fmtDate(v.at)}　${RESULT_LABEL[v.result]}</b></p>
             <div class="choices two">${L0.units.map(u => `<button class="choice${cur === u ? ' on' : ''}" data-as="${esc(v.id)}" data-u="${esc(u)}" aria-pressed="${cur === u}">${esc(sideName(u))}</button>`).join('')}
             <button class="choice${cur === '?' ? ' on' : ''}" data-as="${esc(v.id)}" data-u="?" aria-pressed="${cur === '?'}">分からない</button></div>`;
         });
@@ -476,7 +480,7 @@
         fixable.forEach(v => {
           const u = st.assign[v.id];
           if (!u || u === '?') return;
-          D().visits = D().visits.filter(x => x.id !== v.id);
+          if (isToday(v.at) && canFixVisit(v)) D().visits = D().visits.filter(x => x.id !== v.id); // 直せる記録（今日の自分の記録）は移す。前の日の記録は消せないので、建物の記録として残し、世帯に写す
           D().visits.push({ id: uid(), houseId: hid, unit: u, result: v.result, at: v.at, by: me().id });
         });
       };
