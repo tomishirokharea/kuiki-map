@@ -2031,12 +2031,12 @@ body.duemode .terr-label:not(.duelab){display:none}
           try { await bioCheck(); lkUnlocked(); } catch (err) { msg.textContent = '顔認証・指紋で開けませんでした。番号を入れてください'; }
         } else if (e.target.closest('[data-lkhome]')) { s.hidden = true; lk.cb = null; showView('home'); }
         else if (e.target.closest('[data-lkforget]')) {
-          if (!await ask('このスマホの「係」としての登録を外して、登録し直します。\n区域係からもらったリンクを開き直し、ほかの区域係に承認してもらう必要があります。\n（このスマホの区域の情報は消えます。サーバーのデータは消えません）\nよろしいですか？')) return;
+          if (!await ask('このスマホの「係」としての登録を外して、登録し直します。\n区域係からもらったリンクを開き直し、ほかの区域係に承認してもらう必要があります。\n（このスマホの区域の情報は消えます。サーバーのデータは消えません。まだ送っていない記録は、登録し直したときに送れるよう、7日のあいだこのスマホに残ります）\nよろしいですか？')) return;
           lkSave(null); lsDel(LK_FAIL);
           Store.authLost = true; clearTimeout(Store.cacheTimer); IDB.clearCache().catch(() => {}); clearAllMemos();
           // まだ送っていない変更・送れない変更は消さずに、この人の分として7日取っておく（登録し直したら送る。ログイン切れと同じ・総点検 L6）
-          try { if (typeof orphanAdd === 'function') orphanAdd(String((D() || {}).currentUser || ''), Store.queue, failedList()); } catch (err) { /* 取っておけなくても、登録を外すのは続ける */ }
-          [TOKEN_KEY, QUEUE_KEY, SYNC_KEY, PENDING_KEY, FAILED_KEY, 'kuiki_headfail', 'kuiki_autoretried'].forEach(lsDel); Store.queue = [];
+          try { const cu = String((D() || {}).currentUser || ''); if (typeof orphanAdd === 'function') orphanAdd(cu, Store.queue, failedList().filter(x => x && (!x.uid || x.uid === cu))); } catch (err) { /* 取っておけなくても、登録を外すのは続ける */ } // 本人の分だけ（監査6 L4）
+          [TOKEN_KEY, QUEUE_KEY, SYNC_KEY, PENDING_KEY, FAILED_KEY, 'kuiki_headfail'].forEach(lsDel); Store.queue = []; // 自動の送り直しの「一度だけ」の控えは残す（監査6 L4）
           s.hidden = true;
           showBlocking('登録を外しました', 'もう一度使うときは、区域係からもらったリンクを開いてください。ほかの区域係が、このスマホの登録を承認します。');
         }

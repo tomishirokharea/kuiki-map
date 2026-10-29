@@ -1186,7 +1186,9 @@ function restoreOrphan() {
   if (!cu || !by[cu]) return; // ちがう人の分は送らない。7日のあいだ取っておく（その人のリンクを開き直したら送る）
   const o = by[cu];
   delete by[cu]; orphanSave(by);
-  if ((o.failed || []).length) lsSet(FAILED_KEY, JSON.stringify(failedList().concat(o.failed).slice(-30))); // その人の「送れない変更」にもどす
+  // その人の「送れない変更」にもどす。もどすのは送ってよい種類（記録・拒否・注意・受け持ち・引き継ぎ）だけ（取っておいた間に区域などの状態が変わっているため・監査6 L4）
+  const fl = (o.failed || []).map(x => { const sp2 = x && x.ch ? orphanSplit([x.ch]) : null; return sp2 && sp2.keep.length ? Object.assign({}, x, { ch: mergeChanges(sp2.keep) }) : null; }).filter(Boolean);
+  if (fl.length) lsSet(FAILED_KEY, JSON.stringify(failedList().concat(fl).slice(-30)));
   if (!(o.queue || []).length) return;
   const sp = orphanSplit(o.queue);
   const drop = sp.dropped ? `区域の変更など ${sp.dropped}件は送りませんでした。必要なら区域係に伝えてください` : ''; // 言語のファイルに、文ごと（下の組み合わせも）入れてある

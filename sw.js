@@ -38,9 +38,13 @@ self.addEventListener('install', e => {
       // 版がそろっているか（配信の途中で、新しい index.html と古い app.js がまざっていないか）を確かめる。そろわなければ使わない（監査5 M-3）
       const iv = ((await (await c.match(base + 'index.html')).text()).match(/name="app-version" content="([^"]+)"/) || [])[1];
       const jv = ((await (await c.match(base + 'app.js')).text()).match(/APP_JS_VER = '([^']+)'/) || [])[1];
-      if (!iv || iv !== jv) throw new Error('version mismatch ' + iv + ' / ' + jv);
+      // sw.js の版は APP_CACHE の番号（kuiki-app-v104 → 2026.13.104 の 104）。版上げのたびに必ず上げる番号なので、別の番号は置かない（上げ忘れで取りこみが止まらないように）
+      if (!iv || iv !== jv || iv.split('.').pop() !== APP_CACHE.slice(11)) throw new Error('version mismatch ' + iv + ' / ' + jv + ' / ' + APP_CACHE);
     } catch (err) {
+      // そろわない・取れない：新しい控えを捨て、install を失敗にする。前の版の Service Worker と控えがそのまま使われ、
+      // 次に更新を確かめたとき（開き直し・版の確認）に、もう一度入れ直す（監査6 M2）
       try { await caches.delete(APP_CACHE); } catch (x) { /* */ }
+      throw err;
     }
   })());
 });
