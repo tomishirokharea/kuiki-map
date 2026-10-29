@@ -526,6 +526,7 @@ const Store = {
   token: '',
   queue: [],     // 本番：まだ送っていない変更
   inbox: [],     // 本番：受け取ったが、入力中のため反映を待っている変更
+  pulled: false, // 本番：この起動で、サーバーの最新の変更を一度でも受け取ったか（係の端末の自動の確かめは、受け取る前の古いデータでは動かさない。第3回監査 P6）
   needFull: false,
   permSeen: null,  // 本番：詳細を受け取り済みの範囲
   syncAt: 0,       // 本番：最後に通信できた時刻
@@ -911,6 +912,7 @@ const Store = {
     this.setServer(j);
     this.markAll();
     this.saveCacheSoon();
+    this.pulled = true; // サーバーから全部を読み込んだ＝最新
     loadMark('finish');
     setTimeout(loadLogDone, 0); // 最初の画面を描いたあとに締める
     return 'server';
@@ -1575,6 +1577,9 @@ function applyInbox() {
   Store.saveCacheSoon();
   if (Store.needFull && !reloading) setTimeout(() => reloadAll(true).catch(() => {}), 0);
   else if (Store.needMeta) setTimeout(() => reloadMeta().catch(() => {}), 0);
+  // サーバーの最新の変更を受け取った（変わっていない返事も含む）。係の画面を開いていれば、ここで自動の確かめを動かす（開いた直後の古いデータでは動かさない。P6）
+  Store.pulled = true;
+  if (currentView === 'admin') adminSweepSoon();
   if (!any) return;
   updateTabs();
   // 家・区域だけが変わったときは、家・区域の索引だけを作り直す（記録の分け直しはしない・改善案B1）
@@ -8312,6 +8317,7 @@ function finishTerr(tid, done, lowOk) {
   commit(`区域${t.no}を返却しました${done ? '（回り終えました）' : ''}`, () => {
     const now = new Date().toISOString();
     const rec = { id: 'x' + uid(), terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: done, pct };
+    if (roundFromOf(t)) rec.from = roundFromOf(t); // 続きから回った：前の人が回りはじめた日（記録の少ない返却の確かめは、この日から数える。K-1）
     if (t.group) rec.g = 1; // グループ奉仕の区域（S-13 に「グループ奉仕（名前）」と出す）
     if (isAllUse(t)) rec.ga = 1; // 全体の集まりの区域（S-13 に「全体の集まり（名前）」と出す）
     const ph = paperHandOf(t);
@@ -8357,7 +8363,7 @@ function lowMark(rec, t, p1, lowOk) {
 function recordHandover(t, now) {
   if (!t || !t.holder || !t.lentAt) return;
   const r = roundInfo(t.id, true);
-  D().returns.push(Object.assign({ id: 'x' + uid(), terrId: t.id, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: false, pct: r ? r.pct : null, ho: 1 }, t.group ? { g: 1 } : {}, isAllUse(t) ? { ga: 1 } : {}));
+  D().returns.push(Object.assign({ id: 'x' + uid(), terrId: t.id, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: false, pct: r ? r.pct : null, ho: 1 }, roundFromOf(t) ? { from: roundFromOf(t) } : {}, t.group ? { g: 1 } : {}, isAllUse(t) ? { ga: 1 } : {}));
   delete t.paperHand;
 }
 /* 1回目のあと、会えなかった家を「留守宅カード」（だれでも受け取れる）にして返す。
@@ -8371,6 +8377,7 @@ function poolReturn(tid, lowOk) {
   commit(`区域${t.no}を、留守宅カードにして返しました`, () => {
     const now = new Date().toISOString(), rid = 'x' + uid(), first = t.firstDoneAt || now;
     const rec = { id: rid, terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: first, at: now, completed: false, pct: r ? r.pct1 : null, pool: 1 };
+    if (roundFromOf(t)) rec.from = roundFromOf(t); // 続きから回った：前の人が回りはじめた日（K-1）
     if (t.group) rec.g = 1;
     if (isAllUse(t)) rec.ga = 1;
     delete t.paperHand;
@@ -8478,8 +8485,13 @@ function coverAt(t, since, until) {
 /* 区域係のスマホが開いたときに、記録の少ない正式返却を確かめる（finalizePools と同じ間引き）。
    待つ日数のあとに数え直し、届いていれば正式返却のまま、届いていなければ自動で途中の返却に切りかえる */
 let lowBusy = false;
-/* 返却の記録の「回りはじめた日」：受け取った日。印のない古い返却に足した記録（syn）は from に入れる（S-13 の行を作らないため lentAt は空） */
-const lowFrom = r => (r && (r.lentAt || r.from)) || '';
+/* 返却の記録の「回りはじめた日」（記録を数えはじめる日）：
+   ・from があればそれ：「続きから」受け取った巡回は前の人が回りはじめた日（サーバーが区域の roundFrom から付ける。第3回監査 K-1・2026-10-29）。
+     印のない古い返却に足した記録（syn）も from に入れている（S-13 の行を作らないため lentAt は空）
+   ・なければ受け取った日（lentAt）。サーバーが返却のときに確かめる期間（roundFrom || lentAt）と同じ起点になる */
+const lowFrom = r => (r && (r.from || r.lentAt)) || '';
+/* 返却の記録に入れる「回りはじめた日」：続きから回っているとき（roundFrom が受け取った日より前）だけ。ふつうの受け取りでは付けない（lentAt と同じ） */
+const roundFromOf = t => (t && t.roundFrom && t.lentAt && t.roundFrom < t.lentAt ? t.roundFrom : null);
 /* 紙の記録で回り終えた日（t.paperDone・S-13 に転記した紙の記録）が、その巡回の中にあるか（あれば、紙で回り終えたとみなす） */
 function paperDoneIn(t, from, until) {
   const lo = ymd(new Date(from ? Date.parse(from) : Date.parse(until) - lendDays() * DAY)), hi = ymd(new Date());
@@ -8546,8 +8558,8 @@ function lowSweep() {
     const pct = coverAt(t, lowFrom(r), r.at);
     (pct >= th ? ok : flip).push([r, t, pct]);
   }
-  // 印のない返却：待つ日数がすぎていれば、そのまま途中の返却にする（まだなら印だけ付けて、確かめ待ちに出す）
-  const adoptFlip = adopt.filter(a => now - Date.parse(a[0].completedAt) >= wait);
+  // 印のない返却：この回では印を付けて確かめ待ちに出すだけ。途中の返却への切りかえは次の回（上のループ）で、そのときの記録で数え直してから行う
+  // （以前は待つ日数がすぎていれば同じ回で切りかえていた。開いた直後の端末に残っている古い記録で数えたまま切りかえないため。第3回監査 P6・2026-10-29）
   if (!ok.length && !flip.length && !skip.length && !paper.length && !adopt.length) return;
   lowBusy = true;
   try {
@@ -8557,12 +8569,9 @@ function lowSweep() {
       paper.forEach(([r, t]) => { r.lowOk = 1; r.lowAt = at; r.lowPaper = 1; t.recLess = 1; }); // 紙で回り終えた：回り残しも出さない（H2）
       skip.forEach(r => { r.lowSkip = 1; r.lowAt = at; });
       flip.forEach(([r, t, pct]) => lowToPartial(r, t, at, pct));
-      adopt.forEach(([t, r0, from, pct]) => {
-        const r = lowAdoptMark(t, r0, from, pct);
-        if (adoptFlip.some(a => a[0] === t)) lowToPartial(r, t, at, pct);
-      });
+      adopt.forEach(([t, r0, from, pct]) => { lowAdoptMark(t, r0, from, pct); });
     };
-    const nos = flip.map(x => x[1].no).concat(adoptFlip.map(a => a[0].no));
+    const nos = flip.map(x => x[1].no);
     if (nos.length) commit(`記録が目安に届かなかった区域を、途中の返却にしました（${nos.join('・')}）`, apply);
     else { apply(); Store.save(true); } // 切りかえがないときは、お知らせを出さず静かに保存
   } finally { lowBusy = false; }
@@ -11306,10 +11315,17 @@ function paintTakeTgl() {
 }
 /* 係の画面：開いているタブの中身だけを作る（3万件のとき、全部のタブを毎回作ると重いため） */
 let poolSweepAt = 0;
+/* 係の端末の自動の確かめ：目安に届いた留守宅カードの区域を正式な返却として記録する（finalizePools）・記録の少ない返却を確かめる（lowSweep）・
+   紙や口頭で回り終えた区域に印を付ける（recLessFill）。5分に1回まで。描画の途中で記録しないよう、あとで動かす。
+   本番では、この起動でサーバーの最新の変更を一度受け取ってから動かす（開いた直後の端末に残っている古い記録で数えて、
+   回り終えた区域を途中の返却にしないため。受け取ったときに係の画面を開いていれば applyInbox が呼ぶ。第3回監査 P6・2026-10-29） */
+function adminSweepSoon() {
+  if (!isAdmin() || (LIVE && !Store.pulled)) return;
+  if (Date.now() - poolSweepAt > 300000) { poolSweepAt = Date.now(); setTimeout(() => { finalizePools(); lowSweep(); recLessFill(); }, 400); }
+}
 function renderAdmin() {
   setAdPane(adPane);
-  // 区域係の画面を開いたとき、目安に届いた留守宅カードの区域を正式な返却として記録する（5分に1回まで。描画の途中で記録しないよう、あとで動かす）
-  if (Date.now() - poolSweepAt > 300000) { poolSweepAt = Date.now(); setTimeout(() => { finalizePools(); lowSweep(); recLessFill(); }, 400); }
+  adminSweepSoon();
   renderInbox(); // 承認待ちの数（タブの数字）は、いつも数える
   $('#adInbox').insertAdjacentHTML('afterbegin', ageNoticeHtml());
   if (adPane === 'inbox') renderDevices();

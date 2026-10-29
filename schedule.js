@@ -2537,8 +2537,9 @@ body.duemode .terr-label:not(.duelab){display:none}
     if (!wait.length && !auto.length && !old.length) return '';
     const rows = [];
     wait.slice(0, 20).forEach(([r, t]) => {
-      const pct = coverAt(t, lowFrom(r), r.at); // 自動の確かめ（lowSweep）と同じ期間（受け取った日〜返却した日）
-      rows.push(`<li><span>区域${esc(t.no)}　返却 ${esc(fmtDay(r.at))}　記録 ${pct}%（目安${th}%）<br><small class="muted">${esc(fmtDay(new Date(Date.parse(r.at) + waitMs).toISOString()))}に確かめます</small></span>
+      const pct = coverAt(t, lowFrom(r), r.at); // 自動の確かめ（lowSweep）と同じ期間（回りはじめた日〜返却した日）
+      const due = Date.parse(r.at) + waitMs; // 待つ日数がすぎている（印のない古い返却を拾ったもの）は、次に係の画面を開いたときの確かめで数え直す（P6）
+      rows.push(`<li><span>区域${esc(t.no)}　返却 ${esc(fmtDay(r.at))}　記録 ${pct}%（目安${th}%）<br><small class="muted">${due <= Date.now() ? '次に係の画面を開いたときに確かめます' : esc(fmtDay(new Date(due).toISOString())) + 'に確かめます'}</small></span>
         <span class="duebtns"><button type="button" class="btn small" data-lowconfirm="${esc(r.id)}">正式返却で確定</button> <button type="button" class="btn small" data-lownow="${esc(r.id)}">今すぐ途中にする</button></span></li>`);
     });
     auto.slice(0, 20).forEach(([r, t]) => {
