@@ -84,5 +84,6 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "「{0}」と、すべての部屋の記録を削除しますか？": "¿Borrar «{0}» y los registros de todos los departamentos?",
 "この二世帯住宅と、すべての世帯の記録を削除しますか？": "¿Borrar esta casa de dos hogares y los registros de todos los hogares?",
 "紙の区域カードの区域は、「回り終えたので返す」か「途中で返す」で返してください": "Los territorios de la tarjeta de papel se devuelven con «Lo terminé; devolver» o «Devolver sin terminar»",
+"区域係の画面：記録の少ない返却の自動の確かめは、前の人の続きから回った区域では前の人が回りはじめた日から数え、サーバーから最新の記録を受け取ってから動くようにしました": "Pantalla del encargado: la verificación automática de devoluciones con pocos registros ahora cuenta, en los territorios continuados desde donde los dejó la persona anterior, desde el día en que esa persona empezó a recorrerlos, y se ejecuta después de recibir los registros más recientes del servidor",
 "次に係の画面を開いたときに確かめます": "Se verificará la próxima vez que se abra la pantalla del encargado",
 });
