@@ -180,7 +180,7 @@
   }
   /* 貸出中の区域の進み具合（返却の目安に対して） */
   function paceOf(t) {
-    if (!t.holder || !t.lentAt) return null;
+    if (!t.holder || !t.lentAt || !dueOf(t)) return null; // 返却の目安のない区域（全体の集まり・紙で渡した区域）は見ない（M7）
     const r = roundInfo(t.id, true);
     if (!r) return null;
     const el = daysSince(t.lentAt) / lendDays();
@@ -1531,7 +1531,7 @@ button.ktag{cursor:pointer}
     // 以前は区域の一覧の行に出していた分（改善案A4）：今日一緒に回る人・記録が少ない返却を確かめる日
     { const hp = typeof helpersOf === 'function' ? helpersOf(t) : []; if (hp.length) sub += `${sub ? '<br>' : ''}今日一緒に回る人：${hp.map(h => esc(uname(h.uid)) + 'さん').join('、')}`; }
     { const lw = typeof lowWaitNote === 'function' ? lowWaitNote(t) : ''; if (lw) sub += `${sub ? '<br>' : ''}${lw.replace(/^（|）$/g, '')}`; }
-    const dueTxt = di.left == null ? '前回の記録がありません' : di.left < 0 ? `1年の期限を${-di.left}日過ぎています` : `1年の期限まで あと${di.left}日`;
+    const yearTxt = di.left == null ? '前回の記録がありません' : di.left < 0 ? `1年の期限を${-di.left}日過ぎています` : `1年の期限まで あと${di.left}日`;
     // 4 時間帯の表 5 数字
     let table, nums = '';
     if (few) {
@@ -1553,7 +1553,7 @@ button.ktag{cursor:pointer}
     return headHtml(t, `区域${esc(t.no)}のカルテ`, esc(t.name || '')) + `
       <div class="cover ${cls}" role="status"><i aria-hidden="true">${mark}</i><div><b>${word}</b>${sub ? `<small>${sub}</small>` : ''}</div></div>
       <p class="kq">期限</p>
-      <p>前回回り終えた日：<b>${di.last ? showDay(di.last) : '記録なし'}</b>　／　<b>${dueTxt}</b></p>
+      <p>前回回り終えた日：<b>${di.last ? showDay(di.last) : '記録なし'}</b>　／　<b>${yearTxt}</b></p>
       <p class="kq">次の一手</p>
       <div class="kadv">${karteAdvice(t, homes).map(x => `<p>${esc(x)}</p>`).join('')}</div>
       ${focusLineHtml(t)}

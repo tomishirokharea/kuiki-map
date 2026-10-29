@@ -312,7 +312,7 @@ const API_URL = (function () {
 })(); // GAS の「ウェブアプリのURL」は config.js に書く
 const LIVE = !!API_URL;
 const JOIN_KEY = 'kuiki_join', PENDING_KEY = 'kuiki_pending';
-const CARRY_KEY = 'kuiki_carry'; // Safari から持ってきた、このスマホだけの記録（読み込んだあと、自分の記録が空なら入れる・M13）
+const CARRY_KEY = 'kuiki_carry', CARRY_K = 'kuiki_carry_k'; // CARRY_K：預けた記録を開く鍵（リンクの k=。サーバーには送らない）。 Safari から持ってきた、このスマホだけの記録（読み込んだあと、自分の記録が空なら入れる・M13）
 const HOME_KEY = 'kuiki_home_code', HOME_SEEN = 'kuiki_home_seen', HOME_OFF = 'kuiki_home_banner_off', FIRST_OK = 'kuiki_first_ok', HOME_WELCOME = 'kuiki_home_welcome';
 const TOKEN_KEY = 'kuiki_token', QUEUE_KEY = 'kuiki_queue', OLD_CACHE_KEY = 'kuiki_cache', SYNC_KEY = 'kuiki_sync_at', LOCK_KEY = 'kuiki_lock_ok';
 let onMemoVer = null; // 再訪問メモの合図を受け取る（MemoSync が入れる）
@@ -924,7 +924,7 @@ const Store = {
 /* ?t= … 個別の招待リンク（これまでどおり）
    ?j= … 共通リンク。すでにこのスマホに使う人が決まっていれば、何もしない（名前は変えられない） */
 function readToken() {
-  const u = new URL(location.href), t = u.searchParams.get('t'), j = u.searchParams.get('j'), h = u.searchParams.get('h');
+  const u = new URL(location.href), t = u.searchParams.get('t'), j = u.searchParams.get('j'), h = u.searchParams.get('h'), ck = u.searchParams.get('k');
   let changed = false;
   if (t) {
     changed = lsGet(TOKEN_KEY) !== t;
@@ -934,7 +934,8 @@ function readToken() {
   }
   if (j) { lsSet(JOIN_KEY, j); u.searchParams.delete('j'); }
   if (h) { lsSet(HOME_KEY, h); u.searchParams.delete('h'); } // ホーム画面のアイコンから、はじめて開いたとき
-  if (t || j || h) history.replaceState(null, '', u.pathname + u.search + u.hash); // 画面のURLからコードを消す
+  if (ck) { if (h) lsSet(CARRY_K, ck); u.searchParams.delete('k'); } // 預けた記録を開く鍵（M13）
+  if (t || j || h || ck) history.replaceState(null, '', u.pathname + u.search + u.hash); // 画面のURLからコードを消す
   return { token: lsGet(TOKEN_KEY) || '', changed };
 }
 async function apiRaw(body) {
@@ -975,12 +976,14 @@ async function openHomeGuide() {
     if (Store.queue.length) note = '<div class="notice warn">まだ送っていない記録があります。電波のよい所で送り終えてから追加すると、記録がSafariに残りません。</div>';
     try {
       // 奉仕時間・予定・目標・報告の控え（このスマホだけの記録）も、ホーム画面のアプリに持っていく（15分だけサーバーに預ける）
-      let carry = '';
-      try { const c = JSON.stringify(myData()); if (c.length <= 30000) carry = c; } catch (e) { carry = ''; }
+      // 暗号にしてから預ける（鍵はリンクの k= に入れ、サーバーには送らない。サーバーは中身を読めない・組C 監査 H3）
+      let carry = '', ck = '';
+      try { const e = await carrySeal(JSON.stringify(myData())); if (e && e.c.length <= 30000) { carry = e.c; ck = e.k; } } catch (e) { carry = ''; }
       const j = await api('home_code', carry ? { carry } : {});
       if (j.code) {
         const u = new URL(location.href);
         u.searchParams.delete('t'); u.searchParams.set('h', j.code);
+        if (ck) u.searchParams.set('k', ck); else u.searchParams.delete('k');
         history.replaceState(null, '', u.pathname + u.search + u.hash);
         homeUrlDirty = true; ready = true;
       }
@@ -1134,14 +1137,32 @@ function tzWarn() {
   } catch (e) { /* 何もしない */ }
 }
 /* Safari から持ってきた「このスマホだけの記録」を入れる（ホーム画面のアプリで初めて開いたとき）。自分の記録がまだ空のときだけ（上書きしない・M13） */
-function applyCarry() {
-  const c = lsGet(CARRY_KEY);
-  if (!c) return;
-  lsDel(CARRY_KEY);
+/* 預ける記録を暗号にする（AES-GCM。鍵はこのときだけ作り、リンクの k= で渡す）。WebCrypto がないときは預けない */
+const b64u = a => btoa(String.fromCharCode.apply(null, Array.from(a))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = s => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0));
+async function carrySeal(text) {
+  if (!(window.crypto && crypto.subtle)) return null;
+  const raw = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(text)));
+  return { c: 'v1.' + b64u(iv) + '.' + b64u(ct), k: b64u(raw) };
+}
+async function carryOpen(c, k) {
+  const m = /^v1\.([\w-]+)\.([\w-]+)$/.exec(String(c || ''));
+  if (!m || !k || !(window.crypto && crypto.subtle)) return null;
+  const key = await crypto.subtle.importKey('raw', unb64u(k), 'AES-GCM', false, ['decrypt']);
+  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(m[1]) }, key, unb64u(m[2])));
+}
+async function applyCarry() {
+  const c0 = lsGet(CARRY_KEY), k = lsGet(CARRY_K);
+  if (!c0) { if (k) lsDel(CARRY_K); return; }
+  lsDel(CARRY_KEY); lsDel(CARRY_K);
   try {
+    const c = await carryOpen(c0, k); // 鍵がない・開けないときは何もしない（暗号でない預け方は受け付けない）
+    if (!c) return;
     const o = JSON.parse(c), cur = lsGet(myKey());
     const empty = !cur || (() => { try { const x = JSON.parse(cur); return !Object.keys(x.log || {}).length && !(x.events || []).length && !Object.keys(x.reports || {}).length; } catch (e) { return true; } })();
-    if (o && typeof o === 'object' && empty) { lsSet(myKey(), JSON.stringify(o)); setTimeout(() => toast('Safariで記録していた奉仕時間・予定を、こちらに持ってきました'), 2500); }
+    if (o && typeof o === 'object' && empty) { lsSet(myKey(), JSON.stringify(o)); try { renderAll(); } catch (e) { /* 次に描くときに出る */ } setTimeout(() => toast('Safariで記録していた奉仕時間・予定を、こちらに持ってきました'), 2500); }
   } catch (e) { /* 読めなければ何もしない */ }
 }
 /* 招待リンクが変わったとき（readToken）：送信待ちを、使っていた人の id といっしょに取っておく（ORPHAN_KEY。authLost と同じ入れ物） */
@@ -7752,7 +7773,7 @@ function cardHtml(t, own, helper) {
   const hs = helpersOf(t), groupOk = D().settings.groupOn !== 0;
   const due = dueOf(t), over = due && Date.parse(due) < Date.now();
   const lead = !own && helper && isLead(t), ld = leadOf(t); // lead＝自分が今日の司会。ld＝今日の司会（だれか）
-  const who = own ? `受け取ってから ${daysSince(t.lentAt)}日・<span class="${over ? 'tag-warn' : ''}">返却の目安 ${fmtDay(due)}${over ? '（過ぎています）' : ''}</span>${t.firstDoneAt ? '・留守宅を回る段階' : ''}${isSpecial(t) ? `<span class="spbadge">${esc(specialKindsText(t))}</span>${evTag(t)}` : ''}`
+  const who = own ? `受け取ってから ${daysSince(t.lentAt)}日・<span class="${over ? 'tag-warn' : ''}">返却の目安 ${due ? fmtDay(due) : 'なし'}${over ? '（過ぎています）' : ''}</span>${t.firstDoneAt ? '・留守宅を回る段階' : ''}${isSpecial(t) ? `<span class="spbadge">${esc(specialKindsText(t))}</span>${evTag(t)}` : ''}`
     : lead ? `<span class="leadtag">今日の司会</span>担当：${esc(uname(t.holder))}さん（今日まで）`
     : helper ? `${esc(uname(t.holder))}さんの区域を、一緒に回ります（今日まで）`
     : (holder ? `担当：${esc(holder.name)}さん` : '担当者なし');
@@ -8584,26 +8605,34 @@ function poolInfo(t) {
   // 1回目の段階から、そのまま留守宅カードにして返した区域（返却ボタンの自動の決め方。1回目を終えた日＝返した日）は、
   // 返却ボタンと同じ数え方（awayAgain）：1回目の段階で別の日に訪ね直した家も「訪ね直した」に数える
   const ph1 = first >= t.awayPoolAt;
-  let n = 0;
+  // 1回目に訪ねていなかった家（un*）：1回目が目安（donePct−10）まで回れていたときだけ数えない（M3）。
+  // 1回目が少ない（係が目安未満で留守宅カードにした・紙で回った）ときは、今までどおり数える（少ししか回っていない区域が完了にならないように・組C 監査 M3）
+  let n = 0, tot = 0, vis = 0, unN = 0; const unT = [];
   for (const h of housesOf(t.id)) {
     if (banNo(h)) continue; // 立入禁止の建物は数えない（roundInfo と同じ・M4）
     for (const u of (sp ? specialTargets(h, t) : targets(h))) {
       if (!sp && coveredBySpecial(h, u)) continue;
       const k = K(h.id, u);
       if (D().dnc[k]) continue;
+      const vis1 = visitsOf(k).some(v => v.at >= since && v.at <= first);
+      tot++; if (vis1) vis++;
+      if (!vis1) { // 1回目に訪ねていなかった家（数えるかどうかは、下でまとめて決める）
+        const after = visitsOf(k).filter(v => v.at > first);
+        if (!(recentMet(k) && !after.length)) { unN++; if (after.length) unT.push(after[after.length - 1].at); }
+        continue;
+      }
       if (ph1) {
-        if (!visitsOf(k).some(v => v.at >= since && v.at <= first)) continue; // 1回目の段階で訪ねていなかった家は、どのカードにも入らないので数えない（次の巡回で回る・M3・2026.13.105）
         const a = awayAgain(k, since); if (a === null) continue;
         n++; if (a) times.push(a);
         continue;
       }
       if (metBetween(k, since, first)) continue;
-      const vis1 = visitsOf(k).some(v => v.at >= since && v.at <= first);
-      if (!vis1) continue; // 1回目に訪ねていなかった家は、どのカードにも入らないので数えない（M3）
       n++;
       { const a = revisitAt(k, since, first); if (a) times.push(a); } // 1回目に訪ねた家：訪ね直したと数える条件（係の設定）に合う、いちばん早い記録
     }
   }
+  const need1 = Math.max(0, (Number(D().settings.donePct) || 90) - 10);
+  if (tot && vis / tot * 100 < need1) { n += unN; times.push(...unT); }
   times.sort();
   const need = Math.max(1, Math.ceil(n * awayRetPct() / 100));
   return { n, done: times.length, pct: n ? Math.round(times.length / n * 100) : 100, doneAt: !n ? first : (times.length >= need ? times[need - 1] : null) };
@@ -8890,10 +8919,11 @@ function nextGroupSlot(all) { // all：全体の集まりの予定（group が�
 const isUnmet = k => { const s = sum(k); return s.n > 0 && s.unmet; };
 const triedSlots = k => sum(k).slots;
 // 担当者のいる区域は担当者だけ。空いている区域は、回り終えた記録があるものだけ。
-/* 途中で返され、続きから受け取れる区域か（サーバーの contOk_・tsuzuki.js の canCont と同じ） */
+/* 途中で返され、続きから受け取れる区域か（tsuzuki.js の canCont・サーバーの contAvail_ と同じ） */
 const contAvail = t => {
   if (!t || t.holder || t.awayPoolAt || t.paperLentAt || !t.returnedAt || !t.lastRoundFrom) return false;
-  if (t.completedAt && !(String(t.returnedAt) > String(t.completedAt))) return false;
+  const done = [t.completedAt, t.paperDone].filter(Boolean).map(String).sort().pop() || ''; // 紙の記録で回り終えた日も数える（tsuzuki.js canCont と同じ）
+  if (done && !(String(t.returnedAt) > done)) return false;
   const v = D().settings.contDays, d = v == null || v === '' ? 60 : (Number(v) || 0);
   return d > 0 && Date.now() - Date.parse(t.returnedAt) <= d * DAY;
 };
@@ -12498,7 +12528,7 @@ function openReportLine(ym, opt) {
       ${ok ? `<a class="btn line block" id="rpLine" href="https://line.me/R/share?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">LINEで送る</a>
       ${navigator.share ? '<button class="btn block" id="rpShare">ほかのアプリで送る（メールなど）</button>' : ''}
       <button class="btn block" id="rpCopy">文をコピーする</button>` : '<p class="notice info">「1カ月間に何らかの形で伝道した」の「はい」か「いいえ」を選ぶと、送れるようになります。</p>'}
-      <p class="hint">送る相手は、グループのトークではなく、報告を受け取る人との個別のトークがおすすめです。報告の内容は、このスマホの中だけに保存され、区域係やサーバーには送られません。</p>
+      <p class="hint">送る相手は、グループのトークではなく、報告を受け取る人との個別のトークがおすすめです。報告の内容は、このスマホの中だけに保存され、区域係やサーバーには送られません（iPhoneでホーム画面に追加するときだけ、暗号にして15分間サーバーを通し、ホーム画面のアプリに移します。サーバーは中身を読めません）。</p>
       ${rep ? `<p class="okmsg">${fmtDate(rep.at)}に報告しました（${esc(repSummary(rep))}）。直したときは、もう一度送ってください。</p>`
         : ok ? '<button class="btn block" id="rpDone">もう報告した（送らずに閉じる）</button>' : ''}
       <button class="btn block" data-close>${rep ? '閉じる' : 'あとで'}</button>`);

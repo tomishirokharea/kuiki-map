@@ -254,6 +254,8 @@
       const r = await api('s21_send', body, { timeout: 45000 });
       if (!dry) markSent(ym, body, r.late, pio ? 'rp' : body.aux ? 'aux' : 'pub', st.aux);
       done(ym, opt, body, r);
+      // 終わっていない月を送ったとき：あとで足した時間は、月末にもう一度知らせる（LINE で送るときと同じ・M12・2026.13.105）
+      if (!dry && ym === ymOf(new Date()) && !isLastDayStr(ymd(new Date())) && featTime() && UI.fTimer !== 'off') setTimeout(() => toast('月の途中の報告です。このあと時間を足したときは、月末にもう一度お知らせします'), 1800);
     } catch (e) {
       const c = e && (e.code || e.message);
       if (c === 'auth') return;
@@ -409,7 +411,8 @@
     // same：同じ名前の人がどこにいるか（map＝区域マップの使う人に2人以上・s21＝S21 の名簿に2人以上。C1-1）
     const why = { none: '名前が見つかりません', ambig: '同じ名前が2人以上います', gone: 'えらんだ人が S21 にいません' };
     const whyOf = p => p.how === 'ambig' && p.same === 'map' ? '区域マップに同じ名前の人がいます。手で対応づけてください'
-      : p.how === 'ambig' && p.same === 's21' ? 'S21 に同じ名前の人が2人以上います。手でえらんでください' : why[p.how];
+      : p.how === 'ambig' && p.same === 's21' ? 'S21 に同じ名前の人が2人以上います。手でえらんでください'
+      : p.how === 'ambig' && p.same === 'taken' ? '同じ名前の S21 の人は、ほかの人に対応づけてあります。手でえらんでください' : why[p.how];
     const row = p => `<div class="setrow"><span>${esc(p.name)}${p.how === 'manual' ? '<br><small class="muted">区域係がえらびました</small>' : whyOf(p) ? `<br><small class="muted">${whyOf(p)}</small>` : ''}</span>
       <select class="s21sel" data-s21link="${esc(p.uid)}" aria-label="${esc(p.name)}さんの S21 での名前">${opts(p.pid)}</select></div>`;
     setSheet(headHtml(null, '名前の対応', `つながっている人 ${good.length}人・見つからない人 ${bad.length}人`) + `

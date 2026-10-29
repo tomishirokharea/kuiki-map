@@ -119,5 +119,6 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "S21 のURLを変えたので、前の連携キーを消しました。S21 の書記の画面で発行した連携キーを入れ直してください。": "Como cambió la URL de S21, se borró la clave anterior. Vuelva a poner la clave de conexión emitida en la pantalla del secretario de S21.",
 "区域マップに同じ名前の人がいます。手で対応づけてください": "Hay otra persona con el mismo nombre en el Mapa. Elija a mano la persona de S21",
 "S21 に同じ名前の人が2人以上います。手でえらんでください": "Hay 2 o más personas con el mismo nombre en S21. Elija a mano",
-"S21 と名前が合う人は、自動でつながっています。見つからない人と、同じ名前の人がいる人は、S21 の名前をえらんでください（同じ名前の人は、まちがえて別の人の報告にならないよう、自動ではつなぎません）。「奉仕時間」を使っていない人は、そのままでもかまいません。": "Quienes tienen el mismo nombre en S21 se conectan solos. Elija el nombre en S21 para quienes no se encontraron y para quienes comparten nombre con otra persona (a ellos no se les conecta solos, para que el informe no vaya a otra persona). Quienes no usan «Tiempo de predicación» pueden quedar así."
+"S21 と名前が合う人は、自動でつながっています。見つからない人と、同じ名前の人がいる人は、S21 の名前をえらんでください（同じ名前の人は、まちがえて別の人の報告にならないよう、自動ではつなぎません）。「奉仕時間」を使っていない人は、そのままでもかまいません。": "Quienes tienen el mismo nombre en S21 se conectan solos. Elija el nombre en S21 para quienes no se encontraron y para quienes comparten nombre con otra persona (a ellos no se les conecta solos, para que el informe no vaya a otra persona). Quienes no usan «Tiempo de predicación» pueden quedar así.",
+"同じ名前の S21 の人は、ほかの人に対応づけてあります。手でえらんでください": "La persona de S21 con el mismo nombre ya está vinculada a otra persona. Elíjala manualmente",
 });
