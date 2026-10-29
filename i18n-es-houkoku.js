@@ -109,5 +109,15 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "聖書研究 {0}件": "Cursos bíblicos: {0}",
 "時間 {0}時間": "Horas: {0}",
 "承認された活動 {0}時間": "Actividades aprobadas: {0} h",
-"補助開拓（{0}時間）": "Precursor auxiliar ({0} h)"
+"補助開拓（{0}時間）": "Precursor auxiliar ({0} h)",
+/* S21 の直し（2026-10-30：同じ名前・S21 の名前・返事だけ届かなかった報告・URL を変えたとき） */
+"S21 の「{0}」さんとして送ります": "Se enviará en S21 como «{0}»",
+"S21 の「{0}」さんとして送ります（開拓者）": "Se enviará en S21 como «{0}» (precursor)",
+"{0}月の奉仕報告は、会衆に届いていました（報告しました）": "El informe de predicación del mes {0} ya había llegado a la congregación (informe enviado)",
+"{0}月の奉仕報告を直した内容は、送れないまま締切（{1}月{2}日）を過ぎました。前に送った報告は、会衆に届いています。直す必要があるときは、書記に伝えてください（書記が入力します）。": "La corrección del informe de predicación del mes {0} no se pudo enviar antes de la fecha límite ({2}/{1}). El informe que envió antes sí llegó a la congregación. Si hay que corregirlo, avise al secretario (él lo anotará).",
+"保存しました。連携キーを入れ直してください": "Se guardó. Vuelva a poner la clave de conexión",
+"S21 のURLを変えたので、前の連携キーを消しました。S21 の書記の画面で発行した連携キーを入れ直してください。": "Como cambió la URL de S21, se borró la clave anterior. Vuelva a poner la clave de conexión emitida en la pantalla del secretario de S21.",
+"区域マップに同じ名前の人がいます。手で対応づけてください": "Hay otra persona con el mismo nombre en el Mapa. Elija a mano la persona de S21",
+"S21 に同じ名前の人が2人以上います。手でえらんでください": "Hay 2 o más personas con el mismo nombre en S21. Elija a mano",
+"S21 と名前が合う人は、自動でつながっています。見つからない人と、同じ名前の人がいる人は、S21 の名前をえらんでください（同じ名前の人は、まちがえて別の人の報告にならないよう、自動ではつなぎません）。「奉仕時間」を使っていない人は、そのままでもかまいません。": "Quienes tienen el mismo nombre en S21 se conectan solos. Elija el nombre en S21 para quienes no se encontraron y para quienes comparten nombre con otra persona (a ellos no se les conecta solos, para que el informe no vaya a otra persona). Quienes no usan «Tiempo de predicación» pueden quedar así."
 });
