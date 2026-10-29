@@ -14771,6 +14771,9 @@ function afterWelcome() {
   if (lsGet(HOME_WELCOME)) { lsDel(HOME_WELCOME); toast('ホーム画面のアイコンから使えるようになりました'); }
   const first = !!lsGet(FIRST_OK);
   lsDel(FIRST_OK);
-  if (isMobile() && !isStandalone() && !lsGet(HOME_SEEN) && (first || isIOS())) setTimeout(openHomeGuide, first ? 600 : 1500);
+  // 「ホーム画面に追加する」の案内：ほかの画面（返却・記録など）を開いて使いはじめていたら、その画面を置きかえない。
+  // 少し待って、閉じていれば出す（数回ためしても開いたままなら出さない。設定の「ホーム画面に追加」からいつでも開ける。第3回監査・2026-10-29）
+  const guide = n => { if ($('#sheet').hidden) openHomeGuide(); else if (n > 0) setTimeout(() => guide(n - 1), 3000); };
+  if (isMobile() && !isStandalone() && !lsGet(HOME_SEEN) && (first || isIOS())) setTimeout(() => guide(5), first ? 600 : 1500);
 }
 init();
