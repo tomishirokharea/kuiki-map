@@ -8594,6 +8594,38 @@ function recLessFill() {
   add.forEach(t => { t.recLess = 1; });
   Store.save(true);
 }
+/* この直しより前に「続きから」で回った返却の記録（from が無い）に、回りはじめた日（from）を補う（第3回監査 N-7・2026-10-29）。
+   サーバーが「続きから」と判定する規則と同じ条件で、同じ区域のひとつ前の返却が「途中で返した」（完了でない・留守宅カードでない・担当交代でない）で、
+   その返却から contDays 日以内に受け取っていれば、前の記録の回りはじめた日を引きつぐ（古い順に補うので、途中→途中→完了もいちばん前の日にもどる）。
+   対象は自動の確かめが見る範囲（keepMonths）の記録だけ。係の端末だけ（返却の記録は係の端末にしかない）。何度動いても同じ。お知らせは出さない。
+   補った from は受け取った日より前にしか動かないので、数える記録が増える方向（回り終えた区域を途中にもどさない方向）にしか働かない。補った数を返す */
+function fromFill() {
+  if (!isAdmin() || !D().returns) return 0;
+  const st = D().settings, cd = st.contDays == null || st.contDays === '' ? 60 : (Number(st.contDays) || 0);
+  if (!cd) return 0;
+  const since = Date.now() - Math.max(1, Number(st.keepMonths) || 12) * 30 * DAY;
+  const byTerr = new Map();
+  for (const r of D().returns) {
+    if (!r || !r.terrId || !r.at) continue;
+    if (!byTerr.has(r.terrId)) byTerr.set(r.terrId, []);
+    byTerr.get(r.terrId).push(r);
+  }
+  let n = 0;
+  byTerr.forEach(list => {
+    list.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+    for (let i = 1; i < list.length; i++) {
+      const r = list[i], prev = list[i - 1];
+      if (r.from || !r.lentAt || Date.parse(r.at) < since) continue;
+      if (prev.completed || prev.pool || prev.ho || !prev.at || prev.at > r.lentAt) continue; // 前の返却が途中返却のときだけ
+      if (Date.parse(r.lentAt) - Date.parse(prev.at) > cd * DAY) continue;                    // 続きから受け取れる期間の中
+      const f = lowFrom(prev);
+      if (!f || f >= r.lentAt) continue;
+      r.from = f; n++;
+    }
+  });
+  if (n) Store.save(true);
+  return n;
+}
 /* 係の区域一覧：確かめ待ちの正式返却に、小さく確かめる日を出す */
 function lowWaitNote(t) {
   if (!lowOnSet() || !t || t.holder || t.awayPoolAt || !t.completedAt) return '';
@@ -11324,7 +11356,7 @@ let poolSweepAt = 0;
    回り終えた区域を途中の返却にしないため。受け取ったときに係の画面を開いていれば applyInbox が呼ぶ。第3回監査 P6・2026-10-29） */
 function adminSweepSoon() {
   if (!isAdmin() || (LIVE && !Store.pulled)) return;
-  if (Date.now() - poolSweepAt > 300000) { poolSweepAt = Date.now(); setTimeout(() => { finalizePools(); lowSweep(); recLessFill(); }, 400); }
+  if (Date.now() - poolSweepAt > 300000) { poolSweepAt = Date.now(); setTimeout(() => { finalizePools(); fromFill(); lowSweep(); recLessFill(); }, 400); } // fromFill は lowSweep の前（古い続きからの記録に回りはじめた日を補ってから数える。N-7）
 }
 function renderAdmin() {
   setAdPane(adPane);
