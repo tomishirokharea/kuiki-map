@@ -102,4 +102,5 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "区域の変更など {0}件は送りませんでした。必要なら区域係に伝えてください": "No se enviaron {0} cambios, como los de territorios. Si hace falta, avise al encargado de territorios",
 "前に送れなかった記録を送ります（{0}件）。区域の変更など {1}件は送りませんでした。必要なら区域係に伝えてください": "Se enviarán los registros que antes no se pudieron enviar ({0}). No se enviaron {1} cambios, como los de territorios. Si hace falta, avise al encargado de territorios",
 "ほかの人（{0}人）": "Otras personas ({0})",
+"おすすめの押さえ": "la reserva de casas recomendadas",
 });

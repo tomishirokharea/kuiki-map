@@ -1107,7 +1107,7 @@ function authLost() {
   let kept = 0;
   try {
     const uid = Store.data && Store.data.currentUser ? String(Store.data.currentUser) : ''; // currentUser は使う人の id
-    if (uid && Store.queue.length) { lsSet(ORPHAN_KEY, JSON.stringify({ uid, at: new Date().toISOString(), queue: Store.queue })); kept = Store.queue.length; }
+    if (uid) kept = orphanAdd(uid, Store.queue, failedList().filter(x => x && (!x.uid || x.uid === uid)));
   } catch (e) { kept = 0; /* 取っておけなくても、消すのは続ける */ }
   [TOKEN_KEY, QUEUE_KEY, SYNC_KEY, PENDING_KEY, FAILED_KEY].forEach(lsDel);
   Store.queue = [];
@@ -1117,14 +1117,40 @@ function authLost() {
 }
 /* 招待リンクが変わったとき（readToken）：送信待ちを、使っていた人の id といっしょに取っておく（ORPHAN_KEY。authLost と同じ入れ物） */
 const ME_KEY = 'kuiki_me'; // このスマホで最後に使っていた人の id（リンクが変わったときに、取っておく変更の持ち主を知るため）
+/* 取っておく変更の入れ物：人ごと { by: { 使う人の id: { at（最初に取っておいた時刻）, queue（送信待ち）, failed（送れない変更） } } }（監査5 M-2・H-2）。
+   以前の形 { uid, at, queue } も読む */
+function orphanLoad() {
+  let o = null;
+  try { o = JSON.parse(lsGet(ORPHAN_KEY) || 'null'); } catch (e) { o = null; }
+  if (!o || typeof o !== 'object') return {};
+  if (o.by && typeof o.by === 'object') return o.by;
+  if (o.uid && Array.isArray(o.queue)) return { [o.uid]: { at: o.at, queue: o.queue } };
+  return {};
+}
+function orphanSave(by) {
+  const out = {};
+  Object.keys(by).forEach(k => { const x = by[k]; if (x && ((x.queue || []).length || (x.failed || []).length)) out[k] = x; });
+  if (Object.keys(out).length) lsSet(ORPHAN_KEY, JSON.stringify({ by: out })); else lsDel(ORPHAN_KEY);
+}
+function orphanAdd(uid, queue, failed) {
+  if (!uid || (!(queue || []).length && !(failed || []).length)) return 0;
+  const by = orphanLoad(), cur = by[uid] || {};
+  by[uid] = { at: cur.at || new Date().toISOString(), queue: (cur.queue || []).concat(queue || []), failed: (cur.failed || []).concat(failed || []) };
+  orphanSave(by);
+  return (queue || []).length;
+}
+function orphanPurge() { // 7日すぎた分は消す（開いたときに毎回）
+  const by = orphanLoad(); let ch = false;
+  Object.keys(by).forEach(k => { if (!(daysSince(by[k].at) <= ORPHAN_DAYS)) { delete by[k]; ch = true; } });
+  if (ch) orphanSave(by);
+}
 function keepOrphan() {
   try {
     const q = JSON.parse(lsGet(QUEUE_KEY) || '[]'), uid = lsGet(ME_KEY) || '';
-    if (!uid || !Array.isArray(q) || !q.length) return;
-    let o = null;
-    try { o = JSON.parse(lsGet(ORPHAN_KEY) || 'null'); } catch (e) { o = null; }
-    const prev = o && o.uid === uid && Array.isArray(o.queue) ? o.queue : [];
-    lsSet(ORPHAN_KEY, JSON.stringify({ uid, at: new Date().toISOString(), queue: prev.concat(q) }));
+    // 送れない変更も、その人の分として取っておく（ちがう人のリンクで送らない・監査5 H-2）
+    const f = failedList().filter(x => x && (!x.uid || x.uid === uid));
+    if (uid) orphanAdd(uid, Array.isArray(q) ? q : [], f);
+    lsDel(FAILED_KEY);
   } catch (e) { /* 取っておけなくても、リンクを開くのは続ける */ }
 }
 /* 取っておいた分のうち、あとから送ってよいもの：記録・拒否・注意・受け持ち・引き継ぎだけ。
@@ -1132,27 +1158,38 @@ function keepOrphan() {
 const ORPHAN_SEND = ['visits', 'dnc', 'caution', 'follows', 'released'];
 const chCount = x => (x && typeof x === 'object' ? ((x.up || []).length + (x.del || []).length) || 1 : 1);
 function orphanSplit(queue) {
-  const keep = []; let dropped = 0, kept = 0;
+  const keep = [], newHouses = new Map(); let dropped = 0, kept = 0;
   queue.forEach(ch => {
     if (!ch || typeof ch !== 'object') return;
     const o = {};
-    Object.keys(ch).forEach(k => { if (ORPHAN_SEND.includes(k)) { o[k] = ch[k]; kept += chCount(ch[k]); } else dropped += chCount(ch[k]); });
+    Object.keys(ch).forEach(k => {
+      if (ORPHAN_SEND.includes(k)) { o[k] = ch[k]; kept += chCount(ch[k]); }
+      else if (k === 'houses' && ch[k] && !(ch[k].del || []).length && (ch[k].up || []).every(h => h && !houseById(h.id))) (ch[k].up || []).forEach(h => newHouses.set(h.id, h)); // サーバーにまだない家（電波のない所で足した家）
+      else dropped += chCount(ch[k]);
+    });
     if (Object.keys(o).length) keep.push(o);
   });
+  // 足した家は、送る記録・印が使っている家だけ、先に送る（家がないと記録が断られる・監査5 M-1）
+  const used = new Set();
+  keep.forEach(o => { Object.keys(o).forEach(k => { (o[k].up || []).forEach(x => { const hid = x && (x.houseId || String(x.id || '').split('|')[0]); if (hid) used.add(String(hid)); }); }); });
+  const hs = [...newHouses.values()].filter(h => used.has(String(h.id)));
+  dropped += newHouses.size - hs.length;
+  if (hs.length) keep.unshift({ houses: { up: hs, del: [] } });
   return { keep, kept, dropped };
 }
 /* 取っておいた「まだ送っていない記録」を、同じ人として登録し直したときに送る（ちがう人のときは送らずに残す・7日すぎは消す） */
 function restoreOrphan() {
-  let o = null;
-  try { o = JSON.parse(lsGet(ORPHAN_KEY) || 'null'); } catch (e) { o = null; }
-  if (!o) return;
+  orphanPurge();
+  const by = orphanLoad();
   const cu = Store.data && Store.data.currentUser ? String(Store.data.currentUser) : '';
-  if (!cu) return;
-  if (!Array.isArray(o.queue) || !o.queue.length || !(daysSince(o.at) <= ORPHAN_DAYS)) { lsDel(ORPHAN_KEY); return; }
-  if (o.uid !== cu) return; // ちがう人のリンク：送らない。7日のあいだ取っておく（その人のリンクを開き直したら送る）
-  lsDel(ORPHAN_KEY);
+  if (!cu || !by[cu]) return; // ちがう人の分は送らない。7日のあいだ取っておく（その人のリンクを開き直したら送る）
+  const o = by[cu];
+  delete by[cu]; orphanSave(by);
+  if ((o.failed || []).length) lsSet(FAILED_KEY, JSON.stringify(failedList().concat(o.failed).slice(-30))); // その人の「送れない変更」にもどす
+  if (!(o.queue || []).length) return;
   const sp = orphanSplit(o.queue);
   const drop = sp.dropped ? `区域の変更など ${sp.dropped}件は送りませんでした。必要なら区域係に伝えてください` : ''; // 言語のファイルに、文ごと（下の組み合わせも）入れてある
+  if (drop) lsSet(SYNC_NOTE_KEY, drop); // 見のがしたときのため「送信のようす」にも残す（監査5 L-3）
   if (!sp.keep.length) { setTimeout(() => toast(drop), 1500); return; }
   Store.sweep('orphan');
   Store.queue = sp.keep.concat(Store.queue);
@@ -1719,7 +1756,6 @@ function mergeChanges(list) {
 /* 送信に失敗したときは、2秒→4秒→8秒…（最大1分）と間をあけて送り直す。
    同じ変更が何度送っても受け付けられないときは、それを脇に置いて、ほかの記録の送受信を止めない */
 let flushFail = 0, flushNextAt = 0, headFail = 0, skewWarned = false;
-let headFailAt = 0; // 一時的なエラーが続きはじめた時刻（B-4）
 // 送り直しの印：前の送信の返事が届かなかったとき（と、アプリを開いて最初の送信）は、サーバーに「すでに届いているかもしれない」と伝える。
 // サーバーは、その記録がシートにすでにあるか確かめてから入れる（同じ記録が2行にならないように・監査D3）
 let sendRetry = true;
@@ -1727,9 +1763,16 @@ const failedList = () => { try { return JSON.parse(lsGet(FAILED_KEY) || '[]') ||
 /* 次に開いたとき：一時的なエラー（サーバー・混雑・電波・返事なし）で「送れない変更」に回した分を、一度だけ自動で送り直す（B-4）。
    中身が原因の失敗（http400 など）は送らない（今までどおり「送信のようす」から） */
 const PARK_TMP = /^(server|busy|timeout|network|nonjson|slow|http(404|429|5\d\d))$/;
+/* 先頭の変更の失敗：回数と始まった時刻を、開き直しをまたいで数える（監査5 H-1） */
+const HF_KEY = 'kuiki_headfail', AR_KEY = 'kuiki_autoretried', SYNC_NOTE_KEY = 'kuiki_sync_note';
+const sigOf = ch => { const t = JSON.stringify(ch || null); let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return t.length + ':' + (h >>> 0).toString(36); };
+const hfLoad = () => { try { return JSON.parse(lsGet(HF_KEY) || 'null'); } catch (e) { return null; } };
+const arList = () => { try { const a = JSON.parse(lsGet(AR_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
 function retryParked() {
-  const l = failedList(), re = l.filter(x => x && x.ch && PARK_TMP.test(String(x.code || '')));
+  const cu = Store.data && Store.data.currentUser ? String(Store.data.currentUser) : '', ar = arList();
+  const l = failedList(), re = l.filter(x => x && x.ch && PARK_TMP.test(String(x.code || '')) && (!x.uid || x.uid === cu) && !ar.includes(sigOf(x.ch))); // 自動の送り直しは、変更ごとに一度だけ
   if (!re.length) return;
+  lsSet(AR_KEY, JSON.stringify(ar.concat(re.map(x => sigOf(x.ch))).slice(-60)));
   lsSet(FAILED_KEY, JSON.stringify(l.filter(x => !re.includes(x))));
   Store.queue = re.map(x => x.ch).concat(Store.queue);
   Store.persistQueue(); Store.reapplyQueue();
@@ -1744,7 +1787,8 @@ function parkHead(e) {
   const ch = Store.queue.shift();
   if (!ch) return;
   const list = failedList();
-  list.push({ at: new Date().toISOString(), code: String((e && (e.code || e.message)) || ''), ch });
+  list.push({ at: new Date().toISOString(), code: String((e && (e.code || e.message)) || ''), ch, uid: Store.data && Store.data.currentUser ? String(Store.data.currentUser) : '' }); // だれの変更か（ちがう人のリンクで送らない・監査5 H-2）
+  lsDel(HF_KEY);
   lsSet(FAILED_KEY, JSON.stringify(list.slice(-30)));
   Store.persistQueue();
   headFail = 0; flushNextAt = 0;
@@ -1773,7 +1817,8 @@ async function flush(force) {
       sendRetry = true; // 返事が届くまでは「届いたかどうか分からない」
       const j = await api('sync', body, { keepalive });
       sendRetry = false;
-      flushFail = 0; headFail = 0; headFailAt = 0; flushNextAt = 0;
+      flushFail = 0; headFail = 0; flushNextAt = 0;
+      if (take >= 1) lsDel(HF_KEY); // 先頭が届いた
       if (j.skew && !skewWarned) { skewWarned = true; setTimeout(() => toast('スマホの時刻がずれています。スマホの設定で、日付と時刻を「自動」にしてください'), 1500); }
       const rj = j.rejected || [];
       if (rj.length) {
@@ -1797,9 +1842,16 @@ async function flush(force) {
       // サーバーの一時的なエラー（server・busy）は、30分以上続いたときだけ回す（約4分で回していたため、混んでいるだけの変更まで止まった・M1・2026.13.102）
       const bad = !e.retry, tmp = e.code === 'server' || e.code === 'busy';
       if (bad || tmp) {
-        if (!headFail) headFailAt = Date.now();
         headFail++;
-        if (take === 1 && (bad ? headFail >= 2 : headFail >= 8 && Date.now() - headFailAt >= 30 * 60000)) parkHead(e);
+        if (take === 1) {
+          // 先頭の変更ごとに、失敗の回数と始まった時刻を端末に残す（開き直しても続けて数える・監査5 H-1）
+          const sg = sigOf(Store.queue[0]);
+          let hf = hfLoad();
+          if (!hf || hf.sig !== sg) hf = { sig: sg, n: 0, at: Date.now() };
+          hf.n++; lsSet(HF_KEY, JSON.stringify(hf));
+          const again = arList().includes(sg); // 一度自動で送り直して、また失敗した変更は、すぐ回す
+          if (bad ? hf.n >= 2 : (again || (hf.n >= 8 && Date.now() - hf.at >= 30 * 60000))) parkHead(e);
+        }
       }
     }
   } finally {
@@ -1850,7 +1902,9 @@ function openSyncSheet() {
   const n = Store.queue.length, dead = failedList();
   let last = null;
   try { last = JSON.parse(lsGet(LASTERR_KEY) || 'null'); } catch (e) { last = null; }
+  const note = lsGet(SYNC_NOTE_KEY);
   setSheet(headHtml(null, '送信のようす', '') + `
+    ${note ? `<div class="notice warn">${esc(note)}<br><button type="button" class="btn small" id="syNoteOk">わかりました</button></div>` : ''}
     <div class="setrow"><span>最後にサーバーとつながった時刻<br><b>${Store.syncAt ? fmtDate(new Date(Store.syncAt).toISOString()) : 'まだ'}</b></span></div>
     <p>${n ? `まだ送っていない変更が <b>${n}件</b> あります。電波が戻ると、自動で送ります。アプリを閉じても消えません。`
       : 'まだ送っていない変更はありません。'}</p>
@@ -1860,6 +1914,7 @@ function openSyncSheet() {
       <button class="btn block" id="syRetry">もう一度送る</button>
       <button class="btn block danger" id="syDrop">送らずに消す</button>` : ''}
     <button class="btn block" data-close>閉じる</button>`);
+  if ($('#syNoteOk')) $('#syNoteOk').onclick = () => { lsDel(SYNC_NOTE_KEY); openSyncSheet(); };
   if ($('#syNow')) $('#syNow').onclick = () => { flushFail = 0; flush(true).then(() => { closeSheet(); toast(Store.queue.length ? 'まだ送れていません。電波のよい場所でためしてください' : '送りました'); }); };
   if ($('#syRetry')) $('#syRetry').onclick = () => {
     Store.sweep('retry');
@@ -1958,7 +2013,7 @@ async function logout() {
     ? `まだ送っていない記録が${n}件あります。消すと送られません。それでもこの端末から消しますか？`
     : 'この端末から、区域マップの情報と招待リンクを消します。奉仕時間、自分の予定（このスマホだけの記録）も消えます。よろしいですか？';
   if (!await ask(q)) return;
-  [TOKEN_KEY, QUEUE_KEY, OLD_CACHE_KEY, SYNC_KEY, PENDING_KEY, JOIN_KEY, FAILED_KEY, ME_KEY].forEach(lsDel);
+  [TOKEN_KEY, QUEUE_KEY, OLD_CACHE_KEY, SYNC_KEY, PENDING_KEY, JOIN_KEY, FAILED_KEY, ME_KEY, ORPHAN_KEY, HF_KEY, AR_KEY, SYNC_NOTE_KEY].forEach(lsDel); // 取っておいた変更も消す（監査5 M-2）
   clearAllMemos(true);
   clearTimeout(Store.cacheTimer);
   Store.inactive = true; // このあと保存し直さないように
@@ -2916,7 +2971,9 @@ document.addEventListener('click', e => {
   const t = e.target.closest && e.target.closest('#sheet .stepper button, #sheet .chips button, #sheet [data-type], #sheet [data-wd], #sheet #evAdd, #sheet #dMinSave, #sheet #fPreview, #sheet [data-nm], #sheet [data-rule], #sheet #nmSkip, #sheet #pgGo, #sheet [data-keep]');
   if (t) { sheetKeep = true; setTimeout(() => { sheetKeep = false; }, 0); }
 }, true);
+let sheetGuard = null; // 外側（#backdrop）を押して閉じる前に確かめる画面だけが入れる（setSheet・closeSheet で外れる）
 function setSheet(html) {
+  sheetGuard = null;
   const s = $('#sheet');
   document.body.classList.add('sheet-open');
   // ただのお知らせ（取り消すボタンのないもの）は、画面の下のボタンを隠さないように消す
@@ -2948,6 +3005,7 @@ function setSheet(html) {
 }
 function hideWheel() { const w = document.getElementById('wheelPop'); if (w) w.hidden = true; document.body.classList.remove('wheel-open'); }
 function closeSheet() {
+  sheetGuard = null;
   hideWheel();
   qrWatching = false;
   if (homeUrlDirty) { cleanUrl(); homeUrlDirty = false; } // URLに戻したコードは、画面を閉じたら消す
@@ -3580,11 +3638,12 @@ function openHelpers(tid, cid) {
     $$('#hList [data-name]').forEach(l => { l.hidden = !!q && !l.dataset.name.includes(q); });
     if (q) $$('#hList details').forEach(d => { d.open = true; }); // 名前でさがすときは、ほかの人も見る
   };
-  // えらんだまま閉じるときは確かめる（加え忘れを防ぐ・M9・2026.13.102）
-  $$('[data-close]', S).forEach(b => { b.onclick = async () => {
+  // えらんだまま閉じるときは確かめる（加え忘れを防ぐ・M9。外側を押したときも・監査5 L-1）
+  sheetGuard = async () => {
     if ($$('#hList input:checked').length && !await ask('えらんだ人を加えずに閉じますか？', { ok: '閉じる', danger: false })) return;
     closeSheet();
-  }; });
+  };
+  $$('[data-close]', S).forEach(b => { b.onclick = sheetGuard; });
   $('#hList').onchange = e => {
     if (!e.target.checked) return;
     if ($$('#hList input:checked').length > room) { e.target.checked = false; toast(`あと${room}人までです`); }
@@ -14498,7 +14557,7 @@ function bindStatic() {
     updateTabs(); renderAll();
     if (currentView === 'admin' && !isAdmin()) showView('cards');
   };
-  $('#backdrop').onclick = closeSheet;
+  $('#backdrop').onclick = () => (sheetGuard ? sheetGuard() : closeSheet()); // 閉じる前に確かめる画面（今日回る人など）は sheetGuard を使う（監査5 L-1）
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     if (!$('#sheet').hidden) closeSheet();
@@ -14823,6 +14882,7 @@ async function init() {
     }
     hideBlocking();
     if (Store.data && Store.data.currentUser) lsSet(ME_KEY, String(Store.data.currentUser)); // リンクが変わったときに、取っておく変更の持ち主を知るため（B-2）
+    orphanPurge(); // 7日すぎた分は、読み込みのしかたにかかわらず消す（監査5 M-2）
     retryParked(); // 一時的なエラーで回した変更を、一度だけ自動で送り直す（B-4）
   } else {
     Store.load();
