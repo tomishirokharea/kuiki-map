@@ -10176,6 +10176,8 @@ function openUiSheet() {
     // 帯（見出しの行）はなし。下にスワイプすると、設定を残して閉じる（小さな「×」と、いちばん下の「閉じる」でも閉じられる）
     let b = `<h2 id="sheetTitle" class="vh">設定</h2>` + (window.dougaSettingsRow ? dougaSettingsRow() : '') + (window.KI ? KI.picker(false) : '') + S_BASE + S_VIEW + S_FEAT;
     b += `<button class="btn block" id="uiReset">見え方を最初にもどす</button><button class="btn primary block" data-close>閉じる</button>`;
+    // この端末で動いているアプリの版（更新が届いたかを、だれでも確かめられるように。2026-10-29）
+    b += `<p class="muted appver" style="text-align:center;margin-top:12px;font-size:15px">区域マップ 版 ${esc(APP_VERSION)}</p>`; // hint は「説明を出さない」で消えるので使わない
     b = `<div class="grabrow"><span class="grab" aria-hidden="true"></span><button type="button" class="xmini" data-close aria-label="閉じる">×</button></div><p class="grabhint">下にスワイプすると、設定を残して閉じます</p>` + b;
     setSheet(b);
     $('#sheet').dataset.swipe = '1';
