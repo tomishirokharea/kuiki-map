@@ -180,7 +180,7 @@
   }
   /* 貸出中の区域の進み具合（返却の目安に対して） */
   function paceOf(t) {
-    if (!t.holder || !t.lentAt || !dueOf(t)) return null; // 返却の目安のない区域（全体の集まり・紙で渡した区域）は見ない（M7）
+    if (!t.holder || !t.lentAt) return null;
     const r = roundInfo(t.id, true);
     if (!r) return null;
     const el = daysSince(t.lentAt) / lendDays();
@@ -1327,7 +1327,7 @@ button.ktag{cursor:pointer}
     if (m.over.length) row('#B71C1C', `1年の期限を過ぎた区域　${m.over.length}区域`, `区域${listNos(m.over.map(d => d.t))}`, go('status', 'adDue') + karteBtns(m.over.map(d => d.t), 2));
     if (m.warn.length) row('#C2410C', `1年の期限まで${PIN_DAYS}日以内の区域　${m.warn.length}区域`, `区域${listNos(m.warn.map(d => d.t))}`, go('status', 'adDue'));
     // 7 返却の目安を過ぎた貸出
-    const late = ts.filter(t => t.holder && t.lentAt && dueOf(t) && Date.parse(dueOf(t)) < now); // 全体の集まり・紙で渡した区域は目安なし（M7）
+    const late = ts.filter(t => t.holder && t.lentAt && dueOf(t) && Date.parse(dueOf(t)) < now);
     if (late.length) row('#C2410C', `返却の目安を過ぎた貸出　${late.length}件`,
       late.slice(0, 4).map(t => `区域${esc(t.no)}（${esc(uname(t.holder))}さん・${daysSince(dueOf(t))}日超過）`).join('、') + (late.length > 4 ? `　ほか${late.length - 4}件` : '') + '。声をかけるかどうかは、係が決めてください。',
       karteBtns(late, 3));

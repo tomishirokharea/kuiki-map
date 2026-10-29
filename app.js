@@ -2678,7 +2678,6 @@ function terrStats(t, sinceMs) {
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
   { v: '2026.13.105', items: [
-    ['返', '全体の集まりで使う区域と、紙の区域カードで渡した区域は、「返却の目安を過ぎた」に数えないようにしました（返却の目安は「なし」と出ます）'],
     ['報', '奉仕報告を送ったあとで時間を足したときは、月末にもう一度「直しますか」と知らせるようにしました。S21 に送る画面に、S21 のだれとして送るかを出します'],
     ['留', '留守宅カードの区域は、1回目に留守だった家を訪ね直せば完了にできるようにしました。途中で返された区域は、続きから受け取る人が回るので、留守宅カードには出しません'],
     ['数', '区域の軒数は、どの画面も拒否の家を除いた数にそろえました'],
@@ -9377,9 +9376,8 @@ function returnPlan(r) {
 }
 const lendDays = () => Number(D().settings.lendDays) || 120;
 const awayRetPct = () => (D().settings.awayRetPct == null ? 70 : Number(D().settings.awayRetPct));
-/* 返却の目安のない区域：全体の集まりで使う区域・紙の区域カード（S-13）で渡した区域。持ち続ける決まり・紙で割り当てた日から数えるため（M7・2026.13.105） */
-const dueExempt = t => isAllUse(t) || paperHandOf(t);
-const dueOf = t => (t && t.lentAt && !dueExempt(t) ? new Date(Date.parse(t.lentAt) + lendDays() * DAY).toISOString() : '');
+// 返却の目安：受け取った日から lendDays。個人・グループ・全体の集まりの区域とも同じ（留守宅も含めて4か月以内が決まり・2026-10-30 に確認）
+const dueOf = t => (t && t.lentAt ? new Date(Date.parse(t.lentAt) + lendDays() * DAY).toISOString() : '');
 const dueTxt = t => (dueOf(t) ? fmtDay(dueOf(t)) : 'なし'); // 区域カードなどに出す「返却の目安」
 /* 返却の目安を過ぎた貸出か。係の画面の「状況」・内訳・「今日」・申し込みの一覧で、同じ数え方にそろえる（区域カードの「返却の目安」の日付と同じ） */
 const pastDue = t => !!(t && t.holder && t.lentAt && dueOf(t) && Date.parse(dueOf(t)) < Date.now());
@@ -11700,8 +11698,7 @@ function openStatList(key) {
   } else if (key === 'over') {
     const list = ts.filter(pastDue).sort((a, b) => (a.lentAt < b.lentAt ? -1 : 1));
     title = `返却の目安を過ぎた貸出 ${list.length}`;
-    const exN = ts.filter(t => t.holder && dueExempt(t)).length;
-    hint = `受け取ってから${lendDays()}日（返却の目安）をこえている区域です。古い順です。` + (exN ? `全体の集まり・紙で渡した区域（${exN}枚）は、返却の目安なしで数えていません。` : '');
+    hint = `受け取ってから${lendDays()}日（返却の目安）をこえている区域です。古い順です。`;
     body = list.length ? list.map(t => { const r = roundInfo(t.id, true); return statRow(t, `${esc(uname(t.holder))}さん・${daysSince(t.lentAt)}日目${r ? `・進み具合 約${r.pct}%${r.phase === 'away' ? '（留守宅を回る段階）' : ''}` : ''}`, true); }).join('') : '<div class="empty">ありません</div>';
   } else if (key === 'units') {
     let house = 0, aptB = 0, aptU = 0, biz = 0, cov = 0, prov = 0, outN = 0, outU = 0;
