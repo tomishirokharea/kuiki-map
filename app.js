@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.100';
+var APP_JS_VER = '2026.13.101';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2509,6 +2509,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.101', items: [
+    ['版', '設定（歯車）のいちばん下に、このスマホで使っているアプリの版を出すようにしました。更新が届いたかを確かめるときに見てください']
+  ] },
   { v: '2026.13.100', items: [
     ['確', '記録の少ない返却の自動の確かめは、受け取った日から返却した日までの記録で数えるようにしました。1回目のあとに留守宅を回った記録・留守宅カードで訪ね直した記録も数えるので、回り終えた区域が途中の返却にもどることはありません'],
     ['係', '区域係の画面：記録の少ない返却の自動の確かめは、前の人の続きから回った区域では前の人が回りはじめた日から数え、サーバーから最新の記録を受け取ってから動くようにしました']
@@ -10176,6 +10179,8 @@ function openUiSheet() {
     // 帯（見出しの行）はなし。下にスワイプすると、設定を残して閉じる（小さな「×」と、いちばん下の「閉じる」でも閉じられる）
     let b = `<h2 id="sheetTitle" class="vh">設定</h2>` + (window.dougaSettingsRow ? dougaSettingsRow() : '') + (window.KI ? KI.picker(false) : '') + S_BASE + S_VIEW + S_FEAT;
     b += `<button class="btn block" id="uiReset">見え方を最初にもどす</button><button class="btn primary block" data-close>閉じる</button>`;
+    // この端末で動いているアプリの版（更新が届いたかを、だれでも確かめられるように。2026-10-29）
+    b += `<p class="muted appver" style="text-align:center;margin-top:12px;font-size:15px">区域マップ 版 ${esc(APP_VERSION)}</p>`; // hint は「説明を出さない」で消えるので使わない
     b = `<div class="grabrow"><span class="grab" aria-hidden="true"></span><button type="button" class="xmini" data-close aria-label="閉じる">×</button></div><p class="grabhint">下にスワイプすると、設定を残して閉じます</p>` + b;
     setSheet(b);
     $('#sheet').dataset.swipe = '1';
