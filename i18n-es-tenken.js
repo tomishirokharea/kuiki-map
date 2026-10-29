@@ -87,4 +87,5 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "区域係の画面：記録の少ない返却の自動の確かめは、前の人の続きから回った区域では前の人が回りはじめた日から数え、サーバーから最新の記録を受け取ってから動くようにしました": "Pantalla del encargado: la verificación automática de devoluciones con pocos registros ahora cuenta, en los territorios continuados desde donde los dejó la persona anterior, desde el día en que esa persona empezó a recorrerlos, y se ejecuta después de recibir los registros más recientes del servidor",
 "次に係の画面を開いたときに確かめます": "Se verificará la próxima vez que se abra la pantalla del encargado",
 "区域マップ 版 {0}": "Mapa de Territorios · versión {0}",
+"設定（歯車）のいちばん下に、このスマホで使っているアプリの版を出すようにしました。更新が届いたかを確かめるときに見てください": "Al final de los ajustes (engranaje) ahora se muestra la versión de la aplicación que usa este teléfono. Mírela para comprobar si llegó la actualización",
 });
