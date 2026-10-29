@@ -8484,6 +8484,7 @@ function coverAt(t, since, until) {
   const sp = isSpecial(t), inc = D().settings.skipDone !== 0, s0 = Date.parse(since) || 0;
   let done = 0, total = 0;
   for (const h of housesOf(t.id)) {
+    if (banNo(h)) continue; // 立入禁止の建物は数えない（roundInfo・サーバーの terrDonePct_ と同じ。数えると、受け付けた完了を係の端末が途中の返却に戻す・監査 H-1）
     for (const u of (sp ? specialTargets(h, t) : targets(h))) {
       if (!sp && coveredBySpecial(h, u)) continue;
       const k = K(h.id, u);
