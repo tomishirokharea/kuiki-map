@@ -15,6 +15,8 @@
      その月は見るだけ：出した報告があれば中身、なければ「まだ会衆に届いていません」と、記録した時間（書記に伝えるとき用）。
      送って s21_locked が返ったら・送り直しで締切を過ぎていたら、下書きは残さない（送り直しのときは、画面で知らせる）。
      電波がなく確かめられないときも、この端末の時計で締切を過ぎていれば、入力の画面を出さない（送れない下書きを作らない）。
+   ・S21 が受け付けたあとで返事だけ届かなかった下書きは、締切の判定より先に S21 の報告と中身を比べ、同じなら「報告しました」にする（2026-10-30 C1-5）。
+   ・報告の画面に、つながっている S21 側の名前を出す（「S21 の「○○」さんとして送ります」。2026-10-30 C1-2）。
    ========================================================= */
 (function () {
   'use strict';
@@ -42,6 +44,15 @@
     if (c === 'slow') return '続けて送ったため、少し待ってから送ってください。';
     return '電波が弱いか、会衆の報告システムが混み合っていて、送れませんでした。';
   };
+  /* S21 の報告と、送ろうとした内容（下書き）が同じか（受け付けられたのに返事だけ届かなかったかを見分ける。C1-5）
+     備考は、サーバー（s21.gs の s21Clean_）と同じく制御文字を除き、200字までで比べる */
+  const remN = s => String(s == null ? '' : s).replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').slice(0, 200).trim();
+  const sameRep = (r, v) => !!r && !r.empty && !!v && !!r.preached === !!v.preached && (Number(r.studies) || 0) === (Number(v.studies) || 0) &&
+    !!r.aux === !!v.aux && (Number(r.hours) || 0) === (Number(v.hours) || 0) && (Number(r.actHours) || 0) === (Number(v.actHours) || 0) &&
+    remN(r.remarks) === remN(v.remarks);
+  /* つながっている S21 側の名前（C1-2）。前に確かめたことがないとき（unknown）は、区域マップの名前で「○○さんの報告」 */
+  const whoLine = (ctx, pio) => ctx.unknown ? `${ctx.person.name || ''}さんの報告${pio ? '（開拓者）' : ''}`
+    : `S21 の「${ctx.person.name || ''}」さんとして送ります${pio ? '（開拓者）' : ''}`;
 
   /* ---- この端末に残すもの（本人のスマホの中だけ） ---- */
   function remember(fn) { const o = myData(); o.s21q = o.s21q || {}; o.s21p = o.s21p || null; fn(o); mySave(o); }
@@ -192,6 +203,9 @@
   function paint(ym, opt, ctx) {
     const justNow = !!opt.lockedNow; // 送ったら締切後で断られた（案内を目立たせる）
     if (justNow) { opt = Object.assign({}, opt); delete opt.lockedNow; }
+    // 送れなかったはずの下書きと同じ中身が S21 に届いていた（返事だけ届かなかった）：報告済みにして、下書きを消す（C1-5）
+    const d0 = (myData().s21q || {})[ym];
+    if (!opt.dry && d0 && sameRep(ctx.report, d0.v)) markSent(ym, d0.v, ctx.report.late, d0.kind, d0.auxH);
     // 締切を過ぎた月（S21 の locked。まだ出していなくても）・変えられない報告・電波がなくてもこの端末の時計で締切を過ぎた月
     if (ctx.locked || (ctx.report && ctx.report.locked) || (ctx.offline && pastDl(ym, ctx.deadline))) {
       if ((myData().s21q || {})[ym]) { remember(o => { delete o.s21q[ym]; }); renderHome(); } // 送れない下書きは残さない
@@ -212,7 +226,7 @@
         ${opt.pick ? reportPickHtml(ym) : ''}
         ${opt.auto ? `<p class="praise">${esc(praiseLine(ctx.done, ctx.goal))}</p>` : ''}
         ${ctx.done ? `<div class="rpbox"><p class="muted" style="margin:0">${Mo(ym)}月に記録した時間（${monthDays(o, ym)}日）</p><p class="big">${fmtMin(ctx.done)}</p></div>` : ''}
-        <p class="muted" style="margin:6px 0 2px">${esc(ctx.person.name || '')}さんの報告${pio ? '（開拓者）' : ''}</p>
+        <p class="muted s21who" style="margin:6px 0 2px">${esc(whoLine(ctx, pio))}</p>
         ${ctx.offline ? `<div class="notice warn">${esc(errText(ctx.err))}${ctx.unknown ? '<br>入力しておくと、つながったときに送ります（開拓者の人は、つながってから時間を確かめてください）。' : '<br>入力して「会衆に報告する」を押すと、電波が戻ったときに自動で送ります。'}</div>` : ''}
         ${justNow ? `<div class="notice warn" role="status">${esc(errText({ code: 's21_locked' }, ym))}</div>` : ''}
         ${draft ? `<div class="notice warn">まだ送れていない報告があります（${fmtDate(draft.at)}に入力）。「会衆に報告する」を押すと、もう一度送ります。</div>` : ''}
@@ -240,6 +254,8 @@
       const r = await api('s21_send', body, { timeout: 45000 });
       if (!dry) markSent(ym, body, r.late, pio ? 'rp' : body.aux ? 'aux' : 'pub', st.aux);
       done(ym, opt, body, r);
+      // 終わっていない月を送ったとき：あとで足した時間は、月末にもう一度知らせる（LINE で送るときと同じ・M12・2026.13.105）
+      if (!dry && ym === ymOf(new Date()) && !isLastDayStr(ymd(new Date())) && featTime() && UI.fTimer !== 'off') setTimeout(() => toast('月の途中の報告です。このあと時間を足したときは、月末にもう一度お知らせします'), 1800);
     } catch (e) {
       const c = e && (e.code || e.message);
       if (c === 'auth') return;
@@ -274,8 +290,10 @@
      ほかの端末で、あとから送り直していたら（S21 の提出日時のほうが新しければ）、古い下書きは送らずに消す。
      締切を過ぎていたら、下書きを消して知らせる（「電波が戻ったら送ります」と伝えてあるので、トーストだけにしない。
      ほかの画面が開いているときは、じゃまをしないようトースト） */
-  function lostNotice(ym, dl) {
-    const msg = `${Mo(ym)}月の奉仕報告は、送れないまま締切（${dlDate(ym, dl)}）を過ぎました。書記に伝えてください（書記が入力します）。`;
+  function lostNotice(ym, dl, had) {
+    // had：前に送った報告は S21 に届いている（直した内容だけが届かなかった）
+    const msg = had ? `${Mo(ym)}月の奉仕報告を直した内容は、送れないまま締切（${dlDate(ym, dl)}）を過ぎました。前に送った報告は、会衆に届いています。直す必要があるときは、書記に伝えてください（書記が入力します）。`
+      : `${Mo(ym)}月の奉仕報告は、送れないまま締切（${dlDate(ym, dl)}）を過ぎました。書記に伝えてください（書記が入力します）。`;
     if (typeof overlayOpen === 'function' && !overlayOpen()) infoSheet('奉仕報告を送れませんでした', esc(msg)); else toast(msg);
   }
   let flushing = false;
@@ -289,11 +307,18 @@
         const item = q[ym];
         try {
           const m = await api('s21_me', { ym }, { timeout: 45000 });
-          const sub = m.report && !m.report.empty ? Date.parse(m.report.submitted) : NaN;
+          const has = !!(m.report && !m.report.empty);
+          // 締切の判定より先に：前に送ったときに S21 が受け付けていた（返事だけ届かなかった）なら、報告済みにする（C1-5）
+          if (has && sameRep(m.report, item.v)) {
+            markSent(ym, item.v, m.report.late, item.kind, item.auxH);
+            toast(`${Mo(ym)}月の奉仕報告は、会衆に届いていました（報告しました）`);
+            continue;
+          }
+          const sub = has ? Date.parse(m.report.submitted) : NaN;
           if (isFinite(sub) && sub > Date.parse(item.at)) { remember(o => { delete o.s21q[ym]; }); continue; }
-          if (m.locked || (m.report && !m.report.empty && m.report.locked)) { // 締切を過ぎた月（まだ出していなくても）：送れないので下書きを消す
+          if (m.locked || (has && m.report.locked)) { // 締切を過ぎた月（まだ出していなくても）：送れないので下書きを消す
             remember(o => { delete o.s21q[ym]; }); renderHome();
-            lostNotice(ym, m.deadline);
+            lostNotice(ym, m.deadline, has);
             continue;
           }
           const r = await api('s21_send', item.v, { timeout: 45000 });
@@ -334,12 +359,12 @@
       ${onNow ? '<div id="s21Cfg"><p class="hint">つながり方を確かめています…</p></div>' : ''}`;
     if (onNow) loadCfg();
   }
-  async function loadCfg() {
+  async function loadCfg(note) {
     const box = $('#s21Cfg'); if (!box) return;
     let c;
     try { c = await api('s21_cfg', {}, { timeout: 30000 }); } catch (e) { box.innerHTML = '<p class="hint">つながり方を確かめられませんでした。電波を確かめてください。</p>'; return; }
     const ready = c.url && c.keySet;
-    box.innerHTML = `
+    box.innerHTML = `${note ? `<div class="notice warn" role="status">${esc(note)}</div>` : ''}
       <div class="setrow"><span>つなぎ先：<b>${c.url ? '設定済み' : 'まだ'}</b>・連携キー：<b>${c.keySet ? '設定済み' : 'まだ'}</b><br>
         <small class="hint">S21 のウェブアプリのURLと、S21 の書記の画面で発行した連携キーを入れます。キーは区域マップのサーバーにだけ保存し、この画面にも出しません</small></span></div>
       <details class="more"${ready ? '' : ' open'}><summary>${ready ? 'URL・連携キーを変える' : 'URL・連携キーを入れる'}</summary>
@@ -352,7 +377,12 @@
       const url = $('#s21Url').value.trim(), key = $('#s21Key').value.trim();
       const body = {}; if (url !== (c.url || '')) body.url = url; if (key) body.key = key;
       if (!Object.keys(body).length) { toast('変えたところはありません'); return; }
-      try { await api('s21_set', body, { timeout: 30000 }); $('#s21Key').value = ''; toast('保存しました'); loadCfg(); }
+      try {
+        const r = await api('s21_set', body, { timeout: 30000 }); $('#s21Key').value = '';
+        // URL を変えると、前の連携キーはサーバーで消える（前のキーを新しい宛先に送らないため。C3-11a）
+        if (r.keyCleared) { toast('保存しました。連携キーを入れ直してください'); loadCfg('S21 のURLを変えたので、前の連携キーを消しました。S21 の書記の画面で発行した連携キーを入れ直してください。'); }
+        else { toast('保存しました'); loadCfg(); }
+      }
       catch (e) { toast(e.code === 's21_badurl' ? 'URLの形がちがいます（…/exec で終わるURL）' : e.code === 's21_badkey' ? '連携キーの形がちがいます' : '保存できませんでした'); }
     };
     if (!ready) return;
@@ -378,11 +408,15 @@
     const opts = sel => '<option value="">（えらばない）</option>' + r.roster.map(p => `<option value="${esc(p.id)}"${p.id === sel ? ' selected' : ''}>${esc(p.name)}${p.group ? `（${esc(p.group)}）` : ''}</option>`).join('');
     const bad = r.people.filter(p => p.how === 'none' || p.how === 'ambig' || p.how === 'gone');
     const good = r.people.filter(p => p.how === 'auto' || p.how === 'manual');
+    // same：同じ名前の人がどこにいるか（map＝区域マップの使う人に2人以上・s21＝S21 の名簿に2人以上。C1-1）
     const why = { none: '名前が見つかりません', ambig: '同じ名前が2人以上います', gone: 'えらんだ人が S21 にいません' };
-    const row = p => `<div class="setrow"><span>${esc(p.name)}${p.how === 'manual' ? '<br><small class="muted">区域係がえらびました</small>' : why[p.how] ? `<br><small class="muted">${why[p.how]}</small>` : ''}</span>
+    const whyOf = p => p.how === 'ambig' && p.same === 'map' ? '区域マップに同じ名前の人がいます。手で対応づけてください'
+      : p.how === 'ambig' && p.same === 's21' ? 'S21 に同じ名前の人が2人以上います。手でえらんでください'
+      : p.how === 'ambig' && p.same === 'taken' ? '同じ名前の S21 の人は、ほかの人に対応づけてあります。手でえらんでください' : why[p.how];
+    const row = p => `<div class="setrow"><span>${esc(p.name)}${p.how === 'manual' ? '<br><small class="muted">区域係がえらびました</small>' : whyOf(p) ? `<br><small class="muted">${whyOf(p)}</small>` : ''}</span>
       <select class="s21sel" data-s21link="${esc(p.uid)}" aria-label="${esc(p.name)}さんの S21 での名前">${opts(p.pid)}</select></div>`;
     setSheet(headHtml(null, '名前の対応', `つながっている人 ${good.length}人・見つからない人 ${bad.length}人`) + `
-      <p class="muted">名前が同じ人は、自動でつながっています。見つからない人だけ、S21 の名前をえらんでください。「奉仕時間」を使っていない人は、そのままでもかまいません。</p>
+      <p class="muted">S21 と名前が合う人は、自動でつながっています。見つからない人と、同じ名前の人がいる人は、S21 の名前をえらんでください（同じ名前の人は、まちがえて別の人の報告にならないよう、自動ではつなぎません）。「奉仕時間」を使っていない人は、そのままでもかまいません。</p>
       ${bad.length ? `<h3>見つからない人</h3>${bad.map(row).join('')}` : '<div class="okmsg">全員つながっています。</div>'}
       <details class="more"><summary>つながっている人（${good.length}人）</summary>${good.map(row).join('')}</details>
       <button class="btn block" id="s21Fresh">S21 の名簿を読み直す</button>

@@ -371,9 +371,10 @@
     try {
       const el = document.getElementById('syncState');
       if (simple() && el && !el.hidden && Store.queue) {
-        const n = Store.queue.length, t = el.textContent || '';
+        // 数えるのは訪問の記録だけ（仮の家の確かめなど、記録でない変更は数えない・総点検 L4・2026.13.105）
+        const nv = Store.queue.reduce((a, ch) => a + (ch && ch.visits ? (ch.visits.up || []).length : 0), 0), t = el.textContent || '';
         if (/^電波待ち/.test(t)) el.textContent = '電波が戻ったら送ります';
-        else if (/^未送信/.test(t)) el.textContent = `まだ送っていない記録 ${n}件`;
+        else if (/^未送信/.test(t)) el.textContent = nv ? `まだ送っていない記録 ${nv}件` : 'まだ送っていない変更があります';
       }
     } catch (e) { /* 表示だけの話 */ }
     return r;

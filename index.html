@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.104"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
+<meta name="app-version" content="2026.13.105"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -531,6 +531,9 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .fontbtn small{font-size:12px;color:var(--ink2);font-family:"BIZ UDPGothic",sans-serif}
 .fontbtn[aria-pressed="true"]{border-color:var(--brand-ink);background:var(--terr-soft);box-shadow:0 0 0 2px var(--brand-ink)}
 body.simple .adv{display:none!important}
+/* かんたんモードの文字は16px以上・設定の歯車は48px四方（総点検 L1・2026.13.105） */
+body.simple #whoName,body.simple .gbadge,body.simple .grabhint,body.simple .appver,body.simple #sheet small,body.simple .twoline small,body.simple .tgo span,body.simple .tname small{font-size:16px!important}
+body.simple #btnUi{min-width:48px;min-height:48px}
 /* 「地図で見る」の目印：四すみの枠が家にしぼりこまれ、輪が広がる */
 .tgt{position:relative;width:0;height:0;pointer-events:none}
 .tgt b{pointer-events:auto;cursor:pointer}
@@ -1538,7 +1541,7 @@ body.renshu #btnUpd{display:none!important}
         <h2 class="sec">奉仕の予定</h2>
         <div id="homeSchedTools"></div>
         <div id="homeCal"></div>
-        <p class="hint">自分で入れた予定や時間は、このスマホの中だけに保存されます。係やほかの人には送られません。</p>
+        <p class="hint">自分で入れた予定や時間は、このスマホの中だけに保存されます。係やほかの人には送られません（iPhoneでホーム画面に追加するときだけ、暗号にして15分間サーバーを通し、ホーム画面のアプリに移します。サーバーは中身を読めません）。</p>
         </div></div>
       </div>
     </section>

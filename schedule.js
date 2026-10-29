@@ -146,7 +146,7 @@
   }
   const youngPct = t => tmemo('y', t, () => { const y = youngShare(t); return y && y.pct != null ? y.pct : null; });
   /* 区域の家・部屋の数（特別区域で回る家は数えない。terrStats(t, 0).n と同じ数を、記録を見ずに数える） */
-  const unitN = t => tmemo('n', t, () => housesOf(t.id).reduce((a, h) => a + unitsIn(h, t).length, 0));
+  const unitN = t => tmemo('n', t, () => housesOf(t.id).reduce((a, h) => a + unitsIn(h, t).filter(u => !D().dnc[K(h.id, u)]).length, 0)); // 拒否の家は数えない（M10）
   /* 会いやすい時間帯の目安（年齢データと記録から。既存の meetChance を使う） */
   function meetLabel(t) {
     return tmemo('m', t, () => {
@@ -180,7 +180,7 @@
   }
   /* 貸出中の区域の進み具合（返却の目安に対して） */
   function paceOf(t) {
-    if (!t.holder || !t.lentAt) return null;
+    if (!t.holder || !t.lentAt || !dueOf(t)) return null; // 返却の目安のない区域（全体の集まり・紙で渡した区域）は見ない（M7）
     const r = roundInfo(t.id, true);
     if (!r) return null;
     const el = daysSince(t.lentAt) / lendDays();
@@ -332,7 +332,7 @@
     return `<div class="duerow" style="border-left-color:${ST[d.st][0]}"><div>
       <p>${chip(d.st)} <b>区域${esc(t.no)}</b> ${esc(t.name || '')}</p>
       <p class="muted">前回回り終えた日 ${showDay(d.last)}・期限 ${d.deadline ? showDay(d.deadline) : '—'}（${leftTxt(d)}）</p>
-      <p class="muted">${t.holder ? `貸出中：${esc(uname(t.holder))}さん（返却の目安 ${fmtDay(dueOf(t))}）` : paperLent(t) ? paperHoldTxt(t) : t.awayPoolAt ? '留守宅カードで回っています' : '空いています'}${meetTag(t)}</p>
+      <p class="muted">${t.holder ? `貸出中：${esc(uname(t.holder))}さん（返却の目安 ${dueTxt(t)}）` : paperLent(t) ? paperHoldTxt(t) : t.awayPoolAt ? '留守宅カードで回っています' : '空いています'}${meetTag(t)}</p>
       ${adjTag(t)}
     </div><div class="duebtns"><button class="btn small" data-open="${esc(t.id)}">地図</button><button class="btn small" data-dueadj="${esc(t.id)}">調整</button><button class="btn small primary" data-karte="${esc(t.id)}">カルテ</button></div></div>`;
   };
@@ -1327,10 +1327,15 @@ button.ktag{cursor:pointer}
     if (m.over.length) row('#B71C1C', `1年の期限を過ぎた区域　${m.over.length}区域`, `区域${listNos(m.over.map(d => d.t))}`, go('status', 'adDue') + karteBtns(m.over.map(d => d.t), 2));
     if (m.warn.length) row('#C2410C', `1年の期限まで${PIN_DAYS}日以内の区域　${m.warn.length}区域`, `区域${listNos(m.warn.map(d => d.t))}`, go('status', 'adDue'));
     // 7 返却の目安を過ぎた貸出
-    const late = ts.filter(t => t.holder && t.lentAt && Date.parse(dueOf(t)) < now);
+    const late = ts.filter(t => t.holder && t.lentAt && dueOf(t) && Date.parse(dueOf(t)) < now); // 全体の集まり・紙で渡した区域は目安なし（M7）
     if (late.length) row('#C2410C', `返却の目安を過ぎた貸出　${late.length}件`,
       late.slice(0, 4).map(t => `区域${esc(t.no)}（${esc(uname(t.holder))}さん・${daysSince(dueOf(t))}日超過）`).join('、') + (late.length > 4 ? `　ほか${late.length - 4}件` : '') + '。声をかけるかどうかは、係が決めてください。',
       karteBtns(late, 3));
+    // 7b 留守宅カードで回っている区域のうち、2週間進んでいないもの（M3・2026.13.105）。必要なら「正式に返却したことにする」
+    const slow = ts.filter(t => !t.holder && t.awayPoolAt && Date.now() - Date.parse(t.awayPoolAt) >= 14 * DAY && (() => { const p = poolInfo(t); if (!p) return false; const last = housesOf(t.id).some(h => targets(h).some(u => visitsOf(K(h.id, u)).some(v => Date.now() - Date.parse(v.at) < 14 * DAY))); return !last; })());
+    if (slow.length) row('#8A6D00', `留守宅カードで2週間進んでいない区域　${slow.length}区域`,
+      slow.slice(0, 4).map(t => { const p = poolInfo(t); return `区域${esc(t.no)}（訪ね直し ${p.done}/${p.n}・${p.pct}%）`; }).join('、') + (slow.length > 4 ? `　ほか${slow.length - 4}区域` : '') + '。必要なら、区域のカルテから「正式に返却したことにする」を使ってください。',
+      karteBtns(slow, 3));
     // 8 留守宅カードが長く受け取られていない区域（第6弾：日数と、受け取れるカードの時間帯を出す。集まりで紹介する紙を印刷できる）
     const stuck = unclaimedCards();
     if (stuck.length) row('#8A6D00', `受け取られていない留守宅カード　${stuck.length}区域`,
@@ -1508,11 +1513,11 @@ button.ktag{cursor:pointer}
     // 1 今の状態
     let cls = 'cv-none', mark = '○', word = '空いています', sub = '';
     if (t.holder) {
-      const over = t.lentAt && Date.parse(dueOf(t)) < Date.now();
+      const over = t.lentAt && dueOf(t) && Date.parse(dueOf(t)) < Date.now();
       let prog = '';
       try { const r = roundInfo(t.id, true); if (r) prog = r.phase === 'away' ? `　留守宅を訪ね直す段階：${r.aw.pct}%（目安 ${awayRetPct()}%）` : `　1回目：${r.pct1}%`; } catch (e) { /* 進み具合なしで出す */ }
       cls = over ? 'cv-bad' : 'cv-ok'; mark = over ? '▲' : '✓'; word = over ? '貸出中（返却の目安を過ぎています）' : '貸出中';
-      sub = `${esc(uname(t.holder))}さん・${t.lentAt ? fmtDay(t.lentAt) + 'に受け取り（' + daysSince(t.lentAt) + '日目）' : ''}　返却の目安 ${t.lentAt ? fmtDay(dueOf(t)) : '—'}${prog}`;
+      sub = `${esc(uname(t.holder))}さん・${t.lentAt ? fmtDay(t.lentAt) + 'に受け取り（' + daysSince(t.lentAt) + '日目）' : ''}　返却の目安 ${t.lentAt ? dueTxt(t) : '—'}${prog}`;
     } else if (paperLent(t)) {
       const ph = paperHoldOf(t), over = daysFrom(ph.a) > lendDays();
       cls = over ? 'cv-bad' : 'cv-ok'; mark = over ? '▲' : '✓'; word = over ? '紙の記録で貸出中（返却の目安を過ぎています）' : '紙の記録で貸出中';
@@ -1526,7 +1531,7 @@ button.ktag{cursor:pointer}
     // 以前は区域の一覧の行に出していた分（改善案A4）：今日一緒に回る人・記録が少ない返却を確かめる日
     { const hp = typeof helpersOf === 'function' ? helpersOf(t) : []; if (hp.length) sub += `${sub ? '<br>' : ''}今日一緒に回る人：${hp.map(h => esc(uname(h.uid)) + 'さん').join('、')}`; }
     { const lw = typeof lowWaitNote === 'function' ? lowWaitNote(t) : ''; if (lw) sub += `${sub ? '<br>' : ''}${lw.replace(/^（|）$/g, '')}`; }
-    const dueTxt = di.left == null ? '前回の記録がありません' : di.left < 0 ? `1年の期限を${-di.left}日過ぎています` : `1年の期限まで あと${di.left}日`;
+    const yearTxt = di.left == null ? '前回の記録がありません' : di.left < 0 ? `1年の期限を${-di.left}日過ぎています` : `1年の期限まで あと${di.left}日`;
     // 4 時間帯の表 5 数字
     let table, nums = '';
     if (few) {
@@ -1548,7 +1553,7 @@ button.ktag{cursor:pointer}
     return headHtml(t, `区域${esc(t.no)}のカルテ`, esc(t.name || '')) + `
       <div class="cover ${cls}" role="status"><i aria-hidden="true">${mark}</i><div><b>${word}</b>${sub ? `<small>${sub}</small>` : ''}</div></div>
       <p class="kq">期限</p>
-      <p>前回回り終えた日：<b>${di.last ? showDay(di.last) : '記録なし'}</b>　／　<b>${dueTxt}</b></p>
+      <p>前回回り終えた日：<b>${di.last ? showDay(di.last) : '記録なし'}</b>　／　<b>${yearTxt}</b></p>
       <p class="kq">次の一手</p>
       <div class="kadv">${karteAdvice(t, homes).map(x => `<p>${esc(x)}</p>`).join('')}</div>
       ${focusLineHtml(t)}

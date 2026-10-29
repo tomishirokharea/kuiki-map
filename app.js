@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.104';
+var APP_JS_VER = '2026.13.105';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -312,6 +312,7 @@ const API_URL = (function () {
 })(); // GAS の「ウェブアプリのURL」は config.js に書く
 const LIVE = !!API_URL;
 const JOIN_KEY = 'kuiki_join', PENDING_KEY = 'kuiki_pending';
+const CARRY_KEY = 'kuiki_carry', CARRY_K = 'kuiki_carry_k'; // CARRY_K：預けた記録を開く鍵（リンクの k=。サーバーには送らない）。 Safari から持ってきた、このスマホだけの記録（読み込んだあと、自分の記録が空なら入れる・M13）
 const HOME_KEY = 'kuiki_home_code', HOME_SEEN = 'kuiki_home_seen', HOME_OFF = 'kuiki_home_banner_off', FIRST_OK = 'kuiki_first_ok', HOME_WELCOME = 'kuiki_home_welcome';
 const TOKEN_KEY = 'kuiki_token', QUEUE_KEY = 'kuiki_queue', OLD_CACHE_KEY = 'kuiki_cache', SYNC_KEY = 'kuiki_sync_at', LOCK_KEY = 'kuiki_lock_ok';
 let onMemoVer = null; // 再訪問メモの合図を受け取る（MemoSync が入れる）
@@ -923,7 +924,7 @@ const Store = {
 /* ?t= … 個別の招待リンク（これまでどおり）
    ?j= … 共通リンク。すでにこのスマホに使う人が決まっていれば、何もしない（名前は変えられない） */
 function readToken() {
-  const u = new URL(location.href), t = u.searchParams.get('t'), j = u.searchParams.get('j'), h = u.searchParams.get('h');
+  const u = new URL(location.href), t = u.searchParams.get('t'), j = u.searchParams.get('j'), h = u.searchParams.get('h'), ck = u.searchParams.get('k');
   let changed = false;
   if (t) {
     changed = lsGet(TOKEN_KEY) !== t;
@@ -933,7 +934,8 @@ function readToken() {
   }
   if (j) { lsSet(JOIN_KEY, j); u.searchParams.delete('j'); }
   if (h) { lsSet(HOME_KEY, h); u.searchParams.delete('h'); } // ホーム画面のアイコンから、はじめて開いたとき
-  if (t || j || h) history.replaceState(null, '', u.pathname + u.search + u.hash); // 画面のURLからコードを消す
+  if (ck) { if (h) lsSet(CARRY_K, ck); u.searchParams.delete('k'); } // 預けた記録を開く鍵（M13）
+  if (t || j || h || ck) history.replaceState(null, '', u.pathname + u.search + u.hash); // 画面のURLからコードを消す
   return { token: lsGet(TOKEN_KEY) || '', changed };
 }
 async function apiRaw(body) {
@@ -969,11 +971,19 @@ async function openHomeGuide() {
   let ready = !LIVE || !ios, note = '';
   if (LIVE && ios) {
     toast('準備しています…');
+    // 先に送り終える（ホーム画面のアプリと Safari は保存が別。Safari に送信待ちを残さないように・M13・2026.13.105）
+    if (Store.queue.length) { try { flushFail = 0; flushNextAt = 0; await flush(true); } catch (e) { /* 下で知らせる */ } }
+    if (Store.queue.length) note = '<div class="notice warn">まだ送っていない記録があります。電波のよい所で送り終えてから追加すると、記録がSafariに残りません。</div>';
     try {
-      const j = await api('home_code');
+      // 奉仕時間・予定・目標・報告の控え（このスマホだけの記録）も、ホーム画面のアプリに持っていく（15分だけサーバーに預ける）
+      // 暗号にしてから預ける（鍵はリンクの k= に入れ、サーバーには送らない。サーバーは中身を読めない・組C 監査 H3）
+      let carry = '', ck = '';
+      try { const e = await carrySeal(JSON.stringify(myData())); if (e && e.c.length <= 30000) { carry = e.c; ck = e.k; } } catch (e) { carry = ''; }
+      const j = await api('home_code', carry ? { carry } : {});
       if (j.code) {
         const u = new URL(location.href);
         u.searchParams.delete('t'); u.searchParams.set('h', j.code);
+        if (ck) u.searchParams.set('k', ck); else u.searchParams.delete('k');
         history.replaceState(null, '', u.pathname + u.search + u.hash);
         homeUrlDirty = true; ready = true;
       }
@@ -1071,7 +1081,7 @@ async function claimHome() {
   for (let i = 0; i < 3; i++) { // 混んでいる・回数制限（slow）のときは、少し待って3回までためす
     try {
       const j = await apiRaw({ action: 'home_claim', code, device: deviceLabel() });
-      if (j.ok && j.token) { lsSet(TOKEN_KEY, j.token); lsSet(HOME_WELCOME, '1'); return j.token; }
+      if (j.ok && j.token) { lsSet(TOKEN_KEY, j.token); lsSet(HOME_WELCOME, '1'); if (j.carry) lsSet(CARRY_KEY, String(j.carry)); return j.token; }
       if (j.error !== 'slow' && j.error !== 'busy') break;
     } catch (e) { break; /* つながらないときは、下の案内を出す */ }
     await new Promise(r => setTimeout(r, 4000));
@@ -1114,6 +1124,46 @@ function authLost() {
   showBlocking('このスマホは使えなくなりました',
     '区域係がこのスマホの登録を外したか、リンクが作り直されました。区域の情報は、このスマホから消しました。もう一度使うときは、区域係からもらったリンクを開いてください。' +
     (kept ? `まだ送っていない記録（${kept}件）は、7日のあいだ取っておきます。区域係からもらった新しいリンクを開くと、送ります。` : ''));
+}
+/* スマホの時刻の地域が日本でないとき：「今日」・時間帯・期限がずれるので、1日1回知らせる（総点検 L8・2026.13.105。
+   数える所が多く一部だけ日本時間にすると食いちがうため、地域を日本にしてもらう） */
+function tzWarn() {
+  try {
+    if (new Date().getTimezoneOffset() === -540) return;
+    const k = 'kuiki_tzwarn', d = new Date().toISOString().slice(0, 10);
+    if (lsGet(k) === d) return;
+    lsSet(k, d);
+    setTimeout(() => toast('スマホの時刻の地域が日本ではありません。「今日」や時間帯がずれます。スマホの設定で、日付と時刻を「自動」にし、地域を日本にしてください'), 3500);
+  } catch (e) { /* 何もしない */ }
+}
+/* Safari から持ってきた「このスマホだけの記録」を入れる（ホーム画面のアプリで初めて開いたとき）。自分の記録がまだ空のときだけ（上書きしない・M13） */
+/* 預ける記録を暗号にする（AES-GCM。鍵はこのときだけ作り、リンクの k= で渡す）。WebCrypto がないときは預けない */
+const b64u = a => btoa(String.fromCharCode.apply(null, Array.from(a))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = s => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0));
+async function carrySeal(text) {
+  if (!(window.crypto && crypto.subtle)) return null;
+  const raw = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(text)));
+  return { c: 'v1.' + b64u(iv) + '.' + b64u(ct), k: b64u(raw) };
+}
+async function carryOpen(c, k) {
+  const m = /^v1\.([\w-]+)\.([\w-]+)$/.exec(String(c || ''));
+  if (!m || !k || !(window.crypto && crypto.subtle)) return null;
+  const key = await crypto.subtle.importKey('raw', unb64u(k), 'AES-GCM', false, ['decrypt']);
+  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(m[1]) }, key, unb64u(m[2])));
+}
+async function applyCarry() {
+  const c0 = lsGet(CARRY_KEY), k = lsGet(CARRY_K);
+  if (!c0) { if (k) lsDel(CARRY_K); return; }
+  lsDel(CARRY_KEY); lsDel(CARRY_K);
+  try {
+    const c = await carryOpen(c0, k); // 鍵がない・開けないときは何もしない（暗号でない預け方は受け付けない）
+    if (!c) return;
+    const o = JSON.parse(c), cur = lsGet(myKey());
+    const empty = !cur || (() => { try { const x = JSON.parse(cur); return !Object.keys(x.log || {}).length && !(x.events || []).length && !Object.keys(x.reports || {}).length; } catch (e) { return true; } })();
+    if (o && typeof o === 'object' && empty) { lsSet(myKey(), JSON.stringify(o)); try { renderAll(); } catch (e) { /* 次に描くときに出る */ } setTimeout(() => toast('Safariで記録していた奉仕時間・予定を、こちらに持ってきました'), 2500); }
+  } catch (e) { /* 読めなければ何もしない */ }
 }
 /* 招待リンクが変わったとき（readToken）：送信待ちを、使っていた人の id といっしょに取っておく（ORPHAN_KEY。authLost と同じ入れ物） */
 const ME_KEY = 'kuiki_me'; // このスマホで最後に使っていた人の id（リンクが変わったときに、取っておく変更の持ち主を知るため）
@@ -2611,6 +2661,7 @@ function terrStats(t, sinceMs) {
   const now = Date.now(); let n = 0, visited = 0, met = 0, last = null;
   for (const h of housesOf(t.id)) {
     for (const u of unitsIn(h, t)) { // 特別区域で回る家は、ふつうの区域の数に入れない
+      if (D().dnc[K(h.id, u)]) continue; // 拒否の家は数えない（区域カードの「あと○軒」と同じ・M10・2026.13.105）
       n++;
       const s = sum(K(h.id, u));
       if (s.last) {
@@ -2626,6 +2677,15 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.105', items: [
+    ['返', '全体の集まりで使う区域と、紙の区域カードで渡した区域は、「返却の目安を過ぎた」に数えないようにしました（返却の目安は「なし」と出ます）'],
+    ['報', '奉仕報告を送ったあとで時間を足したときは、月末にもう一度「直しますか」と知らせるようにしました。S21 に送る画面に、S21 のだれとして送るかを出します'],
+    ['留', '留守宅カードの区域は、1回目に留守だった家を訪ね直せば完了にできるようにしました。途中で返された区域は、続きから受け取る人が回るので、留守宅カードには出しません'],
+    ['数', '区域の軒数は、どの画面も拒否の家を除いた数にそろえました'],
+    ['簡', 'かんたんモードの小さな文字を大きくし、設定の歯車を押しやすくしました'],
+    ['追', 'ホーム画面に追加するとき、まだ送っていない記録を先に送り、奉仕時間や予定もホーム画面のアプリに持っていくようにしました'],
+    ['係', '区域係の画面：留守宅カードで2週間進んでいない区域を「今日の対応」に出すようにしました。持てる枚数は −・＋ で変えます。スペイン語の訳を足しました']
+  ] },
   { v: '2026.13.104', items: [
     ['更', '電波が弱いときに更新が届いても、新しい版と前の版のファイルがまざらないようにしました。圏外で開いたときも、同じ版のファイルで開きます'],
     ['係', '区域係の画面ロックで「番号を忘れた」を押したときも、まだ送っていない記録は消さずに取っておき、登録し直したら送るようにしました']
@@ -6017,7 +6077,8 @@ function openAptSeq(hid, startUnit) {
     let b = headHtml(t, esc(h.label || '集合住宅'), `${inRound ? '受け取ってから訪ねた部屋' : '今日入力した部屋'} ${cnt} / ${need}`);
     // 部屋のボタン：前回の結果は色だけでなく「会・留・拒」の字でも見せる。部屋が多い建物は階ごとに分ける（点検④U3）
     const chip = u => {
-      const i = h.units.indexOf(u), s = statusOf(K(hid, u)), uk = unitKind(h, u), g = UST_GLYPH[s];
+      // 色と字は、見出しと同じ「今の巡回（受け取ってから）」の結果で出す。前の巡回の結果は出さない（総点検 L5・2026.13.105）
+      const i = h.units.indexOf(u), s0 = statusOf(K(hid, u)), s = s0 === 'dnc' || !inRound || visitedSince(K(hid, u), since) ? s0 : 'new', uk = unitKind(h, u), g = UST_GLYPH[s];
       return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? '（前回 ' + UST_NAME[s] + '）' : ''}へ">${kindBadge(uk)}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
     };
     const groups = h.units.length > 10 ? unitGroups(h) : [];
@@ -7712,7 +7773,7 @@ function cardHtml(t, own, helper) {
   const hs = helpersOf(t), groupOk = D().settings.groupOn !== 0;
   const due = dueOf(t), over = due && Date.parse(due) < Date.now();
   const lead = !own && helper && isLead(t), ld = leadOf(t); // lead＝自分が今日の司会。ld＝今日の司会（だれか）
-  const who = own ? `受け取ってから ${daysSince(t.lentAt)}日・<span class="${over ? 'tag-warn' : ''}">返却の目安 ${fmtDay(due)}${over ? '（過ぎています）' : ''}</span>${t.firstDoneAt ? '・留守宅を回る段階' : ''}${isSpecial(t) ? `<span class="spbadge">${esc(specialKindsText(t))}</span>${evTag(t)}` : ''}`
+  const who = own ? `受け取ってから ${daysSince(t.lentAt)}日・<span class="${over ? 'tag-warn' : ''}">返却の目安 ${due ? fmtDay(due) : 'なし'}${over ? '（過ぎています）' : ''}</span>${t.firstDoneAt ? '・留守宅を回る段階' : ''}${isSpecial(t) ? `<span class="spbadge">${esc(specialKindsText(t))}</span>${evTag(t)}` : ''}`
     : lead ? `<span class="leadtag">今日の司会</span>担当：${esc(uname(t.holder))}さん（今日まで）`
     : helper ? `${esc(uname(t.holder))}さんの区域を、一緒に回ります（今日まで）`
     : (holder ? `担当：${esc(holder.name)}さん` : '担当者なし');
@@ -8295,7 +8356,9 @@ function renderInbox() {
         <button type="button" data-kset="holdMaxPersonal" data-d="1" aria-label="枚数を増やす">＋</button></div></div>`,
     holdMaxGroup: `<div class="setrow">
       <span>監督・司会者が持てる集まりで使う区域<br><small class="hint">グループ奉仕と全体の集まりを合わせて数えます（個人の区域とは別）。申し込み中もふくみます。枝番は1つずつ数えます</small></span>
-      <div class="rng"><input type="range" min="1" max="40" step="1" value="${Math.min(40, Number(st.holdMaxGroup) || 2)}" data-range="holdMaxGroup" data-unit="枚まで" aria-label="枚数"><output>${Math.min(40, Number(st.holdMaxGroup) || 2)}枚まで</output></div></div>`,
+      <div class="stepper"><button type="button" data-kset="holdMaxGroup" data-d="-5" aria-label="枚数を5減らす">−5</button><button type="button" data-kset="holdMaxGroup" data-d="-1" aria-label="枚数を減らす">−</button>
+        <output class="wide">${Math.min(40, Number(st.holdMaxGroup) || 2)}枚まで</output>
+        <button type="button" data-kset="holdMaxGroup" data-d="1" aria-label="枚数を増やす">＋</button><button type="button" data-kset="holdMaxGroup" data-d="5" aria-label="枚数を5増やす">＋5</button></div></div>`, // スライダーは幅が狭く、間の数をえらびにくかった（総点検 L2・2026.13.105）
     reqMaxPersonal: `<div class="setrow">
       <span>1人が同時に「係に頼める」申し込み（個人の区域）<br><small class="hint">係の返事を待っている申し込みの数です</small></span>
       <div class="stepper"><button type="button" data-kset="reqMaxPersonal" data-d="-1" aria-label="件数を減らす">−</button>
@@ -8368,7 +8431,7 @@ function openReturnSheet(tid) {
   const r = roundInfo(tid, true); if (!r) return;
   const th = D().settings.donePct, ret = awayRetPct(), adm = isAdmin(), plan = returnPlan(r), a = plan.a;
   const simple = typeof isSimple === 'function' && isSimple();
-  const sub = `${esc(uname(t.holder))}さん${t.lentAt ? `　受け取ってから ${daysSince(t.lentAt)}日・返却の目安 ${fmtDay(dueOf(t))}` : ''}`;
+  const sub = `${esc(uname(t.holder))}さん${t.lentAt ? `　受け取ってから ${daysSince(t.lentAt)}日・返却の目安 ${dueTxt(t)}` : ''}`;
   const bar = (pct, label) => `<div class="progress big" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="${label}"><i style="width:${pct}%"></i></div>`;
   const total = r.c.todo + r.c.done;
   const firstPart = r.phase === 'away'
@@ -8542,33 +8605,34 @@ function poolInfo(t) {
   // 1回目の段階から、そのまま留守宅カードにして返した区域（返却ボタンの自動の決め方。1回目を終えた日＝返した日）は、
   // 返却ボタンと同じ数え方（awayAgain）：1回目の段階で別の日に訪ね直した家も「訪ね直した」に数える
   const ph1 = first >= t.awayPoolAt;
-  let n = 0;
+  // 1回目に訪ねていなかった家（un*）：1回目が目安（donePct−10）まで回れていたときだけ数えない（M3）。
+  // 1回目が少ない（係が目安未満で留守宅カードにした・紙で回った）ときは、今までどおり数える（少ししか回っていない区域が完了にならないように・組C 監査 M3）
+  let n = 0, tot = 0, vis = 0, unN = 0; const unT = [];
   for (const h of housesOf(t.id)) {
     if (banNo(h)) continue; // 立入禁止の建物は数えない（roundInfo と同じ・M4）
     for (const u of (sp ? specialTargets(h, t) : targets(h))) {
       if (!sp && coveredBySpecial(h, u)) continue;
       const k = K(h.id, u);
       if (D().dnc[k]) continue;
-      if (ph1) {
+      const vis1 = visitsOf(k).some(v => v.at >= since && v.at <= first);
+      tot++; if (vis1) vis++;
+      if (!vis1) { // 1回目に訪ねていなかった家（数えるかどうかは、下でまとめて決める）
         const after = visitsOf(k).filter(v => v.at > first);
-        if (!visitsOf(k).some(v => v.at >= since && v.at <= first)) { // 1回目の段階で訪ねていなかった家：返したあとに1回訪ねれば「訪ね直した」
-          if (recentMet(k) && !after.length) continue;
-          n++; if (after.length) times.push(after[after.length - 1].at);
-          continue;
-        }
+        if (!(recentMet(k) && !after.length)) { unN++; if (after.length) unT.push(after[after.length - 1].at); }
+        continue;
+      }
+      if (ph1) {
         const a = awayAgain(k, since); if (a === null) continue;
         n++; if (a) times.push(a);
         continue;
       }
       if (metBetween(k, since, first)) continue;
-      const vis1 = visitsOf(k).some(v => v.at >= since && v.at <= first);
-      if (!vis1 && recentMet(k)) continue;
       n++;
-      if (vis1) { const a = revisitAt(k, since, first); if (a) times.push(a); continue; } // 1回目に訪ねた家：訪ね直したと数える条件（係の設定）に合う、いちばん早い記録
-      const after = visitsOf(k).filter(v => v.at > first);
-      if (after.length) times.push(after[after.length - 1].at); // 1回目に訪ねていなかった家：いちばん早く訪ねた日
+      { const a = revisitAt(k, since, first); if (a) times.push(a); } // 1回目に訪ねた家：訪ね直したと数える条件（係の設定）に合う、いちばん早い記録
     }
   }
+  const need1 = Math.max(0, (Number(D().settings.donePct) || 90) - 10);
+  if (tot && vis / tot * 100 < need1) { n += unN; times.push(...unT); }
   times.sort();
   const need = Math.max(1, Math.ceil(n * awayRetPct() / 100));
   return { n, done: times.length, pct: n ? Math.round(times.length / n * 100) : 100, doneAt: !n ? first : (times.length >= need ? times[need - 1] : null) };
@@ -8855,12 +8919,21 @@ function nextGroupSlot(all) { // all：全体の集まりの予定（group が�
 const isUnmet = k => { const s = sum(k); return s.n > 0 && s.unmet; };
 const triedSlots = k => sum(k).slots;
 // 担当者のいる区域は担当者だけ。空いている区域は、回り終えた記録があるものだけ。
-const awayEligibleBase = (t, uid) => (t.holder ? t.holder === uid : (!!t.awayPoolAt || !!t.completedAt || D().settings.awayAllTerr === 1));
+/* 途中で返され、続きから受け取れる区域か（tsuzuki.js の canCont・サーバーの contAvail_ と同じ） */
+const contAvail = t => {
+  if (!t || t.holder || t.awayPoolAt || t.paperLentAt || !t.returnedAt || !t.lastRoundFrom) return false;
+  const done = [t.completedAt, t.paperDone].filter(Boolean).map(String).sort().pop() || ''; // 紙の記録で回り終えた日も数える（tsuzuki.js canCont と同じ）
+  if (done && !(String(t.returnedAt) > done)) return false;
+  const v = D().settings.contDays, d = v == null || v === '' ? 60 : (Number(v) || 0);
+  return d > 0 && Date.now() - Date.parse(t.returnedAt) <= d * DAY;
+};
+// 続きから受け取れる区域は、留守宅カードに出さない（続きから受け取った人と同じ家を訪ねないように・M11・2026.13.105）
+const awayEligibleBase = (t, uid) => (t.holder ? t.holder === uid : !contAvail(t) && (!!t.awayPoolAt || !!t.completedAt || D().settings.awayAllTerr === 1));
 /* 区域係が「この時間帯を重点にする」と決めた時間帯（係の画面の時間帯の表から）。期限を過ぎたものは使わない
    ・空いている区域は、ふだん留守宅カードを出さない区域でも、その時間帯のカードだけは出す
    ・一覧では「区域係のおすすめ」として上に出す */
 const focusSlots = t => { const today = ymd(new Date()); return (Array.isArray(t && t.focus) ? t.focus : []).filter(f => f && SLOTS.includes(f.s) && String(f.until || '') >= today).map(f => f.s); };
-const awayEligibleTerr = (t, uid) => awayEligibleBase(t, uid) || (!t.holder && focusSlots(t).length > 0);
+const awayEligibleTerr = (t, uid) => awayEligibleBase(t, uid) || (!t.holder && !contAvail(t) && focusSlots(t).length > 0);
 
 /* ---------- 留守宅訪問のルール（係の設定：「区域」＞「状況」の「留守宅訪問のルール」） ----------
    ・上限回数（awayCap）：今回の巡回で「留守」だった日の数（同じ日は何回記録しても1回）。届いた家は、次の巡回まで留守宅カードに入れない
@@ -9202,7 +9275,7 @@ function otherMetOnly(k, since) {
   let met = false;
   for (const v of visitsOf(k)) { // 新しい順
     if (v.at < since) break;
-    if (!v.oc) return false;
+    if (!v.oc || v.by === me().id) return false; // 自分の記録は「ほかの人」にしない（特別区域を持っている人の記録・L12）
     if (v.result === 'met') met = true;
   }
   return met;
@@ -9304,9 +9377,12 @@ function returnPlan(r) {
 }
 const lendDays = () => Number(D().settings.lendDays) || 120;
 const awayRetPct = () => (D().settings.awayRetPct == null ? 70 : Number(D().settings.awayRetPct));
-const dueOf = t => (t && t.lentAt ? new Date(Date.parse(t.lentAt) + lendDays() * DAY).toISOString() : '');
+/* 返却の目安のない区域：全体の集まりで使う区域・紙の区域カード（S-13）で渡した区域。持ち続ける決まり・紙で割り当てた日から数えるため（M7・2026.13.105） */
+const dueExempt = t => isAllUse(t) || paperHandOf(t);
+const dueOf = t => (t && t.lentAt && !dueExempt(t) ? new Date(Date.parse(t.lentAt) + lendDays() * DAY).toISOString() : '');
+const dueTxt = t => (dueOf(t) ? fmtDay(dueOf(t)) : 'なし'); // 区域カードなどに出す「返却の目安」
 /* 返却の目安を過ぎた貸出か。係の画面の「状況」・内訳・「今日」・申し込みの一覧で、同じ数え方にそろえる（区域カードの「返却の目安」の日付と同じ） */
-const pastDue = t => !!(t && t.holder && t.lentAt && Date.parse(dueOf(t)) < Date.now());
+const pastDue = t => !!(t && t.holder && t.lentAt && dueOf(t) && Date.parse(dueOf(t)) < Date.now());
 /* 留守宅を回る段階：1回目に留守だった時間帯と、まだ訪ねていない時間帯（違う曜日・時間に訪ねると会えやすい） */
 function awayAdvice(r) {
   const tried = slotList(r.aw.slots);
@@ -9676,7 +9752,8 @@ function extAdminHtml(idx, rrow, stpd) {
   const set = `<p class="hint">区域が完了した（S-13 に完了として記録した）あと、次に区域カードとして受け取られるまで、残りの留守宅を、留守宅カードにせず、全員の「おすすめ」タブに近くの数軒として出します。</p>` +
     rrow('寝かせる日数', '完了してから、この日数はおすすめに出しません。家ごとにも、最後に訪ねてからこの日数は出しません', stpd('extRest', x.rest, '日', '寝かせる日数', 1)) +
     rrow('1軒あたりの回数', '完了のあとに、同じ家を留守宅として訪ねる上限です（同じ日は1回。回り残しの家は、はじめて訪ねた日を数えません）', stpd('extCap', x.cap, '回', '1軒あたりの回数', 1)) +
-    rrow('おすすめに出す期間', '完了してから、この日数で止めます' + (auto && x.days >= fd ? `<br><b>自由に受け取れる日のほうが先に来ます。その${x.before}日前で止まります</b>` : ''), stpd('extDays', x.days, '日', 'おすすめに出す期間', 7)) +
+    rrow('おすすめに出す期間', '完了してから、この日数で止めます' + (auto && x.days >= fd ? `<br><b>自由に受け取れる日のほうが先に来ます。その${x.before}日前で止まります</b>` : '') +
+      (() => { const end = auto ? Math.min(x.days, fd - x.before) : x.days, len = Math.max(0, end - x.rest); return `<br><b>今の設定では、完了の${x.rest}日後から${len ? `${len}日間` : ''}おすすめに出ます${len ? '' : '…のはずが、0日です（出ません）。「寝かせる日数」「次の新規の前に止める」を短くするか、自動受け取りの日数を長くしてください'}</b>`; })(), stpd('extDays', x.days, '日', 'おすすめに出す期間', 7)) +
     rrow('次の新規の前に止める', `自動受け取りを使う区域では、自由に受け取れる日（${fd > 0 ? `完了から${fd}日` : 'まだ決めていません'}）のこの日数前で止めます。次に区域カードで回る人と重ならないようにするためです`, stpd('extStopBefore', x.before, '日', '次の新規の前に止める日数', 7)) +
     `<div class="setrow"><span>1つのおすすめに入れる家の数<br><small class="hint">近い家どうしを、この軒数ずつまとめて出します</small></span><div class="stepper">
       <button type="button" data-kset="recoCount" data-d="-1" aria-label="家の数を減らす">−</button><output class="wide">${rc}軒まで</output>
@@ -10255,7 +10332,7 @@ function openUiSheet() {
     const S_FEAT = `<h3 class="sub feathead">使う機能</h3>
       <p class="hint">はじめは、区域を回って「会えた・留守」を記録するだけの、かんたんな形です。必要な機能だけ「使う」にしてください。</p>
       <div class="featrow"><p><b>奉仕時間</b><small>時間を残す・今月の目標と計画・月末の奉仕報告</small></p>${seg('fTime', [['off', '使わない'], ['on', '使う']])}</div>
-      ${featTime() ? `<div class="featrow sub2"><p><b>タイマー</b><small>使う：「奉仕スタート」「奉仕終了」を押すだけで時間を記録します。月末の夜8時すぎには、奉仕報告の画面を出します。<br>使わない：ホームで、今日の時間を＋−で入れます</small></p>${seg('fTimer', [['on', '使う'], ['off', '使わない']], UI.fTimer || 'on')}</div>` : ''}
+      ${featTime() ? `<div class="featrow sub2"><p><b>タイマー</b><small>使う：「奉仕スタート」「奉仕終了」を押すだけで時間を記録します。月末の夜8時すぎには、奉仕報告の画面を出します。<br>使わない：ホームで、今日の時間を時間と分のダイヤルで入れます</small></p>${seg('fTimer', [['on', '使う'], ['off', '使わない']], UI.fTimer || 'on')}</div>` : ''}
       <div class="featrow"><p><b>再訪問</b><small>会えたあとに「再訪問する」をえらぶと、メモを残して、下の「再訪問」タブで管理できます（メモは${memoSyncOn() ? '暗号化して、同じ人のほかの端末とも同じになります' : 'このスマホの中だけ'}）</small></p>${seg('fFollow', [['off', '使わない'], ['on', '使う']])}</div>
       <h3 class="sub">ホームに出すもの</h3>
       <div class="featrow"><p><b>毎日はじめのひと言</b><small>その日はじめて開いたときに、ひと言・今日の目標・今の時間帯におすすめの家を出します（まわりをさわると閉じます）</small></p>${seg('hello', [['on', '出す'], ['off', '出さない']], UI.hello || 'on')}</div>
@@ -11623,7 +11700,8 @@ function openStatList(key) {
   } else if (key === 'over') {
     const list = ts.filter(pastDue).sort((a, b) => (a.lentAt < b.lentAt ? -1 : 1));
     title = `返却の目安を過ぎた貸出 ${list.length}`;
-    hint = `受け取ってから${lendDays()}日（返却の目安）をこえている区域です。古い順です。`;
+    const exN = ts.filter(t => t.holder && dueExempt(t)).length;
+    hint = `受け取ってから${lendDays()}日（返却の目安）をこえている区域です。古い順です。` + (exN ? `全体の集まり・紙で渡した区域（${exN}枚）は、返却の目安なしで数えていません。` : '');
     body = list.length ? list.map(t => { const r = roundInfo(t.id, true); return statRow(t, `${esc(uname(t.holder))}さん・${daysSince(t.lentAt)}日目${r ? `・進み具合 約${r.pct}%${r.phase === 'away' ? '（留守宅を回る段階）' : ''}` : ''}`, true); }).join('') : '<div class="empty">ありません</div>';
   } else if (key === 'units') {
     let house = 0, aptB = 0, aptU = 0, biz = 0, cov = 0, prov = 0, outN = 0, outU = 0;
@@ -12424,6 +12502,8 @@ function openReportLine(ym, opt) {
       : { pre: done > 0 ? true : null, studies: o0.lastLes || 0, aux: 0, hours: Math.floor(done / 60), actHours: 0, remarks: '' };
   const kindOf = () => kind === 'rp' ? 'rp' : st.pre === true && st.aux ? 'aux' : 'pub';
   const mark = how => {
+    // 終わっていない月を送るとき：あとで足した時間は、月末にもう一度知らせる（M12）
+    if (ym === ymOf(new Date()) && !isLastDayStr(ymd(new Date())) && featTime() && UI.fTimer !== 'off') setTimeout(() => toast('月の途中の報告です。このあと時間を足したときは、月末にもう一度お知らせします'), 800);
     const k = kindOf(), b = RepForm.toBody(st, kind === 'rp');
     const x = myData(); x.reports[ym] = { kind: k, pre: b.preached, h: b.hours, les: b.studies, auxH: k === 'aux' ? st.aux : 0, at: new Date().toISOString(), how }; x.lastLes = b.studies; mySave(x); renderHome();
   };
@@ -12448,7 +12528,7 @@ function openReportLine(ym, opt) {
       ${ok ? `<a class="btn line block" id="rpLine" href="https://line.me/R/share?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">LINEで送る</a>
       ${navigator.share ? '<button class="btn block" id="rpShare">ほかのアプリで送る（メールなど）</button>' : ''}
       <button class="btn block" id="rpCopy">文をコピーする</button>` : '<p class="notice info">「1カ月間に何らかの形で伝道した」の「はい」か「いいえ」を選ぶと、送れるようになります。</p>'}
-      <p class="hint">送る相手は、グループのトークではなく、報告を受け取る人との個別のトークがおすすめです。報告の内容は、このスマホの中だけに保存され、区域係やサーバーには送られません。</p>
+      <p class="hint">送る相手は、グループのトークではなく、報告を受け取る人との個別のトークがおすすめです。報告の内容は、このスマホの中だけに保存され、区域係やサーバーには送られません（iPhoneでホーム画面に追加するときだけ、暗号にして15分間サーバーを通し、ホーム画面のアプリに移します。サーバーは中身を読めません）。</p>
       ${rep ? `<p class="okmsg">${fmtDate(rep.at)}に報告しました（${esc(repSummary(rep))}）。直したときは、もう一度送ってください。</p>`
         : ok ? '<button class="btn block" id="rpDone">もう報告した（送らずに閉じる）</button>' : ''}
       <button class="btn block" data-close>${rep ? '閉じる' : 'あとで'}</button>`);
@@ -12483,8 +12563,16 @@ function reportDueYm() {
   let ym = null;
   if (isLastDayStr(today) && now.getHours() >= 20) ym = ymOf(now);
   else if (now.getDate() <= reportDl()) ym = ymOf(new Date(now.getFullYear(), now.getMonth() - 1, 1)); // 締切日（10日）まで
-  if (!ym || o.reports[ym] || o.repAsk[ym] === today || !monthMin(o, ym)) return null;
+  if (!ym || o.repAsk[ym] === today || !monthMin(o, ym)) return null;
+  if (o.reports[ym] && !repMore(o, ym)) return null; // 送ったあとで時間が増えたときだけ、もう一度知らせる（M12・2026.13.105）
   return ym;
+}
+/* 送った報告のあとで、記録した時間がふえたか（時間で報告する人だけ。一度知らせたら、その報告では二度は知らせない） */
+function repMore(o, ym) {
+  const r = o.reports[ym];
+  if (!r || !(r.kind === 'rp' || r.kind === 'aux' || Number(r.h) > 0)) return false;
+  if ((o.repMore || {})[ym] === r.at) return false;
+  return Math.floor(monthMin(o, ym) / 60) > (Number(r.h) || 0);
 }
 const overlayOpen = () => !$('#sheet').hidden || !$('#askBox').hidden || !$('#news').hidden || ($('#hello') && !$('#hello').hidden) ||
   ($('#joinScreen') && !$('#joinScreen').hidden) || ($('#blocker') && !$('#blocker').hidden) || ($('#s13View') && !$('#s13View').hidden) ||
@@ -12492,8 +12580,12 @@ const overlayOpen = () => !$('#sheet').hidden || !$('#askBox').hidden || !$('#ne
 function checkReport() {
   if (document.hidden) return;
   const ym = reportDueYm(); if (!ym || overlayOpen()) return;
-  const o = myData(); o.repAsk[ym] = ymd(new Date()); mySave(o);
+  const o = myData(), more = repMore(o, ym), r = o.reports[ym];
+  o.repAsk[ym] = ymd(new Date());
+  if (more) { o.repMore = o.repMore || {}; o.repMore[ym] = r.at; }
+  mySave(o);
   openReportSheet(ym, { auto: true });
+  if (more) setTimeout(() => toast(`${Number(ym.slice(5))}月の報告のあとに、時間が増えています（送った ${Number(r.h) || 0}時間・記録 ${Math.floor(monthMin(o, ym) / 60)}時間）。直して送り直してください`), 600);
 }
 
 /* ---- 毎日はじめのひと言 ----
@@ -14891,7 +14983,9 @@ async function init() {
     hideBlocking();
     if (Store.data && Store.data.currentUser) lsSet(ME_KEY, String(Store.data.currentUser)); // リンクが変わったときに、取っておく変更の持ち主を知るため（B-2）
     orphanPurge(); // 7日すぎた分は、読み込みのしかたにかかわらず消す（監査5 M-2）
+    applyCarry();
     retryParked(); // 一時的なエラーで回した変更を、一度だけ自動で送り直す（B-4）
+    tzWarn();
   } else {
     Store.load();
     if (RENSHU) { // 使う人は伝道者A（係の画面に入れないように）。「使う人」の選びは出さない
