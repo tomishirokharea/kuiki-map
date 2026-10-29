@@ -1109,7 +1109,7 @@ function authLost() {
     const uid = Store.data && Store.data.currentUser ? String(Store.data.currentUser) : ''; // currentUser は使う人の id
     if (uid) kept = orphanAdd(uid, Store.queue, failedList().filter(x => x && (!x.uid || x.uid === uid)));
   } catch (e) { kept = 0; /* 取っておけなくても、消すのは続ける */ }
-  [TOKEN_KEY, QUEUE_KEY, SYNC_KEY, PENDING_KEY, FAILED_KEY].forEach(lsDel);
+  [TOKEN_KEY, QUEUE_KEY, SYNC_KEY, PENDING_KEY, FAILED_KEY, HF_KEY, AR_KEY].forEach(lsDel); // 失敗の数え方の控えも消す（監査5 N-5）
   Store.queue = [];
   showBlocking('このスマホは使えなくなりました',
     '区域係がこのスマホの登録を外したか、リンクが作り直されました。区域の情報は、このスマホから消しました。もう一度使うときは、区域係からもらったリンクを開いてください。' +
@@ -1149,7 +1149,8 @@ function keepOrphan() {
     const q = JSON.parse(lsGet(QUEUE_KEY) || '[]'), uid = lsGet(ME_KEY) || '';
     // 送れない変更も、その人の分として取っておく（ちがう人のリンクで送らない・監査5 H-2）
     const f = failedList().filter(x => x && (!x.uid || x.uid === uid));
-    if (uid) orphanAdd(uid, Array.isArray(q) ? q : [], f);
+    if (!uid) return; // 前の人が分からない（13.103 で初めて開くのと同時にリンクが変わった）：送れない変更は消さずに残す（送信待ちは今までどおり消える・監査5 N-2）
+    orphanAdd(uid, Array.isArray(q) ? q : [], f);
     lsDel(FAILED_KEY);
   } catch (e) { /* 取っておけなくても、リンクを開くのは続ける */ }
 }
@@ -1892,6 +1893,7 @@ function updateSyncBadge(text) {
     if (flushing) t = '送信中…';
     else if (n) t = navigator.onLine === false ? `電波待ち ${n}件` : flushFail ? `未送信 ${n}件・自動で再送` : `未送信 ${n}件`;
     else if (dead) t = `送れない変更 ${dead}件`;
+    else if (LIVE && lsGet(SYNC_NOTE_KEY)) t = '送信のお知らせ'; // 送らなかった変更のお知らせを、「送信のようす」で読めるように（監査5 N-1）
   }
   el.hidden = !LIVE || !t;
   el.textContent = t;
@@ -14560,7 +14562,7 @@ function bindStatic() {
   $('#backdrop').onclick = () => (sheetGuard ? sheetGuard() : closeSheet()); // 閉じる前に確かめる画面（今日回る人など）は sheetGuard を使う（監査5 L-1）
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
-    if (!$('#sheet').hidden) closeSheet();
+    if (!$('#sheet').hidden) { if (sheetGuard) sheetGuard(); else closeSheet(); } // PC の Esc も確かめる（監査5 N-4）
     else if (!$('#legend').hidden) toggleLegend(false);
     else if (!$('#s13View').hidden) $('#s13View').hidden = true;
     else if (draw) endDraw();
