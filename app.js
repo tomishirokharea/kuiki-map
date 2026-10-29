@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.101';
+var APP_JS_VER = '2026.13.102';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -1935,6 +1935,7 @@ function userOptions(sel, noneLabel) {
 const me = () => userById(D().currentUser) || D().users[0];
 const isAdmin = () => me().role === 'admin';
 const targets = h => h.type === 'apt' ? h.units : [''];
+const banNo = h => !!h && h.type === 'apt' && h.ban === 'no'; // 立入禁止の建物（手紙のみ letter は今までどおり回る家に数える）
 const K = (hid, unit) => hid + '|' + (unit || '');
 /* 区域番号：「53」「53-1」などを文字として扱い、数字の順に並べる */
 const cmpNo = (a, b) => String(a).localeCompare(String(b), 'ja', { numeric: true });
@@ -1963,13 +1964,16 @@ const canDelHouse = h => isAdmin() || h.createdBy === me().id;
 /* 変更 → 保存 → 再表示 → 「取り消す」付きのお知らせ
    取り消しは「この操作で変わったものだけ」を元にもどす。
    （そのあいだに届いた、ほかの人の記録や変更は消さない） */
-function commit(msg, fn, onUndo) {
+/* opt.noUndo：「取り消す」を出さない（区域の受け取り・返却・留守宅カードの返却。取り消すと返却の記録だけが消え、
+   S-13 の記録が食いちがっていた。サーバーも伝道者の返却の記録の削除を断る。まちがえたときは区域係が直す・H3・2026.13.102） */
+function commit(msg, fn, onUndo, opt) {
   const snapOf = () => JSON.stringify(Object.assign({}, D(), { visits: undefined, currentUser: undefined }));
   const preJson = snapOf(), vArr = D().visits, vLen = vArr.length, preVisits = vArr.slice();
   fn();
   // ほとんどの編集（区域・家・予定など）は記録を変えない。そのときは記録の調べ直しと索引の作り直しをはぶく
   const vSame = D().visits === vArr && vArr.length === vLen;
   Store.save(vSame); renderAll(vSame ? 'houses' : undefined);
+  if (opt && opt.noUndo) { toast(msg); return; }
   const postJson = snapOf(), postIds = vSame ? null : new Set(D().visits.map(v => v.id));
   toast(msg, () => {
     closeSheet();
@@ -1978,6 +1982,7 @@ function commit(msg, fn, onUndo) {
     Store.save(); renderAll(); toast('取り消しました');
   });
 }
+const NO_UNDO = { noUndo: true };
 /* よく使う直し（家の名前・建物と部屋・種別・家を足す・動かす・印・受け持ち）の commit（改善案B2）
    hids：この操作で変える家の id（足す家は、fn の中で D().houses に push すれば、自動で入る）
    ・家（2〜3万件）は、hids と足した家だけを、控え・比べ・送る。家のほかの部分（区域・印・受け持ち・設定など）は今までどおり全部を比べる
@@ -2509,6 +2514,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.102', items: [
+    ['返', '区域の受け取り・返却・留守宅カードの返却のあとに「取り消す」を出さないようにしました。まちがえて返したときは、区域係に伝えてください（返却の記録が食いちがわないようにするため）'],
+    ['禁', '立入禁止の建物の部屋は、「回る家」の数に入れないようにしました。ほかの家を回り終えれば、区域を回り終えたにできます']
+  ] },
   { v: '2026.13.101', items: [
     ['版', '設定（歯車）のいちばん下に、このスマホで使っているアプリの版を出すようにしました。更新が届いたかを確かめるときに見てください']
   ] },
@@ -8006,7 +8015,7 @@ async function takeTerr(id) {
     t.group = reqForGroup && canGroupTerr() ? myGroup() : null;
     if (t.group && reqUse === 'all') t.use = 'all'; else delete t.use;
     D().requests = D().requests.filter(r => !(r.status === 'pending' && r.by === me().id && r.terrId === id));
-  });
+  }, null, NO_UNDO);
 }
 function askTerr(id) {
   const g = !!(reqForGroup && canGroupTerr());
@@ -8339,7 +8348,7 @@ function finishTerr(tid, done, lowOk) {
     delete t.paperHand;
     t.lastLentAt = t.lentAt; t.lastFirstAt = t.firstDoneAt || null;
     t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
-  });
+  }, null, NO_UNDO);
 }
 const returnTerr = (tid, completed) => finishTerr(tid, completed); // 以前の呼び方
 /* ---- 記録の少ない正式返却（区域係が目安未満のまま正式返却にしたものを、待ってから自動で確かめる） ---- */
@@ -8391,7 +8400,7 @@ function poolReturn(tid, lowOk) {
     lowMark(rec, t, lowP1(t, r), lowFirstPicked(t) ? t.firstLow === 'ok' : lowOk); // まだ正式返却ではない。あとで留守宅カードが完了したとき、この印がそのまま使われる
     t.lastLentAt = t.lentAt; t.lastFirstAt = first; t.awayPoolAt = now; t.poolRetId = rid;
     t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
-  });
+  }, null, NO_UNDO);
 }
 /* 留守宅カードで回っている区域：1回目に会えなかった家のうち、何軒が訪ね直されたか。決めた割合に届いた日 */
 function poolInfo(t) {
@@ -8402,6 +8411,7 @@ function poolInfo(t) {
   const ph1 = first >= t.awayPoolAt;
   let n = 0;
   for (const h of housesOf(t.id)) {
+    if (banNo(h)) continue; // 立入禁止の建物は数えない（roundInfo と同じ・M4）
     for (const u of (sp ? specialTargets(h, t) : targets(h))) {
       if (!sp && coveredBySpecial(h, u)) continue;
       const k = K(h.id, u);
@@ -8990,7 +9000,7 @@ async function endAwayCard(id) {
     const now = new Date().toISOString();
     c.endedAt = now;
     if (reached) poolFinish(t, now, pool.pct);
-  });
+  }, null, NO_UNDO);
 }
 /* 留守宅カードで回っていた区域を、正式に返却されたものとして記録する（返却記録の書きかえは、伝道者のときはサーバーが行う） */
 function poolFinish(t, at, pct) {
@@ -9073,6 +9083,7 @@ function roundInfo(tid, anyHolder) {
   const aw = { n: 0, done: 0, slots: 0 };
   const aw0 = { n: 0, done: 0 }; // 1回目の段階の留守宅（返却ボタンで「留守宅も回り終えたか」を決める。awayAgain）
   for (const h of housesOf(tid)) {
+    if (banNo(h)) continue; // 立入禁止の建物は回らないので、部屋を「回る家」に数えない（地図では薄く出る。サーバーの terrDonePct_ と同じ・M4・2026.13.102）
     for (const u of (sp ? specialTargets(h, t) : targets(h))) {
       if (!sp && coveredBySpecial(h, u)) { map.set(K(h.id, u), 'sp'); c.sp++; continue; } // 特別区域（コンビニなど）で回る家は、ふつうの区域カードに入れない（地図では薄く「特」）
       const k = K(h.id, u);
