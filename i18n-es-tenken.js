@@ -88,4 +88,6 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "次に係の画面を開いたときに確かめます": "Se verificará la próxima vez que se abra la pantalla del encargado",
 "区域マップ 版 {0}": "Mapa de Territorios · versión {0}",
 "設定（歯車）のいちばん下に、このスマホで使っているアプリの版を出すようにしました。更新が届いたかを確かめるときに見てください": "Al final de los ajustes (engranaje) ahora se muestra la versión de la aplicación que usa este teléfono. Mírela para comprobar si llegó la actualización",
+"区域の受け取り・返却・留守宅カードの返却のあとに「取り消す」を出さないようにしました。まちがえて返したときは、区域係に伝えてください（返却の記録が食いちがわないようにするため）": "Después de tomar o devolver un territorio, o de devolver una tarjeta de ausentes, ya no aparece «Deshacer». Si lo devolvió por error, avise al encargado de territorios (así los registros de devolución no quedan inconsistentes)",
+"立入禁止の建物の部屋は、「回る家」の数に入れないようにしました。ほかの家を回り終えれば、区域を回り終えたにできます": "Los departamentos de edificios con entrada prohibida ya no se cuentan entre las casas por visitar. Al terminar las demás casas, puede marcar el territorio como terminado",
 });

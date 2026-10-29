@@ -43,7 +43,7 @@
 
   /* ---------- 1 受け取り・返却の決まり（commit をつつむ） ---------- */
   const _commit = window.commit;
-  window.commit = function (msg, fn, onUndo) {
+  window.commit = function (msg, fn, onUndo, opt) {
     const f = function () {
       const pre = new Map();
       try {
@@ -67,7 +67,7 @@
       } catch (e) { console.error(e); }
       return ret;
     };
-    return _commit.call(this, msg, f, onUndo);
+    return _commit.call(this, msg, f, onUndo, opt); // opt（取り消しを出さない など）もそのまま渡す（2026.13.102）
   };
 
   /* ---------- 2 「回りはじめた日」を使う場所 ---------- */
