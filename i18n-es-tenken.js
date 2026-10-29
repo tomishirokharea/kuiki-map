@@ -77,6 +77,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "区域係の画面：目安に届かない区域を完了にするときは、「紙や口頭で確かめた」か「アプリの記録で確かめる」を、かならずえらぶようにしました。紙の区域カードの区域では、「留守宅カードにして返す」「1回目を終えたことにする」は出ません": "Pantalla del encargado: al dar por terminado un territorio que no llega al porcentaje indicado, ahora hay que elegir «Comprobé en papel o de palabra» o «Comprobar con los registros de la aplicación». En los territorios de la tarjeta de papel no aparecen «Devolver como tarjetas de ausentes» ni «Dar por terminada la 1.ª vuelta»",
 "記録・拒否・注意・再訪問のある家は、「ここは家ではない（消す）」で消せなくなりました。家ではないときは、区域係に削除を申請してください": "Las casas con registros, «No visitar», avisos o revisitas ya no se pueden borrar con «Aquí no hay casa (borrar)». Si no es una casa, pida al encargado que la borre",
 "紙の区域カードで回り終えた区域は、おすすめに「まだ一度も訪ねていない家」を出さないようにしました": "En los territorios terminados con la tarjeta de papel, Recomendadas ya no muestra «casas nunca visitadas»",
+"記録の少ない返却の自動の確かめは、受け取った日から返却した日までの記録で数えるようにしました。1回目のあとに留守宅を回った記録・留守宅カードで訪ね直した記録も数えるので、回り終えた区域が途中の返却にもどることはありません": "La verificación automática de devoluciones con pocos registros ahora cuenta los registros desde el día en que se tomó el territorio hasta el día de la devolución. También cuenta las visitas a casas ausentes hechas después de la 1.ª vuelta y las de las tarjetas de ausentes, así que un territorio terminado ya no vuelve a devolución parcial",
 "この家と、その記録をすべて削除しますか？": "¿Borrar esta casa y todos sus registros?",
 "「{0}」を消しますか？": "¿Borrar «{0}»?",
 "{0}さんの申請で「{1}」を消しますか？": "¿Borrar «{1}» según la solicitud de {0}?",

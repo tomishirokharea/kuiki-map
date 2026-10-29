@@ -2506,7 +2506,8 @@ const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).c
 const CHANGELOG = [
   { v: '2026.13.99', items: [
     ['消', '記録・拒否・注意・再訪問のある家は、「ここは家ではない（消す）」で消せなくなりました。家ではないときは、区域係に削除を申請してください'],
-    ['係', '区域係の画面：目安に届かない区域を完了にするときは、「紙や口頭で確かめた」か「アプリの記録で確かめる」を、かならずえらぶようにしました。紙の区域カードの区域では、「留守宅カードにして返す」「1回目を終えたことにする」は出ません']
+    ['係', '区域係の画面：目安に届かない区域を完了にするときは、「紙や口頭で確かめた」か「アプリの記録で確かめる」を、かならずえらぶようにしました。紙の区域カードの区域では、「留守宅カードにして返す」「1回目を終えたことにする」は出ません'],
+    ['確', '記録の少ない返却の自動の確かめは、受け取った日から返却した日までの記録で数えるようにしました。1回目のあとに留守宅を回った記録・留守宅カードで訪ね直した記録も数えるので、回り終えた区域が途中の返却にもどることはありません']
   ] },
   { v: '2026.13.91', items: [
     ['残', 'おすすめに、回り終えた区域で一度も訪ねていない家（回り残し）も出すようにしました。留守宅より先に出ます。訪ねて留守だったときは、次からは留守宅として、時間をあけて出ます'],
@@ -8452,8 +8453,10 @@ function finalizePools() {
   } finally { poolBusy = false; }
 }
 
-/* 返却した区域の1回目の割合を、いま届いている記録で数え直す。since＝受け取った日、until＝返却（1回目を終えた）日。
-   roundInfo の1回目と同じ数え方。until より後の記録は数えない。最近会えた家は、受け取った日の時点で数える（3万件対策：その区域の家だけ見る） */
+/* 返却した区域の、巡回で訪ねた家の割合を、いま届いている記録で数え直す。since＝受け取った日、until＝返却（完了）した日。
+   roundInfo の1回目と同じ数え方で、until より後の記録は数えない。最近会えた家は、受け取った日の時点で数える（3万件対策：その区域の家だけ見る）
+   until は「1回目を終えた日（firstAt）」ではなく「返却した日」（10/16 の決まり3。サーバーが返却のときに確かめる期間と同じ。2026-10-29 監査 R1）：
+   1回目のあとに留守宅を回った記録・留守宅カードで訪ね直した記録も数え、完了した区域を途中の返却にもどさないため */
 function coverAt(t, since, until) {
   const sp = isSpecial(t), inc = D().settings.skipDone !== 0, s0 = Date.parse(since) || 0;
   let done = 0, total = 0;
@@ -8491,9 +8494,12 @@ function paperDoneIn(t, from, until) {
      （たっていれば、もう受け取れるので変えない。S-13 の日付をむだに動かさない）
    ・訪問記録が整理されて消えた古い返却は、数え直せないので対象にしない（keepMonths）
    ・紙の記録で回り終えた日が、その巡回の中にある区域は対象にしない
-   ・1回目の割合が、目安から10ポイント下（サーバーの監査D5と同じ幅）に届いていない区域だけ。伝道者がふつうに返した区域を、数え方の少しの差で動かさない
+   ・紙や口頭で回り終えた巡回（区域の recLess）も対象にしない（訪ねた家がアプリにない。係が「紙や口頭で確かめた」で1回目を終え、本人が返した区域など）
+   ・受け取った日から返却（完了）した日までの記録で数え、目安から10ポイント下（サーバーの監査D5と同じ幅）に届いていない区域だけ。伝道者がふつうに返した区域を、数え方の少しの差で動かさない
+     （以前は「1回目を終えた日（firstAt）」までしか数えず、1回目のあとに留守宅を回った・留守宅カードで訪ね直した記録が数えられないため、
+       完了した区域を途中の返却にもどし、S-13 の完了日が前回にもどっていた。2026-10-29 監査 R1）
    ・返却の記録がない（古いデータ）ときは、S-13 の行を作らない記録を足して、あとで「正式返却に戻す」ができるようにする
-   返り値：[区域, 返却の記録（なければ null）, 回りはじめた日, 1回目の割合] */
+   返り値：[区域, 返却の記録（なければ null）, 回りはじめた日, 巡回で訪ねた割合] */
 function lowAdoptList() {
   const st = D().settings, fd = Number(st.freeAfterDays) || 0;
   if (Number(st.autoFree) !== 1 || fd <= 0) return [];
@@ -8501,12 +8507,13 @@ function lowAdoptList() {
   for (const t of D().territories) {
     if (t.dummy || t.holder || t.awayPoolAt || !t.completedAt || lendMode(t) !== 'auto') continue;
     if (t.returnedAt && t.returnedAt > t.completedAt) continue;   // すでに途中の返却（すぐ受け取れる）
+    if (t.recLess === 1) continue;                                 // この巡回は紙や口頭で回り終えた（記録では確かめない。H2 と同じ印）
     if (!(daysSince(t.completedAt) < lim)) continue;
     const r = D().returns.find(x => x.terrId === t.id && x.completed && x.at === t.completedAt) || null;
     if (r && (r.low || r.lowOk || r.lowAuto || r.lowSkip || r.ph)) continue; // ph＝紙の区域カードで回った（アプリに記録がない）
     const from = r ? lowFrom(r) : (t.lastLentAt || '');
     if (paperDoneIn(t, from, t.completedAt)) continue;
-    const pct = coverAt(t, from, (r && r.firstAt) || (!r && t.lastFirstAt) || t.completedAt);
+    const pct = coverAt(t, from, t.completedAt); // 返却（完了）した日まで（r.at と同じ。1回目を終えた日 firstAt ではない）
     if (pct < th) out.push([t, r, from, pct]);
   }
   return out;
@@ -8534,7 +8541,9 @@ function lowSweep() {
     if (!t) continue;
     if (t.holder || t.awayPoolAt || t.completedAt !== r.at) { skip.push(r); continue; } // あとの動きがあるので、何も変えない
     if (paperDoneIn(t, lowFrom(r), r.at)) { paper.push([r, t]); continue; } // 紙の記録（S-13）の完了日がその巡回にある：途中にしない（H1）
-    const pct = coverAt(t, lowFrom(r), r.firstAt || r.at);
+    // 受け取った日から返却（完了）した日 r.at まで数える。1回目を終えた日（r.firstAt）までにすると、そのあとに本人が留守宅を回った記録・
+    // 留守宅カードで訪ね直した記録が数えられず、回り終えた区域が途中の返却にもどる（2026-10-29 監査 R1・R3）
+    const pct = coverAt(t, lowFrom(r), r.at);
     (pct >= th ? ok : flip).push([r, t, pct]);
   }
   // 印のない返却：待つ日数がすぎていれば、そのまま途中の返却にする（まだなら印だけ付けて、確かめ待ちに出す）
