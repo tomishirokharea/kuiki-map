@@ -657,7 +657,7 @@
       const keys = route.flatMap(s => s.xs.map(x => x.k));
       const last = route.reduce((a, s) => s.xs.reduce((b, x) => (x.lastAt < b ? x.lastAt : b), a), '9999');
       out.push({ kind: 'after', t: arr[0].t, stops: route, keys, n: keys.length, dist: pos ? route[0].leg : null, mins: ceil5(walk / 67 + 4 * keys.length),
-        last, rank: Math.max(...route.map(s => rainRank(s.h))), rain: !!rain, focus: arr[0].focus, left: !!arr[0].left, prov: route.filter(s => s.h.prov).length });
+        last, rank: Math.max(...route.map(s => rainRank(s.h))), rain: !!rain, focus: arr[0].focus, left: !!arr[0].left, prov: route.filter(s => s.h.prov && !houseHasRec(s.h)).length }); // 消せる仮の家だけ数える（記録・印のある家は消せない。H8）
     });
     out.forEach((c, i) => { c.i = i; });
     return out;
@@ -1026,7 +1026,7 @@
     $('#legendBtn').classList.toggle('hasbar', barHidden);
     if (barHidden) { bar.hidden = true; return; }
     const t = terrById(KF.tid), keys = [...KF.keys].filter(k => houseById(keyHid(k))), done = keys.filter(k => visitedSince(k, KF.since)).length; // 消した仮の家は数えない
-    const prov = new Set(keys.map(keyHid).filter(id => { const hh = houseById(id); return hh && hh.prov; })).size;
+    const prov = new Set(keys.map(keyHid).filter(id => { const hh = houseById(id); return hh && hh.prov && !houseHasRec(hh); })).size; // 消せる仮の家だけ（H8）
     const h = KF.hold ? holdById(KF.hold) : null, live = !!h && holdLive(h);
     const when = !h ? '見るだけです（まだ予定に入れていません）' : !live ? 'この予定の押さえは、もう終わっています'
       : h.kind === 'plan' ? `${fmtYmd(h.date)}の予定です（その日の終わりまで、ほかの人のおすすめに出しません）` : '今日の終わりまで、あなたの予定です（ほかの人のおすすめに出しません）';

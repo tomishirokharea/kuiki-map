@@ -1589,7 +1589,7 @@ button.ktag{cursor:pointer}
       closeSheet();
       commit(`区域${t.no}を${uname(v)}さんに貸し出しました`, () => {
         t.holder = v; t.lentAt = new Date().toISOString();
-        t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
+        t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; delete t.recLess; t.awayPoolAt = null; t.poolRetId = null;
       });
     });
   }
@@ -1774,7 +1774,7 @@ button.ktag{cursor:pointer}
           toast('候補から外しました（半年は出しません）'); paintCand();
         } else if ((x = q('[data-cgone]'))) {
           const h = houseById(x.dataset.cgone);
-          if (h && await ask(`「${h.label || '目印なし'}」を消します。訪問の記録も一緒に消えます（消したあとの「取り消す」で戻せます）。よろしいですか？`)) deleteHouse(h.id);
+          if (h && await ask(`「${h.label || '目印なし'}」を消します。${(typeof houseRecText === 'function' && houseRecText(h)) || '訪問の記録も一緒に消えます。'}消したあとの「取り消す」で戻せます。よろしいですか？`)) deleteHouse(h.id);
         }
       });
     }
@@ -2391,7 +2391,7 @@ body.duemode .terr-label:not(.duelab){display:none}
         const now = new Date().toISOString();
         recordHandover(t, now); // 前の担当者の行を S-13 に残す
         t.holder = v; t.lentAt = now;
-        t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
+        t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; delete t.recLess; t.awayPoolAt = null; t.poolRetId = null;
       });
     });
     on('[data-kgrp]', 'onchange', e => setTerrUse(t, e.target.value));
@@ -2537,8 +2537,9 @@ body.duemode .terr-label:not(.duelab){display:none}
     if (!wait.length && !auto.length && !old.length) return '';
     const rows = [];
     wait.slice(0, 20).forEach(([r, t]) => {
-      const pct = coverAt(t, lowFrom(r), r.firstAt || r.at);
-      rows.push(`<li><span>区域${esc(t.no)}　返却 ${esc(fmtDay(r.at))}　記録 ${pct}%（目安${th}%）<br><small class="muted">${esc(fmtDay(new Date(Date.parse(r.at) + waitMs).toISOString()))}に確かめます</small></span>
+      const pct = coverAt(t, lowFrom(r), r.at); // 自動の確かめ（lowSweep）と同じ期間（回りはじめた日〜返却した日）
+      const due = Date.parse(r.at) + waitMs; // 待つ日数がすぎている（印のない古い返却を拾ったもの）は、次に係の画面を開いたときの確かめで数え直す（P6）
+      rows.push(`<li><span>区域${esc(t.no)}　返却 ${esc(fmtDay(r.at))}　記録 ${pct}%（目安${th}%）<br><small class="muted">${due <= Date.now() ? '次に係の画面を開いたときに確かめます' : esc(fmtDay(new Date(due).toISOString())) + 'に確かめます'}</small></span>
         <span class="duebtns"><button type="button" class="btn small" data-lowconfirm="${esc(r.id)}">正式返却で確定</button> <button type="button" class="btn small" data-lownow="${esc(r.id)}">今すぐ途中にする</button></span></li>`);
     });
     auto.slice(0, 20).forEach(([r, t]) => {
@@ -2603,7 +2604,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       if (t.holder) { toast(`区域${t.no}は、${uname(t.holder)}さんがすでに持っています。ほかの区域をえらんでください`); renderAll(); return; }
       commit(`区域${t.no}を${uname(r.by)}さんに貸し出しました`, () => {
         const now = new Date().toISOString();
-        t.holder = r.by; t.lentAt = now; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
+        t.holder = r.by; t.lentAt = now; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; delete t.recLess; t.awayPoolAt = null; t.poolRetId = null;
         t.group = r.forGroup || null;
         if (t.group && r.use === 'all') t.use = 'all'; else delete t.use;
         Object.assign(r, { status: 'approved', terrId: t.id, decidedAt: now, decidedBy: me().id, seen: false });
@@ -2619,7 +2620,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     return decide(id, async r => {
       const h = houseById(r.houseId);
       const name = h ? (h.type === 'apt' ? `${h.label || '集合住宅'}（${h.units.length}部屋）` : (h.label || '家')) : '';
-      if (h && !await ask(`${uname(r.by)}さんの申請で「${name}」を消します。訪問の記録も一緒に消えます。よろしいですか？`)) return;
+      if (h && !await ask(`${uname(r.by)}さんの申請で「${name}」を消します。${(typeof houseRecText === 'function' && houseRecText(h)) || ''}よろしいですか？`)) return; // 件数つき（H8）
       commit(h ? `「${name}」を削除しました` : '申請を閉じました', () => {
         if (h) deleteHouseData(h.id);
         Object.assign(r, { status: 'approved', decidedAt: new Date().toISOString(), decidedBy: me().id, seen: false });
@@ -2708,7 +2709,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       commit(`区域${t.no}を${uname(v)}さんに${all ? '（全体の集まりの区域として）' : g ? `（${g}グループの区域として）` : ''}貸し出しました`, () => {
         t.holder = v; t.lentAt = new Date().toISOString();
         if (all) t.use = 'all'; else delete t.use;
-        t.helpers = []; t.group = g; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; t.awayPoolAt = null; t.poolRetId = null;
+        t.helpers = []; t.group = g; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; delete t.recLess; t.awayPoolAt = null; t.poolRetId = null;
       });
     });
   }
