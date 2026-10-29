@@ -3199,5 +3199,14 @@ window.KUIKI_I18N.es = {
 "監督・司会者": "Superintendentes y conductores",
 "区域{0}を{1}さんに（全体の集まりの区域として）貸し出しました": "Se prestó el territorio {0} a {1} (como territorio de la reunión general)",
 "監督・司会者は、全体の集まり（金曜の晩・日曜の昼など）で使う区域も受け取れるようになりました。グループ奉仕の区域といっしょに「集まりで使う区域」に出ます。S-13には「全体の集まり（名前）」と出ます": "Superintendentes y conductores ahora también pueden recibir territorios para la reunión general (viernes por la noche, domingo al mediodía, etc.). Aparecen con los de predicación en grupo en «Territorios para las reuniones». En el S-13 aparecen como «Reunión general (nombre)».",
-"集まりで使う区域の枚数": "Cantidad de territorios para las reuniones"
+"集まりで使う区域の枚数": "Cantidad de territorios para las reuniones",
+/* 2026.13.106：S-13 からアプリで貸出中の区域を完了にする・アプリで貸出中の区域に紙の記録を入れるときに知らせる */
+"完了にする": "Marcar como completado",
+"区域{0}を、今日完了にしますか？": "¿Marcar hoy el territorio {0} como completado?",
+"{0}さんの区域カードから外れ、S-13 の完了した日付が今日（{1}）になります。区域係が回り終えたことを確かめた完了として記録します（あとで自動で途中の返却にもどしません）。まだ回っていない家があるときは「やめる」を押して、区域のカルテの「返却する」から途中で返却してください。": "Se quitará de las tarjetas de territorio de {0} y la fecha de completado del S-13 será hoy ({1}). Se registra como completado confirmado por el encargado de territorios (después no se cambiará automáticamente a devolución incompleta). Si quedan casas sin visitar, toque «Cancelar» y haga una devolución incompleta con «Devolver» en la ficha del territorio.",
+"{0}さんの区域カードから外れ、S-13 の完了した日付が今日（{1}）になります。区域係が回り終えたことを確かめた完了として記録します（あとで自動で途中の返却にもどしません）。": "Se quitará de las tarjetas de territorio de {0} y la fecha de completado del S-13 será hoy ({1}). Se registra como completado confirmado por el encargado de territorios (después no se cambiará automáticamente a devolución incompleta).",
+"ほかの操作で担当が変わったので、完了にしませんでした": "No se marcó como completado porque el responsable cambió por otra operación",
+"アプリで貸出中の区域です": "Este territorio está prestado en la aplicación",
+"区域{0}は、アプリで{1}さんが持っています。紙の記録を入れても、アプリの区域カードはそのままで、完了になりません。アプリの区域を完了にするときは「やめる」を押して、「この年度の割り当て」の「完了にする」を押してください。": "El territorio {0} lo tiene {1} en la aplicación. Aunque agregue un registro en papel, la tarjeta de territorio en la aplicación sigue igual y no queda completada. Para completar el territorio de la aplicación, toque «Cancelar» y luego «Marcar como completado» en «Asignaciones de este año».",
+"区域係の画面：S-13 の区域の記録で、アプリで貸出中の区域を「完了にする」で完了にできるようにしました（紙の記録に完了した日付を入れるのと同じように、区域カードから外れます）。アプリで貸出中の区域に紙の記録を入れるときは、区域カードが外れないことを先に知らせます": "Pantalla del encargado: en el registro del territorio del S-13, ahora puede completar con «Marcar como completado» un territorio prestado en la aplicación (igual que al anotar la fecha de completado en un registro en papel, se quita de la tarjeta de territorio). Al agregar un registro en papel a un territorio prestado en la aplicación, se avisa antes que la tarjeta no se quitará."
 };

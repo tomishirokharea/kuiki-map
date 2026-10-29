@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.105';
+var APP_JS_VER = '2026.13.106';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2677,6 +2677,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.106', items: [
+    ['係', '区域係の画面：S-13 の区域の記録で、アプリで貸出中の区域を「完了にする」で完了にできるようにしました（紙の記録に完了した日付を入れるのと同じように、区域カードから外れます）。アプリで貸出中の区域に紙の記録を入れるときは、区域カードが外れないことを先に知らせます']
+  ] },
   { v: '2026.13.105', items: [
     ['返', '全体の集まりで使う区域と、紙の区域カードで渡した区域は、「返却の目安を過ぎた」に数えないようにしました（返却の目安は「なし」と出ます）'],
     ['報', '奉仕報告を送ったあとで時間を足したときは、月末にもう一度「直しますか」と知らせるようにしました。S21 に送る画面に、S21 のだれとして送るかを出します'],
@@ -8519,8 +8522,9 @@ function firstDone(tid, lowOk) {
     if (t.firstLow === 'ok') t.recLess = 1; // 紙や口頭で確かめた：このあと本人が返しても、回り残しを出さない（H2）
   });
 }
-/* 返却。done＝留守宅も回り終えた（今日が「回り終えた日」） */
-function finishTerr(tid, done, lowOk) {
+/* 返却。done＝留守宅も回り終えた（今日が「回り終えた日」）。
+   sure＝区域係が回り終えたことを確かめた（S-13 の「完了にする」）：1回目に「アプリの記録で確かめる」をえらんでいても、紙や口頭で確かめた完了にする */
+function finishTerr(tid, done, lowOk, sure) {
   const t = terrById(tid); if (!t) return;
   const r = roundInfo(tid, true), pct = r ? r.pct : null;
   closeSheet();
@@ -8538,7 +8542,7 @@ function finishTerr(tid, done, lowOk) {
       t.completedAt = now; t.completedPct = null;
       t.recLess = 1; // 紙で回った家はアプリにないので、おすすめに回り残しを出さない（H2）
     } else if (done) {
-      lowMark(rec, t, lowP1(t, r), lowFirstPicked(t) ? t.firstLow === 'ok' : lowOk); // 印は、t.completedAt を書きかえる前に付ける
+      lowMark(rec, t, lowP1(t, r), sure || (lowFirstPicked(t) ? t.firstLow === 'ok' : lowOk)); // 印は、t.completedAt を書きかえる前に付ける
       t.completedAt = now; t.completedPct = r && r.phase === 'away' ? r.pct1 : pct;
     }
     delete t.paperHand;
@@ -13937,7 +13941,8 @@ function openS13Edit(tid, editId) {
     <h3 class="sub">この年度の割り当て</h3>
     ${r.rows.length ? r.rows.map(x => `<div class="setrow"><span><b>${esc(x.name)}</b>　${s13Fmt(x.a)} 〜 ${x.c ? s13Fmt(x.c) + ' 完了' : x.cur ? '貸出中' : x.ret ? '返却 ' + s13Fmt(x.ret) : '（完了日なし）'}
         <br><small class="hint">${x.src === 'paper' ? '紙から転記' : 'アプリの記録'}</small></span>
-        ${x.src === 'paper' ? `<span class="actions" style="margin:0"><button class="btn small" data-s13ed="${esc(x.id)}">直す</button><button class="btn small danger" data-s13del="${esc(x.id)}">消す</button></span>` : ''}</div>`).join('')
+        ${x.src === 'paper' ? `<span class="actions" style="margin:0"><button class="btn small" data-s13ed="${esc(x.id)}">直す</button><button class="btn small danger" data-s13del="${esc(x.id)}">消す</button></span>`
+          : x.cur && t.holder ? '<span class="actions" style="margin:0"><button class="btn small" data-s13fin>完了にする</button></span>' : ''}</div>`).join('')
       : '<p class="muted">この年度の記録はありません。</p>'}
     <h3 class="sub">${ed ? '紙の記録を直す' : '紙の記録を転記する'}</h3>
     <label class="field"><span>伝道者の名前</span><input type="text" id="s13Name" list="s13Names" maxlength="30" value="${esc(ed ? ed.name : '')}" placeholder="例：山田 花子"></label>
@@ -14001,6 +14006,13 @@ function openS13Edit(tid, editId) {
       return;
     }
     if (g && !g.user && !await ask(`「${g.name}」さんは、グループ監督・司会者としてアプリに登録されていないので、紙の記録として入れます。\n登録したあとで、この記録を「直す」から保存し直すと、アプリに渡せます。`, { ok: '紙の記録として入れる', danger: false })) return;
+    // アプリで貸出中の区域に、その期間の紙の記録を入れても、アプリの区域カードはそのまま（完了にならない）。入れる前に知らせる
+    // （前の巡回の紙の記録を転記するとき＝完了した日付が受け取った日より前、は知らせない）
+    const appHeld = targets.filter(x => x.holder && x.lentAt && (!c || c >= dstr(x.lentAt)));
+    if (appHeld.length && !await ask('', {
+      title: 'アプリで貸出中の区域です',
+      body: `区域${appHeld.map(x => x.no).join('・')}は、アプリで${[...new Set(appHeld.map(x => uname(x.holder)))].join('・')}さんが持っています。紙の記録を入れても、アプリの区域カードはそのままで、完了になりません。アプリの区域を完了にするときは「やめる」を押して、「この年度の割り当て」の「完了にする」を押してください。`,
+      ok: '紙の記録として入れる', danger: false })) return;
     commit(ed ? '記録を直しました' : `区域${targets.map(x => x.no).join('・')}に${name}さんの記録を入れました`, () => {
       const at = new Date().toISOString();
       targets.forEach(x => {
@@ -14008,6 +14020,19 @@ function openS13Edit(tid, editId) {
         else D().s13.push({ id: 's' + uid(), kind: 'a', terrId: x.id, name, a, c, at, by: me().id });
       });
     });
+    again();
+  };
+  // アプリで貸出中の区域を、S-13 から完了にする（紙の記録に完了した日付を入れるのと同じ考え方。区域係の操作「正式に返却する」と同じ返却）
+  if ($('[data-s13fin]', $('#sheet'))) $('[data-s13fin]', $('#sheet')).onclick = async () => {
+    const h = t.holder; if (!h || !isAdmin()) return;
+    const ph = paperHandOf(t);
+    if (!await ask('', {
+      title: `区域${t.no}を、今日完了にしますか？`,
+      body: `${uname(h)}さんの区域カードから外れ、S-13 の完了した日付が今日（${s13Fmt(ymd(new Date()))}）になります。区域係が回り終えたことを確かめた完了として記録します（あとで自動で途中の返却にもどしません）。` +
+        (ph ? '' : 'まだ回っていない家があるときは「やめる」を押して、区域のカルテの「返却する」から途中で返却してください。'),
+      ok: '完了にする', danger: false })) return;
+    if (terrById(tid).holder !== h) { toast('ほかの操作で担当が変わったので、完了にしませんでした'); again(); return; }
+    finishTerr(tid, true, true, true);
     again();
   };
   if ($('#s13EdCancel')) $('#s13EdCancel').onclick = () => openS13Edit(tid);
