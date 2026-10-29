@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.103';
+var APP_JS_VER = '2026.13.104';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -1186,7 +1186,9 @@ function restoreOrphan() {
   if (!cu || !by[cu]) return; // ちがう人の分は送らない。7日のあいだ取っておく（その人のリンクを開き直したら送る）
   const o = by[cu];
   delete by[cu]; orphanSave(by);
-  if ((o.failed || []).length) lsSet(FAILED_KEY, JSON.stringify(failedList().concat(o.failed).slice(-30))); // その人の「送れない変更」にもどす
+  // その人の「送れない変更」にもどす。もどすのは送ってよい種類（記録・拒否・注意・受け持ち・引き継ぎ）だけ（取っておいた間に区域などの状態が変わっているため・監査6 L4）
+  const fl = (o.failed || []).map(x => { const sp2 = x && x.ch ? orphanSplit([x.ch]) : null; return sp2 && sp2.keep.length ? Object.assign({}, x, { ch: mergeChanges(sp2.keep) }) : null; }).filter(Boolean);
+  if (fl.length) lsSet(FAILED_KEY, JSON.stringify(failedList().concat(fl).slice(-30)));
   if (!(o.queue || []).length) return;
   const sp = orphanSplit(o.queue);
   const drop = sp.dropped ? `区域の変更など ${sp.dropped}件は送りませんでした。必要なら区域係に伝えてください` : ''; // 言語のファイルに、文ごと（下の組み合わせも）入れてある
@@ -2624,6 +2626,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.104', items: [
+    ['更', '電波が弱いときに更新が届いても、新しい版と前の版のファイルがまざらないようにしました。圏外で開いたときも、同じ版のファイルで開きます'],
+    ['係', '区域係の画面ロックで「番号を忘れた」を押したときも、まだ送っていない記録は消さずに取っておき、登録し直したら送るようにしました']
+  ] },
   { v: '2026.13.103', items: [
     ['送', '招待リンクが新しくなったとき、まだ送っていない訪問の記録は消さずに取っておき、同じ人のリンクを開いたら送るようにしました（区域の受け取りなどは送りません）'],
     ['待', 'サーバーが混んでいるだけのときは、変更を「送れない変更」に回さずに送り続けるようにしました。前に回った変更は、次に開いたときに一度だけ自動で送り直します'],

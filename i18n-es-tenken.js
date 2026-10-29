@@ -104,4 +104,6 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "ほかの人（{0}人）": "Otras personas ({0})",
 "おすすめの押さえ": "la reserva de casas recomendadas",
 "送信のお知らせ": "Aviso de envío",
+"電波が弱いときに更新が届いても、新しい版と前の版のファイルがまざらないようにしました。圏外で開いたときも、同じ版のファイルで開きます": "Aunque la actualización llegue con mala señal, ya no se mezclan archivos de la versión nueva y de la anterior. Al abrir sin conexión también se usan archivos de una misma versión",
+"区域係の画面ロックで「番号を忘れた」を押したときも、まだ送っていない記録は消さずに取っておき、登録し直したら送るようにしました": "En la pantalla del encargado, al tocar «Olvidé el número» del bloqueo, los registros que aún no se enviaron ya no se borran: se guardan y se envían al volver a registrarse",
 });
