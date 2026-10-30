@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.107';
+var APP_JS_VER = '2026.13.108';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2677,6 +2677,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.108', items: [
+    ['係', '区域係の画面：S-13 の表で「記録をえらんで消す」を押すと、アプリの記録をいくつもえらんで、まとめて消せるようにしました（テストの記録など。訪問の記録は消えません）。']
+  ] },
   { v: '2026.13.107', items: [
     ['係', '区域係の画面：S-13 の区域の記録で、アプリの記録（返却・貸出中）も「消す」で消せるようにしました（テストや押しまちがいの記録。訪問の記録は消えません）。']
   ] },
@@ -13830,6 +13833,7 @@ const svcYearOf = d => (d.getMonth() >= 8 ? d.getFullYear() + 1 : d.getFullYear(
 const dstr = v => { if (!v) return ''; if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v; const d = new Date(v); return isNaN(d) ? '' : ymd(d); };
 const s13Fmt = s => { if (!s) return ''; const [y, m, d] = s.split('-').map(Number); return `${y}/${m}/${d}`; };
 let s13Y = null;
+let s13Pick = null; // えらんで消すときの、えらんだ記録（返却の記録の id か 'cur:区域の id'）。えらんでいないときは null
 /* S-13 の名前：グループ奉仕の区域は「グループ奉仕（監督・司会者の名前）」（紙の S-13 と同じ書き方）、全体の集まりの区域は「全体の集まり（司会者の名前）」 */
 const s13Who = (uid, g, all) => (g && all ? `全体の集まり（${uname(uid)}）` : g ? `グループ奉仕（${uname(uid)}）` : uname(uid));
 /* 「グループ奉仕（名前）」と書いた名前から、その監督・司会者をさがす。null＝その書き方ではない／{ name } だけ＝渡せる人がいない */
@@ -13879,7 +13883,9 @@ function s13BlockHtml(r, print) {
   for (let i = 0; i < Math.max(1, r.rows.length); i += 4) chunks.push(r.rows.slice(i, i + 4));
   return chunks.map((ch, ci) => {
     const slots = [0, 1, 2, 3].map(i => ch[i] || null);
-    const cls = x => (!x || print ? '' : ` class="s13-${x.src}${x.cur ? ' s13-cur' : ''}"`);
+    // えらんで消す（区域係・2026.13.108）：消せるアプリの記録（返却・貸出中。留守宅カードの段階は除く）のマスに、記録の目印を付ける
+    const pk = x => (!print && x && x.src === 'app' && !x.pool ? (x.cur ? 'cur:' + r.t.id : x.rid || '') : '');
+    const cls = (x, nm) => (!x || print ? '' : ` class="s13-${x.src}${x.cur ? ' s13-cur' : ''}${nm ? ' s13-nm' : ''}${pk(x) && s13Pick && s13Pick.has(pk(x)) ? ' s13-on' : ''}"${pk(x) ? ` data-s13k="${esc(pk(x))}"` : ''}`);
     const cdate = x => {
       if (!x) return '';
       if (x.c) return s13Fmt(x.c);
@@ -13889,7 +13895,7 @@ function s13BlockHtml(r, print) {
     const prevCls = !print && r.prevPaper && ci === 0 ? ' s13-paper' : '';
     return `<tbody class="s13blk"${print ? '' : ` data-s13t="${esc(r.t.id)}"`}>
       <tr><td rowspan="2" class="no">${esc(r.t.no)}</td><td rowspan="2" class="prev${prevCls}">${ci === 0 ? s13Fmt(r.prev) : (print ? '' : '<small>続き</small>')}</td>
-        ${slots.map(x => `<td colspan="2"${cls(x)}>${x ? esc(x.name) : ''}</td>`).join('')}</tr>
+        ${slots.map(x => `<td colspan="2"${cls(x, true)}>${x ? esc(x.name) : ''}</td>`).join('')}</tr>
       <tr>${slots.map(x => `<td${cls(x)}>${x ? s13Fmt(x.a) : ''}</td><td${cls(x)}>${cdate(x)}</td>`).join('')}</tr></tbody>`;
   }).join('');
 }
@@ -13907,14 +13913,32 @@ function openS13(y) {
       <p class="hint">${s13Y - 1}年9月1日〜${s13Y}年8月31日。アプリの貸し出し・返却の記録と、紙から転記した記録（${nPaper}件）を合わせて表示しています。<br>
         <b>区域の行を押すと</b>、紙の記録を転記したり、前回完了した日付を入れたりできます。</p>
       <p class="s13keys"><span class="k s13-app">アプリの記録</span><span class="k s13-paper">紙から転記</span><span class="k s13-cur">いま貸出中</span></p>
-      <div class="scroll"><table class="s13tbl screen">${S13_COLS}${S13_HEAD}${data.map(r => s13BlockHtml(r, false)).join('')}</table></div>
+      ${s13Pick ? '<p class="hint s13pickhint"><b>消すアプリの記録の名前のマスを押して、えらんでください。</b>もう一度押すと外れます。紙から転記した記録と、留守宅カードで回っている記録はえらべません。</p>'
+        : '<p><button class="btn small" id="s13PickOn">記録をえらんで消す</button></p>'}
+      <div class="scroll"><table class="s13tbl screen${s13Pick ? ' s13pick' : ''}">${S13_COLS}${S13_HEAD}${data.map(r => s13BlockHtml(r, false)).join('')}</table></div>
       <p class="hint">*新しいシートを使い始める時には，各区域の前回完了した日付をこの欄に記入してください。</p>
-    </div></div>`;
+    </div></div>
+    ${s13Pick ? `<div class="s13pickbar"><button class="btn danger" id="s13PickGo"${s13Pick.size ? '' : ' disabled'}>えらんだ ${s13Pick.size}件を消す</button><button class="btn" id="s13PickOff">やめる</button></div>` : ''}`;
   el.hidden = false;
-  $('#s13Close').onclick = () => { el.hidden = true; };
+  $('#s13Close').onclick = () => { s13Pick = null; el.hidden = true; };
+  if ($('#s13PickOn')) $('#s13PickOn').onclick = () => { s13Pick = new Set(); openS13(s13Y); };
+  if ($('#s13PickOff')) $('#s13PickOff').onclick = () => { s13Pick = null; openS13(s13Y); };
+  if ($('#s13PickGo')) $('#s13PickGo').onclick = async () => {
+    const res = await s13DelMany([...s13Pick]);
+    if (res) { if (res === true) s13Pick = null; openS13(s13Y); }
+    if (typeof res === 'string') toast(res); // 消さなかった理由（描き直したあとに出す）
+  };
   $('#s13Print').onclick = () => printS13(s13Rows(s13Y), s13Y);
-  $$('[data-s13y]', el).forEach(b => b.onclick = () => openS13(s13Y + Number(b.dataset.s13y)));
-  $$('[data-s13t]', el).forEach(b => b.onclick = () => openS13Edit(b.dataset.s13t));
+  $$('[data-s13y]', el).forEach(b => b.onclick = () => { if (s13Pick) s13Pick = new Set(); openS13(s13Y + Number(b.dataset.s13y)); });
+  $$('[data-s13t]', el).forEach(b => b.onclick = e => {
+    if (!s13Pick) { openS13Edit(b.dataset.s13t); return; }
+    // えらんでいる間：記録のマスを押すと、えらぶ・外す（区域の記録の画面は開かない）
+    const c = e.target.closest('[data-s13k]'); if (!c) return;
+    const k = c.dataset.s13k;
+    if (s13Pick.has(k)) s13Pick.delete(k); else s13Pick.add(k);
+    $$(`[data-s13k="${CSS.escape(k)}"]`, el).forEach(x => x.classList.toggle('s13-on', s13Pick.has(k)));
+    const go = $('#s13PickGo'); go.disabled = !s13Pick.size; go.textContent = `えらんだ ${s13Pick.size}件を消す`;
+  });
 }
 function printS13(data, y) {
   const blocks = [];
@@ -14100,12 +14124,93 @@ async function s13DelApp(tid, rid) {
       if (roundTerr === tid) roundTerr = null;
       commit(`区域${t.no}の貸し出しを、なかったことにしました`, () => {
         // 返却（finishTerr）と同じ項目を空にする。前回の返却・完了した日付は変えない
-        delete t.paperHand;
-        t.unLend = 1; // 「続きから」の起点（tsuzuki.js）：途中の返却とみなさず、受け取る前にもどす。印は tsuzuki.js が消す
-        t.holder = null; t.lentAt = null; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
+        s13UnLend(t);
       });
       delete t.unLend; // tsuzuki.js が読み込まれていないときも残さない（commit のあとに消しても、送るのは次の保存）
     }
+    return true;
+  } finally { s13DelBusy = false; }
+}
+/* 貸し出しをなかったことにする（commit の中で呼ぶ）。返却（finishTerr）と同じ項目を空にする。前回の返却・完了した日付は変えない */
+function s13UnLend(t) {
+  delete t.paperHand;
+  t.unLend = 1; // 「続きから」の起点（tsuzuki.js）：途中の返却とみなさず、受け取る前にもどす。印は tsuzuki.js が消す
+  t.holder = null; t.lentAt = null; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
+}
+/* S-13 の表でえらんだアプリの記録を、まとめて消す（2026.13.108）。1件ずつ消す s13DelApp と同じ決まりで、1回の commit にまとめる。
+   戻り値：true＝消した・文字＝消さなかった理由（えらんだまま描き直す）・false＝何もしない */
+async function s13DelMany(keys) {
+  if (!isAdmin() || s13DelBusy || !keys || !keys.length) return false;
+  const T = s => (window.KI ? window.KI.t(s) : s), J = xs => xs.filter(Boolean).join(window.KI && KI.lang !== 'ja' ? ' ' : '');
+  if (LIVE && navigator.onLine === false) { toast('電波のあるところで消してください'); return false; }
+  if (LIVE && (Store.queue.length || flushing)) { toast('まだ送っていない変更があります。送り終えてから、もう一度押してください'); return false; }
+  const snap = x => (x ? [x.holder || '', x.lentAt || '', x.awayPoolAt || '', x.poolRetId || '', x.returnedAt || '', x.completedAt || ''].join('|') : '');
+  // えらんだ記録を、区域ごとに分ける
+  const plan = () => {
+    const by = new Map(), skip = [];
+    keys.forEach(k => {
+      if (k.startsWith('cur:')) {
+        const t = terrById(k.slice(4)); if (!t || !t.holder || !t.lentAt) return;
+        const g = by.get(t.id) || { t, rets: [], cur: false }; g.cur = true; by.set(t.id, g);
+      } else {
+        const r = (D().returns || []).find(x => x.id === k); const t = r && terrById(r.terrId); if (!r || !t) return;
+        if (t.awayPoolAt && t.poolRetId === r.id) { skip.push(r); return; }
+        const g = by.get(t.id) || { t, rets: [], cur: false }; g.rets.push(r); by.set(t.id, g);
+      }
+    });
+    // 留守宅カードを受け取っている人がいる区域：最新の返却（と、それを消すと最新になる記録）は消さない
+    by.forEach(g => {
+      if (!g.rets.length || !activeCards().some(c => c.terrId === g.t.id)) return;
+      const latest = s13RetSort(g.t.id).pop();
+      if (g.rets.includes(latest)) { skip.push(...g.rets); g.rets = []; }
+    });
+    return { by, skip };
+  };
+  let { by, skip } = plan();
+  const nRet = [...by.values()].reduce((n, g) => n + g.rets.length, 0), nCur = [...by.values()].filter(g => g.cur).length;
+  if (!nRet && !nCur) { toast(T('消せる記録がありません（留守宅カードを受け取っている人がいる区域の、最新の記録は消せません）')); return false; }
+  // だれの・いつの記録か（同じ人・同じ日をまとめる）
+  const sum = new Map();
+  by.forEach(g => {
+    g.rets.forEach(r => { const k = (r.g ? s13Who(r.by, r.g, r.ga) : uname(r.by) + 'さん') + ' ' + s13Fmt(dstr(r.lentAt)); sum.set(k, (sum.get(k) || 0) + 1); });
+    if (g.cur) { const k = T(`${uname(g.t.holder)}さん 貸出中`); sum.set(k, (sum.get(k) || 0) + 1); }
+  });
+  const list = [...sum.entries()].map(([k, n]) => T(`${k}（${n}件）`)).join(window.KI && KI.lang !== 'ja' ? ', ' : '、');
+  const body = J([
+    T(`消す記録：${list}。`),
+    nRet ? T('区域の完了した日付と前回の返却は、それぞれ前の記録にもどります。') : '',
+    nCur ? T(`貸出中の${nCur}件は、貸し出しをなかったことにします（返却の記録は残りません）。`) : '',
+    skip.length ? T(`えらんだうち${skip.length}件は、留守宅カードで回っているため消しません。`) : '',
+    T('訪問の記録（会えた・留守）は消えません。'),
+    T('消したあと、下に出る「取り消す」でもどせます。')
+  ]);
+  if (!await ask('', { title: T(`${nRet + nCur}件の記録を消しますか？`), body, ok: '消す', danger: true })) return false;
+  const before = new Map([...by.values()].map(g => [g.t.id, snap(g.t)]));
+  s13DelBusy = true;
+  try {
+    if (LIVE && navigator.onLine !== false) {
+      const go = $('#s13PickGo'); if (go) { go.disabled = true; go.textContent = '確かめています…'; }
+      toast('最新の状態を確かめています…');
+      try { await Promise.race([refresh(true), wait(5000)]); } catch (e) { /* 今のデータで続ける */ }
+    }
+    if (LIVE && (Store.queue.length || flushing)) return 'まだ送っていない変更があります。送り終えてから、もう一度押してください';
+    // 最新を受け取ったあとで、えらんだ区域が変わっていたら、1件も消さない（えらんだまま描き直すので、見直してもう一度押せる）
+    const p2 = plan();
+    const n2 = [...p2.by.values()].reduce((n, g) => n + g.rets.length, 0), c2 = [...p2.by.values()].filter(g => g.cur).length;
+    if (n2 !== nRet || c2 !== nCur || [...p2.by.values()].some(g => snap(g.t) !== before.get(g.t.id))) return 'ほかの操作で区域の状態が変わったので、消しませんでした';
+    by = p2.by;
+    commit(`${nRet + nCur}件の記録を消しました`, () => {
+      by.forEach(g => {
+        const t = g.t;
+        if (g.cur) { if (roundTerr === t.id) roundTerr = null; s13UnLend(t); }
+        // 新しい記録から順に消し、そのたびに区域の状態を作り直す（あとで消す記録の日にもどらないように）
+        g.rets.slice().sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).forEach(r => {
+          D().returns = D().returns.filter(x => x.id !== r.id);
+          s13RetRebuild(t, r);
+        });
+      });
+    }, () => setTimeout(() => { if (!$('#s13View').hidden) openS13(s13Y); }, 0)); // 取り消したら、表も描き直す
+    by.forEach(g => { delete g.t.unLend; });
     return true;
   } finally { s13DelBusy = false; }
 }
