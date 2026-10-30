@@ -3253,4 +3253,8 @@ window.KUIKI_I18N.es = {
 "えらんだうち{0}件は、留守宅カードで回っているため消しません。": "{0} de los elegidos no se borrarán porque se están trabajando con tarjetas de ausentes.",
 "消せる記録がありません（留守宅カードを受け取っている人がいる区域の、最新の記録は消せません）": "No hay registros que se puedan borrar (no se puede borrar el último registro de un territorio cuyas tarjetas de ausentes tiene alguien)",
 "区域係の画面：S-13 の表で「記録をえらんで消す」を押すと、アプリの記録をいくつもえらんで、まとめて消せるようにしました（テストの記録など。訪問の記録は消えません）。": "Pantalla del encargado: en la tabla del S-13, con «Elegir registros y borrarlos» ahora se pueden elegir varios registros de la aplicación y borrarlos juntos (por ejemplo, registros de prueba; los registros de visitas no se borran).",
+/* 2026.13.109：訪問の記録のない途中の返却は S-13 に残さない */
+"区域{0}を返却しました（訪問の記録がないので、S-13 には残りません）": "Se devolvió el territorio {0} (no hay registros de visitas, así que no queda en el S-13)",
+"ほかの操作で区域の状態が変わったので、返却しませんでした": "No se devolvió porque el estado del territorio cambió por otra operación",
+"区域を受け取ってから訪問の記録が1件もないまま返したときは、S-13 に記録を残さないようにしました（受け取ってすぐ返したときなど）。区域は今までどおり、だれでも受け取れる区域にもどります。": "Si se devuelve un territorio sin ningún registro de visita desde que se recibió, ya no queda registro en el S-13 (por ejemplo, si se devuelve enseguida). El territorio vuelve a estar disponible para cualquiera, como antes.",
 };

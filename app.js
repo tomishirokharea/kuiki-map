@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.108';
+var APP_JS_VER = '2026.13.109';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2677,6 +2677,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.109', items: [
+    ['返', '区域を受け取ってから訪問の記録が1件もないまま返したときは、S-13 に記録を残さないようにしました（受け取ってすぐ返したときなど）。区域は今までどおり、だれでも受け取れる区域にもどります。']
+  ] },
   { v: '2026.13.108', items: [
     ['係', '区域係の画面：S-13 の表で「記録をえらんで消す」を押すと、アプリの記録をいくつもえらんで、まとめて消せるようにしました（テストの記録など。訪問の記録は消えません）。']
   ] },
@@ -8531,19 +8534,38 @@ function firstDone(tid, lowOk) {
 /* 返却。done＝留守宅も回り終えた（今日が「回り終えた日」）。
    sure＝区域係が回り終えたことを確かめた（S-13 の「完了にする」）：設定・記録の割合・1回目にえらんだ確かめ方にかかわらず、紙や口頭で確かめた完了にする。
    関数を渡したときは、同じ commit の中で呼ぶ（S-13 の紙の記録をまとめる） */
-function finishTerr(tid, done, lowOk, sure) {
-  const t = terrById(tid); if (!t) return;
+/* 受け取ってから、この区域に訪問の記録が1件でもあるか（だれの記録でも。グループで回った人の記録も数える）。
+   訪問の記録のない途中の返却は、S-13 に残さない（受け取ってすぐ返した・押しまちがい。2026.13.109） */
+function terrVisitedSince(t, iso) {
+  if (!t || !iso) return true; // 受け取った日が分からないときは、今までどおり残す
+  const ids = new Set(housesOf(t.id).map(h => h.id));
+  return D().visits.some(v => v && v.at >= iso && ids.has(v.houseId));
+}
+const RET_NOREC_MSG = '訪問の記録がないので、S-13 には残りません';
+async function finishTerr(tid, done, lowOk, sure) {
+  let t = terrById(tid); if (!t) return;
+  // 訪問の記録がないまま途中で返すとき：一緒に回った人の記録がまだ届いていないこともあるので、最新を受け取ってから数え直す
+  if (!done && !paperHandOf(t) && !terrVisitedSince(t, t.lentAt) && LIVE && navigator.onLine !== false && !Store.queue.length && !flushing) {
+    const before = [t.holder || '', t.lentAt || ''].join('|');
+    closeSheet();
+    toast('最新の状態を確かめています…');
+    try { await Promise.race([refresh(true), wait(5000)]); } catch (e) { /* 今のデータで続ける */ }
+    t = terrById(tid);
+    if (!t || [t.holder || '', t.lentAt || ''].join('|') !== before) { toast('ほかの操作で区域の状態が変わったので、返却しませんでした'); return; }
+  }
+  // 記録を残さない：途中の返却で、受け取ってから訪問の記録が1件もない（紙の区域カードは、紙で回るので今までどおり残す）
+  const noRec = !done && !paperHandOf(t) && !terrVisitedSince(t, t.lentAt);
   const r = roundInfo(tid, true), pct = r ? r.pct : null;
   closeSheet();
   if (roundTerr === tid) roundTerr = null;
-  commit(`区域${t.no}を返却しました${done ? '（回り終えました）' : ''}`, () => {
+  commit(`区域${t.no}を返却しました${done ? '（回り終えました）' : noRec ? `（${RET_NOREC_MSG}）` : ''}`, () => {
     const now = new Date().toISOString();
     const rec = { id: 'x' + uid(), terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: done, pct };
     if (roundFromOf(t)) rec.from = roundFromOf(t); // 続きから回った：前の人が回りはじめた日（記録の少ない返却の確かめは、この日から数える。K-1）
     if (t.group) rec.g = 1; // グループ奉仕の区域（S-13 に「グループ奉仕（名前）」と出す）
     if (isAllUse(t)) rec.ga = 1; // 全体の集まりの区域（S-13 に「全体の集まり（名前）」と出す）
     const ph = paperHandOf(t);
-    D().returns.push(rec);
+    if (!noRec) D().returns.push(rec);
     if (done && ph) {
       rec.ph = 1; // 紙の区域カードで回った（記録の少ない返却の確かめ・まわり漏れの対象にしない）
       t.completedAt = now; t.completedPct = null;
@@ -8588,6 +8610,7 @@ function lowMark(rec, t, p1, lowOk) {
    commit の中で、t.holder を書きかえる前に呼ぶ。担当者がいない・受け取った日が分からないときは何もしない */
 function recordHandover(t, now) {
   if (!t || !t.holder || !t.lentAt) return;
+  if (!paperHandOf(t) && !terrVisitedSince(t, t.lentAt)) { delete t.paperHand; return; } // 訪問の記録がなければ、前の担当者の行は S-13 に残さない（2026.13.109）
   const r = roundInfo(t.id, true);
   D().returns.push(Object.assign({ id: 'x' + uid(), terrId: t.id, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: false, pct: r ? r.pct : null, ho: 1 }, roundFromOf(t) ? { from: roundFromOf(t) } : {}, t.group ? { g: 1 } : {}, isAllUse(t) ? { ga: 1 } : {}));
   delete t.paperHand;
