@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.107"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
+<meta name="app-version" content="2026.13.109"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -1003,6 +1003,15 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .s13tbl td.s13-paper{background:#FFF1C9}
 .s13tbl td.s13-cur{background:#E3F0FC}
 .s13tbl td small{color:var(--ink2);font-size:11px}
+/* えらんで消す（2026.13.108）：えらべる記録の名前に□、えらんだ記録は☑と赤い地（色だけにたよらない） */
+.s13tbl.s13pick tbody.s13blk:hover td{background-color:inherit}
+.s13tbl.s13pick td[data-s13k]{cursor:pointer}
+.s13tbl.s13pick td.s13-nm[data-s13k]::before{content:'☐ ';font-size:16px}
+.s13tbl.s13pick td.s13-nm.s13-on::before{content:'☑ '}
+.s13tbl.s13pick td.s13-on{background:#FBE3E1!important;font-weight:700}
+.s13pickhint{background:#FFF6E0;border-radius:8px;padding:8px 10px}
+.s13pickbar{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--paper);border-top:2px solid var(--line);zoom:var(--z,1)}
+.s13pickbar .btn{flex:1;min-height:48px}
 #printArea{display:none}
 #printReady{position:fixed;inset:0;z-index:5100;background:#0006;display:grid;place-items:center;padding:24px}
 #printReady[hidden]{display:none}
