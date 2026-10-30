@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.105';
+var APP_JS_VER = '2026.13.106';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2677,6 +2677,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.106', items: [
+    ['係', '区域係の画面：S-13 の区域の記録で、アプリで回っている区域（貸出中・留守宅カード）を「完了にする」で完了にできるようにしました（紙の記録に完了した日付を入れるのと同じように、区域カードから外れます）。アプリで回っている区域に紙の記録を入れるときは、完了にならないことを先に知らせます']
+  ] },
   { v: '2026.13.105', items: [
     ['返', '全体の集まりで使う区域と、紙の区域カードで渡した区域は、「返却の目安を過ぎた」に数えないようにしました（返却の目安は「なし」と出ます）'],
     ['報', '奉仕報告を送ったあとで時間を足したときは、月末にもう一度「直しますか」と知らせるようにしました。S21 に送る画面に、S21 のだれとして送るかを出します'],
@@ -8519,8 +8522,10 @@ function firstDone(tid, lowOk) {
     if (t.firstLow === 'ok') t.recLess = 1; // 紙や口頭で確かめた：このあと本人が返しても、回り残しを出さない（H2）
   });
 }
-/* 返却。done＝留守宅も回り終えた（今日が「回り終えた日」） */
-function finishTerr(tid, done, lowOk) {
+/* 返却。done＝留守宅も回り終えた（今日が「回り終えた日」）。
+   sure＝区域係が回り終えたことを確かめた（S-13 の「完了にする」）：設定・記録の割合・1回目にえらんだ確かめ方にかかわらず、紙や口頭で確かめた完了にする。
+   関数を渡したときは、同じ commit の中で呼ぶ（S-13 の紙の記録をまとめる） */
+function finishTerr(tid, done, lowOk, sure) {
   const t = terrById(tid); if (!t) return;
   const r = roundInfo(tid, true), pct = r ? r.pct : null;
   closeSheet();
@@ -8538,9 +8543,13 @@ function finishTerr(tid, done, lowOk) {
       t.completedAt = now; t.completedPct = null;
       t.recLess = 1; // 紙で回った家はアプリにないので、おすすめに回り残しを出さない（H2）
     } else if (done) {
-      lowMark(rec, t, lowP1(t, r), lowFirstPicked(t) ? t.firstLow === 'ok' : lowOk); // 印は、t.completedAt を書きかえる前に付ける
+      // 印は、t.completedAt を書きかえる前に付ける。S-13 の完了（sure）は、設定（lowOn）や割合にかかわらず「完了で確定」の印だけ付ける
+      // （lowMark の「紙や口頭で確かめた」は回り残しを消す recLess も付けるので使わない。アプリで回った記録は、おすすめの回り残しに使う）
+      if (sure) s13Sure(rec, t, lowP1(t, r));
+      else lowMark(rec, t, lowP1(t, r), lowFirstPicked(t) ? t.firstLow === 'ok' : lowOk);
       t.completedAt = now; t.completedPct = r && r.phase === 'away' ? r.pct1 : pct;
     }
+    if (typeof sure === 'function') sure();
     delete t.paperHand;
     t.lastLentAt = t.lentAt; t.lastFirstAt = t.firstDoneAt || null;
     t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
@@ -13839,12 +13848,13 @@ function s13Rows(y) {
   return D().territories.filter(t => !t.dummy).slice().sort(byNo).map(t => {
     const list = [];
     D().returns.filter(r => r.terrId === t.id && r.lentAt).forEach(r =>
-      list.push({ name: s13Who(r.by, r.g, r.ga), a: dstr(r.lentAt), c: r.completed ? dstr(r.at) : '', ret: dstr(r.at), lw: r.lowAuto ? 1 : 0, src: 'app' }));
+      list.push({ name: s13Who(r.by, r.g, r.ga), a: dstr(r.lentAt), c: r.completed ? dstr(r.at) : '', ret: dstr(r.at), lw: r.lowAuto ? 1 : 0, src: 'app',
+        pool: !r.completed && !t.holder && !!t.awayPoolAt && r.id === t.poolRetId })); // 留守宅カードにして返し、まだ完了していない（留守宅を回っている）
     if (t.holder && t.lentAt) list.push({ name: s13Who(t.holder, t.group, isAllUse(t)), a: dstr(t.lentAt), c: '', ret: '', cur: true, src: 'app' });
     paper.filter(x => x.kind === 'a' && x.terrId === t.id).forEach(x =>
       list.push({ name: x.name, a: x.a, c: x.c || '', ret: '', src: 'paper', id: x.id, cur: !x.c && paperLent(t) && x.a === t.paperLentAt }));
     // この年度に割り当てた記録と、前の年度から続いていた記録
-    const inYear = x => (x.a >= S && x.a < E) || (x.a < S && (x.c || x.ret || (x.cur ? today : '')) >= S);
+    const inYear = x => (x.a >= S && x.a < E) || (x.a < S && (x.c || (x.pool ? today : x.ret) || (x.cur ? today : '')) >= S); // 留守宅カードで回っている区域は、終わるまで続いている割り当て
     const rows = list.filter(inYear).sort((p, q) => (p.a < q.a ? -1 : p.a > q.a ? 1 : 0));
     // 前回完了した日付：手で入れた日付があればそれを、なければ年度が始まる前の最後の完了日
     const man = paper.find(x => x.kind === 'p' && x.terrId === t.id && Number(x.year) === y);
@@ -13871,7 +13881,7 @@ function s13BlockHtml(r, print) {
       if (!x) return '';
       if (x.c) return s13Fmt(x.c);
       if (print) return '';
-      return x.cur ? '<small>貸出中</small>' : x.ret ? `<small>返却 ${s13Fmt(x.ret)}${x.lw ? '（記録が少なく途中扱い）' : ''}</small>` : '';
+      return x.cur ? '<small>貸出中</small>' : x.pool ? '<small>留守宅カードで回っています</small>' : x.ret ? `<small>返却 ${s13Fmt(x.ret)}${x.lw ? '（記録が少なく途中扱い）' : ''}</small>` : '';
     };
     const prevCls = !print && r.prevPaper && ci === 0 ? ' s13-paper' : '';
     return `<tbody class="s13blk"${print ? '' : ` data-s13t="${esc(r.t.id)}"`}>
@@ -13923,6 +13933,82 @@ function printS13(data, y) {
   printDoc(html, false);
 }
 /* 1つの区域の記録：紙から転記する・前回完了した日付を入れる */
+/* S-13 から、アプリで回っている区域を今日完了にする（2026.13.106）
+   ・貸出中の区域：区域係の操作「正式に返却する」と同じ返却（finishTerr）。区域カードから外れる
+   ・留守宅カードの段階の区域：カルテの「正式に返却したことにする」と同じ（poolFinish）
+   ・紙の記録に完了した日付を入れるのと同じ考え方なので、完了で確定する（lowOk。設定や記録の割合にかかわらず、
+     自動の確かめ（lowSweep・lowAdoptList）で途中の返却にもどさない）。アプリで回った記録はそのまま使い、おすすめに回り残しを出す（recLess は付けない）
+   ・その巡回の紙の記録（受け取った日以後に割り当てた・完了した記録）は、同じ割り当てが2行にならないよう、この完了にまとめる（消す）
+   ・完了した日付は今日（係の「正式に返却する」と同じ。サーバーが受け付ける形を変えないため） */
+const s13RoundDay = t => (t.holder ? (t.lentAt ? dstr(t.lentAt) : '') : t.awayPoolAt && t.lastLentAt ? dstr(t.lastLentAt) : '');
+/* その巡回をアプリで回っている人（貸出中なら担当者、留守宅カードの段階なら留守宅カードにして返した人） */
+const s13RoundBy = t => (t.holder ? t.holder : t.awayPoolAt && t.poolRetId ? ((D().returns || []).find(x => x.id === t.poolRetId) || {}).by || '' : '');
+/* 完了にまとめる紙の記録：その巡回（受け取った日以後に割り当てた・完了した）で、名前が同じ人のもの（「グループ奉仕（名前）」「全体の集まり（名前）」も）。
+   ほかの人の紙の割り当ては消さない（中-A） */
+const s13RoundPaper = t => {
+  const d = s13RoundDay(t), by = s13RoundBy(t); if (!d || !by) return [];
+  const nf = v => s13Norm(String(v || '').normalize('NFKC')), nm = nf(uname(by)); // 全角・半角のちがいも同じ名前とみなす（比べるときだけ）
+  const same = x => { if (nf(x.name) === nm) return true; const g = s13GroupOf(String(x.name || '').normalize('NFKC')); return !!(g && (g.user ? g.user.id === by : nf(g.name) === nm)); };
+  return (D().s13 || []).filter(x => x && x.kind === 'a' && x.terrId === t.id && (String(x.a || '') >= d || (x.c && String(x.c) >= d)) && same(x));
+};
+let s13FinBusy = false;
+async function s13Finish(tid) {
+  if (!isAdmin() || s13FinBusy) return;
+  const T = s => (window.KI ? window.KI.t(s) : s); // 文を1つずつ訳す（meibo.js と同じ）
+  const J = xs => xs.filter(Boolean).join(window.KI && KI.lang !== 'ja' ? ' ' : ''); // 訳したときは文のあいだに空白
+  const snap = x => (x ? [x.holder || '', x.lentAt || '', x.awayPoolAt || '', x.poolRetId || ''].join('|') : '');
+  let t = terrById(tid); if (!t) return;
+  const pool = !t.holder && t.awayPoolAt ? poolInfo(t) : null;
+  if (!t.holder && !pool) return;
+  const before = snap(t), day = s13Fmt(ymd(new Date())), th = D().settings.donePct, ph = paperHandOf(t), papers = s13RoundPaper(t);
+  const r = t.holder && !ph ? roundInfo(tid, true) : null, p1 = r ? lowP1(t, r) : null; // 1回目の割合（返却の画面・自動の確かめと同じ数え方）
+  const cards = pool ? activeCards().filter(c => c.terrId === t.id).length : 0;
+  const body = J([
+    t.holder ? T(`${uname(t.holder)}さんの区域カードから外れ、S-13 の完了した日付が今日（${day}）になります。`)
+      : T(`留守宅カードで回るのを終えて、S-13 の完了した日付が今日（${day}）になります。`),
+    p1 != null && p1 < th ? T(`アプリの記録で1回目に訪ねた家は ${p1}%（目安 ${th}%）です。`) : '',
+    pool && pool.pct < awayRetPct() ? T(`留守宅を訪ね直した家は ${pool.pct}%（目安 ${awayRetPct()}%）です。`) : '',
+    T('区域係が回り終えたことを確かめた完了として記録します（あとで自動で途中の返却にもどしません）。'),
+    papers.length ? T(`この巡回で前に入れた${uname(s13RoundBy(t))}さんの紙の記録（${papers.map(x => s13Fmt(x.a) + '〜' + (x.c ? s13Fmt(x.c) : '')).join('、')}）は、この完了にまとめます。紙の記録の完了した日付は消え、今日の1行になります。`) : '',
+    cards ? T(`留守宅カードを受け取っている人がいます（${cards}枚）。カードは期限まで、そのまま使えます。`) : '',
+    t.holder && !ph ? T('途中で返すときは「やめる」を押して、区域のカルテの「返却する（回り終えたかを確かめる）」から返してください。') : ''
+  ]);
+  if (!await ask('', { title: T(`区域${t.no}を、今日完了にしますか？`), body, ok: '完了にする', danger: false })) return;
+  s13FinBusy = true;
+  try {
+    // 決める前に最新を受け取る（ほかの係・本人が返した・担当が変わった、を見るため。電波がなければ今のデータで続ける）
+    if (LIVE && navigator.onLine !== false) {
+      $$('[data-s13fin]', $('#sheet')).forEach(b => { b.disabled = true; b.textContent = '確かめています…'; });
+      toast('最新の状態を確かめています…');
+      try { await Promise.race([refresh(true), wait(5000)]); } catch (e) { /* 今のデータで続ける */ }
+    }
+    t = terrById(tid);
+    if (!t || snap(t) !== before) { toast('ほかの操作で区域の状態が変わったので、完了にしませんでした'); return; }
+    const ids = new Set(papers.map(x => x.id));
+    const merge = () => { if (ids.size) D().s13 = (D().s13 || []).filter(x => !ids.has(x.id)); };
+    if (t.holder) finishTerr(tid, true, true, merge);
+    else {
+      const p = poolInfo(t); if (!p) { toast('ほかの操作で区域の状態が変わったので、完了にしませんでした'); return; }
+      closeSheet();
+      commit(`区域${t.no}を正式に返却されたことにしました`, () => {
+        const rec = D().returns.find(x => x.id === t.poolRetId); // poolFinish が poolRetId を消す前に
+        poolFinish(t, new Date().toISOString(), p.pct);
+        s13Sure(rec, t, null);
+        merge();
+      }, null, NO_UNDO);
+    }
+  } finally { s13FinBusy = false; }
+}
+/* S-13 の完了の印（commit の中で呼ぶ）：自動の確かめ（lowSweep・lowAdoptList）で途中の返却にもどさないよう「完了で確定」（lowOk）にする。
+   lowBy と recLess は付けない（「紙や口頭で確かめた」とはちがい、アプリで回った記録はそのまま使い、おすすめに回り残しを出す。
+   lowOk だけの印は、自動の確かめで記録が目安に届いたときと同じ形で、recLessFill も拾わない）。
+   紙の区域カード（ph）は紙で回った家がアプリにないので、今までどおり（finishTerr が recLess を付ける）。
+   前から付いている印（1回目に係が「紙や口頭で確かめた」をえらんだ recLess など）は変えない */
+function s13Sure(rec, t, p1) {
+  if (!rec || rec.ph) return;
+  delete rec.low; rec.lowOk = 1; rec.lowAt = new Date().toISOString();
+  if (p1 != null && rec.p1 == null) rec.p1 = p1;
+}
 function openS13Edit(tid, editId) {
   const y = s13Y, t = terrById(tid); if (!t) return;
   const r = s13Rows(y).find(x => x.t.id === tid);
@@ -13935,9 +14021,10 @@ function openS13Edit(tid, editId) {
   const kin = s13Kin(t);
   setSheet(headHtml(t, `区域${esc(t.no)}の記録`, `${y}奉仕年度（${y - 1}年9月〜${y}年8月）`) + `
     <h3 class="sub">この年度の割り当て</h3>
-    ${r.rows.length ? r.rows.map(x => `<div class="setrow"><span><b>${esc(x.name)}</b>　${s13Fmt(x.a)} 〜 ${x.c ? s13Fmt(x.c) + ' 完了' : x.cur ? '貸出中' : x.ret ? '返却 ' + s13Fmt(x.ret) : '（完了日なし）'}
+    ${r.rows.length ? r.rows.map(x => `<div class="setrow"><span><b>${esc(x.name)}</b>　${s13Fmt(x.a)} 〜 ${x.c ? s13Fmt(x.c) + ' 完了' : x.cur ? '貸出中' : x.pool ? '留守宅カードで回っています' : x.ret ? '返却 ' + s13Fmt(x.ret) : '（完了日なし）'}
         <br><small class="hint">${x.src === 'paper' ? '紙から転記' : 'アプリの記録'}</small></span>
-        ${x.src === 'paper' ? `<span class="actions" style="margin:0"><button class="btn small" data-s13ed="${esc(x.id)}">直す</button><button class="btn small danger" data-s13del="${esc(x.id)}">消す</button></span>` : ''}</div>`).join('')
+        ${x.src === 'paper' ? `<span class="actions" style="margin:0"><button class="btn small" data-s13ed="${esc(x.id)}">直す</button><button class="btn small danger" data-s13del="${esc(x.id)}">消す</button></span>`
+          : (x.cur && t.holder) || x.pool ? '<span class="actions" style="margin:0"><button class="btn small" data-s13fin>完了にする</button></span>' : ''}</div>`).join('')
       : '<p class="muted">この年度の記録はありません。</p>'}
     <h3 class="sub">${ed ? '紙の記録を直す' : '紙の記録を転記する'}</h3>
     <label class="field"><span>伝道者の名前</span><input type="text" id="s13Name" list="s13Names" maxlength="30" value="${esc(ed ? ed.name : '')}" placeholder="例：山田 花子"></label>
@@ -14001,6 +14088,20 @@ function openS13Edit(tid, editId) {
       return;
     }
     if (g && !g.user && !await ask(`「${g.name}」さんは、グループ監督・司会者としてアプリに登録されていないので、紙の記録として入れます。\n登録したあとで、この記録を「直す」から保存し直すと、アプリに渡せます。`, { ok: '紙の記録として入れる', danger: false })) return;
+    // アプリで回っている区域（貸出中・留守宅カードの段階）に、その巡回の紙の記録を入れても、アプリの区域は完了にならない。入れる前に知らせる
+    // （前の巡回の紙の記録の転記＝割り当てた日も完了した日も受け取った日より前、は知らせない）
+    const inRound = x => { const d = s13RoundDay(x); return d && (c || a) >= d; };
+    const appHeld = targets.filter(x => x.holder && inRound(x)), appPool = targets.filter(x => !x.holder && x.awayPoolAt && inRound(x));
+    if (appHeld.length || appPool.length) {
+      const T = s => (window.KI ? window.KI.t(s) : s); // 文を1つずつ訳す（ひとかたまりの文字になるため。meibo.js と同じ）
+      const body = [
+        appHeld.length ? T(`区域${appHeld.map(x => x.no).join('・')}は、アプリで${[...new Set(appHeld.map(x => uname(x.holder)))].join('・')}さんが持っています。`) : '',
+        appPool.length ? T(`区域${appPool.map(x => x.no).join('・')}は、アプリの留守宅カードで回っています。`) : '',
+        T('紙の記録を入れても、アプリの区域は完了になりません。'),
+        T('アプリの区域を完了にするときは「やめる」を押して、「この年度の割り当て」の「完了にする」を押してください。')
+      ].filter(Boolean).join(window.KI && KI.lang !== 'ja' ? ' ' : '');
+      if (!await ask('', { title: T('アプリで回っている区域です'), body, ok: '紙の記録として入れる', danger: false })) return;
+    }
     commit(ed ? '記録を直しました' : `区域${targets.map(x => x.no).join('・')}に${name}さんの記録を入れました`, () => {
       const at = new Date().toISOString();
       targets.forEach(x => {
@@ -14010,6 +14111,8 @@ function openS13Edit(tid, editId) {
     });
     again();
   };
+  // アプリで回っている区域（貸出中・留守宅カードの段階）を、S-13 から完了にする（紙の記録に完了した日付を入れるのと同じ考え方）
+  if ($('[data-s13fin]', $('#sheet'))) $('[data-s13fin]', $('#sheet')).onclick = async () => { await s13Finish(tid); again(); };
   if ($('#s13EdCancel')) $('#s13EdCancel').onclick = () => openS13Edit(tid);
   $$('[data-s13ed]', $('#sheet')).forEach(b => b.onclick = () => openS13Edit(tid, b.dataset.s13ed));
   $$('[data-s13del]', $('#sheet')).forEach(b => b.onclick = async () => {

@@ -3199,5 +3199,26 @@ window.KUIKI_I18N.es = {
 "監督・司会者": "Superintendentes y conductores",
 "区域{0}を{1}さんに（全体の集まりの区域として）貸し出しました": "Se prestó el territorio {0} a {1} (como territorio de la reunión general)",
 "監督・司会者は、全体の集まり（金曜の晩・日曜の昼など）で使う区域も受け取れるようになりました。グループ奉仕の区域といっしょに「集まりで使う区域」に出ます。S-13には「全体の集まり（名前）」と出ます": "Superintendentes y conductores ahora también pueden recibir territorios para la reunión general (viernes por la noche, domingo al mediodía, etc.). Aparecen con los de predicación en grupo en «Territorios para las reuniones». En el S-13 aparecen como «Reunión general (nombre)».",
-"集まりで使う区域の枚数": "Cantidad de territorios para las reuniones"
+"集まりで使う区域の枚数": "Cantidad de territorios para las reuniones",
+/* 2026.13.106：S-13 からアプリで回っている区域を完了にする・紙の記録を入れるときに知らせる */
+"完了にする": "Marcar como completado",
+"区域{0}を、今日完了にしますか？": "¿Marcar hoy el territorio {0} como completado?",
+"{0}さんの区域カードから外れ、S-13 の完了した日付が今日（{1}）になります。": "Se quitará de las tarjetas de territorio de {0} y la fecha de completado del S-13 será hoy ({1}).",
+"留守宅カードで回るのを終えて、S-13 の完了した日付が今日（{0}）になります。": "Se termina el recorrido con tarjetas de ausentes y la fecha de completado del S-13 será hoy ({0}).",
+"アプリの記録で1回目に訪ねた家は {0}%（目安 {1}%）です。": "Según los registros de la aplicación, en la primera vuelta se visitó el {0}% de las casas (meta: {1}%).",
+"留守宅を訪ね直した家は {0}%（目安 {1}%）です。": "Se volvió a visitar el {0}% de las casas ausentes (meta: {1}%).",
+"区域係が回り終えたことを確かめた完了として記録します（あとで自動で途中の返却にもどしません）。": "Se registra como completado confirmado por el encargado de territorios (después no se cambiará automáticamente a devolución incompleta).",
+"この巡回で前に入れた{0}さんの紙の記録（{1}）は、この完了にまとめます。紙の記録の完了した日付は消え、今日の1行になります。": "Los registros en papel de {0} de esta vuelta que se agregaron antes ({1}) se unen a este completado. La fecha de completado del registro en papel se borra y queda una sola fila con la fecha de hoy.",
+"留守宅カードを受け取っている人がいます（{0}枚）。カードは期限まで、そのまま使えます。": "Hay personas que tienen tarjetas de ausentes de este territorio ({0}). Las tarjetas se pueden seguir usando hasta su vencimiento.",
+"確かめています…": "Comprobando…",
+"最新の状態を確かめています…": "Comprobando el estado más reciente…",
+"途中で返すときは「やめる」を押して、区域のカルテの「返却する（回り終えたかを確かめる）」から返してください。": "Para devolverlo sin terminar, toque «Cancelar» y devuélvalo con «Devolver (confirmar si se completó)» en la ficha del territorio.",
+"返却する（回り終えたかを確かめる）": "Devolver (confirmar si se completó)",
+"ほかの操作で区域の状態が変わったので、完了にしませんでした": "No se marcó como completado porque el estado del territorio cambió por otra operación",
+"アプリで回っている区域です": "Este territorio se está trabajando en la aplicación",
+"区域{0}は、アプリで{1}さんが持っています。": "El territorio {0} lo tiene {1} en la aplicación.",
+"区域{0}は、アプリの留守宅カードで回っています。": "El territorio {0} se está trabajando con tarjetas de ausentes en la aplicación.",
+"紙の記録を入れても、アプリの区域は完了になりません。": "Aunque agregue un registro en papel, el territorio de la aplicación no queda completado.",
+"アプリの区域を完了にするときは「やめる」を押して、「この年度の割り当て」の「完了にする」を押してください。": "Para completar el territorio de la aplicación, toque «Cancelar» y luego «Marcar como completado» en «Asignaciones de este año».",
+"区域係の画面：S-13 の区域の記録で、アプリで回っている区域（貸出中・留守宅カード）を「完了にする」で完了にできるようにしました（紙の記録に完了した日付を入れるのと同じように、区域カードから外れます）。アプリで回っている区域に紙の記録を入れるときは、完了にならないことを先に知らせます": "Pantalla del encargado: en el registro del territorio del S-13, ahora puede completar con «Marcar como completado» un territorio que se está trabajando en la aplicación (prestado o con tarjetas de ausentes); igual que al anotar la fecha de completado en un registro en papel, se quita de la tarjeta de territorio. Al agregar un registro en papel a un territorio que se está trabajando en la aplicación, se avisa antes que no quedará completado."
 };
