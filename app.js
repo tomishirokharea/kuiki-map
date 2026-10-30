@@ -8543,8 +8543,10 @@ function finishTerr(tid, done, lowOk, sure) {
       t.completedAt = now; t.completedPct = null;
       t.recLess = 1; // 紙で回った家はアプリにないので、おすすめに回り残しを出さない（H2）
     } else if (done) {
-      lowMark(rec, t, lowP1(t, r), !!sure || (lowFirstPicked(t) ? t.firstLow === 'ok' : lowOk)); // 印は、t.completedAt を書きかえる前に付ける
-      if (sure) s13Sure(rec, t); // lowMark は設定（lowOn）や割合で印を付けないことがあるので、ここで必ず付ける
+      // 印は、t.completedAt を書きかえる前に付ける。S-13 の完了（sure）は、設定（lowOn）や割合にかかわらず「完了で確定」の印だけ付ける
+      // （lowMark の「紙や口頭で確かめた」は回り残しを消す recLess も付けるので使わない。アプリで回った記録は、おすすめの回り残しに使う）
+      if (sure) s13Sure(rec, t, lowP1(t, r));
+      else lowMark(rec, t, lowP1(t, r), lowFirstPicked(t) ? t.firstLow === 'ok' : lowOk);
       t.completedAt = now; t.completedPct = r && r.phase === 'away' ? r.pct1 : pct;
     }
     if (typeof sure === 'function') sure();
@@ -13934,8 +13936,8 @@ function printS13(data, y) {
 /* S-13 から、アプリで回っている区域を今日完了にする（2026.13.106）
    ・貸出中の区域：区域係の操作「正式に返却する」と同じ返却（finishTerr）。区域カードから外れる
    ・留守宅カードの段階の区域：カルテの「正式に返却したことにする」と同じ（poolFinish）
-   ・紙の記録に完了した日付を入れるのと同じ考え方なので、区域係が回り終えたことを確かめた完了として記録する（lowOk・recLess。
-     設定や記録の割合にかかわらず、自動の確かめ（lowSweep・lowAdoptList）で途中の返却にもどさない）
+   ・紙の記録に完了した日付を入れるのと同じ考え方なので、完了で確定する（lowOk。設定や記録の割合にかかわらず、
+     自動の確かめ（lowSweep・lowAdoptList）で途中の返却にもどさない）。アプリで回った記録はそのまま使い、おすすめに回り残しを出す（recLess は付けない）
    ・その巡回の紙の記録（受け取った日以後に割り当てた・完了した記録）は、同じ割り当てが2行にならないよう、この完了にまとめる（消す）
    ・完了した日付は今日（係の「正式に返却する」と同じ。サーバーが受け付ける形を変えないため） */
 const s13RoundDay = t => (t.holder ? (t.lentAt ? dstr(t.lentAt) : '') : t.awayPoolAt && t.lastLentAt ? dstr(t.lastLentAt) : '');
@@ -13991,16 +13993,21 @@ async function s13Finish(tid) {
       commit(`区域${t.no}を正式に返却されたことにしました`, () => {
         const rec = D().returns.find(x => x.id === t.poolRetId); // poolFinish が poolRetId を消す前に
         poolFinish(t, new Date().toISOString(), p.pct);
-        s13Sure(rec, t);
+        s13Sure(rec, t, null);
         merge();
       }, null, NO_UNDO);
     }
   } finally { s13FinBusy = false; }
 }
-/* 区域係が確かめた完了の印（commit の中で呼ぶ）：自動の確かめで途中の返却にもどさない・おすすめに回り残しを出さない（「紙や口頭で確かめた」と同じ印） */
-function s13Sure(rec, t) {
-  if (rec && !rec.ph) { delete rec.low; rec.lowOk = 1; rec.lowBy = me().id; }
-  if (t && (!rec || !rec.ph)) t.recLess = 1;
+/* S-13 の完了の印（commit の中で呼ぶ）：自動の確かめ（lowSweep・lowAdoptList）で途中の返却にもどさないよう「完了で確定」（lowOk）にする。
+   lowBy と recLess は付けない（「紙や口頭で確かめた」とはちがい、アプリで回った記録はそのまま使い、おすすめに回り残しを出す。
+   lowOk だけの印は、自動の確かめで記録が目安に届いたときと同じ形で、recLessFill も拾わない）。
+   紙の区域カード（ph）は紙で回った家がアプリにないので、今までどおり（finishTerr が recLess を付ける）。
+   前から付いている印（1回目に係が「紙や口頭で確かめた」をえらんだ recLess など）は変えない */
+function s13Sure(rec, t, p1) {
+  if (!rec || rec.ph) return;
+  delete rec.low; rec.lowOk = 1; rec.lowAt = new Date().toISOString();
+  if (p1 != null && rec.p1 == null) rec.p1 = p1;
 }
 function openS13Edit(tid, editId) {
   const y = s13Y, t = terrById(tid); if (!t) return;
