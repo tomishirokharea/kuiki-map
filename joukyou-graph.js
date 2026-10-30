@@ -44,40 +44,74 @@
       }
       return 'area';
     };
-    const kindOf = (v, t, key, day) => {
-      const src = String(v.src || '');
-      if (src.indexOf('card:') === 0) return 'card';
-      if (src === 'area' || src.indexOf('reco') === 0) return 'area';
-      if (day < unsplitBefore) return 'unsplit'; // 印がなく、カードの記録も消えている
-      return inferred(v, t, key);
-    };
-    // 同じ日・同じ家（部屋）を1軒にまとめる
-    const groups = new Map(), dayMemo = new Map(); // 日付の文字は15分ごとに覚える（記録のたびに作らない）
-    const vs = o.visits || [];
-    for (let i = 0; i < vs.length; i++) {
-      const v = vs[i], t = Date.parse(v.at);
-      if (!(t >= fromMs) || t > now + DAY) continue;
-      const terr = o.terrOfHouse(v.houseId);
-      if (!terr || !o.eligible.has(terr)) continue;
-      const q = (t / 900000) | 0;
-      let day = dayMemo.get(q);
-      if (day === undefined) dayMemo.set(q, day = ymd(t));
-      if (day < from || day > today) continue;
-      const key = v.houseId + '|' + (v.unit || ''), gk = key + '#' + day;
-      const g = groups.get(gk);
-      if (!g) groups.set(gk, { v, t, key, day, res: v.result });
-      else {
-        if ((rank[v.result] || 0) > (rank[g.res] || 0)) g.res = v.result;
-        if (t < g.t) { g.v = v; g.t = t; }
+    const kindOf = (v, key, day) => {
+      const src = v.src ? String(v.src) : '';
+      if (src) {
+        if (src.indexOf('card:') === 0) return 'card';
+        if (src === 'area' || src.indexOf('reco') === 0) return 'area';
       }
+      if (day < unsplitBefore) return 'unsplit'; // 印がなく、カードの記録も消えている
+      return inferred(v, Date.parse(v.at), key); // 時間を読むのは、印がなく新しい記録のときだけ
+    };
+    // 同じ日・同じ家（部屋）を1軒にまとめる。家（部屋）ごとの記録の索引（新しい順）を使い、1年より前は読まずに止める（速さ・指示書5.）
+    // 日は番号（dayId）で扱う：日付の文字から番号を引くのは、1時間ごとに1回だけ。数は配列にためて、最後に日付ごとの Map にする
+    const dayIds = new Map(), dayStr = [], dayFlag = [], hourDay = new Map(), okHouse = new Map();
+    let counts = new Int32Array(9 * 64);
+    const idOf = str => { // 日の番号。flag：0＝数える／1＝今日より先（飛ばす）／2＝期間より前（ここで止める）
+      let id = dayIds.get(str);
+      if (id === undefined) { id = dayStr.length; dayIds.set(str, id); dayStr.push(str); dayFlag.push(str > today ? 1 : str < from ? 2 : 0); if (counts.length < 9 * dayStr.length) { const n = new Int32Array(counts.length * 2); n.set(counts); counts = n; } }
+      return id;
+    };
+    const dayOf = at => { // 時刻の文字を切り出さず、数字だけで1時間ごとの見出しを作る（記録30万件でも、文字のごみを作らない）。-1＝日付でない
+      if (at.length >= 13 && at.charCodeAt(10) === 84 && at.charCodeAt(at.length - 1) === 90) {
+        const yy = (at.charCodeAt(0) - 48) * 1000 + (at.charCodeAt(1) - 48) * 100 + (at.charCodeAt(2) - 48) * 10 + (at.charCodeAt(3) - 48),
+          mo = (at.charCodeAt(5) - 48) * 10 + (at.charCodeAt(6) - 48), dd = (at.charCodeAt(8) - 48) * 10 + (at.charCodeAt(9) - 48), hh = (at.charCodeAt(11) - 48) * 10 + (at.charCodeAt(12) - 48);
+        const k = (((yy * 12 + mo) * 32 + dd) * 24) + hh;
+        if (k === k) {
+          let d = hourDay.get(k);
+          if (d === undefined) { const t0 = Date.UTC(yy, mo - 1, dd, hh); d = isFinite(t0) && ymd(t0) === ymd(t0 + 3599999) ? idOf(ymd(t0)) : -2; hourDay.set(k, d); }
+          if (d >= 0) return d;
+        }
+      }
+      const t = Date.parse(at);
+      return isFinite(t) ? idOf(ymd(t)) : -1;
+    };
+    const eligHouse = hid => { let b = okHouse.get(hid); if (b === undefined) { const terr = o.terrOfHouse(hid); okHouse.set(hid, b = !!(terr && o.eligible.has(terr))); } return b; };
+    const RES = { met: 0, refused: 1, away: 2 }, CAT = { area: 0, card: 1, unsplit: 2 };
+    const desc = (a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
+    const processList = list => {
+      const f0 = list[0];
+      if (!f0 || !eligHouse(f0.houseId)) return;
+      for (let i = 1; i < list.length; i++) if (list[i].at > list[i - 1].at) { list = list.slice().sort(desc); break; } // 新しい順でないときだけ、並べ直す
+      const key = f0.houseId + '|' + (f0.unit || '');
+      let cur = -1, res = '', first = null;
+      for (let i = 0; i < list.length; i++) {
+        const v = list[i], id = dayOf(v.at);
+        if (id < 0) continue;
+        const fl = dayFlag[id];
+        if (fl === 1) continue;
+        if (fl === 2) break;
+        if (id !== cur) { if (first) counts[cur * 9 + CAT[kindOf(first, key, dayStr[cur])] * 3 + (RES[res] === undefined ? 2 : RES[res])]++; cur = id; res = v.result; first = v; }
+        else { if ((rank[v.result] || 0) > (rank[res] || 0)) res = v.result; first = v; } // 新しい順なので、最後に見たものが、その日の最初の訪問
+      }
+      if (first) counts[cur * 9 + CAT[kindOf(first, key, dayStr[cur])] * 3 + (RES[res] === undefined ? 2 : RES[res])]++;
+    };
+    if (o.index) { for (const list of o.index) processList(list); }
+    else { // 索引がないとき（試験・ほかの使い方）：家（部屋）ごとにまとめてから、同じ数え方をする
+      const byKey = new Map(), vs = o.visits || [];
+      for (let i = 0; i < vs.length; i++) { const v = vs[i], k = v.houseId + '|' + (v.unit || ''); let a = byKey.get(k); if (!a) byKey.set(k, a = []); a.push(v); }
+      byKey.forEach(a => processList(a.sort(desc)));
     }
     const days = new Map();
-    groups.forEach(g => {
-      const cat = kindOf(g.v, g.t, g.key, g.day);
-      let d = days.get(g.day);
-      if (!d) days.set(g.day, d = empty());
-      d[cat][g.res === 'met' ? 'met' : g.res === 'refused' ? 'refused' : 'away']++;
-    });
+    for (let id = 0; id < dayStr.length; id++) {
+      if (dayFlag[id] !== 0) continue;
+      let any = false;
+      for (let q = 0; q < 9; q++) if (counts[id * 9 + q]) { any = true; break; }
+      if (!any) continue;
+      const d = empty();
+      CATS.forEach((c, ci) => { d[c].met = counts[id * 9 + ci * 3]; d[c].refused = counts[id * 9 + ci * 3 + 1]; d[c].away = counts[id * 9 + ci * 3 + 2]; });
+      days.set(dayStr[id], d);
+    }
     // 集まりのあった日（予定にあるものは、掃除などもすべて集まりとして数える）
     const gather = new Map();
     (o.schedules || []).forEach(s => {
@@ -183,12 +217,15 @@
     if (!r.n) return `<b>${name}：</b>訪ねた 0軒`;
     return `<b>${name}：</b>訪ねた ${r.n}軒・会えた ${r.met}軒（${r.few ? 'データ少' : r.pct + '%'}）・留守 ${r.away}軒${r.refused ? `・拒否 ${r.refused}軒` : ''}`;
   };
-  const gatherText = a => (a && a.length ? a.map(g => `${g.group ? esc(g.group) + 'グループ' : '全体の集まり'}${g.time ? ' ' + esc(g.time) : ''}`).join('・') : 'なし');
+  // 集まりの名前は1つずつ別の部品にする（スペイン語に訳すとき、組み合わせごとの辞書を作らなくてよいように）
+  const gatherText = a => (a && a.length ? a.map(g => `<span>${g.group ? esc(g.group) + 'グループ' : '全体の集まり'}${g.time ? ' ' + esc(g.time) : ''}</span>`).join('<span>・</span>') : '<span>なし</span>');
+  // 横軸の「集」の印は、辞書の「集」（別の意味で使われている）に頼らず、言語に合わせて出す（日本語＝集・スペイン語＝R。data-notr で自動の置きかえから外す）
+  const MK = () => (window.KI && window.KI.lang === 'es' ? 'R' : '集');
 
   function compute() {
     const sig = dataSig();
     if (st.agg && st.agg.sig === sig) return st.agg;
-    const d = D(), r = build({ visits: d.visits || [], terrOfHouse: hid => { const h = houseById(hid); return h && h.terrId; }, eligible: terrSet(), cards: d.awayCards || [], schedules: d.schedules || [], now: Date.now(), keepMonths: d.settings && d.settings.keepMonths });
+    const d = D(), r = build({ index: typeof IDX !== 'undefined' && IDX instanceof Map && IDX.size ? IDX.values() : null, visits: d.visits || [], terrOfHouse: hid => { const h = houseById(hid); return h && h.terrId; }, eligible: terrSet(), cards: d.awayCards || [], schedules: d.schedules || [], now: Date.now(), keepMonths: d.settings && d.settings.keepMonths });
     st.agg = { sig, r };
     return st.agg;
   }
@@ -214,8 +251,8 @@
 <pattern id="jgNo" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#F2F2F2"/><path d="M0,0 L8,8 M8,0 L0,8" stroke="#BDBDBD" stroke-width=".8"/></pattern></defs></svg>`;
   const FILL = { met: '#1565C0', away: 'url(#jgAway)', refused: 'url(#jgRef)' };
   const swatch = (k, label) => `<span><svg width="22" height="16" aria-hidden="true"><rect x="1" y="1" width="20" height="14" fill="${FILL[k]}" stroke="#17324D"/></svg>${label}</span>`;
-  const LEGEND = `<div class="jg-leg" aria-label="凡例">${swatch('met', '会えた（塗りつぶし）')}${swatch('away', '留守（斜線）')}${swatch('refused', '拒否（点々）')}
-<span><svg width="22" height="16" aria-hidden="true"><rect x="1" y="1" width="20" height="14" fill="#FFE9A8" stroke="#C99A00"/></svg><b>集</b> 集まりのあった日</span>
+  const LEGEND = () => `<div class="jg-leg" aria-label="凡例">${swatch('met', '会えた（塗りつぶし）')}${swatch('away', '留守（斜線）')}${swatch('refused', '拒否（点々）')}
+<span><svg width="22" height="16" aria-hidden="true"><rect x="1" y="1" width="20" height="14" fill="#FFE9A8" stroke="#C99A00"/></svg><b data-notr>${MK()}</b> 集まりのあった日</span>
 <span><svg width="22" height="16" aria-hidden="true"><rect x="2" y="2" width="18" height="12" fill="#fff" stroke="#17324D" stroke-dasharray="3 2"/></svg>途中（今日をふくむ）</span></div>`;
 
   function niceMax(v) { if (v <= 5) return 5; const p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; }
@@ -251,8 +288,8 @@
       const lab = unit === 'day' ? (i % 7 === 0 ? md(b.key) : '') : unit === 'week' ? (i % wstep === 0 ? md(b.key) : '') : `${Number(b.key.slice(5))}月`;
       if (lab) out.push(`<text x="${cx}" y="${T + ph + 16}" font-size="13" text-anchor="middle">${lab}</text>`);
       if (b.gatherDays) {
-        if (unit === 'day') out.push(`<text x="${cx}" y="${T + ph + 33}" font-size="13" font-weight="700" text-anchor="middle">集</text>`);
-        else out.push(`<text x="${cx}" y="${T + 15}" font-size="13" text-anchor="middle">集${b.gatherDays}</text>`);
+        if (unit === 'day') out.push(`<text data-notr x="${cx}" y="${T + ph + 33}" font-size="13" font-weight="700" text-anchor="middle">${MK()}</text>`);
+        else out.push(`<text data-notr x="${cx}" y="${T + 15}" font-size="13" text-anchor="middle">${MK()}${b.gatherDays}</text>`);
       }
       if (b.current) out.push(`<text x="${cx}" y="${H - 4}" font-size="13" text-anchor="${cx > W - 30 ? 'end' : 'middle'}">途中</text>`);
     });
@@ -300,7 +337,7 @@
       <div class="seg jg-seg" role="group" aria-label="期間">${PERIODS.map(p => `<button type="button" data-jgper="${p[0]}" aria-pressed="${p[0] === st.period}">${p[1]}</button>`).join('')}</div>
       ${head('区域カード', 'area')}${chartSvg(bars, 'area', mx, W, H, g.unit, r)}
       ${head('留守宅カード', 'card')}${chartSvg(bars, 'card', mx, W, H, g.unit, r)}
-      ${LEGEND}
+      ${LEGEND()}
       <p class="jg-line" id="jgLine" aria-live="polite">${lineHtml(bars, st.sel, g.unit, r)}</p>
       ${notes.map(x => `<p class="hint">${esc(x)}</p>`).join('')}
       <h3>くらべ（${label}）</h3>
@@ -357,8 +394,8 @@
   const _renderAdminJg = window.renderAdmin;
   window.renderAdmin = function () {
     _renderAdminJg.apply(this, arguments);
-    try { if (isAdmin() && adPane === 'status' && $id('adAch')) paint(); } // 「会えた成果」の箱は、画面ロック中は作られない（schedule.js）ので、それを目印にする
+    try { if (isAdmin() && adPane === 'status' && !(typeof window.lkLocked === 'function' && window.lkLocked())) paint(); } // 画面ロック中は出さない（schedule.js が window に出している lkLocked）
     catch (e) { console.error(e); }
   };
-  window.JGUI = { sum, paint, state: st };
+  window.JGUI = { sum, paint, state: st, recompute: () => { st.agg = null; return compute(); } }; // recompute：「速さを測る」用（覚えた結果を捨てて作り直す）
 })(typeof window !== 'undefined' ? window : globalThis);
