@@ -3234,6 +3234,8 @@ window.KUIKI_I18N.es = {
 "区域{0}の貸し出しを、なかったことにしますか？": "¿Anular el préstamo del territorio {0}?",
 "{0}さんの区域カードから外れます。返却の記録は残りません。": "Se quitará de las tarjetas de territorio de {0}. No quedará registro de devolución.",
 "区域{0}の貸し出しを、なかったことにしました": "Se anuló el préstamo del territorio {0}",
+"電波のあるところで消してください": "Bórrelo donde haya señal",
+"まだ送っていない変更があります。送り終えてから、もう一度押してください": "Hay cambios que aún no se han enviado. Cuando se terminen de enviar, vuelva a tocar el botón",
 "ほかの操作で区域の状態が変わったので、消しませんでした": "No se borró porque el estado del territorio cambió por otra operación",
 "区域係の画面：S-13 の区域の記録で、アプリの記録（返却・貸出中）も「消す」で消せるようにしました（テストや押しまちがいの記録。訪問の記録は消えません）。": "Pantalla del encargado: en el registro de cada territorio del S-13 ahora también se pueden borrar los registros de la aplicación (devoluciones y préstamos) con «Borrar» (para registros de prueba o errores; los registros de visitas no se borran).",
 };

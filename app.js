@@ -14022,19 +14022,22 @@ const s13RetSort = tid => (D().returns || []).filter(x => x && x.terrId === tid 
 /* 返却の記録 r を D().returns から外したあとに、区域 t の状態を残りの記録から作り直す（commit の中で呼ぶ） */
 function s13RetRebuild(t, r) {
   const rest = s13RetSort(t.id), last = rest[rest.length - 1] || null;
-  if (last && last.at > r.at) return; // あとにも返却がある：区域の状態は、その新しい返却のまま
-  if (t.returnedAt === r.at) {
+  // 前回の返却：消した記録がいちばん新しい返却だったとき、残った最後の返却にもどす。
+  // 留守宅カードで完了した記録は、記録の日時が完了の日に書きかわり、区域の returnedAt は留守宅カードにして返した日のまま。受け取った日（lentAt）でも見分ける
+  if ((!last || last.at <= r.at) && (t.returnedAt === r.at || (r.lentAt && t.lastLentAt === r.lentAt))) {
     t.returnedAt = last ? last.at : null; t.lastLentAt = last ? last.lentAt || null : null; t.lastFirstAt = last ? last.firstAt || null : null;
     delete t.lastRoundFrom;
   }
+  // 完了した日付：消した記録の日だったとき（あとに途中の返却があっても）、残った記録の最後の完了にもどす
   if (t.completedAt === r.at) {
     const done = rest.filter(x => x.completed).pop() || null;
     const cands = [done ? { at: done.at, pct: done.pct, rec: done } : null, r.prevAt ? { at: r.prevAt, pct: r.prevPct, rec: null } : null].filter(Boolean)
       .sort((p, q) => (p.at < q.at ? -1 : p.at > q.at ? 1 : p.rec ? 1 : -1)); // 同じ日時なら返却の記録のほうを使う（ph・係の確認の印を見るため）
     const c = cands.pop();
     if (c) { t.completedAt = c.at; t.completedPct = c.pct == null ? null : c.pct; } else { delete t.completedAt; delete t.completedPct; }
-    // 回り残しを出さない印（H2）は、もどった完了が紙の区域カード・係の確認つきのときだけ。だれかが持っているときは付けない（受け取ると消える印）
-    if (!t.holder && c && c.rec && (c.rec.ph || (c.rec.lowOk && c.rec.lowBy))) t.recLess = 1; else delete t.recLess;
+    // 回り残しを出さない印（H2）は、もどった完了が紙の区域カード・係の確認つきのときだけ。
+    // だれかが持っているときは、今の巡回の印なので変えない（受け取ると消える印）
+    if (!t.holder) { if (c && c.rec && (c.rec.ph || (c.rec.lowOk && c.rec.lowBy))) t.recLess = 1; else delete t.recLess; }
   }
 }
 let s13DelBusy = false;
@@ -14057,7 +14060,7 @@ async function s13DelApp(tid, rid) {
     title = r.g ? T(`${s13Who(r.by, r.g, r.ga)}の記録を消しますか？`) : T(`${uname(r.by)}さんの記録を消しますか？`); // 集まりの区域は「グループ奉仕（名前）」の形（さんを付けない）
     body = J([
       T(`${s13Fmt(dstr(r.lentAt))}〜${s13Fmt(dstr(r.at))}（${r.completed ? '完了' : '返却'}）の記録を、S-13 から消します。`),
-      latest && t.completedAt === r.at ? T(`区域の完了した日付は、その前の記録（${back ? s13Fmt(dstr(back)) : 'なし'}）にもどります。`) : '',
+      t.completedAt === r.at ? T(`区域の完了した日付は、その前の記録（${back ? s13Fmt(dstr(back)) : 'なし'}）にもどります。`) : '',
       T('訪問の記録（会えた・留守）は消えません。'),
       T('消したあと、下に出る「取り消す」でもどせます。')
     ]);
@@ -14070,6 +14073,9 @@ async function s13DelApp(tid, rid) {
     ]);
   }
   if (!await ask('', { title, body, ok: '消す', danger: true })) return false;
+  // 送り終えていない変更があるとき・電波がないときは消さない（最新を受け取れず、区域の版がずれて、記録だけ消えるのを防ぐ）
+  if (LIVE && (navigator.onLine === false)) { toast('電波のあるところで消してください'); return false; }
+  if (LIVE && (Store.queue.length || flushing)) { toast('まだ送っていない変更があります。送り終えてから、もう一度押してください'); return false; }
   const before = snap(t);
   s13DelBusy = true;
   try {
@@ -14079,9 +14085,12 @@ async function s13DelApp(tid, rid) {
       toast('最新の状態を確かめています…');
       try { await Promise.race([refresh(true), wait(5000)]); } catch (e) { /* 今のデータで続ける */ }
     }
+    if (LIVE && (Store.queue.length || flushing)) return 'まだ送っていない変更があります。送り終えてから、もう一度押してください';
     t = terrById(tid);
     const r2 = rid ? (D().returns || []).find(x => x.id === rid && x.terrId === tid) : null;
-    if (!t || snap(t) !== before || (rid && !r2)) { toast('ほかの操作で区域の状態が変わったので、消しませんでした'); return true; }
+    // 画面を描き直すとお知らせが消えるので、文を返して、描き直したあとに出す（呼ぶ側）
+    if (!t || snap(t) !== before || (rid && !r2)) return 'ほかの操作で区域の状態が変わったので、消しませんでした';
+    if (r2 && s13RetSort(tid).pop() === r2 && activeCards().some(c => c.terrId === tid)) return 'ほかの操作で区域の状態が変わったので、消しませんでした';
     if (r2) {
       commit('記録を消しました', () => {
         D().returns = D().returns.filter(x => x.id !== r2.id);
@@ -14092,8 +14101,10 @@ async function s13DelApp(tid, rid) {
       commit(`区域${t.no}の貸し出しを、なかったことにしました`, () => {
         // 返却（finishTerr）と同じ項目を空にする。前回の返却・完了した日付は変えない
         delete t.paperHand;
+        t.unLend = 1; // 「続きから」の起点（tsuzuki.js）：途中の返却とみなさず、受け取る前にもどす。印は tsuzuki.js が消す
         t.holder = null; t.lentAt = null; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
       });
+      delete t.unLend; // tsuzuki.js が読み込まれていないときも残さない（commit のあとに消しても、送るのは次の保存）
     }
     return true;
   } finally { s13DelBusy = false; }
@@ -14113,7 +14124,7 @@ function openS13Edit(tid, editId) {
     ${r.rows.length ? r.rows.map(x => `<div class="setrow"><span><b>${esc(x.name)}</b>　${s13Fmt(x.a)} 〜 ${x.c ? s13Fmt(x.c) + ' 完了' : x.cur ? '貸出中' : x.pool ? '留守宅カードで回っています' : x.ret ? '返却 ' + s13Fmt(x.ret) : '（完了日なし）'}
         <br><small class="hint">${x.src === 'paper' ? '紙から転記' : 'アプリの記録'}</small></span>
         ${x.src === 'paper' ? `<span class="actions" style="margin:0"><button class="btn small" data-s13ed="${esc(x.id)}">直す</button><button class="btn small danger" data-s13del="${esc(x.id)}">消す</button></span>`
-          : `<span class="actions" style="margin:0">${(x.cur && t.holder) || x.pool ? '<button class="btn small" data-s13fin>完了にする</button>' : ''}${isAdmin() ? `<button class="btn small danger" data-s13dapp="${esc(x.cur ? 'cur' : x.rid || '')}">消す</button>` : ''}</span>`}</div>`).join('')
+          : `<span class="actions" style="margin:0">${(x.cur && t.holder) || x.pool ? '<button class="btn small" data-s13fin>完了にする</button>' : ''}${isAdmin() && !x.pool ? `<button class="btn small danger" data-s13dapp="${esc(x.cur ? 'cur' : x.rid || '')}">消す</button>` : ''}</span>`}</div>`).join('')
       : '<p class="muted">この年度の記録はありません。</p>'}
     <h3 class="sub">${ed ? '紙の記録を直す' : '紙の記録を転記する'}</h3>
     <label class="field"><span>伝道者の名前</span><input type="text" id="s13Name" list="s13Names" maxlength="30" value="${esc(ed ? ed.name : '')}" placeholder="例：山田 花子"></label>
@@ -14203,7 +14214,11 @@ function openS13Edit(tid, editId) {
   // アプリで回っている区域（貸出中・留守宅カードの段階）を、S-13 から完了にする（紙の記録に完了した日付を入れるのと同じ考え方）
   if ($('[data-s13fin]', $('#sheet'))) $('[data-s13fin]', $('#sheet')).onclick = async () => { await s13Finish(tid); again(); };
   // アプリの記録（返却・貸出中）を消す（テストや押しまちがい。区域係だけ・2026.13.107）
-  $$('[data-s13dapp]', $('#sheet')).forEach(b => b.onclick = async () => { if (await s13DelApp(tid, b.dataset.s13dapp === 'cur' ? '' : b.dataset.s13dapp)) again(); });
+  $$('[data-s13dapp]', $('#sheet')).forEach(b => b.onclick = async () => {
+    const res = await s13DelApp(tid, b.dataset.s13dapp === 'cur' ? '' : b.dataset.s13dapp);
+    if (res) again();
+    if (typeof res === 'string') toast(res); // 消さなかった理由（描き直したあとに出す）
+  });
   if ($('#s13EdCancel')) $('#s13EdCancel').onclick = () => openS13Edit(tid);
   $$('[data-s13ed]', $('#sheet')).forEach(b => b.onclick = () => openS13Edit(tid, b.dataset.s13ed));
   $$('[data-s13del]', $('#sheet')).forEach(b => b.onclick = async () => {
