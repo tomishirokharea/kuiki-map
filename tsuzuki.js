@@ -58,6 +58,9 @@
             delete t.lastRoundFrom;
           } else if (p.holder && t.holder && t.lentAt && t.lentAt !== p.lentAt) { // 担当者を入れかえた＝新しく回りはじめる
             t.roundFrom = t.lentAt; delete t.lastRoundFrom;
+          } else if (p.holder && !t.holder && t.unLend) {       // 貸し出しをなかったことにした（S-13 の［消す］・2026.13.107）：受け取る前にもどす
+            if (p.rf && p.rf !== (p.lentAt || '')) t.lastRoundFrom = p.rf; else delete t.lastRoundFrom; // 続きから受け取っていたときだけ、前の起点を残す
+            delete t.roundFrom; delete t.unLend;
           } else if (p.holder && !t.holder) {                   // 返した
             if (t.awayPoolAt !== p.pool || t.completedAt !== p.comp) { delete t.lastRoundFrom; }   // 留守宅カードにした／回り終えた
             else if (p.rf) t.lastRoundFrom = p.rf;                                                   // 途中で返した

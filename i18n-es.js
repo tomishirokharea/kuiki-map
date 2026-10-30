@@ -3220,5 +3220,22 @@ window.KUIKI_I18N.es = {
 "区域{0}は、アプリの留守宅カードで回っています。": "El territorio {0} se está trabajando con tarjetas de ausentes en la aplicación.",
 "紙の記録を入れても、アプリの区域は完了になりません。": "Aunque agregue un registro en papel, el territorio de la aplicación no queda completado.",
 "アプリの区域を完了にするときは「やめる」を押して、「この年度の割り当て」の「完了にする」を押してください。": "Para completar el territorio de la aplicación, toque «Cancelar» y luego «Marcar como completado» en «Asignaciones de este año».",
-"区域係の画面：S-13 の区域の記録で、アプリで回っている区域（貸出中・留守宅カード）を「完了にする」で完了にできるようにしました（紙の記録に完了した日付を入れるのと同じように、区域カードから外れます）。アプリで回っている区域に紙の記録を入れるときは、完了にならないことを先に知らせます": "Pantalla del encargado: en el registro del territorio del S-13, ahora puede completar con «Marcar como completado» un territorio que se está trabajando en la aplicación (prestado o con tarjetas de ausentes); igual que al anotar la fecha de completado en un registro en papel, se quita de la tarjeta de territorio. Al agregar un registro en papel a un territorio que se está trabajando en la aplicación, se avisa antes que no quedará completado."
+"区域係の画面：S-13 の区域の記録で、アプリで回っている区域（貸出中・留守宅カード）を「完了にする」で完了にできるようにしました（紙の記録に完了した日付を入れるのと同じように、区域カードから外れます）。アプリで回っている区域に紙の記録を入れるときは、完了にならないことを先に知らせます": "Pantalla del encargado: en el registro del territorio del S-13, ahora puede completar con «Marcar como completado» un territorio que se está trabajando en la aplicación (prestado o con tarjetas de ausentes); igual que al anotar la fecha de completado en un registro en papel, se quita de la tarjeta de territorio. Al agregar un registro en papel a un territorio que se está trabajando en la aplicación, se avisa antes que no quedará completado.",
+/* 2026.13.107：S-13 のアプリの記録（返却・貸出中）を消す */
+"留守宅カードで回っている記録は消せません。先に「完了にする」で終えてください。": "No se puede borrar un registro que se está trabajando con tarjetas de ausentes. Primero termínelo con «Marcar como completado».",
+"この区域の留守宅カードを受け取っている人がいます（{0}枚）。カードを返してもらってから消してください。": "Hay personas que tienen tarjetas de ausentes de este territorio ({0}). Bórrelo cuando hayan devuelto las tarjetas.",
+"{0}さんの記録を消しますか？": "¿Borrar el registro de {0}?",
+"{0}の記録を消しますか？": "¿Borrar el registro de {0}?",
+"{0}〜{1}（完了）の記録を、S-13 から消します。": "Se borrará del S-13 el registro del {0} al {1} (completado).",
+"{0}〜{1}（返却）の記録を、S-13 から消します。": "Se borrará del S-13 el registro del {0} al {1} (devuelto).",
+"区域の完了した日付は、その前の記録（{0}）にもどります。": "La fecha de completado del territorio volverá al registro anterior ({0}).",
+"訪問の記録（会えた・留守）は消えません。": "Los registros de visitas (encontrado, ausente) no se borran.",
+"消したあと、下に出る「取り消す」でもどせます。": "Después de borrarlo, puede deshacerlo con «Anular» que aparece abajo.",
+"区域{0}の貸し出しを、なかったことにしますか？": "¿Anular el préstamo del territorio {0}?",
+"{0}さんの区域カードから外れます。返却の記録は残りません。": "Se quitará de las tarjetas de territorio de {0}. No quedará registro de devolución.",
+"区域{0}の貸し出しを、なかったことにしました": "Se anuló el préstamo del territorio {0}",
+"電波のあるところで消してください": "Bórrelo donde haya señal",
+"まだ送っていない変更があります。送り終えてから、もう一度押してください": "Hay cambios que aún no se han enviado. Cuando se terminen de enviar, vuelva a tocar el botón",
+"ほかの操作で区域の状態が変わったので、消しませんでした": "No se borró porque el estado del territorio cambió por otra operación",
+"区域係の画面：S-13 の区域の記録で、アプリの記録（返却・貸出中）も「消す」で消せるようにしました（テストや押しまちがいの記録。訪問の記録は消えません）。": "Pantalla del encargado: en el registro de cada territorio del S-13 ahora también se pueden borrar los registros de la aplicación (devoluciones y préstamos) con «Borrar» (para registros de prueba o errores; los registros de visitas no se borran).",
 };
