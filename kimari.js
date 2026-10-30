@@ -345,13 +345,14 @@
     due: () => [['1年の期限を過ぎた', dueNum('over')], ['期限まで60日以内', dueNum('warn')], ['今月中に出したい', dueNum('need')], ['声かけ候補', dueNum('pace')]],
     tiles: () => [['区域の数', tileNum('terr')], ['返却の目安を過ぎた貸出', tileNum('over')], ['この90日で会えた', tileNum('met')]],
     away: () => [['完了した区域', extN()]],
-    hard: () => [['手紙の候補', hardN()]]
+    hard: () => [['手紙の候補', hardN()]],
+    jg: () => (window.JGUI ? JGUI.sum() : []) // 区域カードと留守宅カードのグラフ（joukyou-graph.js）：直近30日の会えた割合
   };
   const sumHtml = a => a.filter(x => x[1] != null).map(x => `<span class="krn">${esc(x[0])} ${esc(x[1])}</span>`).join('・');
   // 状況の見出し（id・見つけ方・中身の終わり）
   function foldBlocks() {
     const out = [], panes = [document.querySelector('.apane[data-apane="status"]'), document.querySelector('.apane[data-apane="status2"]')];
-    const BOX = { adDue: 'due', adSlotBox: 'slot', adAch: 'ach', adCand: 'cand' };
+    const BOX = { adDue: 'due', adSlotBox: 'slot', adAch: 'ach', adJG: 'jg', adCand: 'cand' };
     // 見出しは、文字ではなく、すぐ下の箱で見分ける（スペイン語の画面でも同じに動くように）
     const HID = new Map();
     const put = (h, id) => { if (h) HID.set(h, id); };
@@ -391,7 +392,7 @@
   }
   const toggleFold = h => { const id = h.dataset.krfold; if (!id) return; setOpenF(id, !isOpen(id)); paintFolds(); };
   // 「今日」タブの「見る」などで状況の中の場所に飛ぶときは、その見出しを開いておく（たたんだ中には飛べないため）
-  const ANCHOR = { adDue: 'due', adTiles: 'tiles', adSlotBox: 'slot', adAch: 'ach', adMeet: 'meet', adCand: 'cand', adAwaySet: 'away', adAwaySlots: 'slots2', adAwayTerrs: 'terrs', adHard: 'hard' };
+  const ANCHOR = { adDue: 'due', adTiles: 'tiles', adSlotBox: 'slot', adAch: 'ach', adJG: 'jg', adMeet: 'meet', adCand: 'cand', adAwaySet: 'away', adAwaySlots: 'slots2', adAwayTerrs: 'terrs', adHard: 'hard' };
   document.addEventListener('click', e => {
     const b = e.target && e.target.closest ? e.target.closest('[data-tgo="status"][data-anchor]') : null;
     const id = b && ANCHOR[b.dataset.anchor];
