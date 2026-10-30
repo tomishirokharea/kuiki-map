@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.106';
+var APP_JS_VER = '2026.13.107';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2677,6 +2677,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.107', items: [
+    ['係', '区域係の画面：S-13 の区域の記録で、アプリの記録（返却・貸出中）も「消す」で消せるようにしました（テストや押しまちがいの記録。訪問の記録は消えません）。']
+  ] },
   { v: '2026.13.106', items: [
     ['係', '区域係の画面：S-13 の区域の記録で、アプリで回っている区域（貸出中・留守宅カード）を「完了にする」で完了にできるようにしました（紙の記録に完了した日付を入れるのと同じように、区域カードから外れます）。アプリで回っている区域に紙の記録を入れるときは、完了にならないことを先に知らせます']
   ] },
@@ -13848,7 +13851,7 @@ function s13Rows(y) {
   return D().territories.filter(t => !t.dummy).slice().sort(byNo).map(t => {
     const list = [];
     D().returns.filter(r => r.terrId === t.id && r.lentAt).forEach(r =>
-      list.push({ name: s13Who(r.by, r.g, r.ga), a: dstr(r.lentAt), c: r.completed ? dstr(r.at) : '', ret: dstr(r.at), lw: r.lowAuto ? 1 : 0, src: 'app',
+      list.push({ name: s13Who(r.by, r.g, r.ga), a: dstr(r.lentAt), c: r.completed ? dstr(r.at) : '', ret: dstr(r.at), lw: r.lowAuto ? 1 : 0, src: 'app', rid: r.id,
         pool: !r.completed && !t.holder && !!t.awayPoolAt && r.id === t.poolRetId })); // 留守宅カードにして返し、まだ完了していない（留守宅を回っている）
     if (t.holder && t.lentAt) list.push({ name: s13Who(t.holder, t.group, isAllUse(t)), a: dstr(t.lentAt), c: '', ret: '', cur: true, src: 'app' });
     paper.filter(x => x.kind === 'a' && x.terrId === t.id).forEach(x =>
@@ -14009,6 +14012,92 @@ function s13Sure(rec, t, p1) {
   delete rec.low; rec.lowOk = 1; rec.lowAt = new Date().toISOString();
   if (p1 != null && rec.p1 == null) rec.p1 = p1;
 }
+/* S-13 のアプリの記録を消す（2026.13.107）：テストや押しまちがいでできた記録を、区域係が1行ずつ消す。
+   ・返却の記録：S-13 から行が消える。その区域の最新の返却だったときは、区域の「前回の返却」「完了した日付」を、
+     残った返却の記録から作り直す（あとにも返却がある古い記録なら、区域の状態は変えない）
+   ・貸出中：貸し出しをなかったことにする（返却の記録は作らない）
+   ・どちらも、訪問の記録（会えた・留守）は消さない。消したあとは「取り消す」でもどせる
+   ・留守宅カードで回っている段階の返却と、留守宅カードを受け取っている人がいる区域の最新の返却は消さない（カードの数え方がくずれるため） */
+const s13RetSort = tid => (D().returns || []).filter(x => x && x.terrId === tid && x.at).sort((p, q) => (p.at < q.at ? -1 : p.at > q.at ? 1 : 0));
+/* 返却の記録 r を D().returns から外したあとに、区域 t の状態を残りの記録から作り直す（commit の中で呼ぶ） */
+function s13RetRebuild(t, r) {
+  const rest = s13RetSort(t.id), last = rest[rest.length - 1] || null;
+  if (last && last.at > r.at) return; // あとにも返却がある：区域の状態は、その新しい返却のまま
+  if (t.returnedAt === r.at) {
+    t.returnedAt = last ? last.at : null; t.lastLentAt = last ? last.lentAt || null : null; t.lastFirstAt = last ? last.firstAt || null : null;
+    delete t.lastRoundFrom;
+  }
+  if (t.completedAt === r.at) {
+    const done = rest.filter(x => x.completed).pop() || null;
+    const cands = [done ? { at: done.at, pct: done.pct, rec: done } : null, r.prevAt ? { at: r.prevAt, pct: r.prevPct, rec: null } : null].filter(Boolean)
+      .sort((p, q) => (p.at < q.at ? -1 : p.at > q.at ? 1 : p.rec ? 1 : -1)); // 同じ日時なら返却の記録のほうを使う（ph・係の確認の印を見るため）
+    const c = cands.pop();
+    if (c) { t.completedAt = c.at; t.completedPct = c.pct == null ? null : c.pct; } else { delete t.completedAt; delete t.completedPct; }
+    // 回り残しを出さない印（H2）は、もどった完了が紙の区域カード・係の確認つきのときだけ。だれかが持っているときは付けない（受け取ると消える印）
+    if (!t.holder && c && c.rec && (c.rec.ph || (c.rec.lowOk && c.rec.lowBy))) t.recLess = 1; else delete t.recLess;
+  }
+}
+let s13DelBusy = false;
+async function s13DelApp(tid, rid) {
+  if (!isAdmin() || s13DelBusy) return false;
+  const T = s => (window.KI ? window.KI.t(s) : s); // 文を1つずつ訳す（meibo.js と同じ）
+  const J = xs => xs.filter(Boolean).join(window.KI && KI.lang !== 'ja' ? ' ' : '');
+  const snap = x => (x ? [x.holder || '', x.lentAt || '', x.awayPoolAt || '', x.poolRetId || '', x.returnedAt || '', x.completedAt || ''].join('|') : '');
+  let t = terrById(tid); if (!t) return false;
+  const r = rid ? (D().returns || []).find(x => x.id === rid && x.terrId === tid) : null;
+  if (rid ? !r : !(t.holder && t.lentAt)) return false;
+  let body, title;
+  if (r) {
+    const rest = s13RetSort(tid), latest = rest[rest.length - 1] === r;
+    if (t.awayPoolAt && t.poolRetId === r.id) { toast(T('留守宅カードで回っている記録は消せません。先に「完了にする」で終えてください。')); return false; }
+    const cards = latest ? activeCards().filter(c => c.terrId === tid).length : 0;
+    if (cards) { toast(T(`この区域の留守宅カードを受け取っている人がいます（${cards}枚）。カードを返してもらってから消してください。`)); return false; }
+    const after = rest.filter(x => x !== r), done = after.filter(x => x.completed).pop();
+    const back = [done ? done.at : '', r.prevAt || ''].filter(Boolean).sort().pop();
+    title = r.g ? T(`${s13Who(r.by, r.g, r.ga)}の記録を消しますか？`) : T(`${uname(r.by)}さんの記録を消しますか？`); // 集まりの区域は「グループ奉仕（名前）」の形（さんを付けない）
+    body = J([
+      T(`${s13Fmt(dstr(r.lentAt))}〜${s13Fmt(dstr(r.at))}（${r.completed ? '完了' : '返却'}）の記録を、S-13 から消します。`),
+      latest && t.completedAt === r.at ? T(`区域の完了した日付は、その前の記録（${back ? s13Fmt(dstr(back)) : 'なし'}）にもどります。`) : '',
+      T('訪問の記録（会えた・留守）は消えません。'),
+      T('消したあと、下に出る「取り消す」でもどせます。')
+    ]);
+  } else {
+    title = T(`区域${t.no}の貸し出しを、なかったことにしますか？`);
+    body = J([
+      T(`${uname(t.holder)}さんの区域カードから外れます。返却の記録は残りません。`),
+      T('訪問の記録（会えた・留守）は消えません。'),
+      T('消したあと、下に出る「取り消す」でもどせます。')
+    ]);
+  }
+  if (!await ask('', { title, body, ok: '消す', danger: true })) return false;
+  const before = snap(t);
+  s13DelBusy = true;
+  try {
+    // 決める前に最新を受け取る（ほかの係・本人が返した・担当が変わった、を見るため。電波がなければ今のデータで続ける）
+    if (LIVE && navigator.onLine !== false) {
+      $$('[data-s13dapp]', $('#sheet')).forEach(b => { b.disabled = true; b.textContent = '確かめています…'; });
+      toast('最新の状態を確かめています…');
+      try { await Promise.race([refresh(true), wait(5000)]); } catch (e) { /* 今のデータで続ける */ }
+    }
+    t = terrById(tid);
+    const r2 = rid ? (D().returns || []).find(x => x.id === rid && x.terrId === tid) : null;
+    if (!t || snap(t) !== before || (rid && !r2)) { toast('ほかの操作で区域の状態が変わったので、消しませんでした'); return true; }
+    if (r2) {
+      commit('記録を消しました', () => {
+        D().returns = D().returns.filter(x => x.id !== r2.id);
+        s13RetRebuild(t, r2);
+      });
+    } else {
+      if (roundTerr === tid) roundTerr = null;
+      commit(`区域${t.no}の貸し出しを、なかったことにしました`, () => {
+        // 返却（finishTerr）と同じ項目を空にする。前回の返却・完了した日付は変えない
+        delete t.paperHand;
+        t.holder = null; t.lentAt = null; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
+      });
+    }
+    return true;
+  } finally { s13DelBusy = false; }
+}
 function openS13Edit(tid, editId) {
   const y = s13Y, t = terrById(tid); if (!t) return;
   const r = s13Rows(y).find(x => x.t.id === tid);
@@ -14024,7 +14113,7 @@ function openS13Edit(tid, editId) {
     ${r.rows.length ? r.rows.map(x => `<div class="setrow"><span><b>${esc(x.name)}</b>　${s13Fmt(x.a)} 〜 ${x.c ? s13Fmt(x.c) + ' 完了' : x.cur ? '貸出中' : x.pool ? '留守宅カードで回っています' : x.ret ? '返却 ' + s13Fmt(x.ret) : '（完了日なし）'}
         <br><small class="hint">${x.src === 'paper' ? '紙から転記' : 'アプリの記録'}</small></span>
         ${x.src === 'paper' ? `<span class="actions" style="margin:0"><button class="btn small" data-s13ed="${esc(x.id)}">直す</button><button class="btn small danger" data-s13del="${esc(x.id)}">消す</button></span>`
-          : (x.cur && t.holder) || x.pool ? '<span class="actions" style="margin:0"><button class="btn small" data-s13fin>完了にする</button></span>' : ''}</div>`).join('')
+          : `<span class="actions" style="margin:0">${(x.cur && t.holder) || x.pool ? '<button class="btn small" data-s13fin>完了にする</button>' : ''}${isAdmin() ? `<button class="btn small danger" data-s13dapp="${esc(x.cur ? 'cur' : x.rid || '')}">消す</button>` : ''}</span>`}</div>`).join('')
       : '<p class="muted">この年度の記録はありません。</p>'}
     <h3 class="sub">${ed ? '紙の記録を直す' : '紙の記録を転記する'}</h3>
     <label class="field"><span>伝道者の名前</span><input type="text" id="s13Name" list="s13Names" maxlength="30" value="${esc(ed ? ed.name : '')}" placeholder="例：山田 花子"></label>
@@ -14113,6 +14202,8 @@ function openS13Edit(tid, editId) {
   };
   // アプリで回っている区域（貸出中・留守宅カードの段階）を、S-13 から完了にする（紙の記録に完了した日付を入れるのと同じ考え方）
   if ($('[data-s13fin]', $('#sheet'))) $('[data-s13fin]', $('#sheet')).onclick = async () => { await s13Finish(tid); again(); };
+  // アプリの記録（返却・貸出中）を消す（テストや押しまちがい。区域係だけ・2026.13.107）
+  $$('[data-s13dapp]', $('#sheet')).forEach(b => b.onclick = async () => { if (await s13DelApp(tid, b.dataset.s13dapp === 'cur' ? '' : b.dataset.s13dapp)) again(); });
   if ($('#s13EdCancel')) $('#s13EdCancel').onclick = () => openS13Edit(tid);
   $$('[data-s13ed]', $('#sheet')).forEach(b => b.onclick = () => openS13Edit(tid, b.dataset.s13ed));
   $$('[data-s13del]', $('#sheet')).forEach(b => b.onclick = async () => {
