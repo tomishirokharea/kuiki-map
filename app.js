@@ -4662,10 +4662,21 @@ function openTarget(hid, unit, fromBuilding, review) {
   };
   paint();
 }
+/* 記録につけるカードの印（状況のグラフ用・2026-10-31）。自分が持つ（グループのカードは今日回る人も）留守宅カードに入っている家 → 'card:<カードのid>'、それ以外 → 'area'（区域カードなど）。
+   同じ区域の区域カードも持っているときは、そのカードの画面（focusCard）を開いているときだけ留守宅カード。サーバーは src にこの形だけを通す（Code.gs の CARD_SRC_RE） */
+function cardMark(hid, unit) {
+  const k = K(hid, unit || ''), h = houseById(hid), t = h ? terrById(h.terrId) : null;
+  const cs = activeCards().filter(c => c.keys.includes(k) && (c.by === me().id || isCardHelper(c)));
+  if (!cs.length) return 'area';
+  const f = cs.find(c => c.id === focusCard);
+  if (f) return 'card:' + f.id;
+  if (t && (t.holder === me().id || helpersOf(t).some(x => x.uid === me().id))) return 'area';
+  return 'card:' + cs[0].id;
+}
 /* 記録をすぐ画面に出して、送信はうしろで行う（続けて記録しても、印がすぐ変わる） */
 function quickVisit(hid, unit, result, extra, msg, onUndo, keepOpen) {
   const now = new Date().toISOString();
-  const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id }; { const rs = recoSrc(hid, unit); if (rs) v.src = rs; }
+  const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id }; { const rs = recoSrc(hid, unit); v.src = rs || cardMark(hid, unit); } // おすすめ（reco）の印が先。なければカードの印（card:／area）
   if (result === 'met' || result === 'refused') { if (extra.age) v.age = extra.age; }
   if (result === 'met' && extra.interest) v.interest = extra.interest;
   D().visits.push(v);
@@ -4856,7 +4867,7 @@ function saveVisit(hid, unit, result, extra, keepOpen, onUndo) {
   if (!follow && !extra.dnc && !(cur && cur.by === me().id)) { quickVisit(hid, unit, result, extra, msg, onUndo, keepOpen); return; }
   commit(msg, () => {
     const now = new Date().toISOString();
-    const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id }; { const rs = recoSrc(hid, unit); if (rs) v.src = rs; }
+    const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id }; { const rs = recoSrc(hid, unit); v.src = rs || cardMark(hid, unit); } // おすすめ（reco）の印が先。なければカードの印（card:／area）
     if (result === 'met') { // 記録しない設定の項目は、そもそも持たせない
       if (extra.age) v.age = extra.age;
       if (extra.interest) v.interest = extra.interest;
