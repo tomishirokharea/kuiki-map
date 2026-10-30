@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.109';
+var APP_JS_VER = '2026.13.110';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2677,6 +2677,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.110', items: [
+    ['係', '区域係の画面：S-13 の表の「選択」で記録をえらび、「返却する」（今日が完了した日付）か「削除する」を、まとめてできるようにしました。紙の記録で貸出中の区域も、えらんで返却できます。']
+  ] },
   { v: '2026.13.109', items: [
     ['返', '区域を受け取ってから訪問の記録が1件もないまま返したときは、S-13 に記録を残さないようにしました（受け取ってすぐ返したときなど）。区域は今までどおり、だれでも受け取れる区域にもどります。']
   ] },
@@ -8559,29 +8562,33 @@ async function finishTerr(tid, done, lowOk, sure) {
   closeSheet();
   if (roundTerr === tid) roundTerr = null;
   commit(`区域${t.no}を返却しました${done ? '（回り終えました）' : noRec ? `（${RET_NOREC_MSG}）` : ''}`, () => {
-    const now = new Date().toISOString();
-    const rec = { id: 'x' + uid(), terrId: tid, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: done, pct };
-    if (roundFromOf(t)) rec.from = roundFromOf(t); // 続きから回った：前の人が回りはじめた日（記録の少ない返却の確かめは、この日から数える。K-1）
-    if (t.group) rec.g = 1; // グループ奉仕の区域（S-13 に「グループ奉仕（名前）」と出す）
-    if (isAllUse(t)) rec.ga = 1; // 全体の集まりの区域（S-13 に「全体の集まり（名前）」と出す）
-    const ph = paperHandOf(t);
-    if (!noRec) D().returns.push(rec);
-    if (done && ph) {
-      rec.ph = 1; // 紙の区域カードで回った（記録の少ない返却の確かめ・まわり漏れの対象にしない）
-      t.completedAt = now; t.completedPct = null;
-      t.recLess = 1; // 紙で回った家はアプリにないので、おすすめに回り残しを出さない（H2）
-    } else if (done) {
-      // 印は、t.completedAt を書きかえる前に付ける。S-13 の完了（sure）は、設定（lowOn）や割合にかかわらず「完了で確定」の印だけ付ける
-      // （lowMark の「紙や口頭で確かめた」は回り残しを消す recLess も付けるので使わない。アプリで回った記録は、おすすめの回り残しに使う）
-      if (sure) s13Sure(rec, t, lowP1(t, r));
-      else lowMark(rec, t, lowP1(t, r), lowFirstPicked(t) ? t.firstLow === 'ok' : lowOk);
-      t.completedAt = now; t.completedPct = r && r.phase === 'away' ? r.pct1 : pct;
-    }
-    if (typeof sure === 'function') sure();
-    delete t.paperHand;
-    t.lastLentAt = t.lentAt; t.lastFirstAt = t.firstDoneAt || null;
-    t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
+    finishApply(t, done, lowOk, sure, noRec, r, pct);
   }, null, NO_UNDO);
+}
+/* 返却の中身（commit の中で呼ぶ）。finishTerr と、S-13 の「選択」→「返却」（s13RetMany）で使う。r・pct は返す前に数えた roundInfo */
+function finishApply(t, done, lowOk, sure, noRec, r, pct) {
+  const now = new Date().toISOString();
+  const rec = { id: 'x' + uid(), terrId: t.id, by: t.holder, lentAt: t.lentAt, firstAt: t.firstDoneAt || null, at: now, completed: done, pct };
+  if (roundFromOf(t)) rec.from = roundFromOf(t); // 続きから回った：前の人が回りはじめた日（記録の少ない返却の確かめは、この日から数える。K-1）
+  if (t.group) rec.g = 1; // グループ奉仕の区域（S-13 に「グループ奉仕（名前）」と出す）
+  if (isAllUse(t)) rec.ga = 1; // 全体の集まりの区域（S-13 に「全体の集まり（名前）」と出す）
+  const ph = paperHandOf(t);
+  if (!noRec) D().returns.push(rec);
+  if (done && ph) {
+    rec.ph = 1; // 紙の区域カードで回った（記録の少ない返却の確かめ・まわり漏れの対象にしない）
+    t.completedAt = now; t.completedPct = null;
+    t.recLess = 1; // 紙で回った家はアプリにないので、おすすめに回り残しを出さない（H2）
+  } else if (done) {
+    // 印は、t.completedAt を書きかえる前に付ける。S-13 の完了（sure）は、設定（lowOn）や割合にかかわらず「完了で確定」の印だけ付ける
+    // （lowMark の「紙や口頭で確かめた」は回り残しを消す recLess も付けるので使わない。アプリで回った記録は、おすすめの回り残しに使う）
+    if (sure) s13Sure(rec, t, lowP1(t, r));
+    else lowMark(rec, t, lowP1(t, r), lowFirstPicked(t) ? t.firstLow === 'ok' : lowOk);
+    t.completedAt = now; t.completedPct = r && r.phase === 'away' ? r.pct1 : pct;
+  }
+  if (typeof sure === 'function') sure();
+  delete t.paperHand;
+  t.lastLentAt = t.lentAt; t.lastFirstAt = t.firstDoneAt || null;
+  t.holder = null; t.lentAt = null; t.returnedAt = now; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
 }
 const returnTerr = (tid, completed) => finishTerr(tid, completed); // 以前の呼び方
 /* ---- 記録の少ない正式返却（区域係が目安未満のまま正式返却にしたものを、待ってから自動で確かめる） ---- */
@@ -13907,7 +13914,8 @@ function s13BlockHtml(r, print) {
   return chunks.map((ch, ci) => {
     const slots = [0, 1, 2, 3].map(i => ch[i] || null);
     // えらんで消す（区域係・2026.13.108）：消せるアプリの記録（返却・貸出中。留守宅カードの段階は除く）のマスに、記録の目印を付ける
-    const pk = x => (!print && x && x.src === 'app' && !x.pool ? (x.cur ? 'cur:' + r.t.id : x.rid || '') : '');
+    // 目印：返却の記録＝その id（削除）／アプリで貸出中＝cur:区域（削除・返却）／留守宅カードの段階＝pool:区域（返却）／紙の記録で貸出中＝pap:紙の記録の id（返却）
+    const pk = x => (print || !x ? '' : x.src === 'app' ? (x.pool ? 'pool:' + r.t.id : x.cur ? 'cur:' + r.t.id : x.rid || '') : x.cur && x.id ? 'pap:' + x.id : '');
     const cls = (x, nm) => (!x || print ? '' : ` class="s13-${x.src}${x.cur ? ' s13-cur' : ''}${nm ? ' s13-nm' : ''}${pk(x) && s13Pick && s13Pick.has(pk(x)) ? ' s13-on' : ''}"${pk(x) ? ` data-s13k="${esc(pk(x))}"` : ''}`);
     const cdate = x => {
       if (!x) return '';
@@ -13936,21 +13944,31 @@ function openS13(y) {
       <p class="hint">${s13Y - 1}年9月1日〜${s13Y}年8月31日。アプリの貸し出し・返却の記録と、紙から転記した記録（${nPaper}件）を合わせて表示しています。<br>
         <b>区域の行を押すと</b>、紙の記録を転記したり、前回完了した日付を入れたりできます。</p>
       <p class="s13keys"><span class="k s13-app">アプリの記録</span><span class="k s13-paper">紙から転記</span><span class="k s13-cur">いま貸出中</span></p>
-      ${s13Pick ? '<p class="hint s13pickhint"><b>消すアプリの記録の名前のマスを押して、えらんでください。</b>もう一度押すと外れます。紙から転記した記録と、留守宅カードで回っている記録はえらべません。</p>'
-        : '<p><button class="btn small" id="s13PickOn">記録をえらんで消す</button></p>'}
+      ${s13Pick ? '<p class="hint s13pickhint"><b>名前のマスを押して、記録をえらんでください。</b>もう一度押すと外れます。えらんだあと、下の「返却する」か「削除する」を押します。</p>'
+        : '<p><button class="btn small" id="s13PickOn">選択</button></p>'}
       <div class="scroll"><table class="s13tbl screen${s13Pick ? ' s13pick' : ''}">${S13_COLS}${S13_HEAD}${data.map(r => s13BlockHtml(r, false)).join('')}</table></div>
       <p class="hint">*新しいシートを使い始める時には，各区域の前回完了した日付をこの欄に記入してください。</p>
     </div></div>
-    ${s13Pick ? `<div class="s13pickbar"><button class="btn danger" id="s13PickGo"${s13Pick.size ? '' : ' disabled'}>えらんだ ${s13Pick.size}件を消す</button><button class="btn" id="s13PickOff">やめる</button></div>` : ''}`;
+    ${s13Pick ? `<div class="s13pickbar"><button class="btn primary" id="s13PickRet"></button><button class="btn danger" id="s13PickGo"></button><button class="btn" id="s13PickOff">やめる</button></div>` : ''}`;
   el.hidden = false;
   $('#s13Close').onclick = () => { s13Pick = null; el.hidden = true; };
   if ($('#s13PickOn')) $('#s13PickOn').onclick = () => { s13Pick = new Set(); openS13(s13Y); };
   if ($('#s13PickOff')) $('#s13PickOff').onclick = () => { s13Pick = null; openS13(s13Y); };
-  if ($('#s13PickGo')) $('#s13PickGo').onclick = async () => {
-    const res = await s13DelMany([...s13Pick]);
-    if (res) { if (res === true) s13Pick = null; openS13(s13Y); }
-    if (typeof res === 'string') toast(res); // 消さなかった理由（描き直したあとに出す）
+  // 下の帯：えらんだ記録のうち、返却できる数・削除できる数（返却＝貸出中・留守宅カードの段階・紙の記録で貸出中／削除＝アプリの返却の記録・貸出中）
+  const canRet = k => /^(cur|pool|pap):/.test(k), canDel = k => !/^(pool|pap):/.test(k);
+  const paintBar = () => {
+    const ks = s13Pick ? [...s13Pick] : [], nr = ks.filter(canRet).length, nd = ks.filter(canDel).length;
+    const rb = $('#s13PickRet'), db = $('#s13PickGo'); if (!rb || !db) return;
+    rb.textContent = `返却する（${nr}件）`; rb.disabled = !nr;
+    db.textContent = `削除する（${nd}件）`; db.disabled = !nd;
   };
+  paintBar();
+  const after = res => { // true＝処理した（えらぶのを終える）・文字＝しなかった理由（えらんだまま描き直したあとに出す）
+    if (res) { if (res === true) s13Pick = null; openS13(s13Y); }
+    if (typeof res === 'string') toast(res);
+  };
+  if ($('#s13PickGo')) $('#s13PickGo').onclick = async () => after(await s13DelMany([...s13Pick].filter(canDel)));
+  if ($('#s13PickRet')) $('#s13PickRet').onclick = async () => after(await s13RetMany([...s13Pick].filter(canRet)));
   $('#s13Print').onclick = () => printS13(s13Rows(s13Y), s13Y);
   $$('[data-s13y]', el).forEach(b => b.onclick = () => { if (s13Pick) s13Pick = new Set(); openS13(s13Y + Number(b.dataset.s13y)); });
   $$('[data-s13t]', el).forEach(b => b.onclick = e => {
@@ -13960,7 +13978,7 @@ function openS13(y) {
     const k = c.dataset.s13k;
     if (s13Pick.has(k)) s13Pick.delete(k); else s13Pick.add(k);
     $$(`[data-s13k="${CSS.escape(k)}"]`, el).forEach(x => x.classList.toggle('s13-on', s13Pick.has(k)));
-    const go = $('#s13PickGo'); go.disabled = !s13Pick.size; go.textContent = `えらんだ ${s13Pick.size}件を消す`;
+    paintBar();
   });
 }
 function printS13(data, y) {
@@ -14160,6 +14178,80 @@ function s13UnLend(t) {
   t.unLend = 1; // 「続きから」の起点（tsuzuki.js）：途中の返却とみなさず、受け取る前にもどす。印は tsuzuki.js が消す
   t.holder = null; t.lentAt = null; t.helpers = []; t.group = null; delete t.use; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow;
 }
+/* S-13 の表でえらんだ区域を、まとめて返却する（2026.13.110）。返却＝完了（今日が完了した日付）。
+   ・アプリで貸出中：S-13 の「完了にする」（s13Finish）と同じ。区域係が確かめた完了（あとで自動で途中の返却にもどさない）。その巡回の同じ人の紙の記録は1行にまとめる
+   ・留守宅カードの段階：カルテの「正式に返却したことにする」と同じ（poolFinish）
+   ・紙の記録で貸出中：その紙の記録の完了した日付に今日を入れる（区域の記録の画面で完了日を入れるのと同じ）
+   返却のあとは「取り消す」を出さない（finishTerr と同じ。取り消すと S-13 がくずれるため・H3）
+   戻り値：true＝返却した・文字＝しなかった理由・false＝何もしない */
+async function s13RetMany(keys) {
+  if (!isAdmin() || s13DelBusy || !keys || !keys.length) return false;
+  const T = s => (window.KI ? window.KI.t(s) : s), J = xs => xs.filter(Boolean).join(window.KI && KI.lang !== 'ja' ? ' ' : '');
+  if (LIVE && navigator.onLine === false) { toast('電波のあるところで返却してください'); return false; }
+  if (LIVE && (Store.queue.length || flushing)) { toast('まだ送っていない変更があります。送り終えてから、もう一度押してください'); return false; }
+  const snap = x => (x ? [x.holder || '', x.lentAt || '', x.awayPoolAt || '', x.poolRetId || '', x.paperLentAt || ''].join('|') : '');
+  const plan = () => {
+    const app = [], pool = [], pap = [];
+    keys.forEach(k => {
+      if (k.startsWith('cur:')) { const t = terrById(k.slice(4)); if (t && t.holder && t.lentAt) app.push(t); }
+      else if (k.startsWith('pool:')) { const t = terrById(k.slice(5)); if (t && !t.holder && t.awayPoolAt && poolInfo(t)) pool.push(t); }
+      else if (k.startsWith('pap:')) {
+        const x = (D().s13 || []).find(z => z.id === k.slice(4)), t = x && terrById(x.terrId);
+        // 割り当てた日が今日より後の紙の記録は、今日を完了日にできないので外す（監査 L4）
+        if (x && t && x.kind === 'a' && !x.c && paperLent(t) && x.a === t.paperLentAt && String(x.a) <= ymd(new Date())) pap.push({ x, t });
+      }
+    });
+    // 同じ区域を2回数えない（留守宅カードの段階と紙の貸出中を両方えらんだとき。監査 L3）
+    const seen = new Set(app.concat(pool).map(t => t.id));
+    return { app, pool, pap: pap.filter(p => !seen.has(p.t.id) && (seen.add(p.t.id), true)) };
+  };
+  const P = plan(), n = P.app.length + P.pool.length + P.pap.length;
+  if (!n) { toast(T('返却できる区域がありません')); return false; }
+  const before = new Map(P.app.concat(P.pool, P.pap.map(p => p.t)).map(t => [t.id, snap(t)])); // 確認を出す前の状態（監査 L2）
+  const day = s13Fmt(ymd(new Date()));
+  const cards = P.pool.reduce((m, t) => m + activeCards().filter(c => c.terrId === t.id).length, 0);
+  const merges = P.app.concat(P.pool).reduce((m, t) => m + s13RoundPaper(t).length, 0);
+  const body = J([
+    T(`今日（${day}）を完了した日付として、S-13 に記録します。`),
+    P.app.length ? T(`アプリで貸出中の${P.app.length}区域は、持っている人の区域カードから外れます。`) : '',
+    P.pool.length ? T(`留守宅カードで回っている${P.pool.length}区域は、留守宅カードで回るのを終えます。`) : '',
+    P.pap.length ? T(`紙の記録で貸出中の${P.pap.length}区域は、紙の記録に完了した日付を入れます。`) : '',
+    T('区域係が回り終えたことを確かめた完了として記録します（あとで自動で途中の返却にもどしません）。'),
+    merges ? T(`この巡回で前に入れた紙の記録（${merges}件）は、この完了にまとめます。`) : '',
+    cards ? T(`留守宅カードを受け取っている人がいます（${cards}枚）。カードは期限まで、そのまま使えます。`) : '',
+    T('返却したあとは、取り消せません。')
+  ]);
+  if (!await ask('', { title: T(`${n}区域を、今日完了にしますか？`), body, ok: '返却する', danger: false })) return false;
+  s13DelBusy = true;
+  try {
+    if (LIVE && navigator.onLine !== false) {
+      $$('.s13pickbar button').forEach(b => { b.disabled = true; }); const rb = $('#s13PickRet'); if (rb) rb.textContent = '確かめています…';
+      toast('最新の状態を確かめています…');
+      try { await Promise.race([refresh(true), wait(5000)]); } catch (e) { /* 今のデータで続ける */ }
+    }
+    if (LIVE && (Store.queue.length || flushing)) return 'まだ送っていない変更があります。送り終えてから、もう一度押してください';
+    const Q = plan(), all = Q.app.concat(Q.pool, Q.pap.map(p => p.t));
+    if (Q.app.length !== P.app.length || Q.pool.length !== P.pool.length || Q.pap.length !== P.pap.length || all.some(t => snap(t) !== before.get(t.id)))
+      return 'ほかの操作で区域の状態が変わったので、返却しませんでした';
+    // 数える値は、返す前に求めておく（commit の中で区域が変わるため）
+    const appR = Q.app.map(t => { const r = paperHandOf(t) ? null : roundInfo(t.id, true); return { t, r, pct: r ? r.pct : null, ids: new Set(s13RoundPaper(t).map(x => x.id)) }; });
+    const poolR = Q.pool.map(t => ({ t, p: poolInfo(t), ids: new Set(s13RoundPaper(t).map(x => x.id)) }));
+    closeSheet();
+    commit(`${n}区域を返却しました（完了）`, () => {
+      const now = new Date().toISOString(), today = ymd(new Date());
+      const merge = ids => () => { if (ids.size) D().s13 = (D().s13 || []).filter(x => !ids.has(x.id)); };
+      appR.forEach(a => { if (roundTerr === a.t.id) roundTerr = null; finishApply(a.t, true, true, merge(a.ids), false, a.r, a.pct); });
+      poolR.forEach(a => {
+        const rec = D().returns.find(x => x.id === a.t.poolRetId); // poolFinish が poolRetId を消す前に
+        poolFinish(a.t, now, a.p.pct);
+        s13Sure(rec, a.t, null);
+        merge(a.ids)();
+      });
+      Q.pap.forEach(p => { p.x.c = today; p.x.at = now; }); // 区域の paperLentAt・paperDone は、係の端末が S-13 から書き直す（syncPaperDone）
+    }, null, NO_UNDO);
+    return true;
+  } finally { s13DelBusy = false; }
+}
 /* S-13 の表でえらんだアプリの記録を、まとめて消す（2026.13.108）。1件ずつ消す s13DelApp と同じ決まりで、1回の commit にまとめる。
    戻り値：true＝消した・文字＝消さなかった理由（えらんだまま描き直す）・false＝何もしない */
 async function s13DelMany(keys) {
@@ -14212,7 +14304,7 @@ async function s13DelMany(keys) {
   s13DelBusy = true;
   try {
     if (LIVE && navigator.onLine !== false) {
-      const go = $('#s13PickGo'); if (go) { go.disabled = true; go.textContent = '確かめています…'; }
+      $$('.s13pickbar button').forEach(b => { b.disabled = true; }); const go = $('#s13PickGo'); if (go) go.textContent = '確かめています…';
       toast('最新の状態を確かめています…');
       try { await Promise.race([refresh(true), wait(5000)]); } catch (e) { /* 今のデータで続ける */ }
     }
