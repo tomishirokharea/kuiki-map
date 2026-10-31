@@ -2,8 +2,8 @@
    ・この中は数える関数だけ（画面は作らない）。集計は係の端末の中だけで行い、サーバーには何も保存しない
    ・出すのは会衆全体の日ごとの数だけ。人・家・区域ごとには分けない
    ・数え方：同じ日の同じ家（部屋）は1軒。結果は 会えた＞拒否＞留守 の順で1つにする。カードは、その日の最初の訪問のカード
-   ・カードの見分け：記録の src に印があればそれに従う（card:<留守宅カードのid>／area／おすすめ reco…＝区域カード）。
-     印のない古い記録だけ、留守宅カードの記録（持ち主・今日回る人・家・期間）から見分ける。
+   ・カードの見分け：記録の src に印（card／area）があればそれに従う。おすすめから開いた記録は、おすすめの印（reco…）のあとに付く（reco:after card）。
+     印のない記録（古い記録・印のないおすすめ）だけ、留守宅カードの記録（持ち主・今日回る人・家・期間）から見分ける。
      終わった留守宅カードは、サーバーが90日で消すので、印のない記録でそれより前のものは「分けられない」（unsplit）
    ・日付は端末の時刻（今の時間帯の表と同じ） */
 (function (root) {
@@ -46,11 +46,13 @@
     };
     const kindOf = (v, key, day) => {
       const src = v.src ? String(v.src) : '';
-      if (src) {
-        if (src.indexOf('card:') === 0) return 'card';
-        if (src === 'area' || src.indexOf('reco') === 0) return 'area';
+      if (src) { // 印：card／area。おすすめの記録は、おすすめの印（reco…）の半角スペースのあとに付く（例：reco:after card）
+        const sp = src.lastIndexOf(' '), mk = sp >= 0 ? src.slice(sp + 1) : src;
+        if (mk === 'card') return 'card';
+        if (mk === 'area') return 'area';
       }
-      if (day < unsplitBefore) return 'unsplit'; // 印がなく、カードの記録も消えている
+      // 印がない記録（古い記録・印のないおすすめ）：90日以内は留守宅カードの記録から見分け、それより前は分けられない
+      if (day < unsplitBefore) return 'unsplit'; // カードの記録も消えている
       return inferred(v, Date.parse(v.at), key); // 時間を読むのは、印がなく新しい記録のときだけ
     };
     // 同じ日・同じ家（部屋）を1軒にまとめる。家（部屋）ごとの記録の索引（新しい順）を使い、1年より前は読まずに止める（速さ・指示書5.）
@@ -179,7 +181,8 @@
   const WD = '日月火水木金土';
   const esc = x => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const $id = id => document.getElementById(id);
-  const st = { period: 30, sel: -1, sig: '', drawn: '', agg: null, pending: false };
+  const THROTTLE_MS = 5000; // 記録が届くたびではなく、数秒に1回にまとめる（監査 M-2）
+  const st = { period: 30, sel: -1, sig: '', drawn: '', agg: null, pending: false, timer: 0, builds: 0, throttle: THROTTLE_MS };
   const PERIODS = [[30, '直近30日'], [90, '直近90日'], [365, '1年']];
   const css = document.createElement('style');
   css.textContent = `#adJG .jg-seg{margin:6px 0 10px}
@@ -199,9 +202,12 @@
   document.head.appendChild(css);
 
   const terrSet = () => new Set(D().territories.filter(t => !t.dummy && !isSpecial(t)).map(t => t.id));
+  // 覚えた結果を作り直すかどうかの見分け（監査 L-2）：記録の数と最後の記録、家・区域の数、予定、留守宅カードの中身（持ち主・期間・終わった日・家・今日回る人）
+  const keyHash = ks => { let h = ks ? ks.length : 0; if (ks) for (let i = 0; i < ks.length; i++) { const k = String(ks[i]); for (let j = 0; j < k.length; j++) h = (h * 31 + k.charCodeAt(j)) | 0; } return h; };
   const dataSig = () => {
     const d = D(), vs = d.visits || [], cs = d.awayCards || [], sc = d.schedules || [];
-    return [vs.length, vs.length ? vs[vs.length - 1].id : '', cs.length, cs.reduce((a, c) => a + (c.endedAt ? 1 : 0), 0), sc.map(x => x.date + x.group + x.time).join(','), d.settings && d.settings.keepMonths, ymd(Date.now())].join('|');
+    const cards = cs.map(x => [x.id, x.by, x.at, x.endedAt || '', x.expiresAt || '', x.dummy ? 1 : 0, keyHash(x.keys), (x.helpers || []).map(h => h.uid + '@' + h.until).join('/')].join(',')).join(';');
+    return [vs.length, vs.length ? vs[vs.length - 1].id : '', (d.houses || []).length, terrSet().size, cards, sc.map(x => x.date + x.group + x.time).join(','), d.settings && d.settings.keepMonths, ymd(Date.now())].join('|');
   };
   const rangeOf = (period, today) => {
     if (period === 30) return { from: addDays(today, -29), to: today, unit: 'day' };
@@ -222,12 +228,30 @@
   // 横軸の「集」の印は、辞書の「集」（別の意味で使われている）に頼らず、言語に合わせて出す（日本語＝集・スペイン語＝R。data-notr で自動の置きかえから外す）
   const MK = () => (window.KI && window.KI.lang === 'es' ? 'R' : '集');
 
-  function compute() {
-    const sig = dataSig();
-    if (st.agg && st.agg.sig === sig) return st.agg;
-    const d = D(), r = build({ index: typeof IDX !== 'undefined' && IDX instanceof Map && IDX.size ? IDX.values() : null, visits: d.visits || [], terrOfHouse: hid => { const h = houseById(hid); return h && h.terrId; }, eligible: terrSet(), cards: d.awayCards || [], schedules: d.schedules || [], now: Date.now(), keepMonths: d.settings && d.settings.keepMonths });
-    st.agg = { sig, r };
+  const curIdx = () => (typeof IDX !== 'undefined' ? IDX : null);
+  function compute(force) {
+    const d = D(), sig = dataSig(), a = st.agg;
+    if (a && a.sig === sig && a.vref === d.visits && a.iref === curIdx()) return a; // 記録の入れ物（配列・索引）が置きかわったときも、作り直す
+    if (!force && a && Date.now() - a.at < st.throttle) { later(); return a; } // 数秒に1回にまとめる：今回は古い結果のまま、少しあとにもう一度確かめる
+    st.builds++;
+    const r = build({ index: typeof IDX !== 'undefined' && IDX instanceof Map && IDX.size ? IDX.values() : null, visits: d.visits || [], terrOfHouse: hid => { const h = houseById(hid); return h && h.terrId; }, eligible: terrSet(), cards: d.awayCards || [], schedules: d.schedules || [], now: Date.now(), keepMonths: d.settings && d.settings.keepMonths });
+    st.agg = { sig, at: Date.now(), vref: d.visits, iref: curIdx(), r };
     return st.agg;
+  }
+  function later() { // 間引いた分は、数秒あとに1回だけもう一度確かめる（そのとき見えていなければ、作り直さない）
+    if (st.timer) return;
+    st.timer = setTimeout(() => { st.timer = 0; try { refresh(false); } catch (e) { console.error(e); } }, Math.max(300, st.throttle - (Date.now() - (st.agg ? st.agg.at : 0))));
+  }
+  // いま見えているか（状況を開いていて、たたんでいない）
+  const shown = () => { const box = $id('adJG'), body = box && $id('jgBody'); return !!(body && box.offsetParent !== null && body.offsetParent !== null && typeof adPane !== 'undefined' && adPane === 'status'); };
+  function refresh(force) {
+    const box = $id('adJG'), body = box && $id('jgBody');
+    if (!body) return;
+    if (!shown()) { // たたんでいる・状況を開いていない間は、作り直さない（まだ一度も作っていないときだけ、要点のために1回作る）
+      if (!st.agg) { compute(true); refreshSum(box); }
+      return;
+    }
+    draw(force);
   }
   /* たたんだときの要点（kimari.js の SUMS）：直近30日の会えた割合 */
   function sum() {
@@ -315,10 +339,10 @@
     return x.few ? `<td class="jg-few"><b>データ少</b><small>訪ねた ${x.n}軒</small></td>` : `<td><b>${x.pct}%</b><small>訪ねた ${x.n}軒・会えた ${x.met}軒</small></td>`;
   }
 
-  function draw() {
+  function draw(force) {
     const box = $id('adJG'), body = box && $id('jgBody');
     if (!body) return;
-    const { r } = compute();
+    const { r } = compute(force);
     const g = rangeOf(st.period, r.today), bars = rollup(r, { unit: g.unit, from: g.from, to: g.to, today: r.today });
     const W = Math.max(260, Math.min(900, Math.floor(body.clientWidth || 320))), H = W < 520 ? 160 : 200;
     const mx = niceMax(Math.max(1, ...bars.map(b => Math.max(b.area.met + b.area.away + b.area.refused, b.card.met + b.card.away + b.card.refused))));
@@ -354,7 +378,7 @@
     if (!st.bars) return;
     st.sel = i;
     st.drawn = '';
-    draw();
+    draw(false);
   }
 
   function paint() {
@@ -368,7 +392,7 @@
       if (ref && ref.parentNode) ref.parentNode.insertBefore(box, ref.nextSibling); else pane.appendChild(box);
       box.addEventListener('click', e => {
         const per = e.target.closest('[data-jgper]');
-        if (per) { st.period = Number(per.dataset.jgper); st.sel = -1; st.drawn = ''; draw(); return; }
+        if (per) { st.period = Number(per.dataset.jgper); st.sel = -1; st.drawn = ''; draw(false); return; }
         const svg = e.target.closest('svg.jg-chart');
         if (svg && st.bars) {
           const rc = svg.getBoundingClientRect(), W = svg.viewBox.baseVal.width, x = (e.clientX - rc.left) / rc.width * W - 38, slot = (W - 46) / st.bars.length;
@@ -376,18 +400,19 @@
           if (i >= 0 && i < st.bars.length) select(i === st.sel ? -1 : i);
         }
       });
+      box.querySelector(':scope > h2').addEventListener('click', () => { setTimeout(() => { try { refresh(true); } catch (e) { console.error(e); } }, 0); }); // たたんだ見出しを開いたとき：古くなっていれば、すぐ最新にする（kimari.js が開け閉めしたあと）
       box.addEventListener('keydown', e => {
         if (!e.target.closest || !e.target.closest('svg.jg-chart') || !st.bars) return;
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const n = st.bars.length; select(Math.max(0, Math.min(n - 1, (st.sel < 0 ? n : st.sel) + (e.key === 'ArrowLeft' ? -1 : 1)))); const c = box.querySelector('svg.jg-chart'); if (c) c.focus({ preventScroll: true }); }
       });
       let rt = 0;
-      window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { try { if (document.body.contains(box) && !box.hidden) { st.drawn = ''; draw(); } } catch (e) { console.error(e); } }, 150); });
+      window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { try { if (document.body.contains(box) && shown()) { st.drawn = ''; draw(false); } } catch (e) { console.error(e); } }, 150); });
     }
     if (st.pending) return;
     st.pending = true;
     setTimeout(() => { // 画面を先に出し、計算はそのあと
       st.pending = false;
-      try { if ($id('adJG')) draw(); } catch (e) { console.error(e); const b = $id('jgBody'); if (b) b.innerHTML = '<p class="hint">グラフを作れませんでした。</p>'; }
+      try { if ($id('adJG')) refresh(false); } catch (e) { console.error(e); const b = $id('jgBody'); if (b) b.innerHTML = '<p class="hint">グラフを作れませんでした。</p>'; }
     }, 0);
   }
 
@@ -397,5 +422,5 @@
     try { if (isAdmin() && adPane === 'status' && !(typeof window.lkLocked === 'function' && window.lkLocked())) paint(); } // 画面ロック中は出さない（schedule.js が window に出している lkLocked）
     catch (e) { console.error(e); }
   };
-  window.JGUI = { sum, paint, state: st, recompute: () => { st.agg = null; return compute(); } }; // recompute：「速さを測る」用（覚えた結果を捨てて作り直す）
+  window.JGUI = { sum, paint, state: st, recompute: () => { st.agg = null; return compute(true); } }; // recompute：「速さを測る」用（覚えた結果を捨てて作り直す）
 })(typeof window !== 'undefined' ? window : globalThis);

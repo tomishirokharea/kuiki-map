@@ -4665,21 +4665,30 @@ function openTarget(hid, unit, fromBuilding, review) {
   };
   paint();
 }
-/* 記録につけるカードの印（状況のグラフ用・2026-10-31）。自分が持つ（グループのカードは今日回る人も）留守宅カードに入っている家 → 'card:<カードのid>'、それ以外 → 'area'（区域カードなど）。
-   同じ区域の区域カードも持っているときは、そのカードの画面（focusCard）を開いているときだけ留守宅カード。サーバーは src にこの形だけを通す（Code.gs の CARD_SRC_RE） */
-function cardMark(hid, unit) {
+/* 記録につけるカードの印（状況のグラフ用・2026-10-31）。自分が持つ（グループのカードは今日回る人も）留守宅カードに入っている家 → 'card'、それ以外 → 'area'（区域カードなど）。印はこの2つだけ（カードの番号は付けない）。
+   同じ区域の区域カードも持っているときは、そのカードの画面（focusCard）を開いているときだけ留守宅カード。おすすめから開いた記録（viaReco）は、画面の文脈がないので、自分のカードの家なら留守宅カード。
+   サーバーは src にこの形だけを通す（Code.gs の CARD_SRC_RE・RECO_CARD_SRC_RE） */
+function cardMark(hid, unit, viaReco) {
   const k = K(hid, unit || ''), h = houseById(hid), t = h ? terrById(h.terrId) : null;
   const cs = activeCards().filter(c => c.keys.includes(k) && (c.by === me().id || isCardHelper(c)));
   if (!cs.length) return 'area';
-  const f = cs.find(c => c.id === focusCard);
-  if (f) return 'card:' + f.id;
+  if (viaReco) return 'card';
+  if (cs.some(c => c.id === focusCard)) return 'card';
   if (t && (t.holder === me().id || helpersOf(t).some(x => x.uid === me().id))) return 'area';
-  return 'card:' + cs[0].id;
+  return 'card';
+}
+/* 記録に付ける src：おすすめの印（reco…）を先頭に残し、半角のスペースのあとにカードの印（例：reco:after card）。おすすめでなければカードの印だけ。
+   カードの印を調べるところで例外が出ても、記録は保存する（印なし・おすすめの印だけ。L-7） */
+function visitSrc(hid, unit) {
+  const rs = recoSrc(hid, unit);
+  let m = '';
+  try { m = cardMark(hid, unit, !!rs); } catch (e) { console.error(e); }
+  return rs ? (m ? rs + ' ' + m : rs) : m;
 }
 /* 記録をすぐ画面に出して、送信はうしろで行う（続けて記録しても、印がすぐ変わる） */
 function quickVisit(hid, unit, result, extra, msg, onUndo, keepOpen) {
   const now = new Date().toISOString();
-  const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id }; { const rs = recoSrc(hid, unit); v.src = rs || cardMark(hid, unit); } // おすすめ（reco）の印が先。なければカードの印（card:／area）
+  const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id }; { const sr = visitSrc(hid, unit); if (sr) v.src = sr; } // おすすめ（reco）の印が先・そのあとにカードの印（card／area）
   if (result === 'met' || result === 'refused') { if (extra.age) v.age = extra.age; }
   if (result === 'met' && extra.interest) v.interest = extra.interest;
   D().visits.push(v);
@@ -4870,7 +4879,7 @@ function saveVisit(hid, unit, result, extra, keepOpen, onUndo) {
   if (!follow && !extra.dnc && !(cur && cur.by === me().id)) { quickVisit(hid, unit, result, extra, msg, onUndo, keepOpen); return; }
   commit(msg, () => {
     const now = new Date().toISOString();
-    const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id }; { const rs = recoSrc(hid, unit); v.src = rs || cardMark(hid, unit); } // おすすめ（reco）の印が先。なければカードの印（card:／area）
+    const v = { id: uid(), houseId: hid, unit, result, at: now, by: me().id }; { const sr = visitSrc(hid, unit); if (sr) v.src = sr; } // おすすめ（reco）の印が先・そのあとにカードの印（card／area）
     if (result === 'met') { // 記録しない設定の項目は、そもそも持たせない
       if (extra.age) v.age = extra.age;
       if (extra.interest) v.interest = extra.interest;
@@ -13072,6 +13081,7 @@ const RECO_LIM = { recoCount: [1, 5], recoDist: [100, 3000], recoLongDays: [30, 
 const recoOn = () => !!Store.data && Number(D().settings.recoOn) !== 0;
 function recoLabel(src) {
   if (!src || String(src).indexOf('reco') !== 0) return '';
+  src = String(src).split(' ')[0]; // おすすめの印のあとに、カードの印（card／area）が付くことがある
   if (src === 'reco:after') return 'おすすめ（完了のあとの留守宅）';
   const r = RECO_KINDS2.find(x => 'reco:' + x[0] === src);
   return r ? r[2] : 'おすすめ';
@@ -13198,7 +13208,7 @@ function renderRecoAdmin() {
   const since = Date.now() - 90 * DAY, stat = { after: { n: 0, m: 0 }, old: { n: 0, m: 0 } };
   D().visits.forEach(v => {
     if (!v.src || String(v.src).indexOf('reco') !== 0 || Date.parse(v.at) < since) return;
-    const s = stat[String(v.src) === 'reco:after' ? 'after' : 'old'];
+    const s = stat[String(v.src).split(' ')[0] === 'reco:after' ? 'after' : 'old']; // おすすめの印のあとに付くカードの印（card／area）は除いて見る
     s.n++; if (v.result === 'met') s.m++;
   });
   const rows = [['after', '完了のあとの留守宅'], ['old', '前の形のおすすめ']].filter(r => stat[r[0]].n).map(r => {
