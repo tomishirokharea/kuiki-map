@@ -1974,6 +1974,7 @@ body.duemode .terr-label:not(.duelab){display:none}
   const bioCan = () => !!(window.PublicKeyCredential && navigator.credentials && lkCan());
   const lkActive = () => { try { return isAdmin() && !!lkCfg(); } catch (e) { return false; } };
   const lkLocked = () => lkActive() && lk.locked;
+  window.lkLocked = lkLocked; // 状況のグラフ（joukyou-graph.js）が、画面ロック中は出さないために使う（2026-10-31）
   const b64e = u8 => btoa(String.fromCharCode.apply(null, u8));
   const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
   async function pinHash(pin, salt, iter) {
@@ -2851,6 +2852,7 @@ body.duemode .terr-label:not(.duelab){display:none}
           rows.push([name, (performance.now() - t0) / n]);
         };
         T('会えた成果：記録を1周して集計', () => { MEMO.delete('ach'); achieveStats(); }, 2);
+        T('区域カードと留守宅カードのグラフ', () => { if (window.JGUI) JGUI.recompute(); }, 2);
         T('受け取られていない留守宅カード', () => { MEMO.delete('uncl'); unclaimedCards(); }, 2);
         const sc = D().schedules.find(s => s.date >= today6());
         T('集まりに合う区域：1回分', () => meetFit(sc || { date: today6(), time: '10:00', place: '' }), 3);
