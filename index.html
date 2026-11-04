@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.115"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
+<meta name="app-version" content="2026.13.116"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -145,10 +145,6 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .pgrp{display:flex;align-items:center;gap:10px;margin:14px 0 -4px;padding:6px 10px;border-left:6px solid #1E3A5F;background:#EEF3F8;border-radius:8px}
 .pgrp b{font-size:18px}
 .trow .stamp.kid{background:#fff}
-.terr-label.par span{transform:translate(-50%,-115%);background:#1E3A5F;border-color:#1E3A5F;color:#fff;font-size:17px;padding:1px 10px}
-.terr-label.kidl span i{font-style:normal;font-size:.72em;opacity:.75}
-#map.zfar .terr-label.kidl span{font-size:12px;padding:0 5px;border-width:2px}
-#map.zfar .terr-label.kidl span i{display:none}
 .terr-label span{display:inline-block;transform:translate(-50%,-50%);background:#ffffffee;border:3px solid var(--terr);color:var(--terr);font-weight:700;font-size:18px;border-radius:10px;padding:0 10px;white-space:nowrap;font-family:"BIZ UDPGothic",sans-serif}
 
 /* ===== 家の印（色＋文字で区別） ===== */

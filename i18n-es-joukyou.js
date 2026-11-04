@@ -52,5 +52,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 /* 更新のお知らせ（2026.13.111） */
 "区域係の状況に、区域カードと留守宅カードの「会えた・留守」のグラフを足しました。": "En la situación del encargado de territorios se añadió el gráfico «En casa / Ausente» de la tarjeta de territorio y la tarjeta de ausentes.",
 /* 更新のお知らせ（2026.13.113） */
-"正式に完了した区域が、完了のあとに家や部屋を足したときに、自動の確かめで「途中の返却」にもどらないようにしました。": "Un territorio terminado oficialmente ya no vuelve a «devuelto sin terminar» en la comprobación automática cuando se añaden casas o habitaciones después de terminarlo."
+"正式に完了した区域が、完了のあとに家や部屋を足したときに、自動の確かめで「途中の返却」にもどらないようにしました。": "Un territorio terminado oficialmente ya no vuelve a «devuelto sin terminar» en la comprobación automática cuando se añaden casas o habitaciones después de terminarlo.",
+/* 更新のお知らせ（2026.13.116） */
+"地図の区域の番号を見やすくしました。縮めたときは番号が重ならないように出し分け、枝番は「14-3」の形にそろえました。": "Los números de territorio del mapa ahora se leen mejor: al alejar el mapa ya no se amontonan, y las subdivisiones se muestran siempre como «14-3»."
 });

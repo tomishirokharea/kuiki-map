@@ -19,6 +19,8 @@ window.KUIKI_I18N.es = {
 "＋ 家を追加": "＋ Agregar casa",
 "＋ 家": "＋ Casa",
 "地図を拡大すると家の印が出ます": "Acerque el mapa para ver las casas",
+"地図を拡大すると区域の番号と家の印が出ます": "Acerque el mapa para ver los números de territorio y las casas",
+"拡大すると番号が出ます": "Acerque para ver los números",
 "記録のあと": "Después de anotar",
 "現在地を表示": "Mostrar mi ubicación",
 "北を上にもどす": "Norte arriba",
