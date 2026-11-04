@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.111';
+var APP_JS_VER = '2026.13.113';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2677,6 +2677,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.113', items: [
+    ['係', '正式に完了した区域が、完了のあとに家や部屋を足したときに、自動の確かめで「途中の返却」にもどらないようにしました。']
+  ] },
   { v: '2026.13.111', items: [
     ['係', '区域係の状況に、区域カードと留守宅カードの「会えた・留守」のグラフを足しました。']
   ] },
@@ -8745,16 +8748,24 @@ function finalizePools() {
    roundInfo の1回目と同じ数え方で、until より後の記録は数えない。最近会えた家は、受け取った日の時点で数える（3万件対策：その区域の家だけ見る）
    until は「1回目を終えた日（firstAt）」ではなく「返却した日」（10/16 の決まり3。サーバーが返却のときに確かめる期間と同じ。2026-10-29 監査 R1）：
    1回目のあとに留守宅を回った記録・留守宅カードで訪ね直した記録も数え、完了した区域を途中の返却にもどさないため */
-function coverAt(t, since, until) {
+/* adopt：印のない正式返却を拾うとき（lowAdoptList）だけ。巡回の中で訪ねた集合住宅の、記録が一度もない部屋は数えない。
+   部屋には足した日がなく、完了のあとに足された部屋と見分けられないため（足された部屋で正しい完了を途中の返却に戻さない・総合監査 D-2・2026-11-04）。
+   建物ごと巡回の中で一度も訪ねていなければ、全部の部屋を数える（集合住宅の記録0%の完了を見逃さない・独立監査 A-2）。
+   戸建ては作った日で見分けるので、記録0%の完了（区域02の形）は今までどおり拾う */
+function coverAt(t, since, until, adopt) {
   const sp = isSpecial(t), inc = D().settings.skipDone !== 0, s0 = Date.parse(since) || 0;
   let done = 0, total = 0;
   for (const h of housesOf(t.id)) {
     if (banNo(h)) continue; // 立入禁止の建物は数えない（roundInfo・サーバーの terrDonePct_ と同じ。数えると、受け付けた完了を係の端末が途中の返却に戻す・監査 H-1）
-    for (const u of (sp ? specialTargets(h, t) : targets(h))) {
+    if (h.createdAt && until && h.createdAt > until) continue; // 返却（完了）のあとに足された家は、その巡回の家ではない（足された家で完了を途中の返却に戻さない・総合監査 D-1・2026-10-31）
+    const us = sp ? specialTargets(h, t) : targets(h);
+    const aptIn = adopt && h.type === 'apt' && us.some(u => visitsOf(K(h.id, u)).some(v => v.at >= since && v.at <= until)); // この建物を巡回の中で訪ねた
+    for (const u of us) {
       if (!sp && coveredBySpecial(h, u)) continue;
       const k = K(h.id, u);
       if (D().dnc[k]) continue;
       const vs = visitsOf(k);
+      if (aptIn && !vs.length) continue;
       if (vs.some(v => v.at >= since && v.at <= until)) { done++; total++; continue; }
       const d = D().follows[k] ? followSkipDays() : skipDays();
       const m = d ? vs.find(v => v.result === 'met' && v.at < since) : null; // 新しい順なので、最初に見つかったものが一番新しい
@@ -8805,12 +8816,32 @@ function lowAdoptList() {
     if (!(daysSince(t.completedAt) < lim)) continue;
     const r = D().returns.find(x => x.terrId === t.id && x.completed && x.at === t.completedAt) || null;
     if (r && (r.low || r.lowOk || r.lowAuto || r.lowSkip || r.ph)) continue; // ph＝紙の区域カードで回った（アプリに記録がない）
-    const from = r ? lowFrom(r) : (t.lastLentAt || '');
+    // サーバーが返却のときに記録で数えて受け付けた完了（sp＝サーバーで数えた割合が目安−10 以上）は、あとから数え直さない。
+    // 完了のあとに家・部屋が足された・毎月の整理で記録が消えた、で分母や記録が変わり、正しい完了を途中の返却に戻していた（総合監査 D-1〜D-3・2026-10-31）
+    if (r && r.sp != null && Number(r.sp) >= th) continue;
+    const from = r ? lowFrom(r) : noRecFrom(t);
+    // 巡回の始まりが記録の保存期間（毎月の整理・keepMonths）より前なら、巡回の中の記録が整理で消えているかもしれないので数え直さない（総合監査 D-3・2026-11-04）
+    if (from && Date.parse(from) < Date.now() - Math.max(1, Number(st.keepMonths) || 12) * 30.5 * DAY) continue;
     if (paperDoneIn(t, from, t.completedAt)) continue;
-    const pct = coverAt(t, from, t.completedAt); // 返却（完了）した日まで（r.at と同じ。1回目を終えた日 firstAt ではない）
+    const pct = coverAt(t, from, t.completedAt, true); // 返却（完了）した日まで（r.at と同じ。1回目を終えた日 firstAt ではない）
     if (pct < th) out.push([t, r, from, pct]);
   }
   return out;
+}
+/* 完了日に合う返却の記録がない区域の「回りはじめた日」：いちばん新しい受け取り日（lastLentAt）。
+   ただし、その受け取りが同じ区域の途中返却の続き（返されてから contDays 日以内・サーバーの続きからと同じ条件）なら、前の人が回りはじめた日。
+   受け取り日だけで数えると、続きから回った巡回の前の人の記録が数えられず、回り終えた区域を途中の返却に戻していた（総合監査 C-S13-3・2026-11-04）。
+   起点は前にしか動かないので、数える記録が増える方向（途中に戻さない方向）にしか働かない */
+function noRecFrom(t) {
+  const L = t.lastLentAt || '';
+  if (!L) return '';
+  if (t.lastRoundFrom && t.lastRoundFrom < L) return t.lastRoundFrom;
+  const st = D().settings, cd = st.contDays == null || st.contDays === '' ? 60 : (Number(st.contDays) || 0);
+  if (!cd) return L;
+  const prev = (D().returns || []).filter(x => x && x.terrId === t.id && x.at && x.at <= L).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)).pop();
+  if (!prev || prev.completed || prev.pool || prev.ho || Date.parse(L) - Date.parse(prev.at) > cd * DAY) return L;
+  const f = lowFrom(prev);
+  return f && f < L ? f : L;
 }
 /* 上の区域に、係が目安未満で返したときと同じ印を付ける（commit の中で呼ぶ）。印を付けた返却の記録を返す */
 function lowAdoptMark(t, r, from, pct) {

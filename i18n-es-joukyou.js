@@ -50,5 +50,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "直近30日の会えた割合：区域カード {0}": "Porcentaje En casa (últimos 30 días): tarjetas de territorio {0}",
 "留守宅カード {0}": "tarjeta de ausentes {0}",
 /* 更新のお知らせ（2026.13.111） */
-"区域係の状況に、区域カードと留守宅カードの「会えた・留守」のグラフを足しました。": "En la situación del encargado de territorios se añadió el gráfico «En casa / Ausente» de la tarjeta de territorio y la tarjeta de ausentes."
+"区域係の状況に、区域カードと留守宅カードの「会えた・留守」のグラフを足しました。": "En la situación del encargado de territorios se añadió el gráfico «En casa / Ausente» de la tarjeta de territorio y la tarjeta de ausentes.",
+/* 更新のお知らせ（2026.13.113） */
+"正式に完了した区域が、完了のあとに家や部屋を足したときに、自動の確かめで「途中の返却」にもどらないようにしました。": "Un territorio terminado oficialmente ya no vuelve a «devuelto sin terminar» en la comprobación automática cuando se añaden casas o habitaciones después de terminarlo."
 });
