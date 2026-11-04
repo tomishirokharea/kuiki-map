@@ -8748,8 +8748,9 @@ function finalizePools() {
    roundInfo の1回目と同じ数え方で、until より後の記録は数えない。最近会えた家は、受け取った日の時点で数える（3万件対策：その区域の家だけ見る）
    until は「1回目を終えた日（firstAt）」ではなく「返却した日」（10/16 の決まり3。サーバーが返却のときに確かめる期間と同じ。2026-10-29 監査 R1）：
    1回目のあとに留守宅を回った記録・留守宅カードで訪ね直した記録も数え、完了した区域を途中の返却にもどさないため */
-/* adopt：印のない正式返却を拾うとき（lowAdoptList）だけ。記録が一度もない集合住宅の部屋は数えない。
+/* adopt：印のない正式返却を拾うとき（lowAdoptList）だけ。巡回の中で訪ねた集合住宅の、記録が一度もない部屋は数えない。
    部屋には足した日がなく、完了のあとに足された部屋と見分けられないため（足された部屋で正しい完了を途中の返却に戻さない・総合監査 D-2・2026-11-04）。
+   建物ごと巡回の中で一度も訪ねていなければ、全部の部屋を数える（集合住宅の記録0%の完了を見逃さない・独立監査 A-2）。
    戸建ては作った日で見分けるので、記録0%の完了（区域02の形）は今までどおり拾う */
 function coverAt(t, since, until, adopt) {
   const sp = isSpecial(t), inc = D().settings.skipDone !== 0, s0 = Date.parse(since) || 0;
@@ -8757,12 +8758,14 @@ function coverAt(t, since, until, adopt) {
   for (const h of housesOf(t.id)) {
     if (banNo(h)) continue; // 立入禁止の建物は数えない（roundInfo・サーバーの terrDonePct_ と同じ。数えると、受け付けた完了を係の端末が途中の返却に戻す・監査 H-1）
     if (h.createdAt && until && h.createdAt > until) continue; // 返却（完了）のあとに足された家は、その巡回の家ではない（足された家で完了を途中の返却に戻さない・総合監査 D-1・2026-10-31）
-    for (const u of (sp ? specialTargets(h, t) : targets(h))) {
+    const us = sp ? specialTargets(h, t) : targets(h);
+    const aptIn = adopt && h.type === 'apt' && us.some(u => visitsOf(K(h.id, u)).some(v => v.at >= since && v.at <= until)); // この建物を巡回の中で訪ねた
+    for (const u of us) {
       if (!sp && coveredBySpecial(h, u)) continue;
       const k = K(h.id, u);
       if (D().dnc[k]) continue;
       const vs = visitsOf(k);
-      if (adopt && h.type === 'apt' && !vs.length) continue;
+      if (aptIn && !vs.length) continue;
       if (vs.some(v => v.at >= since && v.at <= until)) { done++; total++; continue; }
       const d = D().follows[k] ? followSkipDays() : skipDays();
       const m = d ? vs.find(v => v.result === 'met' && v.at < since) : null; // 新しい順なので、最初に見つかったものが一番新しい
