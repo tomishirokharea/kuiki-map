@@ -1907,7 +1907,7 @@ body.duemode .terr-label:not(.duelab){display:none}
         const c = DMC[dmClass(t)], held = isLent(t), stop = lendMode(t) === 'stop';
         L.polygon(t.polygon, { color: '#222', weight: held || stop ? (mode === 'none' ? 2.5 : 4) : (mode === 'none' ? 1.2 : 2),
           dashArray: held ? '10 6' : stop ? '2 8' : null, fillColor: c[0], fillOpacity: mode === 'none' ? 0.6 : 0.4, opacity: 0.9, bubblingMouseEvents: false })
-          .on('click', () => openKarte(t.id)).addTo(dueLayer);
+          .on('click', e => { if (typeof moveTap === 'function' && moveTap(e)) return; openKarte(t.id); }).addTo(dueLayer);
       }
     }
     // 番号の札：縮尺で出し分け、重なるものは優先順で残す
@@ -1940,7 +1940,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       const faint = !on && sel && it.t.id !== sel;
       const m = L.marker(it.ll, { icon: L.divIcon({ className: `terr-label duelab${cp ? ' cp' : ''}${on ? '' : ' ro off'}${faint ? ' faint' : ''}`, html: `<span>${esc(it.text)}</span>`, iconSize: [0, 0] }),
         interactive: on, bubblingMouseEvents: false, keyboard: false, pane: 'labelPane' });
-      if (on) m.on('click', () => openKarte(it.t.id));
+      if (on) m.on('click', e => { if (typeof moveTap === 'function' && moveTap(e)) return; openKarte(it.t.id); }); // 家の場所を直しているときは、その場所に動かす
       m.addTo(dueLayer);
     }
   }

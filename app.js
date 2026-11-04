@@ -491,6 +491,16 @@ function refill(cur, v) {
 /* まだ送っていない変更を、手元のデータに重ねる */
 /* 家の部屋の「もとの一覧」：前に送った（または受け取った）家の部屋と、今の部屋がちがうときだけ、前の一覧を返す（点検②V4）。
    サーバーは、足した部屋・消した部屋だけを今の一覧に当てはめるので、ほかの人がほぼ同時に足した部屋が消えない */
+/* 家を送るとき、送る前に知っていた内容（控え）から「もとの部屋の一覧（ub）」と「もとの場所と区域（lb）」を付ける
+   ・lb：[緯度, 経度, 区域id]。サーバーは、この端末が場所を変えていない（lb と同じ）ときは、サーバーの今の場所のままにする。
+     古い送信（ほかの人が動かす前の内容）で、動かした家がもとの場所にもどらないように（2026-11-04・家の場所を直す） */
+function houseBase(prevJ, y) {
+  const ub = unitsBase(prevJ, y); if (ub) y.ub = ub; // 部屋を変えたときは、もとの一覧も送る（点検②V4）
+  if (!prevJ) return;
+  let prev = null;
+  try { prev = JSON.parse(prevJ); } catch (e) { return; }
+  if (prev && prev.lat != null && prev.lng != null) y.lb = [prev.lat, prev.lng, prev.terrId == null ? null : prev.terrId];
+}
 function unitsBase(prevJ, h) {
   if (!prevJ || !h) return null;
   let prev = null;
@@ -504,7 +514,7 @@ function applyDiff(st, ch) {
     const m = new Map((st[c] || []).map(x => [x.id, x]));
     ch[c].up.forEach(x => {
       const cur = m.get(x.id), y = clone(x);
-      if (c === 'houses') delete y.ub; // 送るときだけに付ける「もとの一覧」は、手元のデータには入れない
+      if (c === 'houses') { delete y.ub; delete y.lb; } // 送るときだけに付ける「もとの一覧」「もとの場所（lb）」は、手元のデータには入れない
       if (cur && c !== 'visits') refill(cur, y); else m.set(x.id, y);
     });
     ch[c].del.forEach(id => m.delete(id));
@@ -585,7 +595,7 @@ const Store = {
           const j = JSON.stringify(x), prevJ = f.get(x.id);
           if (prevJ !== j) {
             const y = JSON.parse(j);
-            const ub = unitsBase(prevJ, y); if (ub) y.ub = ub; // 部屋を変えたときは、もとの一覧も送る（点検②V4）
+            houseBase(prevJ, y); // もとの部屋の一覧・場所も送る（点検②V4・家の場所を直す）
             up.push(y); f.set(x.id, j);
           }
         }
@@ -601,7 +611,7 @@ const Store = {
           const j = JSON.stringify(x), prevJ = f.get(x.id);
           if (prevJ !== j) {
             const y = JSON.parse(j);
-            if (c === 'houses') { const ub = unitsBase(prevJ, y); if (ub) y.ub = ub; } // 部屋を変えたときは、もとの一覧も送る（点検②V4）
+            if (c === 'houses') houseBase(prevJ, y); // もとの部屋の一覧・場所も送る（点検②V4・家の場所を直す）
             up.push(y); f.set(x.id, j);
           }
         }
@@ -698,7 +708,7 @@ const Store = {
   pushHouse(h, del) {
     if (!LIVE) { this.save(); return; }
     const prevJ = this.fp.houses.get(h.id), y = del ? null : clone(h);
-    if (y) { const ub = unitsBase(prevJ, y); if (ub) y.ub = ub; } // 部屋を変えたときは、もとの一覧も送る（点検②V4）
+    if (y) houseBase(prevJ, y); // もとの部屋の一覧・場所も送る（点検②V4・家の場所を直す）
     if (del) this.fp.houses.delete(h.id); else this.fp.houses.set(h.id, JSON.stringify(h));
     this.dirty.houses = true; if (del) this.dirty.visits = true;
     this.queue.push({ houses: { up: del ? [] : [y], del: del ? [h.id] : [] } });
@@ -1797,6 +1807,7 @@ function mergeChanges(list) {
         const prev = o.up.get(x.id);
         // 家の部屋の「もとの一覧」は、まとめる前のいちばん古いもの（サーバーが知っている一覧）を使う（点検②V4）
         if (c === 'houses' && prev && prev.ub) x = Object.assign({}, x, { ub: prev.ub });
+        if (c === 'houses' && prev && prev.lb) x = Object.assign({}, x, { lb: prev.lb }); // 場所も同じく、いちばん古いもの（家の場所を直す）
         o.up.set(x.id, x);
       });
       ch[c].del.forEach(id => { o.up.delete(id); o.del.add(id); });
@@ -3901,7 +3912,7 @@ function renderTerrs() {
     }).addTo(terrLayer);
     if (tapOk && !gray) poly.on('click', e => {
       // 家の場所を直しているときは、区域の中をタップしても、家をその場所に動かす（区域の線が先にタップを受け取り、家が動かなかった・2026-11-04）
-      if (moveHid) { moveHouseTo(e.latlng); return; }
+      if (moveTap(e)) return;
       // 地図で場所をえらんでいるとき（集まりの場所・目印・グループの中心など）は、区域の中をタップしても、その場所をえらぶ
       if (pickPlace) { const f = pickPlace; pickPlace = null; f(e.latlng); return; }
       selectTerr(t.id === cur ? null : t.id, { toast: t.id !== cur });
@@ -4040,7 +4051,7 @@ function renderHouses() {
         renderer: dotRenderer, interactive: allowed, bubblingMouseEvents: false,
         opacity: op * st.o, fillOpacity: op * st.o, dashArray: h.prov ? '3 3' : null
       }, st.s));
-      if (allowed) d.on('click', () => onHouseTap(h.id));
+      if (allowed) d.on('click', e => { if (!moveTap(e)) onHouseTap(h.id); });
       d.addTo(houseLayer);
       continue;
     }
@@ -4050,7 +4061,7 @@ function renderHouses() {
       interactive: allowed, keyboard: allowed,
       zIndexOffset: roundNums && roundNums.has(h.id) ? 1000 : 0
     });
-    if (allowed) m.on('click', () => onHouseTap(h.id));
+    if (allowed) m.on('click', e => { if (!moveTap(e)) onHouseTap(h.id); });
     m.addTo(houseLayer);
   }
   houseNameLabels(list, dense);
@@ -7730,6 +7741,14 @@ function xlCheckSheet(check, nT, nH, nSkip) {
 const MOVE_MAX_M = 500;
 const canMoveHouse = () => isAdmin() || !isSimple();
 let moveHid = null, moveTimer = null;
+/* 場所を直しているときのタップ：区域の線・家の印・拒否や注意の印・期限の地図の塗りなど、タップを先に受け取るものからも呼ぶ。
+   場所を直しているときは、どこをタップしても、その場所に家を動かす（true を返す） */
+function moveTap(e) {
+  if (!moveHid || !e || !e.latlng) return false;
+  if (e.originalEvent) L.DomEvent.stop(e.originalEvent);
+  moveHouseTo(e.latlng);
+  return true;
+}
 function startMoveHouse(hid) {
   if (!canMoveHouse()) return;
   closeSheet();

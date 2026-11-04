@@ -182,7 +182,7 @@
       L.marker([v.lat, v.lng], {
         icon: L.divIcon({ className: '', html: '<div class="pin st-cau chpin">！</div>', iconSize: [30, 30], iconAnchor: [15, 15] }),
         title: '注意', zIndexOffset: 400, keyboard: false
-      }).on('click', () => pinTap(k)).addTo(layer);
+      }).on('click', e => { if (typeof moveTap === 'function' && moveTap(e)) return; pinTap(k); }).addTo(layer);
     }
   }
   function pinTap(k) {
