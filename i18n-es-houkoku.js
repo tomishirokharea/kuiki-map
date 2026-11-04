@@ -5,6 +5,31 @@
    ========================================================= */
 window.KUIKI_I18N = window.KUIKI_I18N || {};
 window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
+/* こまったこと・提案（iken.js・2026-11-05） */
+"こまったこと・提案を送る": "Enviar un problema o sugerencia",
+"名前は送られません": "No se envía su nombre",
+"名前は送られません。区域係が読んで、使いやすくするために役立てます。": "No se envía su nombre. El encargado lo lee y lo usa para mejorar la aplicación.",
+"どんなことですか？": "¿De qué se trata?",
+"こまった・動かない": "Un problema / no funciona",
+"分かりにくい": "Difícil de entender",
+"こうしてほしい": "Una sugerencia",
+"くわしく教えてください": "Cuéntenos con detalle",
+"一緒に送る情報": "Información que se envía junto",
+"ありがとうございます。送りました": "Gracias. Se envió",
+"いまは受け付けていません": "Ahora no se reciben",
+"送れませんでした。もう一度押してください": "No se pudo enviar. Pulse otra vez",
+"こまったこと・提案": "Problemas y sugerencias",
+"受け付ける": "Recibir",
+"受け付けない": "No recibir",
+"送れる人": "Quién puede enviar",
+"監督・司会者・係": "Superintendentes, conductores y encargados",
+"全員": "Todos",
+"届いた声を見る": "Ver lo recibido",
+"読み込み直す": "Volver a cargar",
+"未対応": "Pendiente",
+"対応中": "En curso",
+"見送り": "Descartado",
+"ここに出す声はありません": "No hay nada que mostrar",
 /* 報告の画面 */
 "{0}月の奉仕報告（試し）": "Informe de predicación de {0} (prueba)",
 "試しに送ります（会衆の記録は変わりません）": "Envío de prueba (no cambia el registro de la congregación)",

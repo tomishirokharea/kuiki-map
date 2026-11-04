@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.116"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
+<meta name="app-version" content="2026.13.117"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -1548,6 +1548,7 @@ body.renshu #btnUpd{display:none!important}
         <div id="homeSchedTools"></div>
         <div id="homeCal"></div>
         <p class="hint">自分で入れた予定や時間は、このスマホの中だけに保存されます。係やほかの人には送られません（iPhoneでホーム画面に追加するときだけ、暗号にして15分間サーバーを通し、ホーム画面のアプリに移します。サーバーは中身を読めません）。</p>
+        <div id="homeIken"></div><!-- こまったこと・提案を送る（iken.js・係の設定で出す） -->
         </div></div>
       </div>
     </section>
@@ -1782,6 +1783,7 @@ body.renshu #btnUpd{display:none!important}
         <div id="adReco"></div>
         <div id="adAge"></div>
         <div id="adS21"></div>
+        <div id="adIken"></div>
         <h2 class="sec">データ</h2>
         <div id="adDataSet"></div>
         <div id="adDummy"></div>
@@ -1844,7 +1846,7 @@ body.renshu #btnUpd{display:none!important}
 <script src="torikomi.js"></script><!-- 区域係の「区域の線・取り込み」：線を引く・直す・消す、えらんだものだけを取り込む（2026-10-21） -->
 <script src="tokubetsu.js"></script><!-- 特別区域を決めた件数ずつのカードに分ける・ふつうの区域カードから外す切りかえ（2026-10-21） -->
 <script src="nozoku.js"></script><!-- 受け取る前に、地図で場所を見る（2026-10-21） -->
-<script src="houkoku.js"></script><!-- 奉仕報告を会衆の報告システム（S21）に送る：奉仕時間を使う人の月末の報告・係のつなぎ方（2026-10-27） -->
+<script src="houkoku.js"></script><script src="iken.js"></script><!-- こまったこと・提案（名前なしで送る・2026-11-05） --><!-- 奉仕報告を会衆の報告システム（S21）に送る：奉仕時間を使う人の月末の報告・係のつなぎ方（2026-10-27） -->
 <script src="meibo.js"></script><!-- 名簿（グループ表のPDF）から、人とグループをまとめて直す（区域係だけ・2026-10-24） -->
 <script src="guruchu.js"></script><!-- グループの中心：区域係が地図に置き、グループ奉仕の区域の近さに使う（2026-10-23） -->
 <script src="joukyou-graph.js"></script><!-- 状況の「区域カードと留守宅カード」のグラフ（schedule.js のあと・kimari.js の前に読む。2026-10-31） -->

@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.116';
+var APP_JS_VER = '2026.13.117';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2688,6 +2688,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.117', items: [
+    ['係', '「こまったこと・提案」を受け付けられるようにしました（係の画面「設定・データ」）。受け付けると、ホームのいちばん下から名前なしで送れます。届いた声は係の画面で見られ、AIに渡す形でコピーできます。']
+  ] },
   { v: '2026.13.116', items: [
     ['地', '地図の区域の番号を見やすくしました。縮めたときは番号が重ならないように出し分け、枝番は「14-3」の形にそろえました。']
   ] },
@@ -11690,6 +11693,7 @@ function renderDataSet() {
   renderDummy();
   renderRecoAdmin();
   renderAgeAdmin();
+  if (window.IkenR) IkenR.renderAdmin(); // こまったこと・提案（iken.js）
   if (window.S21R) S21R.renderAdmin(); // 奉仕報告（S21）のつなぎ方（houkoku.js）
   const st = D().settings;
   const row = (key, label, unit, d, hint) => `<div class="setrow"><span>${label}<br><small class="hint">${hint}</small></span><div class="stepper">
@@ -13389,6 +13393,7 @@ function renderHome() {
   // ②の対応：グループ監督の「グループ」タブをなくしたので、そこにあった月の予定印刷（掲示板用）をホームに置く
   $('#homeSchedTools').innerHTML = (isAdmin() || isOverseer())
     ? printMonthPicker('homeScPrint') : '';
+  if (window.IkenR) IkenR.home(); // こまったこと・提案を送る（iken.js）
   if (window.dougaHomeCard) dougaHomeCard(); // はじめての方へ（使い方の動画のカード）
 }
 /* スワイプの動き（指でもマウスでも）：左に半分以上ずらすと開き、ほかをさわると閉じる */

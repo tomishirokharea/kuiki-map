@@ -21,7 +21,7 @@
       awayCap: 3, awayRecentDays: 3, awayNoRepeat: 1, awayScope: 0, awayExp: 0, awayDays: 7, awayMax: 2, awayCardMax: 15,
       awayAllTerr: 0, awayDayOnly: 3, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7, recoLeft: 1,
       recoOn: 1, wxOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1,
-      mapStd: 0, keepMonths: 12, cacheDays: 30, syncGroupSec: 7, syncNormalSec: 20, remindDays: 21, escalateDays: 42, s21On: 0
+      mapStd: 0, keepMonths: 12, cacheDays: 30, syncGroupSec: 7, syncNormalSec: 20, remindDays: 21, escalateDays: 42, s21On: 0, ikenOn: 0, ikenWho: 1
     },
 
     ui: {
@@ -38,6 +38,16 @@
         change: '「使う」にすると、奉仕時間を使っている人の報告の画面が、S-4 と同じ並び（伝道した・聖書研究・補助開拓・時間など）になり、「会衆に報告する」で送れます。奉仕時間を使っていない人の画面は変わりません。「使わない」にすると、今までどおり LINE などで送る画面にもどります。報告の中身は区域マップのサーバーには残りません。',
         ex: '開拓者の人は、記録した時間が最初から入っているので、確かめて「会衆に報告する」を押すだけです。締切（翌月10日）までは、直して送り直せます。締切を過ぎた月は送れないので、書記に伝えてもらいます（書記が入力します）。',
         tip: '使い始める前に、URLと連携キーを入れて「接続テスト」→「名前の対応を見る」で、見つからない人がいないか確かめてください。そのあと「試しに送ってみる」で、記録を変えずに送れるかを試せます。' },
+      ikenOn: { t: 'こまったこと・提案', dt: '受け付けない',
+        what: 'ホームのいちばん下に「こまったこと・提案を送る」を出し、使っている人が気づいたことを名前なしで送れるようにします。送る人は、種類をえらんで書くだけです。直前に見ていた画面・アプリの版・表示のモード・端末・電波・直前の通信のエラーは、アプリが自動で付けます（名前・住所・記録の中身は付けません）。',
+        change: '「受け付ける」にすると、「送れる人」でえらんだ人のホームに入口が出ます。届いた声は、この下の「届いた声を見る」で見られ、「AIに渡す形でコピー」で、まとめ方の指示と一緒に AI に貼り付けられます。「受け付けない」にすると入口が消えます（届いた声は残ります）。',
+        ex: 'フェーズ1の試験運用の間は「受け付ける」・送れる人は「監督・司会者・係」にし、調整のミーティングの前に「AIに渡す形でコピー」でまとめると、話し合うことがはっきりします。',
+        tip: '1人が送れるのは6時間に5件まで、1件500文字までです。届いた声は1年たつと消えます。送った人の名前は係にも分かりません（役割だけ分かります）。' },
+      ikenWho: { t: 'こまったこと・提案を送れる人', dt: '監督・司会者・係',
+        what: '「こまったこと・提案を送る」の入口を、だれのホームに出すかです。',
+        change: '「監督・司会者・係」にすると、グループ監督・司会者・区域係だけが送れます。「全員」にすると、伝道者も送れます。',
+        ex: '段階導入に合わせて、フェーズ1は「監督・司会者・係」、グループ全体で使い始めたら「全員」にします。',
+        tip: '送れる人が多いほど声は集まりますが、同じ内容も増えます。AI でまとめると、同じ内容は件数として数えてくれます。' },
       /* ---- 人＞グループの中心（guruchu.js） ---- */
       groupPts: { t: 'グループの中心',
         what: 'グループの人が、だいたい住んでいるあたりの場所です。区域係が地図に置きます（1グループ2つまで）。人の名前や住所は使わず、「このあたり」という点だけを保存します。伝道者の地図には出ません。',
@@ -387,6 +397,16 @@
         change: 'Con «Usar», la pantalla del informe sigue el orden del S-4 (predicó, cursos bíblicos, precursor auxiliar, horas…) y se envía con «Informar a la congregación». La pantalla de quien no usa el tiempo no cambia. Con «No usar», vuelve la pantalla de enviar por LINE. El contenido del informe no se guarda en el servidor del Mapa.',
         ex: 'Un precursor ya ve sus horas registradas; solo las revisa y pulsa «Informar a la congregación». Hasta la fecha límite (día 10 del mes siguiente) puede corregirlo y volver a enviarlo. Después ya no se puede enviar ese mes: hay que avisar al secretario (él lo anota).',
         tip: 'Antes de empezar, ponga la URL y la clave, pulse «Probar conexión» y luego «Ver nombres» para revisar si falta alguien. Con «Enviar una prueba» puede probar sin cambiar el registro.' },
+      ikenOn: { t: 'Problemas y sugerencias', dt: 'No recibir',
+        what: 'Muestra «Enviar un problema o sugerencia» al final de Inicio, para que los usuarios envíen lo que noten sin su nombre. La aplicación añade sola la pantalla anterior, la versión, el modo, el dispositivo, la conexión y el último error de conexión (no añade nombres, direcciones ni registros).',
+        change: 'Con «Recibir», aparece la entrada en Inicio de las personas elegidas en «Quién puede enviar». Lo recibido se ve abajo y se puede copiar con instrucciones para una IA. Con «No recibir», la entrada desaparece (lo recibido se conserva).',
+        ex: 'Durante la fase 1, use «Recibir» y «Superintendentes, conductores y encargados»; antes de la reunión de ajuste, copie todo para la IA.',
+        tip: 'Cada persona puede enviar hasta 5 en 6 horas, de hasta 500 caracteres. Se borra al año. Ni el encargado ve el nombre de quien envía (solo su función).' },
+      ikenWho: { t: 'Quién puede enviar problemas y sugerencias', dt: 'Superintendentes, conductores y encargados',
+        what: 'En el Inicio de quién se muestra la entrada.',
+        change: 'Con la primera opción, solo superintendentes de grupo, conductores y encargados. Con «Todos», también los publicadores.',
+        ex: 'Fase 1: la primera opción; al usarla toda la congregación: «Todos».',
+        tip: 'Con más personas llegan más opiniones, y también más repetidas; la IA las agrupa y cuenta.' },
       groupPts: { t: 'Centro del grupo',
         what: 'Es la zona donde viven, más o menos, las personas del grupo. La pone el encargado en el mapa (hasta 2 por grupo). No se usan nombres ni direcciones: solo se guarda un punto «por aquí». No aparece en el mapa de los publicadores.',
         change: 'Si se pone, cuando el superintendente o el conductor del grupo ve los territorios para la predicación en grupo en «Pedir territorio», «Más cercanos» se ordena por la distancia a este punto y «Recomendados» también tiene en cuenta la cercanía. Los territorios «urgentes» (fecha límite cercana) siguen arriba sin importar la distancia. En «Territorios para la reunión» de la reunión general, se muestran un poco antes los territorios lejos de todos los grupos. Si no se pone, todo sigue como antes (cercanía al lugar donde está).',
