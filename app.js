@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.113';
+var APP_JS_VER = '2026.13.114';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2677,6 +2677,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.114', items: [
+    ['係', 'アパート・マンションの「続けて入力」で、今日つけた記録をその場で直せるようにしました（ほかの画面と同じ「直す」ボタン）。'],
+    ['係', 'スマートフォン（Androidを含む）から区域カード（S-12）などを印刷するとき、印刷の画面が出ないことがあったのを直しました。']
+  ] },
   { v: '2026.13.113', items: [
     ['係', '正式に完了した区域が、完了のあとに家や部屋を足したときに、自動の確かめで「途中の返却」にもどらないようにしました。']
   ] },
@@ -6138,6 +6142,7 @@ function openAptSeq(hid, startUnit) {
       const uk2 = unitKind(h, u);
       b += `<p class="seqroom"><b>${esc(uName(h, u))}</b>${/\d$/.test(uName(h, u)) ? '号室' : ''}${uk2 !== 'home' ? ` <span class="kindtag">${kindBadge(uk2)}${kindName(uk2)}</span>` : ''} <span class="muted">（${idx + 1} / ${n}）</span></p>`;
       b += `<p class="muted">${last ? `前回：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}` : 'はじめて訪ねる部屋'}</p>`;
+      if (window.fixLineHtml) b += window.fixLineHtml(k); // 今日つけた記録を直す（naoshi.js。不具合C：2026-11-04まで、この画面には出ていなかった）
       b += recentOtherHtml(k);
       if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の部屋です。</b>訪問しないで、次の部屋へ進んでください。</div>`;
       else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="seqOverride">それでも記録する</button></span></div>`;
@@ -6152,6 +6157,7 @@ function openAptSeq(hid, startUnit) {
 
     const S = $('#sheet'), k = st.finished ? null : K(hid, h.units[idx]);
     seqShowRoom(S); // 部屋の一覧が長いときも、今の部屋の「会えた・留守」が見えるところまで動かす（点検④U2）
+    if (!st.finished && window.bindFixLine) window.bindFixLine(S, () => openAptSeq(hid, h.units[idx])); // 不具合C：直したあとも同じ部屋にもどる
     $$('[data-jump]', S).forEach(x => x.onclick = () => go(Number(x.dataset.jump)));
     $$('[data-res]', S).forEach(x => x.onclick = () => {
       const r = x.dataset.res;
@@ -13869,11 +13875,12 @@ function handoffHtml() {
      印刷のプレビューが作り直されても、同じ紙面が出るように
    ・地図などの画像は、読み終えてから印刷の画面を出す（最大8秒待つ）
    ・続けて押されたときは、いちばん新しい紙面だけを印刷する（印刷の画面が2つ出ないように） */
-/* ・iPhone・iPad（Safari・Braveなど）とMacのSafariでは、準備が終わったら「印刷する」ボタンを出し、
+/* ・スマートフォン（iPhone・iPad・Androidとも）とMacのSafariでは、準備が終わったら「印刷する」ボタンを出し、
      押したその場で印刷の画面を出す。準備（地図の読み込み）のあとに自動で印刷の画面を出すと、
-     ブラウザが「勝手に印刷しようとしている」と判断して、止める確認を出すことがあるため */
+     ブラウザが「勝手に印刷しようとしている」と判断して、止める確認を出す・印刷の画面が出ないことがあるため
+     （不具合B：2026-11-04まで、この判定が Android を含めていなかった） */
 let printSeq = 0;
-const printNeedsTap = () => isIOS() || /^((?!chrome|chromium|crios|fxios|edg|android).)*safari/i.test(navigator.userAgent);
+const printNeedsTap = () => isMobile() || /^((?!chrome|chromium|crios|fxios|edg|android).)*safari/i.test(navigator.userAgent);
 function printDoc(html, landscape, pageCss) {
   const my = ++printSeq;
   const box = $('#printArea');

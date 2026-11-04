@@ -224,6 +224,9 @@
       if (v) openFixVisit(v, back);
     });
   }
+  // アパートの「続けて入力」画面（openAptSeq・app.js）からも使えるように外へ出す（不具合C：2026-11-04）
+  window.fixLineHtml = fixLineHtml;
+  window.bindFixLine = bindFixLine;
 
   const _setSheet = window.setSheet;
   window.setSheet = function () {
