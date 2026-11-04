@@ -2319,6 +2319,7 @@ window.KUIKI_I18N.es = {
 "すべての家が番地まで分かりました。": "Todas las casas se ubicaron con su número.",
 "場所を直すのをやめました": "Se canceló la corrección de ubicación",
 "新しい場所をタップしてください（地図を大きくしてから）": "Toque el lugar correcto (acerque antes el mapa)",
+"500mより遠くには動かせません。遠くに動かすときは、区域係にたのんでください": "No se puede mover a más de 500 m. Para moverla más lejos, pídaselo al encargado",
 "家の場所を直しました": "Ubicación de la casa corregida",
 "{0}月{1}日": "{1}/{0}",
 "受け取ってから訪ねた部屋 {0} / {1}": "Departamentos visitados desde que la recibió: {0} / {1}",
