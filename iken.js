@@ -78,13 +78,13 @@
     kind = '';
     const c = ctx();
     setSheet(`<h2>こまったこと・提案を送る</h2>
-      <p class="hint">区域係が読んで、使いやすくするために役立てます。</p>
+      <p class="hint">区域係が読んで、使いやすくするために役立てます。くわしくお聞きすることがあるかもしれません。そのときは、ご協力をお願いします。</p>
       <p style="font-weight:700;margin:12px 0 6px">どんなことですか？</p>
       <div class="ikkinds" role="group" aria-label="どんなことですか" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${KINDS.map(k => `<button type="button" class="chip" data-ikkind="${k[0]}" aria-pressed="false" style="border-radius:12px">${k[1]}</button>`).join('')}</div>
       <label class="field">くわしく教えてください<textarea id="ikText" rows="5" maxlength="${MAX}" placeholder="${esc(KINDS[0][2])}"></textarea></label>
       <p class="hint" style="margin-top:-8px">キーボードのマイクを押すと、話して入力できます。家の人の名前・住所・電話番号は書かないでください。<span id="ikCnt" style="float:right">0/${MAX}</span></p>
-      <details class="more"><summary>一緒に送る情報</summary><p class="hint">${ctxLines(c).map(esc).join('<br>')}<br>（あなたの名前は区域係に伝わります。住所・記録の中身は送りません）</p></details>
+      <details class="more"><summary>一緒に送る情報</summary><p class="hint">${ctxLines(c).map(esc).join('<br>')}<br>（住所・記録の中身は送りません）</p></details>
       <div class="row" style="margin-top:14px"><button type="button" class="btn" data-close>やめる</button>
         <button type="button" class="btn primary" id="ikSend" disabled>送る</button></div>`);
     const ta = $('#ikText'), btn = $('#ikSend');
