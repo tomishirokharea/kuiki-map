@@ -6,6 +6,18 @@
 window.KUIKI_I18N = window.KUIKI_I18N || {};
 window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 /* こまったこと・提案（iken.js・2026-11-05） */
+"キーボードのマイクを押すと、話して入力できます。家の人の名前・住所・電話番号は書かないでください。": "Puede pulsar el micrófono del teclado y dictar. No escriba nombres, direcciones ni teléfonos de las personas de las casas.",
+"（あなたの名前は区域係に伝わります。住所・記録の中身は送りません）": "(Su nombre llega al encargado de territorios. No se envían direcciones ni registros)",
+"電波がないので、このスマホに取っておきました。つながったら自動で送ります": "No hay conexión; se guardó en este teléfono y se enviará solo al conectarse",
+"たくさん送っていただき、ありがとうございます。しばらく（6時間ほど）してから、また送ってください": "Gracias por enviar tanto. Vuelva a enviar dentro de unas 6 horas",
+"住所や電話番号のような数字があります。家の人のことがわかる内容なら、消してから送ってください。\nこのまま送りますか？": "Hay números que parecen una dirección o un teléfono. Si identifican a alguien de una casa, bórrelos antes de enviar.\n¿Enviar así?",
+"このまま送る": "Enviar así",
+"もどって直す": "Volver y corregir",
+"書いた内容は送られません。閉じてもよいですか？": "Lo escrito no se enviará. ¿Cerrar?",
+"サーバーの準備がまだできていません。区域係に伝えてください": "El servidor aún no está listo. Avise al encargado de territorios",
+"取っておいた「こまったこと・提案」を送りました": "Se enviaron los problemas o sugerencias guardados",
+"送っています…": "Enviando…",
+"一緒に送る情報": "Información que se envía junto",
 "こまったこと・提案を送る": "Enviar un problema o sugerencia",
 "区域係が読んで、使いやすくするために役立てます。": "El encargado lo lee y lo usa para mejorar la aplicación.",
 "どんなことですか？": "¿De qué se trata?",
@@ -13,7 +25,6 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "分かりにくい": "Difícil de entender",
 "こうしてほしい": "Una sugerencia",
 "くわしく教えてください": "Cuéntenos con detalle",
-"一緒に送る情報": "Información que se envía junto",
 "ありがとうございます。送りました": "Gracias. Se envió",
 "いまは受け付けていません": "Ahora no se reciben",
 "送れませんでした。もう一度押してください": "No se pudo enviar. Pulse otra vez",

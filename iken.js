@@ -111,26 +111,29 @@
     const text = String(raw || '').trim().slice(0, MAX);
     if (!kind || !text) return;
     // 電話番号・番地のような数字があれば、確かめる（送る前に気づいてもらうため。止めはしない）
-    if (/\d{2,4}[-‐－ー]\d{2,4}[-‐－ー]\d{3,4}|\d+[-‐－ー]\d+[-‐－ー]?\d*\s*(番地|号)?/.test(text.normalize('NFKC'))) {
+    // 区域の番号（14-3 など）では出さない：3つ組の数字（電話・住所）と「○番地・○号」だけ（監査 L-3）
+    if (/\d+[-‐－ー]\d+[-‐－ー]\d+|\d+\s*(番地|号)/.test(text.normalize('NFKC'))) {
       if (!await ask('住所や電話番号のような数字があります。家の人のことがわかる内容なら、消してから送ってください。\nこのまま送りますか？', { ok: 'このまま送る', cancel: 'もどって直す', danger: false })) return;
     }
-    const item = { cid: 'ik' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10), kind, text, ctx: ctx() };
+    const item = { cid: 'ik' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10), kind, text, ctx: ctx(), uid: D().currentUser };
     const btn = $('#ikSend'); if (btn) { btn.disabled = true; btn.textContent = '送っています…'; }
     const r = await post(item);
     if (r === 'ok') { sheetGuard = null; closeSheet(); toast('ありがとうございます。送りました'); return; }
     if (r === 'queued') { sheetGuard = null; closeSheet(); toast('電波がないので、このスマホに取っておきました。つながったら自動で送ります'); return; }
     if (btn) { btn.disabled = false; btn.textContent = '送る'; }
     toast(r === 'many' ? 'たくさん送っていただき、ありがとうございます。しばらく（6時間ほど）してから、また送ってください'
-      : r === 'off' ? 'いまは受け付けていません' : '送れませんでした。もう一度押してください');
+      : r === 'off' ? 'いまは受け付けていません' : r === 'old' ? 'サーバーの準備がまだできていません。区域係に伝えてください' : '送れませんでした。もう一度押してください');
   }
-  /** 'ok'・'queued'・'many'・'off'・'fail' */
+  /** 'ok'・'queued'・'many'・'off'・'old'（サーバーが古い）・'fail' */
   async function post(item, fromQueue) {
     try {
       await api('iken_send', { cid: item.cid, kind: item.kind, text: item.text, ctx: item.ctx }, { timeout: 30000 });
       return 'ok';
     } catch (e) {
       const c = e && (e.code || e.message);
-      if (c === 'many' || c === 'off' || c === 'bad_request') return c === 'bad_request' ? 'fail' : c;
+      if (c === 'many' || c === 'off') return c;
+      if (c === 'unknown_action') return 'old';
+      if (c === 'bad_request' || c === 'auth') return 'fail';
       if (e && e.retry) { if (!fromQueue) queue(item); return 'queued'; }
       return 'fail';
     }
@@ -148,12 +151,18 @@
     flushing = true;
     try {
       const rest = [];
+      let sent = 0, lost = 0;
       for (const it of q) {
+        // 取っておいたあとで、この端末に別の人が登録し直したときは、その人の名前で送らない（監査 L-5）
+        if (it.uid && D() && it.uid !== D().currentUser) { lost++; continue; }
         const r = await post(it, true);
-        if (r === 'queued') rest.push(it); // まだ届かない（同じ cid なので、送り直しても2件にはならない）
+        if (r === 'ok') sent++;
+        else if (r === 'queued' || r === 'many' || r === 'old') rest.push(it); // まだ送れない（同じ cid なので、送り直しても2件にはならない）
+        else lost++; // 受け付けていない・断られた（監査 M-1：黙って消さず、知らせる）
       }
       lsSet(QKEY, JSON.stringify(rest));
-      if (rest.length < q.length) toast('取っておいた「こまったこと・提案」を送りました');
+      if (lost) toast(`取っておいた「こまったこと・提案」のうち ${lost}件は送れませんでした`);
+      else if (sent) toast('取っておいた「こまったこと・提案」を送りました');
     } finally { flushing = false; }
   }
   window.addEventListener('online', () => setTimeout(flush, 3000));
@@ -183,7 +192,7 @@
     loading = true;
     const box = $('#ikList'); if (box) box.innerHTML = '<p class="hint">読み込んでいます…</p>';
     try { const r = await api('iken_list', {}, { timeout: 45000 }); items = r.items || []; }
-    catch (e) { items = null; toast('読み込めませんでした。電波を確かめて、もう一度押してください'); }
+    catch (e) { items = null; toast(e && e.code === 'unknown_action' ? 'サーバーの準備がまだできていません（サーバーの更新が必要です）' : '読み込めませんでした。電波を確かめて、もう一度押してください'); }
     finally { loading = false; }
     renderAdmin();
   }
