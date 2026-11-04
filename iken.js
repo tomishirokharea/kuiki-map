@@ -3,13 +3,13 @@
 
    ・ホームのいちばん下に1行だけ「こまったこと・提案を送る」。区域係の設定「こまったこと・提案」が「受け付ける」のときだけ出る。
      送れる人は係が決める（監督・司会者・係だけ／全員）。サーバー（iken.gs）でも同じ決まりで確かめる。
-   ・送るのは名前なし：送った人の名前・id はサーバーに残らない（残るのは役割だけ）。
+   ・送った人（名前・役割）はサーバーに残り、区域係の画面で、だれが何を送ったかが分かる（2026-11-05 変更）。
    ・送る人がすること：種類を1つえらぶ → 書く（キーボードのマイクで話してもよい）→ 送る。
      AI でまとめるための情報（直前に見ていた画面・版・モード・端末・電波・30分以内の通信のエラー）は、アプリが自動で付ける。
-     付ける情報は「一緒に送る情報」で見られる。住所・名前・記録の中身は付けない。
+     付ける情報は「一緒に送る情報」で見られる。住所・記録の中身は付けない。
    ・電波がないときは、この端末に取っておき（5件まで）、電波が戻ったら送る。
    ・区域係の画面「設定・データ」：受け付ける／受け付けない・送れる人・届いた声の一覧（状態：未対応・対応中・済・見送り）・
-     「AIに渡す形でコピー」（指示文と一緒に。送った人の役割は残る）。
+     「AIに渡す形でコピー」（指示文と一緒に。送った人の名前は外し、役割だけ残す）。
    ========================================================= */
 (function () {
   'use strict';
@@ -68,8 +68,7 @@
   function home() {
     const box = $('#homeIken'); if (!box) return;
     box.innerHTML = allowed()
-      ? `<div class="ikenhome"><button type="button" class="btn block" data-iken>こまったこと・提案を送る</button>
-          <p class="hint" style="text-align:center;margin-top:4px">名前は送られません</p></div>` : '';
+      ? `<div class="ikenhome"><button type="button" class="btn block" data-iken>こまったこと・提案を送る</button></div>` : '';
   }
 
   /* ---- 送る画面 ---- */
@@ -79,13 +78,13 @@
     kind = '';
     const c = ctx();
     setSheet(`<h2>こまったこと・提案を送る</h2>
-      <p class="hint">名前は送られません。区域係が読んで、使いやすくするために役立てます。</p>
+      <p class="hint">区域係が読んで、使いやすくするために役立てます。</p>
       <p style="font-weight:700;margin:12px 0 6px">どんなことですか？</p>
       <div class="ikkinds" role="group" aria-label="どんなことですか" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${KINDS.map(k => `<button type="button" class="chip" data-ikkind="${k[0]}" aria-pressed="false" style="border-radius:12px">${k[1]}</button>`).join('')}</div>
       <label class="field">くわしく教えてください<textarea id="ikText" rows="5" maxlength="${MAX}" placeholder="${esc(KINDS[0][2])}"></textarea></label>
       <p class="hint" style="margin-top:-8px">キーボードのマイクを押すと、話して入力できます。家の人の名前・住所・電話番号は書かないでください。<span id="ikCnt" style="float:right">0/${MAX}</span></p>
-      <details class="more"><summary>一緒に送る情報</summary><p class="hint">${ctxLines(c).map(esc).join('<br>')}<br>（あなたの名前・住所・記録の中身は送りません）</p></details>
+      <details class="more"><summary>一緒に送る情報</summary><p class="hint">${ctxLines(c).map(esc).join('<br>')}<br>（あなたの名前は区域係に伝わります。住所・記録の中身は送りません）</p></details>
       <div class="row" style="margin-top:14px"><button type="button" class="btn" data-close>やめる</button>
         <button type="button" class="btn primary" id="ikSend" disabled>送る</button></div>`);
     const ta = $('#ikText'), btn = $('#ikSend');
@@ -169,7 +168,7 @@
     if (!LIVE) { box.innerHTML = ''; return; }
     const on = Number(st().ikenOn) === 1, all = Number(st().ikenWho) === 0;
     box.innerHTML = `<h2 class="sec">こまったこと・提案</h2>
-      <div class="setrow"><span>ホームに「こまったこと・提案を送る」を出す<br><small class="hint">名前なしで送られます。届いた声はこの下で見られ、AIに渡す形でコピーできます</small></span>
+      <div class="setrow"><span>ホームに「こまったこと・提案を送る」を出す<br><small class="hint">届いた声は、送った人の名前と一緒にこの下で見られます。AIに渡す形でコピーするときは、名前を外します</small></span>
         <div class="seg" role="group" aria-label="こまったこと・提案を受け付ける"><button type="button" data-sset="ikenOn" data-v="1" aria-pressed="${on}">受け付ける</button>
         <button type="button" data-sset="ikenOn" data-v="0" aria-pressed="${!on}">受け付けない</button></div></div>
       ${on ? `<div class="setrow"><span>送れる人</span>
@@ -197,7 +196,7 @@
       <div class="row" style="margin-bottom:8px"><button type="button" class="btn primary" id="ikCopy"${L.length ? '' : ' disabled'}>AIに渡す形でコピー（${L.length}件）</button>
         <button type="button" class="btn" id="ikReload">読み込み直す</button></div>
       ${L.length ? L.map(x => `<div class="setrow" style="display:block">
-          <p style="margin:0 0 4px"><b>${esc(KIND_NAME[x.kind] || x.kind)}</b>　<small class="hint">${esc(fmtAt(x.at))}・${esc(x.role)}・${esc(ST_NAME[x.status] || x.status)}</small></p>
+          <p style="margin:0 0 4px"><b>${esc(KIND_NAME[x.kind] || x.kind)}</b>　<small class="hint">${esc(fmtAt(x.at))}・${esc(plain(x.who) || '（名前なし）')}（${esc(x.role)}）・${esc(ST_NAME[x.status] || x.status)}</small></p>
           <p style="margin:0 0 6px;white-space:pre-wrap;word-break:break-word">${esc(plain(x.text))}</p>
           <p class="hint" style="margin:0 0 6px">${esc([VIEW_NAME[x.scr] || x.scr, x.ver, MODE_NAME[x.mode], DEV_NAME[x.dev], x.net === 'off' ? '電波なし' : '', plain(x.err)].filter(Boolean).join('・'))}</p>
           <div class="seg" role="group" aria-label="状態">${['doing', 'done', 'skip', 'new'].map(s => `<button type="button" data-ikmark="${esc(x.id)}" data-ikst="${s}" aria-pressed="${x.status === s}">${ST_NAME[s]}</button>`).join('')}</div>
@@ -223,7 +222,7 @@
     const d = new Date();
     const head = `# 区域マップ：こまったこと・提案（${L.length}件・${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} 時点）
 
-次は、区域マップ（家から家への訪問を記録し、区域カードを管理するスマホのアプリ）の利用者から、名前なしで届いた声です。利用者には年配の人やスマホに不慣れな人も多くいます。区域係として改善の計画を立てたいので、次をしてください。
+次は、区域マップ（家から家への訪問を記録し、区域カードを管理するスマホのアプリ）の利用者から届いた声です（送った人の名前は外してあります）。利用者には年配の人やスマホに不慣れな人も多くいます。区域係として改善の計画を立てたいので、次をしてください。
 
 1. 1件ずつ「不具合／分かりにくい／要望／その他」に分け直し、どの画面・機能の話かを書く（本文から推定したものは「推定」と書く）
 2. 同じ内容の声をまとめ、件数を数える
