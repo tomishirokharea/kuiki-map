@@ -1810,6 +1810,10 @@ button.ktag{cursor:pointer}
      ・番号の札は、縮尺に合わせて出し分ける
        縮小：色だけ → 中間：小さな番号 → 拡大：くわしい札。重なるときは、期限の近い区域を優先
      ・係の画面では、「切」のときも同じ出し分けにする（番号が重なって区域が見えなくなるのを防ぐ）
+     ・2026-11-04：番号の札の出し分けは、係だけでなく全員の地図で使う（「期限：入／切」のボタンと色分けは係だけ）
+       親の「区域 14」の札は出さない（枝番の札「14-3」に親の番号が入っているため）。枝番は「14-3」を同じ大きさの文字で出す
+       札は区域の中（labelPoint）に置く。重なるときは、えらんだ区域 → 自分の区域 → ほかの区域の順に残す
+       縮めて番号を出さないときも、えらんだ区域の札だけは出す
      ========================================================= */
   const cssDm = document.createElement('style');
   cssDm.textContent = `.maptools{align-items:flex-start}
@@ -1827,7 +1831,9 @@ body.duemode .terr-label:not(.duelab){display:none}
 .duelab span{pointer-events:auto;cursor:pointer;display:inline-block;min-height:34px;line-height:30px;background:#fff;border:2px solid #222;border-radius:8px;padding:1px 6px;font-weight:700;font-size:15px;white-space:nowrap;color:#111}
 .duelab.cp span{min-height:0;line-height:18px;font-size:13px;padding:0 4px;border-width:1.5px;border-radius:6px}
 .duelab.ro span{pointer-events:none;cursor:default}
-.duelab.off span{border-color:var(--terr);color:var(--terr)}`;
+.duelab.off span{border-color:var(--terr);color:var(--terr)}
+.duelab.off.grp span{border-color:#9C6BD1;color:#5B2E8C;background:#F7F2FC}
+.duelab.off.gray span{border-color:#9AA5A0;color:#7B8782}`;
   document.head.appendChild(cssDm);
   const DMC = {
     ok: ['#0072B2', '✓', '4か月以内に回った'], mid: ['#F0E442', '！', '4〜8か月前'], long: ['#E69F00', '▲', '8か月〜1年前'],
@@ -1839,6 +1845,14 @@ body.duemode .terr-label:not(.duelab){display:none}
   document.head.appendChild(cssAt);
   const dmState = { on: lsGet('kuiki_duemode') === '1' };
   let dueLayer = null, dmCtl = null, dmRaf = 0, dmHtml = '';
+  // 今の縮尺で、区域の番号を出していないか（「地図を拡大すると…」の案内の文に使う・app.js の setZoomHint）
+  // 札の描き直しは1コマあとなので、控えた値ではなく、その場で数える（案内を出すときだけ呼ばれる）
+  window.terrNumHidden = () => {
+    try {
+      const on = isAdmin() && !lkLocked() && dmState.on;
+      return dmLabelMode(polyTerrs().filter(t => on ? !t.dummy : true), on) === 'none';
+    } catch (e) { return false; }
+  };
   function dmClass(t) {
     const d = dueInfo(t);
     if (!d.last) return 'none';
@@ -1882,11 +1896,11 @@ body.duemode .terr-label:not(.duelab){display:none}
     }
     if (!dueLayer) dueLayer = L.layerGroup().addTo(map);
     dueLayer.clearLayers();
+    // show：「期限：入／切」のボタンを出すか（係だけ）。番号の札は全員に出す（2026-11-04）
     const show = isAdmin() && !lkLocked(), on = show && dmState.on;
-    document.body.classList.toggle('duemode', show);
+    document.body.classList.add('duemode'); // ふつうの区域の札（app.js）の代わりに、ここで札を出す
     const ctl = document.getElementById('dmCtl');
     ctl.hidden = !show;
-    if (!show) return;
     const ts = polyTerrs().filter(t => on ? !t.dummy : true);
     const mode = dmLabelMode(ts, on);
     // 操作の枠：中身が変わったときだけ作り直す（開いている凡例が、地図を動かすたびに閉じないように）
@@ -1896,7 +1910,7 @@ body.duemode .terr-label:not(.duelab){display:none}
         (mode === 'none' ? '<p class="dm-hint">拡大すると番号が出ます</p>' : '') +
         (on ? `<details><summary>凡例（色・記号の意味）</summary><div>${Object.keys(DMC).map(k => `<p><span class="sw" style="background:${DMC[k][0]}"></span>${DMC[k][1]} ${DMC[k][2]}</p>`).join('')}<p>線が破線＝貸出中（番号の横に「貸」）<br>点線＝貸出中止（「止」）</p><p class="muted"><b>番号の札</b>か、色のついた場所を押すと、その区域の詳しい情報（カルテ）が開きます</p></div></details>` : '') +
         '</div>' : '');
-    if (html !== dmHtml) {
+    if (show && html !== dmHtml) {
       const wasOpen = !!(ctl.querySelector('details') && ctl.querySelector('details').open);
       ctl.innerHTML = html; dmHtml = html;
       if (wasOpen && ctl.querySelector('details')) ctl.querySelector('details').open = true;
@@ -1911,24 +1925,29 @@ body.duemode .terr-label:not(.duelab){display:none}
       }
     }
     // 番号の札：縮尺で出し分け、重なるものは優先順で残す
-    if (mode === 'none') return;
-    const sz = map.getSize(), c0 = sz.divideBy(2), sel = on ? null : selTerrId();
+    // 縮めて番号を出さないとき（none）も、えらんだ区域の札だけは出す（色分けの「入」のときは今までどおり出さない）
+    const sel = on ? null : selTerrId();
+    if (mode === 'none' && !sel) return;
+    const sz = map.getSize(), c0 = sz.divideBy(2);
     const scr = ll => { const p = map.latLngToContainerPoint(ll); return map._kmRad ? c0.add(rotPt(p.subtract(c0), map._kmRad)) : p; };
-    const cp = mode === 'cp';
+    const cp = mode !== 'full';
+    const lock = !on && typeof lockOn === 'function' && lockOn(), okT = lock ? openTerrIds() : null; // 選べない区域は灰色（今までの札と同じ）
     const items = [];
     ts.forEach(t => {
-      const ll = center(t.polygon), p = scr(ll);
+      if (mode === 'none' && t.id !== sel) return;
+      const ll = labelPoint(t.polygon), p = scr(ll); // 札は区域の中に置く（点の平均だと、L字などの区域で外に出るため）
       if (p.x < -20 || p.y < -20 || p.x > sz.x + 20 || p.y > sz.y + 20) return;
-      let text, pri;
+      let text, pri, gray = false;
       if (on) {
         const k = dmClass(t), c = DMC[k], held = isLent(t), stop = lendMode(t) === 'stop';
         text = cp ? `${c[1]}${t.no}` : `${c[1]} ${t.no}${held ? ' 貸' : stop ? ' 止' : ''}`;
         pri = DM_PRI[k];
       } else {
-        text = `${t.group ? 'G ' : ''}${t.no}`;
-        pri = sel && t.id === sel ? 0 : 1;
+        gray = !!lock && !okT.has(t.id);
+        text = `${t.group && !gray ? 'G ' : ''}${t.no}`;
+        pri = sel && t.id === sel ? 0 : myTerr(t) ? 1 : gray ? 3 : 2; // えらんだ区域 → 自分の区域 → ほかの区域 → 選べない区域
       }
-      items.push({ t, ll, p, text, pri });
+      items.push({ t, ll, p, text, pri, gray });
     });
     items.sort((a, b) => a.pri - b.pri || cmpNo(a.t.no, b.t.no));
     const placed = [];
@@ -1938,7 +1957,8 @@ body.duemode .terr-label:not(.duelab){display:none}
       if (placed.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) continue;   // 先に置いた札と重なるものは出さない
       placed.push(r);
       const faint = !on && sel && it.t.id !== sel;
-      const m = L.marker(it.ll, { icon: L.divIcon({ className: `terr-label duelab${cp ? ' cp' : ''}${on ? '' : ' ro off'}${faint ? ' faint' : ''}`, html: `<span>${esc(it.text)}</span>`, iconSize: [0, 0] }),
+      const kind = on ? '' : it.gray ? ' gray' : it.t.group ? ' grp' : '';
+      const m = L.marker(it.ll, { icon: L.divIcon({ className: `terr-label duelab${cp ? ' cp' : ''}${on ? '' : ' ro off'}${faint ? ' faint' : ''}${kind}`, html: `<span>${esc(it.text)}</span>`, iconSize: [0, 0] }),
         interactive: on, bubblingMouseEvents: false, keyboard: false, pane: 'labelPane' });
       if (on) m.on('click', e => { if (typeof moveTap === 'function' && moveTap(e)) return; openKarte(it.t.id); }); // 家の場所を直しているときは、その場所に動かす
       m.addTo(dueLayer);

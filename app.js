@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.115';
+var APP_JS_VER = '2026.13.116';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2688,6 +2688,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.116', items: [
+    ['地', '地図の区域の番号を見やすくしました。縮めたときは番号が重ならないように出し分け、枝番は「14-3」の形にそろえました。']
+  ] },
   { v: '2026.13.114', items: [
     ['係', 'アパート・マンションの「続けて入力」で、今日つけた記録をその場で直せるようにしました（ほかの画面と同じ「直す」ボタン）。'],
     ['係', 'スマートフォン（Androidを含む）から区域カード（S-12）などを印刷するとき、印刷の画面が出ないことがあったのを直しました。']
@@ -3369,7 +3372,7 @@ function initMap() {
   map = L.map('map', { zoomControl: false, zoomSnap: 0.125, zoomDelta: 1, wheelPxPerZoomLevel: 120, doubleClickZoom: false }).setView(HOME_VIEW, Store.data && (Store.data.territories || []).some(t => okPoly(t.polygon)) ? 17 : HOME_ZOOM);
   map._kmRotOn = rotSupported(); // 回せる端末では、家の印などを「まっすぐ立たせる」準備をしておく（回していないときは何も変わらない）
   bindDoubleTap();
-  map.on('zoomend', () => { zoomEndAt = Date.now(); map.getContainer().classList.toggle('zfar', map.getZoom() < 16); }); // 遠くから見るときは枝番の札を小さく
+  map.on('zoomend', () => { zoomEndAt = Date.now(); });
   bindRotate();
   map.createPane('cardPane'); // 古いカードの写真（地図の下）
   map.getPane('cardPane').style.zIndex = 150;
@@ -3817,6 +3820,9 @@ function setZoomHint(need) {
   if (need && !beginner()) need = false;
   if (!need) { clearTimeout(zoomHintTimer); el.hidden = true; zoomHintShown = false; return; }
   if (zoomHintShown) return;
+  // 区域の番号も出ていないほど縮めているときは、番号のことも書く（番号の札は schedule.js・2026-11-04）
+  const txt = window.terrNumHidden && window.terrNumHidden() ? '地図を拡大すると区域の番号と家の印が出ます' : '地図を拡大すると家の印が出ます';
+  el.innerHTML = `${txt}<span aria-hidden="true">×</span>`;
   zoomHintShown = true; el.hidden = false;
   clearTimeout(zoomHintTimer);
   zoomHintTimer = setTimeout(() => { el.hidden = true; }, 4000);
@@ -3875,12 +3881,9 @@ function renderLegend() {
 }
 /* 親番号と枝番（2026-10-18）：枝番の区域（例：5-1）は t.pno＝親の番号（5）・t.pnm＝マイマップでの親の名前（A05）・t.pp＝親の線 を持つ。
    t.rest＝1 は「親の線の中で、どの枝番にも入らない部分」の区域（枝番より後に家を割り当てる）
-   地図では親の線を太い線で囲み、親の番号を線の上に出す。遠くから見るときは枝番の札を小さくする */
-const kidNo = t => (t && t.pno && String(t.no).startsWith(t.pno + '-') ? String(t.no).slice(String(t.pno).length + 1) : '');
-function terrLabelHtml(t) {
-  const k = kidNo(t);
-  return k ? `<span class="kid"><i>${esc(t.pno)}-</i>${esc(k)}</span>` : `<span>${t.group ? 'G ' : ''}${esc(t.no)}</span>`;
-}
+   地図では親の線を太い線で囲む。
+   区域の番号の札（枝番は「14-3」）は、全員 schedule.js の paintDueMap で、縮尺に合わせて・重ならないように出す。
+   親の「区域 14」の札は出さない（枝番の札に親の番号が入っているため。重なって読めなくなっていた・2026-11-04） */
 function renderParents(cur) {
   const ps = new Map();
   for (const t of polyTerrs()) if (t.pno && okPoly(t.pp) && !ps.has(t.pno)) ps.set(t.pno, t);
@@ -3888,11 +3891,6 @@ function renderParents(cur) {
   ps.forEach((t, pno) => {
     const on = !!curT && curT.pno === pno;
     L.polygon(t.pp, { color: '#1E3A5F', weight: on ? 6 : 4.5, opacity: curT && !on ? 0.45 : 0.9, fill: false, interactive: false }).addTo(terrLayer);
-    const b = bboxOf(t.pp); // 親の番号は、親の線のいちばん上に出す（枝番の札と重ならないように）
-    L.marker([b[1], (b[2] + b[3]) / 2], {
-      icon: L.divIcon({ className: `terr-label par${curT && !on ? ' faint' : ''}`, html: `<span>区域 ${esc(pno)}</span>`, iconSize: [0, 0] }),
-      interactive: false, keyboard: false, pane: 'labelPane'
-    }).addTo(terrLayer);
   });
 }
 function renderTerrs() {
@@ -3917,10 +3915,7 @@ function renderTerrs() {
       if (pickPlace) { const f = pickPlace; pickPlace = null; f(e.latlng); return; }
       selectTerr(t.id === cur ? null : t.id, { toast: t.id !== cur });
     });
-    L.marker(labelPoint(t.polygon), {
-      icon: L.divIcon({ className: `terr-label${dim ? ' faint' : ''}${gray ? ' gray' : ''}${t.group && !gray ? ' grp' : ''}${kidNo(t) ? ' kidl' : ''}`, html: terrLabelHtml(t), iconSize: [0, 0] }),
-      interactive: false, keyboard: false, pane: 'labelPane'
-    }).addTo(terrLayer);
+    // 区域の番号の札は schedule.js の paintDueMap で出す（縮尺に合わせて・重ならないように・2026-11-04）
     // 今日わたした範囲（担当者には全部、わたされた人には自分の範囲だけ）
     const mp = myPart(t), hold = canLead(t); // 今日の司会にも、わたした範囲を全部見せる
     partsOf(t).forEach(p => {
@@ -3932,7 +3927,7 @@ function renderTerrs() {
       L.marker(labelPoint(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
     });
   }
-  renderParents(cur); // 親番号の線と番号
+  renderParents(cur); // 親番号の線
   // グループの留守宅カードで分けた範囲（カードを持つ人には全部、わたされた人には自分の範囲だけ）
   const fc = focusCard ? activeCards().find(x => x.id === focusCard) : null;
   if (fc && fc.group && fc.mode === 'split') {
