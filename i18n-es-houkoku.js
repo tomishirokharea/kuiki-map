@@ -15,6 +15,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "もどって直す": "Volver y corregir",
 "書いた内容は送られません。閉じてもよいですか？": "Lo escrito no se enviará. ¿Cerrar?",
 "サーバーの準備がまだできていません。区域係に伝えてください": "El servidor aún no está listo. Avise al encargado de territorios",
+"取っておいた「こまったこと・提案」のうち {0}件は送れませんでした": "{0} de los problemas o sugerencias guardados no se pudieron enviar",
 "取っておいた「こまったこと・提案」を送りました": "Se enviaron los problemas o sugerencias guardados",
 "送っています…": "Enviando…",
 "一緒に送る情報": "Información que se envía junto",
