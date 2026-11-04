@@ -448,7 +448,7 @@
         icon: L.divIcon({ className: '', html: `<div class="pin st-dnc dncpin sm${v.appx ? ' appx' : ''}${cur === k ? ' cur' : ''}">拒</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
         title: '拒否', zIndexOffset: 500, keyboard: false
       });
-      m.on('click', () => pinTap(k));
+      m.on('click', e => { if (typeof moveTap === 'function' && moveTap(e)) return; pinTap(k); }); // 家の場所を直しているときは、その場所に動かす
       m.addTo(pinLayer);
     });
   }
