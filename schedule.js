@@ -1847,6 +1847,12 @@ body.duemode .terr-label:not(.duelab){display:none}
   let dueLayer = null, dmCtl = null, dmRaf = 0, dmHtml = '';
   // 今の縮尺で、区域の番号を出していないか（「地図を拡大すると…」の案内の文に使う・app.js の setZoomHint）
   // 札の描き直しは1コマあとなので、控えた値ではなく、その場で数える（案内を出すときだけ呼ばれる）
+  // 札を1コマあとに出し直す。地図を回し終えたとき（app.js の animateMapDeg・bindRotate）にも呼ぶ（回しただけでは moveend が来ないため・監査3）
+  function repaintTerrLabels() {
+    if (dmRaf) return;
+    dmRaf = requestAnimationFrame(() => { dmRaf = 0; try { paintDueMap(); } catch (e) { console.error(e); } });
+  }
+  window.repaintTerrLabels = repaintTerrLabels;
   window.terrNumHidden = () => {
     try {
       const on = isAdmin() && !lkLocked() && dmState.on;
@@ -1888,11 +1894,8 @@ body.duemode .terr-label:not(.duelab){display:none}
         dmState.on = !dmState.on; lsSet('kuiki_duemode', dmState.on ? '1' : '0');
         renderTerrs();
       });
-      // 拡大・縮小・移動のあと、番号の札を出し直す（続けて動かしているあいだは、描き直しは1コマに1回まで）
-      map.on('zoomend moveend', () => {
-        if (dmRaf) return;
-        dmRaf = requestAnimationFrame(() => { dmRaf = 0; try { paintDueMap(); } catch (e) { console.error(e); } });
-      });
+      // 拡大・縮小・移動・回転のあと、番号の札を出し直す（続けて動かしているあいだは、描き直しは1コマに1回まで）
+      map.on('zoomend moveend', repaintTerrLabels);
     }
     if (!dueLayer) dueLayer = L.layerGroup().addTo(map);
     dueLayer.clearLayers();
@@ -1944,7 +1947,7 @@ body.duemode .terr-label:not(.duelab){display:none}
         pri = DM_PRI[k];
       } else {
         gray = !!lock && !okT.has(t.id);
-        text = `${t.group && !gray ? 'G ' : ''}${t.no}`;
+        text = `${t.group ? 'G ' : ''}${t.no}`;
         pri = sel && t.id === sel ? 0 : myTerr(t) ? 1 : gray ? 3 : 2; // えらんだ区域 → 自分の区域 → ほかの区域 → 選べない区域
       }
       items.push({ t, ll, p, text, pri, gray });

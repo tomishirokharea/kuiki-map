@@ -3289,7 +3289,7 @@ function rotCover() {
 function animateMapDeg(to, after) {
   cancelAnimationFrame(rotAnim);
   const from = mapDeg, d = degNorm(to - from);
-  const done = () => { setMapDeg(to); renderHouses(); if (after) after(); };
+  const done = () => { setMapDeg(to); renderHouses(); if (window.repaintTerrLabels) repaintTerrLabels(); if (after) after(); }; // 区域の番号の札も、回したあとの画面に合わせる
   if (!d || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { done(); return; }
   const t0 = performance.now(), ms = 280;
   const step = now => {
@@ -3345,7 +3345,7 @@ function bindRotate() {
       if (Math.abs(mapDeg) <= ROT_SNAP) animateMapDeg(0);
       else {
         // 拡大・移動がともなわなかったときも、四すみの家の印を出す
-        setTimeout(() => { if (lastMoveEnd < rotEndAt) renderHouses(); }, 450);
+        setTimeout(() => { if (lastMoveEnd < rotEndAt) { renderHouses(); if (window.repaintTerrLabels) repaintTerrLabels(); } }, 450); // 区域の番号の札も
         if (!lsGet('kuiki_rot_tip')) { lsSet('kuiki_rot_tip', '1'); toast('地図を回しました。右下の「北」のボタンを押すと、北が上にもどります'); }
       }
     }
@@ -3365,7 +3365,7 @@ function bindRotate() {
 }
 /* 設定で「回さない」にしたとき */
 function applyRotSetting() {
-  if (!rotAllowed() && mapDeg) { cancelAnimationFrame(rotAnim); setMapDeg(0); renderHouses(); }
+  if (!rotAllowed() && mapDeg) { cancelAnimationFrame(rotAnim); setMapDeg(0); renderHouses(); if (window.repaintTerrLabels) repaintTerrLabels(); }
 }
 
 function initMap() {
