@@ -1033,8 +1033,8 @@
       L.its.sort((a, b) => a.x - b.x);
       const cells = [];
       L.its.forEach(it => {
-        const c = cells[cells.length - 1]; // 列のはじまりで、前の文字との間が少しでもあいていれば、別のセルにする
-        if (c && !(atCol(it.x) && it.x - c.end > 1) && it.x - c.end <= Math.max(5, it.h * 1.2)) { c.s += it.x - c.end > it.h * 0.3 ? ' ' + it.s : it.s; c.end = it.x + it.w; }
+        const c = cells[cells.length - 1]; // 列のはじまりからはじまる文字（数字だけのものはのぞく）は、前の文字とくっついていても別のセルにする
+        if (c && !(atCol(it.x) && !/^[\d０-９\-ー‐－\s]+$/.test(it.s)) && it.x - c.end <= Math.max(5, it.h * 1.2)) { c.s += it.x - c.end > it.h * 0.3 ? ' ' + it.s : it.s; c.end = it.x + it.w; }
         else cells.push({ s: it.s, x: it.x, end: it.x + it.w });
       });
       return cells;
@@ -1057,7 +1057,9 @@
     });
   }
   /* 住所のあとに電話番号が続いていたら、そこから先は捨てる（訪問しないモード） */
-  const skCutRaw = t => String(t || '').replace(/(^|[\s　])\(?0\d{1,4}\)?[-ー‐－ ]\d{1,4}[-ー‐－ ]\d{3,4}.*$/, '').trim();
+  /* 訪問しないで画面に出す住所は、町名・番地・部屋だけ（建物名やその後ろの文字は持たない） */
+  const skShort = e => `${e.muni}${e.town}${e.nums.join('-')}${/^[0-9０-９\-ー]{1,8}(号室?)?$/.test(e.unit || '') ? ' ' + e.unit : ''}`;
+  const skCutRaw = t => String(t || '').replace(/\(?(?:0[5789]0|0120|098\d?)\)?[-ー‐－ ]?\d{2,4}[-ー‐－ ]\d{3,4}.*$/, '').trim();
   const PDF_MAX_PAGES = 100;
   async function readPdfRows(file) {
     await loadScript(LIB.pdf);
@@ -1166,7 +1168,7 @@
       S.muni = muni;
       S.rows.forEach(r => {
         const e = r.raw ? parseAddr(r.raw, muni) : null;
-        r.ok = !!e; r.a = e ? e.a : '';
+        r.ok = !!e; r.a = e ? (SK ? skShort(e) : e.a) : '';
         r.have = !SK && !!(e && have.has(addrKey(e.a)));
         if (SK) r.txt = r.a.normalize('NFKC').toLowerCase(); // 検索も住所の文字だけ
       });
@@ -1368,7 +1370,9 @@
   function skConfirm(rows, fileName, muniSel) {
     const probe = rows.map(r => parseAddr(r.raw, '')).filter(Boolean);
     const muni = muniSel || defMuni(probe);
-    const P = xlPrepare(rows, muni, 'over'); // 住所を保存しないので、登録ずみの拒否の住所でも除かない（家の印の有無はあとで見る）
+    const P = xlPrepare(rows, muni, 'over');
+    P.ok.forEach(e => { e.a = skShort(e); });
+    // 住所を保存しないので、登録ずみの拒否の住所でも除かない（家の印の有無はあとで見る）
     const noMuni = P.ok.filter(e => e.noMuni).length;
     setSheet(headHtml(null, '住所から場所を調べる', esc(fileName)) + `
       <div class="notice info">調べる住所は ${P.ok.length}件です。${P.dup ? `<br>同じ住所の重なり ${P.dup}件は1件にまとめます。` : ''}</div>
@@ -1642,7 +1646,7 @@
     if (ref) ref.after(sp); else lg.appendChild(sp);
   }
 
-  window.kyohiApi = { houseGrid, placeOne, unitMatch: (h, u) => unitMatch(h, u), looksAddr: t => looksAddr(xlNorm(t)), readXl: (f, o) => readXl(f, o), pdfRowsFromItems }; // kml-koushin.js・torikomi.js で使う
+  window.kyohiApi = { houseGrid, placeOne, unitMatch: (h, u) => unitMatch(h, u), looksAddr: t => looksAddr(xlNorm(t)), readXl: (f, o) => readXl(f, o), pdfRowsFromItems, skCutRaw }; // kml-koushin.js・torikomi.js で使う
   window.chibanSrc = () => cbSrc(); // apt-import.js の出典の表示に使う
   /* 建物の画面に出す「拒否の部屋」（備考から取り込んだ、部屋ごとの拒否）。index.html の banNotice から呼ぶ */
   function dncRoomNote(h) {
