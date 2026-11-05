@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.118';
+var APP_JS_VER = '2026.13.119';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2688,6 +2688,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.119', items: [
+    ['印', 'iPhone・iPadでホーム画面のアイコンから開いたときも、印刷できるようにしました。「共有して印刷する」を押して、出てきた画面の「プリント」を押してください。'],
+    ['係', '区域カード（S-12）の印刷で、「印刷する」のボタンを画面の下にいつも出すようにしました。']
+  ] },
   { v: '2026.13.118', items: [
     ['係', '「こまったこと・提案」に、写真を10枚まで付けられるようにしました（いつもの写真アプリからえらべます）。']
   ] },
@@ -13923,6 +13927,12 @@ function printDoc(html, landscape, pageCss) {
   const srcs = [...new Set($$('image, img', box).map(x => x.getAttribute('href') || x.getAttribute('src')).filter(Boolean))];
   const ready = Promise.all(srcs.map(u => { const im = new Image(); im.src = u; return (im.decode ? im.decode() : Promise.resolve()).catch(() => {}); }));
   const loaded = Promise.race([ready, wait(8000)]).then(() => wait(250));
+  if (printByShare()) { // ホーム画面のアイコンから開いた iPhone・iPad：印刷の画面が出ないので、画像にして共有の画面の「プリント」から（2026.13.119）
+    showPrintReady(false, true);
+    loaded.then(() => (my === printSeq ? printImages(box, landscape) : null))
+      .then(files => { if (my === printSeq) showPrintReady(true, files); }, () => { if (my === printSeq) showPrintReady(true, null); });
+    return;
+  }
   if (printNeedsTap()) {
     showPrintReady(false);
     loaded.then(() => { if (my === printSeq) showPrintReady(true); });
@@ -13931,19 +13941,104 @@ function printDoc(html, landscape, pageCss) {
   toast('印刷の画面で「PDFとして保存」をえらぶと、PDFにできます');
   loaded.then(() => { if (my === printSeq) window.print(); });
 }
-/* 「印刷の準備ができました」の画面（この画面は印刷されない） */
-function showPrintReady(ok) {
+/* 「印刷の準備ができました」の画面（この画面は印刷されない）
+   share：ホーム画面のアイコンから開いた iPhone・iPad のとき。true＝準備中／画像の配列＝共有して印刷／null＝画像にできなかった */
+function showPrintReady(ok, share) {
   let el = $('#printReady');
   if (!el) { el = document.createElement('div'); el.id = 'printReady'; document.body.appendChild(el); }
-  el.innerHTML = `<div class="blockbox" role="dialog" aria-modal="true" aria-labelledby="prTitle">
-      <h2 id="prTitle">${ok ? '印刷の準備ができました' : '印刷の準備をしています…'}</h2>
-      <p>${ok ? '「印刷する」を押すと、印刷の画面が出ます。' : '地図の画像を読み込んでいます。少しお待ちください。'}</p>
-      <button type="button" class="btn primary block" id="prGo"${ok ? '' : ' disabled'}>印刷する</button>
-      <button type="button" class="btn block" id="prNo">やめる</button></div>`;
+  const box = (t, p, btns) => `<div class="blockbox" role="dialog" aria-modal="true" aria-labelledby="prTitle"><h2 id="prTitle">${t}</h2><p>${p}</p>${btns}</div>`;
+  const no = '<button type="button" class="btn block" id="prNo">やめる</button>';
+  if (share === undefined) {
+    el.innerHTML = box(ok ? '印刷の準備ができました' : '印刷の準備をしています…', ok ? '「印刷する」を押すと、印刷の画面が出ます。' : '地図の画像を読み込んでいます。少しお待ちください。',
+      `<button type="button" class="btn primary block" id="prGo"${ok ? '' : ' disabled'}>印刷する</button>${no}`);
+  } else if (!ok) {
+    el.innerHTML = box('印刷の準備をしています…', '印刷する紙を、画像にしています。少しお待ちください。',
+      `<button type="button" class="btn primary block" disabled>共有して印刷する</button>${no}`);
+  } else if (Array.isArray(share) && share.length) {
+    el.innerHTML = box('印刷の準備ができました', `「共有して印刷する」を押すと、共有の画面が出ます。その中の「プリント」を押してください（${share.length}ページ）。`,
+      `<button type="button" class="btn primary block" id="prGo">共有して印刷する</button>${no}`);
+  } else {
+    el.innerHTML = box('この画面からは印刷できません', 'ホーム画面のアイコンから開いたときは、iPhoneのしくみで印刷の画面が出ません。Safariで区域マップを開いて、同じところから印刷してください。',
+      '<button type="button" class="btn block" id="prNo">閉じる</button>');
+  }
   el.hidden = false;
   $('#prNo').onclick = () => { printSeq++; el.hidden = true; };
+  if (!ok || !$('#prGo')) return;
   // 押したその場で呼ぶ（あとで呼ぶと、ブラウザに止められることがある）
-  if (ok) $('#prGo').onclick = () => { el.hidden = true; window.print(); };
+  if (share === undefined) { $('#prGo').onclick = () => { el.hidden = true; window.print(); }; return; }
+  $('#prGo').onclick = () => {
+    navigator.share({ files: share, title: '区域マップの印刷' }).then(() => { el.hidden = true; }, e => {
+      if (e && e.name === 'AbortError') return; // 共有の画面を閉じただけ：もう一度押せる
+      showPrintReady(true, null);
+    });
+  };
+}
+/* ホーム画面のアイコンから開いた iPhone・iPad では、印刷の画面が出ない（Safari では出る）。パソコン・Android・Safari はこれまでどおり */
+const printByShare = () => isIOS() && isStandalone();
+/* 印刷用の紙面を、ページごとの画像（JPEG）にする。できないときは失敗で返す */
+const PX_MM = 96 / 25.4;
+let printCssText = null;
+function printCss() {
+  if (printCssText != null) return printCssText;
+  let t = '';
+  for (const sh of Array.from(document.styleSheets)) { try { for (const r of Array.from(sh.cssRules)) t += r.cssText + '\n'; } catch (e) { /* 読めない表は使わない */ } }
+  return (printCssText = t);
+}
+// 地図の画像（blob:）を、画像の中に入れられる形（data:）にする
+function imgToData(u) {
+  if (!u || /^data:/.test(u)) return Promise.resolve(u || '');
+  return new Promise(ok => {
+    const im = new Image();
+    im.onload = () => {
+      try { const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; c.getContext('2d').drawImage(im, 0, 0); ok(c.toDataURL('image/png')); } catch (e) { ok(''); }
+    };
+    im.onerror = () => ok('');
+    im.src = u;
+  });
+}
+async function pageJpeg(el, w, h) {
+  const wrap = document.createElement('div');
+  wrap.className = 'pdoc';
+  wrap.style.cssText = `width:${w}px;height:${h}px;background:#fff;margin:0;overflow:hidden`;
+  const st = document.createElement('style'); st.textContent = printCss();
+  wrap.appendChild(st); wrap.appendChild(el.cloneNode(true));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><foreignObject x="0" y="0" width="${w}" height="${h}">${new XMLSerializer().serializeToString(wrap)}</foreignObject></svg>`;
+  const im = new Image();
+  await new Promise((ok, ng) => { im.onload = ok; im.onerror = () => ng(new Error('svg')); im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+  const sc = Math.min(2, Math.sqrt(16e6 / (w * h)));
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * sc); c.height = Math.round(h * sc);
+  const g = c.getContext('2d');
+  const draw = () => { g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height); };
+  draw(); await wait(150); draw(); // Safari は、はじめの1回で中の画像が描かれないことがある
+  try { return await new Promise((ok, ng) => c.toBlob(b => (b ? ok(b) : ng(new Error('blob'))), 'image/jpeg', 0.92)); }
+  finally { c.width = c.height = 0; }
+}
+async function printImages(src, landscape) {
+  if (!navigator.share || typeof File === 'undefined') throw new Error('share');
+  const host = document.createElement('div');
+  host.className = 'pdoc';
+  host.style.cssText = `position:fixed;left:-99999px;top:0;width:${Math.round((landscape ? 279 : 190) * PX_MM)}px;background:#fff`;
+  host.innerHTML = src.innerHTML;
+  document.body.appendChild(host);
+  try {
+    for (const x of Array.from(host.querySelectorAll('img'))) x.setAttribute('src', await imgToData(x.getAttribute('src')));
+    for (const x of Array.from(host.querySelectorAll('image'))) {
+      const u = x.getAttribute('href') || x.getAttribute('xlink:href'), d = await imgToData(u);
+      x.setAttribute('href', d); if (x.hasAttribute('xlink:href')) x.setAttribute('xlink:href', d);
+    }
+    let pages = Array.from(host.querySelectorAll('.s12sheet, .s13page, .mpage'));
+    if (!pages.length) pages = Array.from(host.children);
+    const files = [], stamp = ymd(new Date());
+    for (let i = 0; i < pages.length; i++) {
+      const el = pages[i];
+      const w = Math.ceil(Math.max(el.offsetWidth, el.scrollWidth)), h = Math.ceil(Math.max(el.offsetHeight, el.scrollHeight));
+      if (!w || !h) continue;
+      files.push(new File([await pageJpeg(el, w, h)], `区域マップ_${stamp}_${i + 1}.jpg`, { type: 'image/jpeg' }));
+    }
+    if (!files.length || (navigator.canShare && !navigator.canShare({ files }))) throw new Error('share');
+    return files;
+  } finally { host.remove(); }
 }
 
 /* =========================================================
@@ -14940,18 +15035,23 @@ function openS12() {
     const ids = selIds(), n = ids.length, S = S12_SIZE[s12Opt.size];
     const pages = k => Math.ceil(k / S.per) * (s12Opt.back ? 2 : 1);
     $('#s12Cnt').textContent = `${n} / ${terrs.length}`;
-    const box = $('#s12GoBox');
+    const box = $('#s12GoBox'), list = $('#s12Parts');
+    list.innerHTML = '';
     if (!n) { box.innerHTML = '<button type="button" class="btn primary block" disabled>印刷する区域を選んでください</button>'; return; }
     if (isMobile() && n > S12_MOBILE_MAX) {
       const parts = [];
       for (let i = 0; i < n; i += S12_MOBILE_MAX) parts.push(ids.slice(i, i + S12_MOBILE_MAX));
-      box.innerHTML = `<p class="hint">スマホでは、一度に${S12_MOBILE_MAX}区域ずつ印刷します（多いと止まることがあるため）。上から順に押してください。<br>
+      const name = p => `区域${esc(terrById(p[0]).no)}〜${esc(terrById(p[p.length - 1]).no)}を印刷（A4で${pages(p.length)}ページ）`;
+      list.innerHTML = `<p class="hint">スマホでは、一度に${S12_MOBILE_MAX}区域ずつ印刷します（多いと止まることがあるため）。下の「印刷する」で、上から順に印刷できます。ここから選んで印刷することもできます。<br>
           まとめて印刷するときは、パソコンから印刷するか、ドライブに毎週保存されるPDFを使ってください。</p>
         <div class="s12parts">${parts.map((p, i) => {
           const done = s12Done.has(p.join(','));
-          return `<button type="button" class="btn block${done ? '' : ' primary'}" data-s12part="${i}">${done ? '✓ ' : ''}区域${esc(terrById(p[0]).no)}〜${esc(terrById(p[p.length - 1]).no)}を印刷（A4で${pages(p.length)}ページ）</button>`;
+          return `<button type="button" class="btn block${done ? '' : ' primary'}" data-s12part="${i}">${done ? '✓ ' : ''}${name(p)}</button>`;
         }).join('')}</div>`;
-      $$('[data-s12part]', box).forEach(b => b.onclick = () => { const p = parts[Number(b.dataset.s12part)]; s12Done.add(p.join(',')); go(p); });
+      const nx = parts.findIndex(p => !s12Done.has(p.join(',')));
+      box.innerHTML = nx < 0 ? '<button type="button" class="btn block" disabled>✓ すべて印刷しました</button>'
+        : `<button type="button" class="btn primary block" data-s12part="${nx}">次を印刷する：区域${esc(terrById(parts[nx][0]).no)}〜${esc(terrById(parts[nx][parts[nx].length - 1]).no)}（A4で${pages(parts[nx].length)}ページ・${nx + 1} / ${parts.length}回め）</button>`;
+      $$('#sheet [data-s12part]').forEach(b => b.onclick = () => { const p = parts[Number(b.dataset.s12part)]; s12Done.add(p.join(',')); go(p); });
     } else {
       box.innerHTML = `<button type="button" class="btn primary block" id="s12Go">印刷する（${n}区域・A4で${pages(n)}ページ）</button>`;
       $('#s12Go').onclick = () => go(ids);
@@ -14972,8 +15072,9 @@ function openS12() {
         const c = cnt.get(t.id) || { h: 0, a: 0 };
         return `<label class="check"><input type="checkbox" data-s12t="${esc(t.id)}"${s12Opt.sel.has(t.id) ? ' checked' : ''}><span><b>${esc(t.no)}</b> ${esc(t.name || '')} <small class="muted">家${c.h}・集合住宅${c.a}</small></span></label>`;
       }).join('')}</div>
-      <div id="s12GoBox"></div>
-      <p class="hint">区域が多いと、地図の準備に1〜2分かかります。印刷の画面で「PDFとして保存」を選ぶと、PDFにもできます。パソコンからの印刷がおすすめです。</p>`);
+      <div id="s12Parts"></div>
+      <p class="hint">区域が多いと、地図の準備に1〜2分かかります。印刷の画面で「PDFとして保存」を選ぶと、PDFにもできます。パソコンからの印刷がおすすめです。</p>
+      <div class="hsavebar" id="s12GoBox"></div>`);
     refresh();
     $$('#sheet [data-s12size]').forEach(b => b.onclick = () => { s12Opt.size = b.dataset.s12size; sheetKeep = true; paint(); });
     $('#s12Back').onchange = e => { s12Opt.back = e.target.checked; sheetKeep = true; paint(); };
