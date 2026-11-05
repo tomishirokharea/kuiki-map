@@ -13690,7 +13690,8 @@ async function saveUserNow(id, name, body, patch, before) {
   if ('yomi' in body && !(j && j.yomi)) {
     delete patch.yomi;
     const u = userById(id); if (u) { if (before.yomi) u.yomi = before.yomi; else delete u.yomi; }
-    toast(`${name}さんのよみは保存できませんでした（ほかの設定は保存しました）。サーバーの更新を待って、もう一度入れてください`);
+    toast(j && j.yomi_col ? `${name}さんのよみは保存できませんでした（ほかの設定は保存しました）。スプレッドシートの users の11列目が、ほかに使われています`
+      : `${name}さんのよみは保存できませんでした（ほかの設定は保存しました）。サーバーの更新を待って、もう一度入れてください`);
   } else toast(`${name}さんの設定を保存しました`);
   if (USER_PENDING.get(id) === patch) { // このあとに、もう変更がないとき
     try { await refresh(true); } catch (e) { /* 次の同期で取り直す */ }
