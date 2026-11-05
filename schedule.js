@@ -2395,7 +2395,7 @@ body.duemode .terr-label:not(.duelab){display:none}
 
   /* ---------- （2）カルテ：区域の操作を集める ---------- */
   function karteOpsHtml(t) {
-    const users = D().users.filter(u => !u.inactive).slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
+    const users = D().users.filter(u => !u.inactive).slice().sort(byKana); // よみがあればあいうえお順（app.js）
     const pool = poolInfo(t), hg = t.holder ? (userById(t.holder) || {}).group : '';
     const lm = lendMode(t);
     return `<p class="kq">区域の操作</p><div class="kops">
@@ -2714,8 +2714,8 @@ body.duemode .terr-label:not(.duelab){display:none}
     const mc = meetCell(s), list = meetFit(s), admin = isAdmin();
     // グループの集まりはそのグループの監督・司会者を、全体の集まりは監督・司会者全員を先に出す
     const pref = D().users.filter(u => !u.inactive && (s.group ? u.group === s.group && (u.overseer || u.leader) : canGroupUser(u)))
-      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
-    const others = D().users.filter(u => !u.inactive && !pref.includes(u)).sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
+      .sort(byKana);
+    const others = D().users.filter(u => !u.inactive && !pref.includes(u)).sort(byKana);
     const opt = u => `<option value="${esc(u.id)}">${esc(u.name)}${u.overseer ? '（監督）' : u.leader ? '（司会者）' : ''}</option>`;
     setSheet(headHtml(null, '集まりに合う区域', `${fmtYmd(s.date)} ${esc(s.time || '')}　${esc(s.place || '')}　${esc(schedGroupName(s.group))}`) + `
       <p class="hint">${mc ? `${esc(mc.label)}の集まりです。` : ''}空いている区域から、この時間帯に会えている区域・まだ試していない区域・期限の近い区域を、近い順に考えて3つまで出しています（記録と統計からの目安です）。${placePos(s) ? '' : s.group && window.GC && GC.has(s.group) ? (!admin ? '' : `場所の位置が分からないため、${esc(s.group)}グループの中心（区域係が地図に置いた点）からの近さを使っています。`) : '場所の位置が分からないため、近さは使っていません（地図の目印に同じ名前があると、近さも使います）。'}${!s.group && window.GC && GC.any() ? 'どのグループの中心からも遠い区域は、少し先に出しています。' : ''}</p>
