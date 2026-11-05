@@ -212,7 +212,7 @@
     opt = opt || {};
     d.visits = []; d.follows = {}; d.awayCards = [];
     // 拒否：訪問で記録したものは消す。取り込み・係が追加した住所のある拒否は、場所だけの拒否にして残す（kyohi.js）
-    Object.keys(d.dnc || {}).forEach(k => { if (k.indexOf('|') < 0) return; if (typeof dncDrop === 'function') dncDrop(k); else delete d.dnc[k]; });
+    Object.keys(d.dnc || {}).forEach(k => { if (k.indexOf('|') < 0 || isSkipV(d.dnc[k])) return; if (typeof dncDrop === 'function') dncDrop(k); else delete d.dnc[k]; }); // 訪問しない（係が付けた印）は、訪問の記録ではないので残す
     // 取り込みで新しく置いた家は、家ごと消す（元からあった家は残して、ふつうの家にもどす）
     d.houses = d.houses.filter(h => !(isNewImp(h) || (opt.legacy && isLegacyNew(h))));
     d.houses.forEach(h => {

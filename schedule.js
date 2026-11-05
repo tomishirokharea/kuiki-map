@@ -1478,7 +1478,7 @@ button.ktag{cursor:pointer}
 
   const karteState = { period: 4 };
   const karteHomes = t => housesOf(t.id).reduce((a, h) => a + targets(h).length, 0);
-  const karteDnc = t => { let n = 0; housesOf(t.id).forEach(h => targets(h).forEach(u => { if (D().dnc[K(h.id, u)]) n++; })); return n; };
+  const karteDnc = t => { let n = 0; housesOf(t.id).forEach(h => targets(h).forEach(u => { const k = K(h.id, u); if (D().dnc[k] && !isSkipV(D().dnc[k])) n++; })); return n; }; // 訪問しないは拒否の数に入れない
   /* S-13のこの区域の履歴（新しい順に5件）。誰が受け取ったかの記録であって、人ごとの集計ではない */
   function karteHist(t) {
     const list = [];

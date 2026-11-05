@@ -1,0 +1,37 @@
+/* =========================================================
+   区域マップ：スペイン語の辞書の足し分（i18n-es-shinai.js）／ Diccionario adicional (casas omitidas)
+   ・i18n-es.js の「あと」に読み込みます（index.html の辞書の行）。
+   ・区域係が付ける「訪問しない」の印（理由を記録しない印・2026-11-05）
+   ・スペイン語では、拒否（訪問を断られた家）が「No visitar」なので、訪問しないは「Omitida」と分けます
+   ========================================================= */
+window.KUIKI_I18N = window.KUIKI_I18N || {};
+window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
+"訪問しない": "Omitida",
+"訪問しない {0}": "Omitidas {0}",
+"訪問しない（区域係が設定）": "Omitida (la marcó el encargado de territorios)",
+"訪問しない家": "Casas omitidas",
+"この家は訪問しない家です（区域係が設定）。": "Esta casa se omite (la marcó el encargado de territorios).",
+"この部屋は訪問しない部屋です（区域係が設定）。": "Este departamento se omite (lo marcó el encargado de territorios).",
+"この世帯は訪問しない世帯です（区域係が設定）。": "Este hogar se omite (lo marcó el encargado de territorios).",
+"ほかは訪ねられます。": "Los demás sí se pueden visitar.",
+"次の部屋へ進んでください。": "Pase al siguiente departamento.",
+"訪問しない印を外す": "Quitar la marca «Omitida»",
+"訪問しない印を外しました": "Se quitó la marca «Omitida»",
+"訪問しない印にしました": "Se marcó como «Omitida»",
+"「訪問しない」は、理由を書かない印です。地図に灰色の「ー」が出て、この家はだれも訪問しません（数にも入りません）。外せるのは区域係だけです。": "«Omitida» es una marca sin motivo escrito. En el mapa aparece una «ー» gris y nadie visita esta casa (tampoco se cuenta). Solo el encargado de territorios puede quitarla.",
+"「訪問しない」は、理由を書かない印です。地図に灰色の「ー」が出て、この部屋はだれも訪問しません（数にも入りません）。外せるのは区域係だけです。": "«Omitida» es una marca sin motivo escrito. En el mapa aparece una «ー» gris y nadie visita este departamento (tampoco se cuenta). Solo el encargado de territorios puede quitarla.",
+"訪問しないの印を外すのは区域係だけです。まちがいのときは区域係に相談してください。": "Solo el encargado de territorios puede quitar la marca «Omitida». Si es un error, consúltele.",
+"理由を書かない印です。地図に灰色の「ー」が出て、だれも訪問しません（区域の数にも入りません）。": "Es una marca sin motivo escrito. En el mapa aparece una «ー» gris y nadie la visita (tampoco se cuenta en el territorio).",
+"付けるときは、家の画面の「この家を編集」（部屋は「この部屋の編集」）の「この家の印」で「訪問しない」をえらびます。": "Para ponerla, en la pantalla de la casa abra «Editar esta casa» (para un departamento, «Editar este departamento») y en «Marca de esta casa» elija «Omitida».",
+"訪問しない家はまだありません。": "Todavía no hay casas omitidas.",
+"係が設定": "La marcó el encargado",
+"理由は記録していません。地図では灰色の「ー」で、だれも訪問しません。": "No se anota el motivo. En el mapa aparece una «ー» gris y nadie la visita.",
+"訪問しない印を外しますか？": "¿Quitar la marca «Omitida»?",
+"この家は、ふつうに訪ねる家にもどります。まちがえたときは、お知らせの「取り消す」でもどせます。": "La casa vuelve a visitarse normalmente. Si se equivoca, puede deshacerlo con «Deshacer» en el aviso.",
+"拒否に変えますか？": "¿Cambiar a «No visitar»?",
+"地図の「ー」が「拒」になります。訪問しないことは変わりません。": "La «ー» del mapa cambia a «拒». Sigue sin visitarse.",
+"この印は、もうありません": "Esta marca ya no existe",
+"この家は「訪問しない」の家です。拒否にするときは「訪問しない」の一覧から変えてください": "Esta casa está marcada como «Omitida». Para cambiarla a «No visitar», hágalo desde la lista de omitidas",
+"訪問しない家（区域係が付ける・理由なし）": "Casas omitidas (las marca el encargado; sin motivo)",
+"地図に灰色の「ー」が出る家・部屋は、区域係が「訪問しない」にした家です。訪ねなくてよく、区域の数にも入りません。": "Las casas y departamentos con una «ー» gris en el mapa son los que el encargado de territorios marcó como «Omitida». No hay que visitarlos y no se cuentan en el territorio."
+});

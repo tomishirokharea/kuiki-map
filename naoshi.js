@@ -281,11 +281,12 @@
   const sideName = u => `${u}の世帯`;
 
   /* ---------- 地図の印 ---------- */
-  const FILL = { todo: '#FFFFFF', done: '#E5F2EE', met: '#E3ECF6', away: '#FFF4CC', ref: '#C62828', faint: '#E6EAEE', lock: '#C9CFCC' };
+  const FILL = { todo: '#FFFFFF', done: '#E5F2EE', met: '#E3ECF6', away: '#FFF4CC', ref: '#C62828', skip: '#6B7280', faint: '#E6EAEE', lock: '#C9CFCC' };
   const MARK = { done: '#0E7C66', met: '#2F5D8A' };
   function bandIcon(x, y, st, s) {
     if (st === 'done' || st === 'met') return `<path d="M${x - 3.6 * s},${y + 0.2 * s} l${2.6 * s},${2.7 * s} l${4.8 * s},${-5.4 * s}" fill="none" stroke="${MARK[st]}" stroke-width="${2.3 * s}" stroke-linecap="round" stroke-linejoin="round"/>`;
     if (st === 'ref') return `<path d="M${x - 2.8 * s},${y - 2.8 * s} l${5.6 * s},${5.6 * s} M${x + 2.8 * s},${y - 2.8 * s} l${-5.6 * s},${5.6 * s}" stroke="#fff" stroke-width="${2 * s}" stroke-linecap="round"/>`;
+    if (st === 'skip') return `<path d="M${x - 3 * s},${y} h${6 * s}" stroke="#fff" stroke-width="${2.2 * s}" stroke-linecap="round"/>`; // 訪問しない
     if (st === 'away') return `<text x="${x}" y="${y + 3.2 * s}" font-size="${8.5 * s}" text-anchor="middle" fill="#7A5C00" font-weight="700">留</text>`;
     return '';
   }
@@ -317,7 +318,7 @@
   function unitState(h, u, ff, since, locked) {
     if (locked) return 'lock';
     const k = K(h.id, u);
-    if (D().dnc[k]) return 'ref';
+    if (D().dnc[k]) return dncSkip(k) ? 'skip' : 'ref';
     if (ff) {
       const f = ff(k);
       if (f === 'dim') return 'faint';
@@ -376,7 +377,8 @@
         b += fixLineHtml(k);
         b += recentOtherHtml(k);
         if (window.chuiNotice) b += window.chuiNotice(h, u); // 注意（！）
-        if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の世帯です。</b>訪問しないでください。${h.units.length > 1 ? 'ほかの世帯は訪ねられます。' : ''}</div>`;
+        if (dncSkip(k)) b += skipNoteHtml('世帯', false);
+        else if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の世帯です。</b>訪問しないでください。${h.units.length > 1 ? 'ほかの世帯は訪ねられます。' : ''}</div>`;
         else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="duOverride">それでも記録する</button></span></div>`;
         else b += st.step === 'result' ? resultChoicesHtml('') : seqStepsHtml(st, k);
         b += '<button class="btn block" data-close>閉じる</button>';

@@ -164,7 +164,7 @@
   }
   function entryOf(k) {
     const raw = D().dnc[k];
-    if (raw === undefined) return null;
+    if (raw === undefined || isSkipV(raw)) return null; // 訪問しないは、拒否の一覧に入れない（下の「訪問しない」の一覧）
     const v = raw && typeof raw === 'object' ? raw : {};
     if (isPinKey(k)) {
       const has = v.lat != null && isFinite(v.lat);
@@ -229,11 +229,16 @@
     const box = $('#adDnc');
     if (!box || !isAdmin()) return;
     // 上の切りかえ：拒否／注意（！）（chui.js）
-    const seg = window.renderChuiAdmin ? `<div class="ch-seg" role="group" aria-label="拒否と注意の切りかえ">
-        <button type="button" data-dncmode="dnc" aria-pressed="${ui.mode !== 'warn'}"><i class="pin st-dnc">拒</i>拒否 ${Object.keys(D().dnc).length}</button>
-        <button type="button" data-dncmode="warn" aria-pressed="${ui.mode === 'warn'}"><i class="pin st-cau">！</i>注意 ${window.chuiCount()}</button></div>` : '';
+    // 訪問しない（区域係が付ける・理由なし）：新しいサーバーか、もう付いている印があるときだけ出す
+    const skN = skipEntries().length, showSk = capSkip() || skN > 0;
+    if (ui.mode === 'skip' && !showSk) ui.mode = 'dnc';
+    const seg = window.renderChuiAdmin ? `<div class="ch-seg${showSk ? ' three' : ''}" role="group" aria-label="拒否・注意・訪問しないの切りかえ">
+        <button type="button" data-dncmode="dnc" aria-pressed="${ui.mode === 'dnc'}"><i class="pin st-dnc">拒</i>拒否 ${dncRefN()}</button>
+        <button type="button" data-dncmode="warn" aria-pressed="${ui.mode === 'warn'}"><i class="pin st-cau">！</i>注意 ${window.chuiCount()}</button>
+        ${showSk ? `<button type="button" data-dncmode="skip" aria-pressed="${ui.mode === 'skip'}"><i class="pin st-skip">ー</i>訪問しない ${skN}</button>` : ''}</div>` : '';
     const bindSeg = () => $$('[data-dncmode]', box).forEach(b => b.onclick = () => { ui.mode = b.dataset.dncmode; renderDncAdmin(); });
     if (ui.mode === 'warn' && window.renderChuiAdmin) { box.innerHTML = seg; bindSeg(); window.renderChuiAdmin(box); return; }
+    if (ui.mode === 'skip') { box.innerHTML = seg; bindSeg(); renderSkipList(box); return; }
     const all = allEntries(), nCheck = all.filter(isCheck).length;
     if (ui.filter === 'check' && !nCheck) ui.filter = 'all';
     const q = ui.q.trim().normalize('NFKC').toLowerCase();
@@ -321,6 +326,58 @@
     };
   }
   function bindRows(root) { $$('[data-dk]', root).forEach(b => b.onclick = () => openDetail(b.dataset.dk)); }
+
+  /* ---------- 訪問しない（2026-11-05）：区域ごとの一覧・1件の画面 ---------- */
+  function skipEntries() {
+    const out = [];
+    for (const k in D().dnc) {
+      if (!isSkipV(D().dnc[k]) || isPinKey(k)) continue;
+      const [hid, unit] = parseKey(k), h = houseById(hid);
+      if (h) out.push({ k, v: D().dnc[k], h, unit, tid: h.terrId || null, lat: h.lat, lng: h.lng });
+    }
+    return out;
+  }
+  function renderSkipList(box) {
+    const g = new Map();
+    skipEntries().forEach(e => { const key = e.tid || 'x'; (g.get(key) || g.set(key, []).get(key)).push(e); });
+    const gs = [...g.entries()].map(([key, es]) => { const t = key !== 'x' ? terrById(key) : null; return { key, t, no: t ? t.no : '', es: es.sort((a, b) => placeName(a).localeCompare(placeName(b), 'ja', { numeric: true })) }; })
+      .sort((a, b) => (a.no ? 0 : 1) - (b.no ? 0 : 1) || cmpNo(a.no, b.no));
+    box.insertAdjacentHTML('beforeend', `
+      <h2 class="sec">訪問しない家</h2>
+      <p class="hint">理由を書かない印です。地図に灰色の「ー」が出て、だれも訪問しません（区域の数にも入りません）。<br>付けるときは、家の画面の「この家を編集」（部屋は「この部屋の編集」）の「この家の印」で「訪問しない」をえらびます。</p>
+      ${!gs.length ? '<p class="dnc-none">訪問しない家はまだありません。</p>' : gs.map(x => `<details class="dncg"${gs.length === 1 || ui.open.has('sk:' + x.key) ? ' open' : ''} data-skg="${esc(x.key)}"><summary>${x.no ? `<span class="stamp sm${noCls(x.no)}">${esc(x.no)}</span>` : '<span class="stamp sm">？</span>'}
+          <span class="nm" data-notr>${x.t ? esc(x.t.name) : '区域の線の外'}</span><span class="cnt">${x.es.length}件</span></summary>
+          ${x.es.map(e => `<button type="button" class="dncrow" data-skk="${esc(e.k)}"><i class="pin st-skip">ー</i><span class="tx"><b data-notr>${esc(placeName(e))}</b><small><span>係が設定</span>${e.v.at ? '・' + fmtDay(e.v.at) : ''}</small></span><span class="chev" aria-hidden="true">›</span></button>`).join('')}</details>`).join('')}`);
+    $$('[data-skg]', box).forEach(d => d.addEventListener('toggle', () => { const key = 'sk:' + d.dataset.skg; if (d.open) ui.open.add(key); else ui.open.delete(key); }));
+    $$('[data-skk]', box).forEach(b => b.onclick = () => openSkipDetail(b.dataset.skk));
+  }
+  function openSkipDetail(k) {
+    const e = skipEntries().find(x => x.k === k);
+    if (!e) { toast('この印は、もうありません'); renderDncAdmin(); return; }
+    const t = e.tid ? terrById(e.tid) : null;
+    setSheet(headHtml(t, '訪問しない家', t ? esc(t.name) : '') + `
+      <div class="dnchead"><i class="pin st-skip">ー</i><div><b data-notr>${esc(placeName(e))}</b><small><span>係が設定</span>${e.v.at ? '・' + fmtDay(e.v.at) : ''}</small></div></div>
+      <p class="hint">理由は記録していません。地図では灰色の「ー」で、だれも訪問しません。</p>
+      ${e.lat != null ? '<button type="button" class="btn block" id="skMap">地図で見る</button>' : ''}
+      <button type="button" class="btn block" id="skDnc"><i class="pin st-dnc" style="width:24px;height:24px;font-size:12px;display:inline-grid;vertical-align:-6px;margin-right:6px">拒</i>拒否に変える</button>
+      <button type="button" class="btn block danger" id="skDel">訪問しない印を外す</button>
+      <button type="button" class="btn block" data-close>閉じる</button>`);
+    const on = (id, f) => { const el = $('#' + id); if (el) el.onclick = f; };
+    on('skMap', () => { closeSheet(); showOnMap(e); });
+    on('skDnc', async () => {
+      if (!await ask('拒否に変えますか？', { title: '拒否に変えますか？', body: '地図の「ー」が「拒」になります。訪問しないことは変わりません。', ok: '拒否に変える' })) return;
+      closeSheet();
+      cmI('拒否に変えました', () => { if (!isSkipV(D().dnc[k])) return; D().dnc[k] = { s: 'adm', at: now(), lat: e.h.lat, lng: e.h.lng }; });
+      renderDncAdmin();
+    });
+    on('skDel', async () => {
+      if (!await ask('訪問しない印を外しますか？', { title: '訪問しない印を外しますか？', body: 'この家は、ふつうに訪ねる家にもどります。まちがえたときは、お知らせの「取り消す」でもどせます。', ok: '外す' })) return;
+      closeSheet();
+      cmI('訪問しない印を外しました', () => { if (isSkipV(D().dnc[k])) delete D().dnc[k]; });
+      renderDncAdmin();
+    });
+  }
+  window.openSkipDetail = openSkipDetail;
 
   /* ---------- 1件のくわしい画面 ---------- */
   function openDetail(k) {
@@ -421,10 +478,10 @@
     if (n > DNC_NEAR) {
       const rd = (typeof dotRenderer !== 'undefined' && dotRenderer) || L.canvas({ padding: 0.3 });
       const seen = new Set();
-      const dot = (lat, lng, id) => {
+      const dot = (lat, lng, id, sk) => {
         if (lat == null || !isFinite(lat) || !b.contains([lat, lng]) || seen.has(id)) return;
         seen.add(id);
-        L.circleMarker([lat, lng], { renderer: rd, interactive: false, radius: 3.5, weight: 1, color: '#fff', fillColor: '#B91C1C', fillOpacity: 0.9, opacity: 0.9 }).addTo(pinLayer);
+        L.circleMarker([lat, lng], { renderer: rd, interactive: false, radius: 3.5, weight: 1, color: '#fff', fillColor: sk ? '#6B7280' : '#B91C1C', fillOpacity: 0.9, opacity: 0.9 }).addTo(pinLayer); // 訪問しないは灰色
       };
       const housesShown = typeof iconFade === 'function' && iconFade() > 0.05; // 家の印が出ているときは、家につながった拒否は家の印で分かる
       for (const k in D().dnc) {
@@ -436,7 +493,7 @@
           dot(v.lat, v.lng, k);
         } else if (!housesShown) {
           const h = houseById(parseKey(k)[0]);
-          if (h) dot(h.lat, h.lng, h.id);
+          if (h) dot(h.lat, h.lng, h.id, isSkipV(v)); // 同じ家に拒否の部屋があれば、先に見た印の色（seen）
         }
       }
       return;
@@ -633,7 +690,7 @@
       return;
     }
     // 追加
-    if (D().dnc[k]) { toast('この家は、もう拒否になっています'); return; }
+    if (D().dnc[k]) { toast(isSkipV(D().dnc[k]) ? 'この家は「訪問しない」の家です。拒否にするときは「訪問しない」の一覧から変えてください' : 'この家は、もう拒否になっています'); return; }
     askAddr(`${esc(name)}を拒否にしますか？`, pick.a, '拒否にする', a => {
       cmI(`${name}を拒否にしました`, () => {
         D().dnc[k] = Object.assign({ s: 'adm', at: now(), lat: r6(h.lat), lng: r6(h.lng) }, a ? { a } : {});
@@ -649,7 +706,7 @@
     ['p', 'appx', 'auto', 't', 'no'].forEach(x => delete o[x]);
     o.lat = r6(h.lat); o.lng = r6(h.lng);
     const cur = D().dnc[k];
-    D().dnc[k] = cur && typeof cur === 'object' ? Object.assign({}, o, cur, { a: cur.a || o.a }) : (Object.keys(o).length ? o : true);
+    D().dnc[k] = cur && typeof cur === 'object' && !isSkipV(cur) ? Object.assign({}, o, cur, { a: cur.a || o.a }) : (Object.keys(o).length ? o : true); // 訪問しないの家に移したら、拒否にする
     if (from !== k) delete D().dnc[from];
     delete D().follows[k]; delete D().released[k];
   }
@@ -1238,6 +1295,7 @@
         }
         if (p.pl.kind === 'house') {
           const h = p.pl.h, k = K(h.id, p.pl.unit), cur = D().dnc[k];
+          if (isSkipV(cur)) return; // 訪問しないの家は、取り込みで変えない（訪問しないことは同じ）
           if (cur) {
             if (over) {
               if (isFirm(k, cur)) { if (base.a) D().dnc[k] = Object.assign({}, cur && typeof cur === 'object' ? cur : {}, { a: base.a }); }

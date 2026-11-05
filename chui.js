@@ -43,13 +43,15 @@
   .mk-box{border:1px solid var(--line);border-radius:12px;background:#fff;padding:4px 12px 10px;margin:10px 0}
   .mk-box legend{font-weight:700;padding:0 4px}
   .mk-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0}
-  .mk-chips.two{grid-template-columns:repeat(2,1fr)}
+  .mk-chips.two,.mk-chips.four{grid-template-columns:repeat(2,1fr)}
   .mk-chips button{min-height:58px;border-radius:12px;border:2px solid var(--line);background:#fff;font:inherit;font-weight:700;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;line-height:1.1}
   .mk-chips button .pin{width:26px;height:26px;font-size:14px;border-width:2px}
   .mk-chips button[aria-pressed="true"]{border-color:var(--brand-ink);background:var(--terr-soft);box-shadow:inset 0 0 0 1px var(--brand-ink)}
   .mk-chips button:disabled{opacity:.45}
   .mk-box textarea{width:100%;min-height:72px;font-size:17px;border:2px solid var(--line);border-radius:12px;padding:8px 10px;font-family:inherit;background:#fff;color:var(--ink)}
   .ch-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 10px}
+  .ch-seg.three{grid-template-columns:repeat(3,1fr)}
+  .ch-seg.three button{flex-direction:column;gap:2px;font-size:15px;line-height:1.15;min-height:58px}
   .ch-seg button{min-height:52px;border-radius:12px;border:2px solid var(--line);background:#fff;font:inherit;font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:center;gap:8px}
   .ch-seg button .pin{width:26px;height:26px;font-size:14px;border-width:2px}
   .ch-seg button[aria-pressed="true"]{border-color:var(--brand-ink);background:var(--terr-soft);box-shadow:inset 0 0 0 1px var(--brand-ink)}
@@ -113,23 +115,30 @@
   window.chuiNotes = notesFor;
 
   /* ---------- 家の編集の「この家の印」 ---------- */
-  const markOf = k => (D().dnc[k] ? 'dnc' : C()[k] ? 'warn' : 'none');
+  const isSkipVal = v => !!(v && typeof v === 'object' && v.q && !v.p); // 訪問しない（app.js の isSkipV と同じ）
+  const markOf = k => (D().dnc[k] ? (isSkipVal(D().dnc[k]) ? 'skip' : 'dnc') : C()[k] ? 'warn' : 'none');
+  /* 訪問しないをえらべるのは区域係だけ（新しいサーバーのときだけ。app.js の capSkip） */
+  const canSkip = () => isAdmin() && typeof capSkip === 'function' && capSkip();
   function markHtml(k, st, opt) {
-    const o = opt || {}, cur = markOf(k), lockDnc = cur === 'dnc' && !isAdmin();
+    const o = opt || {}, cur = markOf(k), lockDnc = (cur === 'dnc' || cur === 'skip') && !isAdmin();
     const kind = st.kind || cur;
-    const chip = (v, icon, lab) => (v === 'dnc' && o.noDnc ? '' : `<button type="button" data-mk="${v}" aria-pressed="${kind === v}"${lockDnc && v !== 'dnc' ? ' disabled' : ''}>${icon}<span>${lab}</span></button>`);
+    const showSkip = !o.noDnc && (canSkip() || cur === 'skip');
+    const chip = (v, icon, lab) => ((v === 'dnc' || v === 'skip') && o.noDnc ? '' : v === 'skip' && !showSkip ? '' : `<button type="button" data-mk="${v}" aria-pressed="${kind === v}"${lockDnc && v !== cur ? ' disabled' : ''}>${icon}<span>${lab}</span></button>`);
     const n = st.n != null ? st.n : ((C()[k] && C()[k].n) || '');
-    return `<fieldset class="mk-box"><legend>この${o.noDnc ? '建物ぜんたい' : k.split('|')[1] ? '部屋' : '家'}の印</legend>
-      <div class="mk-chips${o.noDnc ? ' two' : ''}" role="group" aria-label="印の種類">
+    const what = o.noDnc ? '建物ぜんたい' : k.split('|')[1] ? '部屋' : '家';
+    return `<fieldset class="mk-box"><legend>この${what}の印</legend>
+      <div class="mk-chips${o.noDnc ? ' two' : showSkip ? ' four' : ''}" role="group" aria-label="印の種類">
         ${chip('none', '<i class="pin st-new"></i>', 'なし')}
         ${chip('warn', '<i class="pin st-cau">！</i>', '注意')}
         ${chip('dnc', '<i class="pin st-dnc">拒</i>', '拒否')}
+        ${chip('skip', '<i class="pin st-skip">ー</i>', '訪問しない')}
       </div>
+      ${kind === 'skip' && cur !== 'skip' ? `<p class="hint">「訪問しない」は、理由を書かない印です。地図に灰色の「ー」が出て、この${what}はだれも訪問しません（数にも入りません）。外せるのは区域係だけです。</p>` : ''}
       ${kind === 'warn' ? `<label class="field"><span>注意の内容（なくてもよい）</span>
         <textarea id="mkNote" maxlength="80" placeholder="${NOTE_HINT}">${esc(n)}</textarea>
         <small class="hint">${NOTE_RULE}</small></label>` : ''}
       ${kind === 'dnc' && cur !== 'dnc' ? '<p class="hint">拒否にすると、訪問しない家として地図に「拒」が出ます。外せるのは区域係だけです。</p>' : ''}
-      ${lockDnc ? '<p class="hint">拒否を外すのは区域係だけです。まちがいのときは区域係に相談してください。</p>' : ''}
+      ${lockDnc ? `<p class="hint">${cur === 'skip' ? '訪問しないの印' : '拒否'}を外すのは区域係だけです。まちがいのときは区域係に相談してください。</p>` : ''}
       <p class="hint">「！注意」は訪問の結果ではありません。訪ねる前に気をつけることを、みんなに知らせる印です。</p>
     </fieldset>`;
   }
@@ -148,11 +157,17 @@
   function markApply(h, unit, st) {
     const k = K(h.id, unit || ''), cur = markOf(k), kind = st.kind || cur;
     if (kind === cur && !(cur === 'warn' && st.n != null)) return;
-    if (cur === 'dnc' && kind !== 'dnc' && !isAdmin()) return;
-    if (kind !== 'dnc' && D().dnc[k] !== undefined) { if (typeof dncDrop === 'function') dncDrop(k, h); else delete D().dnc[k]; }
+    if ((cur === 'dnc' || cur === 'skip') && kind !== cur && !isAdmin()) return;
+    if (kind === 'skip' && !canSkip()) return;
+    // 拒否→訪問しない・訪問しない→拒否は、印を書きかえるだけ（拒否のメモを場所だけの印に残さない）
+    if (kind !== 'dnc' && kind !== 'skip' && D().dnc[k] !== undefined) { if (typeof dncDrop === 'function') dncDrop(k, h); else delete D().dnc[k]; }
     if (kind !== 'warn') delete C()[k];
     if (kind === 'dnc') {
-      if (!D().dnc[k]) D().dnc[k] = isAdmin() ? { s: 'adm', at: now(), lat: r6(h.lat), lng: r6(h.lng) } : true;
+      if (!D().dnc[k] || cur === 'skip') D().dnc[k] = isAdmin() ? { s: 'adm', at: now(), lat: r6(h.lat), lng: r6(h.lng) } : true;
+      delete D().follows[k]; delete D().released[k];
+    }
+    if (kind === 'skip') { // 訪問しない：理由は持たない（q と場所だけ）
+      D().dnc[k] = { q: 1, s: 'adm', at: now(), lat: r6(h.lat), lng: r6(h.lng) };
       delete D().follows[k]; delete D().released[k];
     }
     if (kind === 'warn') {
@@ -163,7 +178,7 @@
       C()[k] = o;
     }
   }
-  const markMsg = st => (st.kind === 'warn' ? '注意（！）の印を保存しました' : st.kind === 'dnc' ? '拒否の印にしました' : '印を外しました');
+  const markMsg = st => (st.kind === 'warn' ? '注意（！）の印を保存しました' : st.kind === 'dnc' ? '拒否の印にしました' : st.kind === 'skip' ? '訪問しない印にしました' : '印を外しました');
   window.chuiMark = { html: markHtml, keep: markKeep, bind: markBind, changed: markChanged, apply: markApply, msg: markMsg };
 
   /* ---------- 地図：場所だけの注意（家とつながっていない） ---------- */
