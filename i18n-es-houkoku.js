@@ -6,6 +6,16 @@
 window.KUIKI_I18N = window.KUIKI_I18N || {};
 window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 /* こまったこと・提案（iken.js・2026-11-05） */
+"写真をえらぶ（{0}枚まで）": "Elegir fotos (hasta {0})",
+"写真をえらぶ（あと{0}枚）": "Elegir fotos (quedan {0})",
+"写真を用意しています…": "Preparando las fotos…",
+"写真は{0}枚までです。はじめの{1}枚を入れました": "Hasta {0} fotos. Se añadieron las primeras {1}",
+"{0}枚の写真は読めませんでした": "No se pudieron leer {0} fotos",
+"写真があるときは、電波のあるところで送ってください": "Con fotos, envíe donde haya conexión",
+"写真を送っています {0}/{1}": "Enviando fotos {0}/{1}",
+"文は届きました。写真のうち{0}枚は送れませんでした": "El texto llegó. No se pudieron enviar {0} fotos",
+"送れませんでした。電波のあるところで、もう一度押してください": "No se pudo enviar. Pulse otra vez donde haya conexión",
+"写真を見る（{0}枚）": "Ver fotos ({0})",
 "キーボードのマイクを押すと、話して入力できます。家の人の名前・住所・電話番号は書かないでください。": "Puede pulsar el micrófono del teclado y dictar. No escriba nombres, direcciones ni teléfonos de las personas de las casas.",
 "（住所・記録の中身は送りません）": "(No se envían direcciones ni registros)",
 "電波がないので、このスマホに取っておきました。つながったら自動で送ります": "No hay conexión; se guardó en este teléfono y se enviará solo al conectarse",
