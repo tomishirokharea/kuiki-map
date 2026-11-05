@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.120';
+var APP_JS_VER = '2026.13.121';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2688,6 +2688,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.121', items: [
+    ['人', '名前の一覧を、あいうえお順に並べられるようにしました。区域係が名前のよみ（ひらがな）を入れると、その人はあいうえお順に並び、名前でさがすときもひらがなで見つかります。']
+  ] },
   { v: '2026.13.120', items: [
     ['人', '「今日回る人をえらぶ」で、ほかのグループの人をグループごとに分けて出すようにしました。']
   ] },
@@ -3717,10 +3720,10 @@ function openHelpers(tid, cid) {
   const max = grp ? 40 : D().settings.groupMax, cur = curOf(), curIds = new Set(cur.map(h => h.uid));
   if (!c) { curIds.add(t.holder); const l = leadOf(t); if (l) curIds.add(l.uid); } // 担当者と今日の司会は、もう記録できるので出さない
   const allU = c ? isAllUse(c) : isAllUse(t); // 全体の集まり（区域・留守宅カード）は、グループで分けずに名前順だけで出す
-  const gm = grp && !allU ? groupMembers(grp).filter(u => u.id !== me().id && !curIds.has(u.id)) : [];
+  const gm = grp && !allU ? groupMembers(grp).filter(u => u.id !== me().id && !curIds.has(u.id)).sort(byKana) : [];
   const room = max - cur.length;
-  const cand = D().users.filter(u => !u.inactive && u.id !== me().id && !curIds.has(u.id)).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-  const row = u => `<label class="check" data-name="${esc(u.name)}"><input type="checkbox" data-hadd="${esc(u.id)}"${grp && u.group === grp ? ' data-ing="1"' : ''}>${esc(u.name)}</label>`;
+  const cand = D().users.filter(u => !u.inactive && u.id !== me().id && !curIds.has(u.id)).sort(byKana);
+  const row = u => `<label class="check" data-name="${esc(u.name)}"${yomiAttr(u)}><input type="checkbox" data-hadd="${esc(u.id)}"${grp && u.group === grp ? ' data-ing="1"' : ''}>${esc(u.name)}</label>`;
   const others = grp && !allU ? cand.filter(u => u.group !== grp) : cand;
   // ほかの人は、グループごとに見出しを付けて分ける（グループの決まっていない人はいちばん下・こまったこと o72dgm・2026.13.120）
   const othersHtml = () => {
@@ -3733,7 +3736,7 @@ function openHelpers(tid, cid) {
   setSheet(headHtml(t, c ? `今日回る人をえらぶ（留守宅カード・${slotShort(c.slot)}）` : grp ? '今日回る人をえらぶ' : '一緒に回る人', `${fmtDay(new Date().toISOString())}の終わりまで`) + `
     ${cur.length ? `<p class="q">${grp ? '今日回る人' : '今日一緒に回る人'}（${cur.length}人）</p>` + cur.map(h => `<div class="setrow"><b>${esc(uname(h.uid))}さん</b><button class="btn small danger" data-hdel="${h.uid}">外す</button></div>`).join('') : ''}
     ${room > 0 ? `<p class="q">加える人をえらぶ</p>
-      <label class="field"><span>名前でさがす</span><input type="text" id="hQ" placeholder="名前の一部を入れる" autocomplete="off"></label>
+      <label class="field"><span>名前でさがす</span><input type="text" id="hQ" placeholder="${yomiOn() ? '名前の一部（ひらがなでも）' : '名前の一部を入れる'}" autocomplete="off"></label>
       <div id="hList">
         ${gm.length ? `<div class="hgrp"><b>${esc(grp)}グループ（${gm.length}人）</b><button type="button" class="btn small" id="hAllG">全員えらぶ</button></div>${gm.map(row).join('')}` : ''}
         ${others.length ? (gm.length ? `<details class="hother"><summary class="hgrp"><b>ほかの人（${others.length}人）</b></summary>${othersHtml()}</details>` : othersHtml()) : ''}
@@ -3763,7 +3766,7 @@ function openHelpers(tid, cid) {
   };
   $('#hQ').oninput = e => {
     const q = e.target.value.trim();
-    $$('#hList [data-name]').forEach(l => { l.hidden = !!q && !l.dataset.name.includes(q); });
+    filterNames($$('#hList [data-name]'), q);
     $$('#hList [data-hg]').forEach(b => { b.hidden = !$$('[data-name]', b).some(l => !l.hidden); }); // 当てはまる人がいないグループは、見出しごと隠す
     if (q) $$('#hList details').forEach(d => { d.open = true; }); // 名前でさがすときは、ほかの人も見る
   };
@@ -4477,9 +4480,9 @@ function openPartAssign() {
   partsOf(po).forEach(p => (p.uids || []).forEach(u => taken.add(u)));
   const allU = isAllUse(po); // 全体の集まり：今日回る人を先に出す
   const gm = allU ? helpersOf(po).map(h => userById(h.uid)).filter(u => u && !u.inactive && u.id !== me().id)
-    : po.group ? groupMembers(po.group).filter(u => u.id !== me().id) : [];
-  const others = D().users.filter(u => !u.inactive && u.id !== me().id && !gm.some(g => g.id === u.id));
-  const row = u => `<label class="check${taken.has(u.id) ? ' dimmed' : ''}" data-name="${esc(u.name)}"><input type="checkbox" data-pu="${esc(u.id)}">${esc(u.name)}${taken.has(u.id) ? '<span class="muted">（ほかの範囲に入っています）</span>' : ''}</label>`;
+    : po.group ? groupMembers(po.group).filter(u => u.id !== me().id).sort(byKana) : [];
+  const others = D().users.filter(u => !u.inactive && u.id !== me().id && !gm.some(g => g.id === u.id)).sort(byKana);
+  const row = u => `<label class="check${taken.has(u.id) ? ' dimmed' : ''}" data-name="${esc(u.name)}"${yomiAttr(u)}><input type="checkbox" data-pu="${esc(u.id)}">${esc(u.name)}${taken.has(u.id) ? '<span class="muted">（ほかの範囲に入っています）</span>' : ''}</label>`;
   const pc = partContents(t, poly, partDraw.cid ? po.keys : null), n = pc.total;
   setSheet(headHtml(t, 'この範囲をわたす人', `家・部屋 ${n}か所　今日の終わりまで`) + `
     ${partContentsHtml(pc)}
@@ -4493,7 +4496,7 @@ function openPartAssign() {
     <button class="btn block" data-close>やめる</button>`);
   $('#puQ').oninput = e => {
     const q = e.target.value.trim();
-    $$('#puList [data-name]').forEach(l => { l.hidden = !!q && !l.dataset.name.includes(q); });
+    filterNames($$('#puList [data-name]'), q);
   };
   $('#puSave').onclick = () => {
     const uids = $$('#puList input:checked').map(x => x.dataset.pu);
@@ -10632,17 +10635,17 @@ function dateAtSlot(slot, daysAgo) {
    ・だれでも留守宅カードを受け取れる共通の区域（Z0）も作る。どの時間帯でも合う家を入れる */
 function addDummy() {
   if (dummyTerrs().length) { openDummyGuide(); return; }
-  const users = D().users.filter(u => !u.inactive).slice().sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  const users = D().users.filter(u => !u.inactive).slice().sort(byKana);
   setSheet(headHtml(null, '検証用のダミーを入れる', '') + `
     ${LIVE ? '<div class="notice warn"><b>本番のデータに入ります。</b>地図や係の画面の集計にも入るので、確かめ終わったら「ダミーを消す」で消してください。</div>' : ''}
     <p class="q">検証する人をえらぶ（8人まで）</p>
     <label class="field"><span>名前でさがす</span><input type="text" id="dmQ" placeholder="名前の一部を入れる" autocomplete="off"></label>
-    <div id="dmList">${users.map(u => `<label class="check" data-name="${esc(u.name)}"><input type="checkbox" data-dm="${esc(u.id)}"${u.id === me().id ? ' checked' : ''}>${esc(u.name)}${u.role === 'admin' ? '（区域係）' : ''}</label>`).join('')}</div>
+    <div id="dmList">${users.map(u => `<label class="check" data-name="${esc(u.name)}"${yomiAttr(u)}><input type="checkbox" data-dm="${esc(u.id)}"${u.id === me().id ? ' checked' : ''}>${esc(u.name)}${u.role === 'admin' ? '（区域係）' : ''}</label>`).join('')}</div>
     <p class="hint">えらんだ人ごとに、その人が担当する検証用の区域（Z1〜）を作ります。年代や★は区域の担当者にしか見えない仕組みなので、1人に1区域です。<br>
       ほかに、だれでも留守宅カードを受け取れる共通の区域（Z0）を作ります。Z0と各自の区域には、どの時間帯でも留守宅カードが出るように、時間帯をずらした留守の家を入れます。</p>
     <button class="btn primary block" id="dmGo">えらんだ人のダミーを入れる</button>
     <button class="btn block" data-close>やめる</button>`);
-  $('#dmQ').oninput = e => { const q = e.target.value.trim(); $$('#dmList [data-name]').forEach(l => { l.hidden = !!q && !l.dataset.name.includes(q); }); };
+  $('#dmQ').oninput = e => { const q = e.target.value.trim(); filterNames($$('#dmList [data-name]'), q); };
   $('#dmList').onchange = e => { if (e.target.checked && $$('#dmList input:checked').length > 8) { e.target.checked = false; toast('8人までです'); } };
   $('#dmGo').onclick = () => {
     const ids = $$('#dmList input:checked').map(x => x.dataset.dm);
@@ -11119,7 +11122,7 @@ function renderDevices() {
       : '<p class="muted">共通リンクがまだありません。スプレッドシートのメニュー「区域マップ」→「共通リンクを表示」で作れます。</p>'}
     <h3 class="sub">登録済みのスマホ</h3>
     <p class="hint">スマホをなくした・替えた・使わなくなった人は「使えなくする」を押してください。そのスマホの区域の情報は、次に開いたときに消えます。</p>
-    ${act.length ? act.slice().sort((a, b) => a.name.localeCompare(b.name, 'ja')).map(d => `<article class="devrow">
+    ${act.length ? act.slice().sort((a, b) => byKana(Object.assign({ name: a.name }, { yomi: (userById(a.uid) || {}).yomi }), Object.assign({ name: b.name }, { yomi: (userById(b.uid) || {}).yomi }))).map(d => `<article class="devrow">
       <p><b>${esc(d.name)}さん</b>　${esc(d.label)}</p>
       <p class="muted">${d.decAt ? `${fmtDay(d.decAt)}に承認` : ''}${d.seen ? `　最後に使った日 ${fmtDay(d.seen)}` : ''}</p>
       <div class="actions"><button class="btn small danger" data-dev="revoke" data-id="${esc(d.id)}">使えなくする</button></div></article>`).join('')
@@ -12102,6 +12105,27 @@ function setTerrUse(t, v) {
 const myGroup = () => me().group || '';
 const groupsAll = () => [...new Set(D().users.filter(u => !u.inactive && u.group).map(u => u.group))].sort((a, b) => a.localeCompare(b, 'ja'));
 const groupMembers = g => D().users.filter(u => !u.inactive && u.group === g);
+/* 人の名前の並べ方・さがし方（よみ・2026.13.121）
+   ・よみ（ひらがな。区域係が入れる）のある人はあいうえお順、ない人はそのあとに今までの名前の順
+   ・名前でさがすときは、漢字の名前に加えて、ひらがな・カタカナでよみの一部に当たる人も出す */
+const toHira = s => String(s == null ? '' : s).normalize('NFKC').replace(/[\u30a1-\u30f6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+const normYomi = s => toHira(s).replace(/[^\u3041-\u3096\u30fc]/g, '').slice(0, 30); // サーバーの normYomi_ と同じ
+const yomiOn = () => !(window.KI && window.KI.lang === 'es'); // スペイン語の表示では、よみを入れる所を出さない
+const byKana = (a, b) => {
+  const ya = (a && a.yomi) || '', yb = (b && b.yomi) || '';
+  if (ya && yb) return ya.localeCompare(yb, 'ja') || String(a.name).localeCompare(String(b.name), 'ja');
+  if (ya || yb) return ya ? -1 : 1;
+  return String(a.name).localeCompare(String(b.name), 'ja');
+};
+const nameHit = (name, yomi, q) => {
+  q = String(q || '').trim();
+  if (!q || String(name || '').includes(q)) return true;
+  const h = toHira(q).replace(/\s+/g, '');
+  return !!yomi && /^[\u3041-\u3096\u30fc]+$/.test(h) && String(yomi).includes(h);
+};
+/* 名前でさがす欄：data-name（と data-yomi）を持つ行を、当たらなければ隠す */
+const filterNames = (rows, q) => rows.forEach(l => { l.hidden = !nameHit(l.dataset.name, l.dataset.yomi, q); });
+const yomiAttr = u => (u && u.yomi ? ` data-yomi="${esc(u.yomi)}"` : '');
 const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const ymOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 const parseYmd = s => { const [y, m, dd] = s.split('-').map(Number); return new Date(y, m - 1, dd); };
@@ -13619,9 +13643,10 @@ function openSchedDay(date) {
 /* ---- 人とグループ（区域係は変更できる。監督は自分のグループの人を見るだけ） ---- */
 /* 保存中の変更（id → 変えた値）。返事を待つあいだに同期で名簿が届いても、画面が元にもどって見えないように上から重ねる */
 var USER_PENDING = new Map(); // var：同期の受け取り（上のほうで定義）から、読み込みの順に関係なく見られるように
-const userPatchOf = (group, overseer, leader, role, active) => {
+const userPatchOf = (group, overseer, leader, role, active, yomi) => {
   const p = { group: group || undefined, overseer: !!overseer || undefined, leader: !!leader || undefined };
   if (role) p.role = role;
+  if (yomi !== undefined) p.yomi = yomi || undefined; // よみは、直したときだけ（ほかの保存では今のまま）
   if (active === false) p.inactive = true;
   return p;
 };
@@ -13629,17 +13654,18 @@ function applyUserPending() {
   USER_PENDING.forEach((p, id) => { const u = userById(id); if (u) Object.assign(u, p); });
 }
 const USER_SAVING = new Map(); // id → 送っている保存（同じ人の保存は、順番に1つずつ送る。あとの変更が先に届いて古い値に戻らないように）
-function setUserGroup(u, group, overseer, leader, role, active) {
-  const patch = userPatchOf(group, overseer, leader, role, active);
+function setUserGroup(u, group, overseer, leader, role, active, yomi) {
+  const patch = userPatchOf(group, overseer, leader, role, active, yomi);
   if (!LIVE) {
     Object.assign(u, patch);
     Store.save(); toast(`${u.name}さんの設定を保存しました`);
     renderAll(); return Promise.resolve();
   }
   const id = u.id, name = u.name;
-  const before = { group: u.group, overseer: u.overseer, leader: u.leader, role: u.role, inactive: u.inactive };
+  const before = { group: u.group, overseer: u.overseer, leader: u.leader, role: u.role, inactive: u.inactive, yomi: u.yomi };
   const body = { id, group, overseer, leader };
   if (role) body.role = role;
+  if (yomi !== undefined) body.yomi = yomi; // 送ったときだけサーバーが書く（古いサーバーは使わずに捨てる）
   if (active === false) body.active = false;
   // 先に画面に出す（保存中に画面を変えても、変えた値のまま見える）。描き直しは少しあとで（続けて押したチェックが消えないように）
   USER_PENDING.set(id, patch);
@@ -13652,19 +13678,84 @@ function setUserGroup(u, group, overseer, leader, role, active) {
   return p;
 }
 async function saveUserNow(id, name, body, patch, before) {
+  let j;
   try {
-    await api('user_set', body);
+    j = await api('user_set', body);
   } catch (e) {
     if (USER_PENDING.get(id) === patch) { USER_PENDING.delete(id); Object.assign(userById(id) || {}, before); }
     toast(`${name}さんの設定を保存できませんでした。通信を確認して、もう一度変えてください`);
     renderAll(); return;
   }
-  toast(`${name}さんの設定を保存しました`);
+  // よみを送ったのに受け取りの印がない：サーバーが古い版か、11列目がほかに使われている。よみだけ元にもどして知らせる（監査 よみ M-3）
+  if ('yomi' in body && !(j && j.yomi)) {
+    delete patch.yomi;
+    const u = userById(id); if (u) { if (before.yomi) u.yomi = before.yomi; else delete u.yomi; }
+    toast(j && j.yomi_col ? `${name}さんのよみは保存できませんでした（ほかの設定は保存しました）。スプレッドシートの users の11列目が、ほかに使われています`
+      : `${name}さんのよみは保存できませんでした（ほかの設定は保存しました）。サーバーの更新を待って、もう一度入れてください`);
+  } else toast(`${name}さんの設定を保存しました`);
   if (USER_PENDING.get(id) === patch) { // このあとに、もう変更がないとき
     try { await refresh(true); } catch (e) { /* 次の同期で取り直す */ }
     if (USER_PENDING.get(id) === patch) { USER_PENDING.delete(id); Object.assign(userById(id) || {}, patch); } // 保存できた値を正とする
   }
   renderAll();
+}
+/* よみ：ひらがな・カタカナ・空白のほかの字（漢字・英字など）が入っていたら、まちがいとして知らせる */
+const yomiBad = s => /[^\u3041-\u3096\u30a1-\u30f6\u30fc\s\uff66-\uff9f]/.test(String(s || '').normalize('NFKC'));
+/* よみが入っていない人に、まとめてよみを入れる（区域係・2026.13.121）。入れた人だけを1回で送る */
+function openYomiBulk() {
+  if (!isAdmin()) return;
+  const list = D().users.filter(u => !u.inactive && !u.yomi).sort((a, b) => (a.group || '～').localeCompare(b.group || '～', 'ja') || byKana(a, b));
+  if (!list.length) { toast('よみが入っていない人はいません'); return; }
+  setSheet(headHtml(null, 'よみをまとめて入れる', `よみが入っていない人 ${list.length}人`) + `
+    <p class="hint">名前のよみを、ひらがなで入れてください（カタカナでも、ひらがなに直します）。分からない人は空のままでかまいません。あとから、人の行を押して直すこともできます。</p>
+    <div id="ybList">${list.map(u => `<label class="field"><span>${esc(u.name)}${u.group ? `<small class="muted">　${esc(u.group)}グループ</small>` : ''}</span>
+      <input type="text" data-yb="${esc(u.id)}" maxlength="30" placeholder="ひらがなで" autocomplete="off" lang="ja"></label>`).join('')}</div>
+    <div class="hsavebar"><button class="btn primary block" id="ybSave">入れた人のよみを保存する</button></div>
+    <button class="btn block" data-close>やめる</button>`);
+  const S = $('#sheet');
+  const filled = () => $$('[data-yb]', S).filter(x => x.value.trim());
+  let saving = false;
+  sheetGuard = async () => {
+    if (saving) { toast('保存しています。少し待ってください'); return; } // 保存中に閉じて、あとで別の画面を閉じてしまわないように（監査 よみ L-2）
+    if (filled().length && !await ask('入れたよみを保存せずに閉じますか？', { ok: '閉じる', danger: false })) return;
+    closeSheet();
+  };
+  $$('[data-close]', S).forEach(b => { b.onclick = sheetGuard; });
+  $('#ybSave').onclick = async () => {
+    const xs = filled();
+    if (!xs.length) { toast('よみを入れてください'); return; }
+    const bad = xs.filter(x => yomiBad(x.value) || !normYomi(x.value));
+    if (bad.length) { toast('よみは、ひらがなで入れてください'); bad[0].focus(); return; }
+    const items = xs.map(x => ({ id: x.dataset.yb, yomi: normYomi(x.value) }));
+    $('#ybSave').disabled = true; saving = true;
+    let n = items.length;
+    if (LIVE) {
+      let j = null, code = '';
+      try { j = await api('user_yomi', { items }); } catch (e) { code = e && e.code || ''; }
+      if (!j || !j.ok) {
+        saving = false; $('#ybSave').disabled = false;
+        // 古いサーバー（unknown_action）・11列目がほかに使われている（yomi_col）は、押し直しても直らないので、そう知らせる（監査 よみ L-1）
+        toast(code === 'unknown_action' ? 'サーバーがまだ古い版のため、保存できません。サーバーの更新のあとで、もう一度押してください'
+          : code === 'yomi_col' ? 'スプレッドシートの users の11列目が、ほかに使われているため保存できません（区域係のスプレッドシートを確かめてください）'
+          : '保存できませんでした。通信を確認して、もう一度押してください');
+        return;
+      }
+      n = typeof j.n === 'number' ? j.n : n;
+      const sk = Array.isArray(j.skipped) ? j.skipped.length : 0;
+      try { await refresh(true); } catch (e) { /* 次の同期で取り直す */ }
+      saving = false;
+      if (S.hidden === false && $('#ybSave')) closeSheet();
+      toast(`${n}人のよみを保存しました${sk ? `（${sk}人は名簿にいなかったため、入れていません）` : ''}`); // 数はサーバーが書いた人数（監査 よみ L-3）
+      renderAll();
+      return;
+    }
+    items.forEach(it => { const u = userById(it.id); if (u) u.yomi = it.yomi; });
+    Store.save();
+    saving = false;
+    closeSheet();
+    toast(`${n}人のよみを保存しました`);
+    renderAll();
+  };
 }
 /* 人を追加する（区域係だけ） */
 function openAddUser() {
@@ -13770,10 +13861,10 @@ function openDevRegister(id, back) {
   const d = (devState.list || []).find(x => x.id === id);
   if (!d || d.status !== 'pending') { toast('この申し込みは、もうありません'); if (back) back(); return; }
   const norm = s => String(s || '').normalize('NFKC').replace(/\s+/g, '');
-  const users = D().users.filter(u => !u.inactive).slice().sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  const users = D().users.filter(u => !u.inactive).slice().sort(byKana);
   const h = norm(d.hint);
   const guess = h ? users.filter(u => { const n = norm(u.name); return n && (n.includes(h) || h.includes(n)); }) : [];
-  const btn = u => `<button class="namebtn" data-druid="${esc(u.id)}" data-name="${esc(u.name)}">${esc(u.name)}${u.group ? `<small>${esc(u.group)}グループ</small>` : ''}</button>`;
+  const btn = u => `<button class="namebtn" data-druid="${esc(u.id)}" data-name="${esc(u.name)}"${yomiAttr(u)}>${esc(u.name)}${u.group ? `<small>${esc(u.group)}グループ</small>` : ''}</button>`;
   setSheet(headHtml(null, 'このスマホを使う人', `番号 ${esc(d.code || '')}・${esc(d.label)}`) + `
     <div class="notice info">本人のスマホに出ている番号が <b class="devcode">${esc(d.code || '')}</b> か確かめてください。</div>
     ${guess.length ? `<p class="q">名乗った名前「${esc(d.hint)}」に近い人</p>${guess.map(btn).join('')}` : ''}
@@ -13783,7 +13874,7 @@ function openDevRegister(id, back) {
     <p class="q">名簿にいない人</p>
     <button class="btn block" id="drNew">新しい人として登録する</button>
     <button class="btn block" id="drBack">もどる</button>`);
-  $('#drQ').oninput = e => { const q = norm(e.target.value); $$('#drList [data-name]').forEach(b => { b.hidden = !!q && !norm(b.dataset.name).includes(q); }); };
+  $('#drQ').oninput = e => { const q = norm(e.target.value); $$('#drList [data-name]').forEach(b => { b.hidden = !nameHit(norm(b.dataset.name), b.dataset.yomi, q); }); };
   $$('[data-druid]', $('#sheet')).forEach(b => b.onclick = async () => {
     if (!await ask(`${b.dataset.name}さんのスマホとして登録します。よろしいですか？`)) return;
     approveDevice(d, { uid: b.dataset.druid }, b.dataset.name, back);
@@ -13830,14 +13921,16 @@ function renderPeople() {
   const box = $('#adPeople'); if (!box) return;
   const admin = isAdmin();
   const users = D().users.filter(u => !u.inactive && (admin || u.group === myGroup())).slice()
-    .sort((a, b) => (a.group || '～').localeCompare(b.group || '～', 'ja') || a.name.localeCompare(b.name, 'ja'));
+    .sort((a, b) => (a.group || '～').localeCompare(b.group || '～', 'ja') || byKana(a, b));
   const noGroup = admin ? D().users.filter(u => !u.inactive && !u.group).length : 0;
+  const noYomi = admin && yomiOn() ? D().users.filter(u => !u.inactive && !u.yomi).length : 0;
   box.innerHTML = `<h2 class="sec">${admin ? '人とグループ' : `${esc(myGroup())}グループの人`}</h2>
     ${admin ? `<div class="row"><button class="btn primary" id="adUserAdd">＋ 人を追加</button>
       <button class="btn" id="adJoinQr">共通リンクのQRを見せる</button>
       ${window.MEIBO ? '<button class="btn" id="adMeibo">名簿（PDF）から更新</button>' : ''}</div>
       <p class="hint">集まりのときは「共通リンクのQR」を見せると、みんながその場で申し込めます。申し込みは「申請・承認」で承認します。</p>` : ''}
     ${noGroup ? `<div class="notice warn"><b>グループが決まっていない人が ${noGroup}人 います。</b>この人たちには、グループの集まりの予定は届きません（「全体」の予定だけが届きます）。</div>` : ''}
+    ${noYomi ? `<div class="notice info"><b>よみが入っていない人が ${noYomi}人 います。</b>よみを入れると、名前があいうえお順に並び、ひらがなでもさがせます。<div class="row"><button class="btn small" id="adYomi">まとめて入れる</button></div></div>` : ''}
     ${admin ? '<p class="hint">人の行を押すと、グループ・監督・司会者・役割を直せます（直して「保存する」を押したときだけ変わります）。<br>監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>' : ''}
     <div class="uplist">${users.map(u => {
       const who = `<span class="stamp sm" style="font-size:16px">${esc(u.group || '—')}</span>
@@ -13849,6 +13942,7 @@ function renderPeople() {
     $('#adUserAdd').onclick = openAddUser;
     $('#adJoinQr').onclick = openJoinQr;
     if ($('#adMeibo')) $('#adMeibo').onclick = () => window.MEIBO.open(); // グループ編成のときに、名簿のPDFからまとめて直す（meibo.js）
+    if ($('#adYomi')) $('#adYomi').onclick = openYomiBulk;
     $$('[data-uedit]', box).forEach(b => b.onclick = () => openEditUser(b.dataset.uedit));
   }
 }
@@ -13857,10 +13951,10 @@ function openEditUser(id) {
   const u0 = userById(id); if (!u0 || !isAdmin()) return;
   const groups = groupsAll();
   const roleOf = u => (u.role === 'admin' ? 'admin' : 'pub');
-  const f = { role: roleOf(u0), group: u0.group || '', overseer: !!u0.overseer, leader: !!u0.leader };
+  const f = { role: roleOf(u0), group: u0.group || '', overseer: !!u0.overseer, leader: !!u0.leader, yomi: u0.yomi || '' };
   const paint = () => {
     const u = userById(id); if (!u) { closeSheet(); return; }
-    setSheet(headHtml(null, `${esc(u.name)}さん`, '役割とグループを直します') + `
+    setSheet(headHtml(null, `${esc(u.name)}さん`, yomiOn() ? '役割・グループ・よみを直します' : '役割とグループを直します') + `
       <p class="q">役割</p>
       <div class="seg uiseg" role="group" aria-label="役割">
         <button type="button" data-eurole="pub" aria-pressed="${f.role === 'pub'}">伝道者</button>
@@ -13868,6 +13962,8 @@ function openEditUser(id) {
       <label class="field"><span>グループ</span>
         <input type="text" id="euGroup" list="groupList" maxlength="30" value="${esc(f.group)}" placeholder="例：北"></label>
       <datalist id="groupList">${groups.map(g => `<option value="${esc(g)}">`).join('')}</datalist>
+      ${yomiOn() ? `<label class="field"><span>よみ（ひらがな）</span>
+        <input type="text" id="euYomi" maxlength="30" value="${esc(f.yomi)}" placeholder="例：やまだ はなこ" autocomplete="off" lang="ja"></label>` : ''}
       <label class="check"><input type="checkbox" id="euOver"${f.overseer ? ' checked' : ''}>グループ監督</label>
       <label class="check"><input type="checkbox" id="euLead"${f.leader ? ' checked' : ''}>司会者</label>
       <p class="hint">監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>
@@ -13875,17 +13971,19 @@ function openEditUser(id) {
       <button class="btn block" id="euLink">リンク・QR</button>
       ${u.id === me().id ? '' : '<div class="kops"><details><summary>この人が使うのをやめる</summary><p class="hint">この人のスマホでは、次に開いたときに区域の情報が消えます。</p><button class="btn block danger" id="euOff">使うのをやめる</button></details></div>'}
       <button class="btn block" data-close>やめる</button>`);
-    const keep = () => { f.group = $('#euGroup').value; f.overseer = $('#euOver').checked; f.leader = $('#euLead').checked; };
+    const keep = () => { f.group = $('#euGroup').value; f.overseer = $('#euOver').checked; f.leader = $('#euLead').checked; if ($('#euYomi')) f.yomi = $('#euYomi').value; };
     $$('[data-eurole]', $('#sheet')).forEach(x => x.onclick = () => { keep(); f.role = x.dataset.eurole; sheetKeep = true; paint(); });
     $('#euGroup').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('#euSave').click(); } };
     $('#euSave').onclick = async () => {
       keep();
       const u = userById(id); if (!u) { closeSheet(); return; }
       const g = normGroup(f.group), roleCh = roleOf(u) !== f.role;
-      if (!roleCh && (u.group || '') === g && !!u.overseer === f.overseer && !!u.leader === f.leader) { closeSheet(); toast('変わったところはありません'); return; }
+      if (yomiBad(f.yomi)) { toast('よみは、ひらがなで入れてください'); $('#euYomi').focus(); return; }
+      const y = $('#euYomi') ? normYomi(f.yomi) : undefined, yomiCh = y !== undefined && y !== (u.yomi || '');
+      if (!roleCh && !yomiCh && (u.group || '') === g && !!u.overseer === f.overseer && !!u.leader === f.leader) { closeSheet(); toast('変わったところはありません'); return; }
       if (roleCh && !await ask(`${u.name}さんを「${f.role === 'admin' ? '区域係' : '伝道者'}」にします。よろしいですか？`)) return;
       closeSheet();
-      if (roleCh) setUserGroup(u, g, f.overseer, f.leader, f.role); else setUserGroup(u, g, f.overseer, f.leader);
+      setUserGroup(u, g, f.overseer, f.leader, roleCh ? f.role : undefined, undefined, yomiCh ? y : undefined);
     };
     $('#euLink').onclick = () => { const u = userById(id); if (u) openUserLink(u, false); };
     if ($('#euOff')) $('#euOff').onclick = async () => {
