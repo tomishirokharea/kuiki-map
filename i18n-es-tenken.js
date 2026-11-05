@@ -248,4 +248,5 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "奉仕報告を送ったあとで時間を足したときは、月末にもう一度「直しますか」と知らせるようにしました。S21 に送る画面に、S21 のだれとして送るかを出します": "Si agrega horas después de enviar el informe de servicio, a fin de mes se le preguntará otra vez si desea corregirlo. La pantalla de envío a S21 muestra a nombre de quién se envía",
 "グループなし（{0}人）": "Sin grupo ({0})",
 "「今日回る人をえらぶ」で、ほかのグループの人をグループごとに分けて出すようにしました。": "En «Elegir quién va hoy», las personas de otros grupos ahora aparecen separadas por grupo.",
+"名前の一覧を、あいうえお順に並べられるようにしました。区域係が名前のよみ（ひらがな）を入れると、その人はあいうえお順に並び、名前でさがすときもひらがなで見つかります。": "Las listas de nombres pueden ordenarse por la lectura japonesa (solo en japonés).",
 });
