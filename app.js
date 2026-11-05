@@ -13678,14 +13678,20 @@ function setUserGroup(u, group, overseer, leader, role, active, yomi) {
   return p;
 }
 async function saveUserNow(id, name, body, patch, before) {
+  let j;
   try {
-    await api('user_set', body);
+    j = await api('user_set', body);
   } catch (e) {
     if (USER_PENDING.get(id) === patch) { USER_PENDING.delete(id); Object.assign(userById(id) || {}, before); }
     toast(`${name}さんの設定を保存できませんでした。通信を確認して、もう一度変えてください`);
     renderAll(); return;
   }
-  toast(`${name}さんの設定を保存しました`);
+  // よみを送ったのに受け取りの印がない：サーバーが古い版か、11列目がほかに使われている。よみだけ元にもどして知らせる（監査 よみ M-3）
+  if ('yomi' in body && !(j && j.yomi)) {
+    delete patch.yomi;
+    const u = userById(id); if (u) { if (before.yomi) u.yomi = before.yomi; else delete u.yomi; }
+    toast(`${name}さんのよみは保存できませんでした（ほかの設定は保存しました）。サーバーの更新を待って、もう一度入れてください`);
+  } else toast(`${name}さんの設定を保存しました`);
   if (USER_PENDING.get(id) === patch) { // このあとに、もう変更がないとき
     try { await refresh(true); } catch (e) { /* 次の同期で取り直す */ }
     if (USER_PENDING.get(id) === patch) { USER_PENDING.delete(id); Object.assign(userById(id) || {}, patch); } // 保存できた値を正とする
@@ -13707,7 +13713,9 @@ function openYomiBulk() {
     <button class="btn block" data-close>やめる</button>`);
   const S = $('#sheet');
   const filled = () => $$('[data-yb]', S).filter(x => x.value.trim());
+  let saving = false;
   sheetGuard = async () => {
+    if (saving) { toast('保存しています。少し待ってください'); return; } // 保存中に閉じて、あとで別の画面を閉じてしまわないように（監査 よみ L-2）
     if (filled().length && !await ask('入れたよみを保存せずに閉じますか？', { ok: '閉じる', danger: false })) return;
     closeSheet();
   };
@@ -13718,18 +13726,33 @@ function openYomiBulk() {
     const bad = xs.filter(x => yomiBad(x.value) || !normYomi(x.value));
     if (bad.length) { toast('よみは、ひらがなで入れてください'); bad[0].focus(); return; }
     const items = xs.map(x => ({ id: x.dataset.yb, yomi: normYomi(x.value) }));
-    $('#ybSave').disabled = true;
+    $('#ybSave').disabled = true; saving = true;
+    let n = items.length;
     if (LIVE) {
-      let j;
-      try { j = await api('user_yomi', { items }); } catch (e) { j = null; }
-      if (!j || !j.ok) { $('#ybSave').disabled = false; toast('保存できませんでした。通信を確認して、もう一度押してください'); return; }
+      let j = null, code = '';
+      try { j = await api('user_yomi', { items }); } catch (e) { code = e && e.code || ''; }
+      if (!j || !j.ok) {
+        saving = false; $('#ybSave').disabled = false;
+        // 古いサーバー（unknown_action）・11列目がほかに使われている（yomi_col）は、押し直しても直らないので、そう知らせる（監査 よみ L-1）
+        toast(code === 'unknown_action' ? 'サーバーがまだ古い版のため、保存できません。サーバーの更新のあとで、もう一度押してください'
+          : code === 'yomi_col' ? 'スプレッドシートの users の11列目が、ほかに使われているため保存できません（区域係のスプレッドシートを確かめてください）'
+          : '保存できませんでした。通信を確認して、もう一度押してください');
+        return;
+      }
+      n = typeof j.n === 'number' ? j.n : n;
+      const sk = Array.isArray(j.skipped) ? j.skipped.length : 0;
       try { await refresh(true); } catch (e) { /* 次の同期で取り直す */ }
-    } else {
-      items.forEach(it => { const u = userById(it.id); if (u) u.yomi = it.yomi; });
-      Store.save();
+      saving = false;
+      if (S.hidden === false && $('#ybSave')) closeSheet();
+      toast(`${n}人のよみを保存しました${sk ? `（${sk}人は名簿にいなかったため、入れていません）` : ''}`); // 数はサーバーが書いた人数（監査 よみ L-3）
+      renderAll();
+      return;
     }
+    items.forEach(it => { const u = userById(it.id); if (u) u.yomi = it.yomi; });
+    Store.save();
+    saving = false;
     closeSheet();
-    toast(`${items.length}人のよみを保存しました`);
+    toast(`${n}人のよみを保存しました`);
     renderAll();
   };
 }
