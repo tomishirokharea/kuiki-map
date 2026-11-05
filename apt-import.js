@@ -202,7 +202,9 @@
     const d = D();
     const apt = d.houses.filter(h => h.type === 'apt');
     return {
-      visits: d.visits.length, dnc: Object.keys(d.dnc || {}).filter(k => { const v = d.dnc[k]; return k.indexOf('|') > 0 && !(v && typeof v === 'object' && (v.a || v.s)); }).length, // 住所のある拒否は残すので数えない follows: Object.keys(d.follows || {}).length,
+      // 住所のある拒否（と訪問しない）は残すので数えない。前はこの説明が follows まで行の終わりのコメントに入れてしまい、確認の「再訪問 ○件」が出ていなかった（再監査 R-2）
+      visits: d.visits.length, dnc: Object.keys(d.dnc || {}).filter(k => { const v = d.dnc[k]; return k.indexOf('|') > 0 && !(v && typeof v === 'object' && (v.a || v.s)); }).length,
+      follows: Object.keys(d.follows || {}).length,
       cards: (d.awayCards || []).length, apt: apt.length, houses: d.houses.length, prov: d.houses.filter(h => h.prov).length,
       imp: apt.filter(isNewImp).length, legacy: apt.filter(isLegacyNew).length
     };
@@ -217,6 +219,8 @@
     d.houses = d.houses.filter(h => !(isNewImp(h) || (opt.legacy && isLegacyNew(h))));
     d.houses.forEach(h => {
       if (h.type === 'apt') {
+        skipToHouse(h); // 訪問しないの部屋があれば、ふつうの家にもどしても訪問しない（再監査 HS-A8）
+        h.units.forEach(u => { if (isSkipV(d.dnc[K(h.id, u)])) delete d.dnc[K(h.id, u)]; });
         h.type = 'house'; h.units = []; h.label = '';
         delete h.lock; delete h.uk; delete h.ul; delete h.kind; delete h.ban;
       } else delete h.ban;
@@ -234,7 +238,9 @@
     const inApt = k => { const i = k.lastIndexOf('|'); return i > 0 && ids.has(k.slice(0, i)) && k.slice(i + 1) !== ''; };
     return {
       apt: apt.length, imp: apt.filter(isNewImp).length, legacy: apt.filter(isLegacyNew).length, roomV,
-      roomD: Object.keys(d.dnc || {}).filter(k => inApt(k) && !isSkipV(d.dnc[k])).length, // 訪問しないは家の印に移して残す（監査 HS-A9） roomF: Object.keys(d.follows || {}).filter(inApt).length
+      // 訪問しないは家の印に移して残すので、拒否の数に入れない（監査 HS-A9）
+      roomD: Object.keys(d.dnc || {}).filter(k => inApt(k) && !isSkipV(d.dnc[k])).length,
+      roomF: Object.keys(d.follows || {}).filter(inApt).length
     };
   }
   function resetApts(opt) {

@@ -437,6 +437,7 @@
   function openDuplexConvert(hid) {
     if (typeof simpleBlock === 'function' && simpleBlock('二世帯住宅に変えることは')) return;
     const h = houseById(hid); if (!h || h.type !== 'house') return;
+    if (!isAdmin() && hasSkip(h)) { toast('訪問しないの家の種類は、区域係だけが変えられます'); return; } // 再監査 HS-A8
     const t = terrById(h.terrId), k0 = K(hid, '');
     // 世帯に分ける記録：今日の自分の記録（直せる記録は移す）と、受け取ってから（今の巡回）の自分の記録（写す）。
     // 以前は今日の記録だけで、回っている途中で変えると、前の日の記録が残らず両方の世帯が「まだ」になった（総点検 L14・2026.13.105）
