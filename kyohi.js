@@ -1058,8 +1058,8 @@
   }
   /* 住所のあとに電話番号が続いていたら、そこから先は捨てる（訪問しないモード） */
   /* 訪問しないで画面に出す住所は、町名・番地・部屋だけ（建物名やその後ろの文字は持たない） */
-  const skShort = e => `${e.muni}${e.town}${e.nums.join('-')}${/^[0-9０-９\-ー]{1,8}(号室?)?$/.test(e.unit || '') ? ' ' + e.unit : ''}`;
-  const skCutRaw = t => String(t || '').replace(/\(?(?:0[5789]0|0120|098\d?)\)?[-ー‐－ ]?\d{2,4}[-ー‐－ ]\d{3,4}.*$/, '').trim();
+  const skShort = e => `${e.muni}${e.town}${e.nums.join('-')}${/^[0-9０-９\-ー]{1,8}(号室?)?$/.test(e.unit || '') ? ' ' + e.unit.replace(/号室?$/, '') + '号室' : ''}`;
+  const skCutRaw = t => String(t || '').replace(/\(?(?:098\d?\)?[-ー‐－ ]?\d{3,4}[-ー‐－ ]\d{4}|0[5789]0\)?[-ー‐－ ]?\d{4}[-ー‐－ ]\d{4}|0120[-ー‐－ ]\d{2,3}[-ー‐－ ]\d{3,4}).*$/, '').trim(); // 電話の形（番地の「1098-12-345」は切らない）
   const PDF_MAX_PAGES = 100;
   async function readPdfRows(file) {
     await loadScript(LIB.pdf);
