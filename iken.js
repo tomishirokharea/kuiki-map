@@ -14,7 +14,7 @@
 (function () {
   'use strict';
 
-  const MAX = 500, QKEY = 'kuiki_iken_q';
+  const MAX = 500, QKEY = 'kuiki_iken_q', PH_MAX = 10, PH_PX = 1280, PH_BYTES = 400000;
   const KINDS = [
     ['komatta', 'こまった・動かない', '例：地図が白いまま出てこない'],
     ['wakaran', '分かりにくい', '例：「返す」を押したら、どうなるのか分からない'],
@@ -72,10 +72,36 @@
   }
 
   /* ---- 送る画面 ---- */
-  let kind = '';
+  let kind = '', photos = [], curCid = '';
+  const newCid = () => 'ik' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  /* 写真を縮める：長い辺 PH_PX まで・JPEG。大きければ画質を下げる。描き直すので、撮った場所などの情報（Exif）は消える */
+  async function shrink(file) {
+    let src;
+    try { src = await createImageBitmap(file); }
+    catch (e) {
+      src = await new Promise((ok, ng) => { const im = new Image(); const u = URL.createObjectURL(file); im.onload = () => { URL.revokeObjectURL(u); ok(im); }; im.onerror = () => { URL.revokeObjectURL(u); ng(e); }; im.src = u; });
+    }
+    const w0 = src.width, h0 = src.height, k = Math.min(1, PH_PX / Math.max(w0, h0));
+    const c = document.createElement('canvas'); c.width = Math.round(w0 * k); c.height = Math.round(h0 * k);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(src, 0, 0, c.width, c.height);
+    if (src.close) src.close();
+    let url = '';
+    for (const q of [0.8, 0.65, 0.5, 0.35]) { url = c.toDataURL('image/jpeg', q); if (url.length * 0.75 <= PH_BYTES) break; }
+    const b64 = url.slice(url.indexOf(',') + 1);
+    if (!/^\/9j\//.test(b64) || b64.length * 0.75 > PH_BYTES) throw new Error('photo');
+    return { url, b64 };
+  }
+  function thumbs() {
+    const box = $('#ikThumbs'); if (!box) return;
+    box.innerHTML = photos.map((p, i) => `<span style="position:relative;display:inline-block">
+        <img src="${p.url}" alt="えらんだ写真 ${i + 1}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:2px solid var(--line)">
+        <button type="button" data-ikdel="${i}" aria-label="写真 ${i + 1} を外す" style="position:absolute;top:-10px;right:-10px;width:36px;height:36px;border-radius:99px;border:2px solid var(--ink);background:#fff;font-weight:700;font-size:18px">×</button></span>`).join('');
+    $$('[data-ikdel]', box).forEach(b => { b.onclick = () => { photos.splice(Number(b.dataset.ikdel), 1); thumbs(); }; });
+    const pk = $('#ikPick'); if (pk) { pk.disabled = photos.length >= PH_MAX; pk.textContent = photos.length ? `写真をえらぶ（あと${PH_MAX - photos.length}枚）` : `写真をえらぶ（${PH_MAX}枚まで）`; }
+  }
   function open() {
     if (!allowed()) { toast('いまは受け付けていません'); home(); return; }
-    kind = '';
+    kind = ''; photos = []; curCid = newCid(); // 押し直しても同じ番号で送る（届いていれば2件にならない）
     const c = ctx();
     setSheet(`<h2>こまったこと・提案を送る</h2>
       <p class="hint">区域係が読んで、使いやすくするために役立てます。くわしくお聞きすることがあるかもしれません。そのときは、ご協力をお願いします。</p>
@@ -84,6 +110,9 @@
         ${KINDS.map(k => `<button type="button" class="chip" data-ikkind="${k[0]}" aria-pressed="false" style="border-radius:12px">${k[1]}</button>`).join('')}</div>
       <label class="field">くわしく教えてください<textarea id="ikText" rows="5" maxlength="${MAX}" placeholder="${esc(KINDS[0][2])}"></textarea></label>
       <p class="hint" style="margin-top:-8px">キーボードのマイクを押すと、話して入力できます。家の人の名前・住所・電話番号は書かないでください。<span id="ikCnt" style="float:right">0/${MAX}</span></p>
+      <input type="file" id="ikFile" accept="image/*" multiple hidden>
+      <button type="button" class="btn block" id="ikPick">写真をえらぶ（${PH_MAX}枚まで）</button>
+      <div id="ikThumbs" style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0"></div>
       <details class="more"><summary>一緒に送る情報</summary><p class="hint">${ctxLines(c).map(esc).join('<br>')}<br>（住所・記録の中身は送りません）</p></details>
       <div class="row" style="margin-top:14px"><button type="button" class="btn" data-close>やめる</button>
         <button type="button" class="btn primary" id="ikSend" disabled>送る</button></div>`);
@@ -98,10 +127,23 @@
       };
     });
     ta.oninput = ready;
+    const fi = $('#ikFile');
+    $('#ikPick').onclick = () => fi.click(); // iPhone は「フォトライブラリ・写真を撮る・ファイル」、Android はギャラリーからえらべる
+    fi.onchange = async () => {
+      const list = [...(fi.files || [])]; fi.value = '';
+      if (!list.length) return;
+      const room = PH_MAX - photos.length;
+      if (list.length > room) toast(`写真は${PH_MAX}枚までです。はじめの${room}枚を入れました`);
+      const pk = $('#ikPick'); if (pk) { pk.disabled = true; pk.textContent = '写真を用意しています…'; }
+      let bad = 0;
+      for (const f of list.slice(0, room)) { try { photos.push(await shrink(f)); } catch (e) { bad++; } }
+      thumbs();
+      if (bad) toast(`${bad}枚の写真は読めませんでした`);
+    };
     btn.onclick = () => send(ta.value);
     // 書いている途中で外を押して消えないように
     sheetGuard = async () => {
-      if (ta.value.trim() && !await ask('書いた内容は送られません。閉じてもよいですか？', { ok: '閉じる', danger: false })) return;
+      if ((ta.value.trim() || photos.length) && !await ask('書いた内容は送られません。閉じてもよいですか？', { ok: '閉じる', danger: false })) return;
       closeSheet();
     };
     $$('[data-close]', $('#sheet')).forEach(b => { b.onclick = sheetGuard; });
@@ -115,28 +157,47 @@
     if (/\d+[-‐－ー]\d+[-‐－ー]\d+|\d+\s*(番地|号)/.test(text.normalize('NFKC'))) {
       if (!await ask('住所や電話番号のような数字があります。家の人のことがわかる内容なら、消してから送ってください。\nこのまま送りますか？', { ok: 'このまま送る', cancel: 'もどって直す', danger: false })) return;
     }
-    const item = { cid: 'ik' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10), kind, text, ctx: ctx(), uid: D().currentUser };
+    const ph = photos.slice(0, PH_MAX);
+    if (ph.length && navigator.onLine === false) { toast('写真があるときは、電波のあるところで送ってください'); return; }
+    const item = { cid: curCid || newCid(), kind, text, ctx: ctx(), uid: D().currentUser, pn: ph.length };
     const btn = $('#ikSend'); if (btn) { btn.disabled = true; btn.textContent = '送っています…'; }
-    const r = await post(item);
-    if (r === 'ok') { sheetGuard = null; closeSheet(); toast('ありがとうございます。送りました'); return; }
-    if (r === 'queued') { sheetGuard = null; closeSheet(); toast('電波がないので、このスマホに取っておきました。つながったら自動で送ります'); return; }
+    const r = await post(item, ph.length > 0); // 写真があるときは、端末に取っておかない（大きいため）
+    if (r === 'ok') {
+      let bad = 0;
+      for (let i = 0; i < ph.length; i++) {
+        if (btn) btn.textContent = `写真を送っています ${i + 1}/${ph.length}`;
+        if (!await sendPhoto(item.cid, i, ph[i].b64)) bad++;
+      }
+      sheetGuard = null; closeSheet(); photos = [];
+      toast(bad ? `文は届きました。写真のうち${bad}枚は送れませんでした` : 'ありがとうございます。送りました');
+      return;
+    }
+    if (r === 'queued' && !ph.length) { sheetGuard = null; closeSheet(); toast('電波がないので、このスマホに取っておきました。つながったら自動で送ります'); return; }
     if (btn) { btn.disabled = false; btn.textContent = '送る'; }
-    toast(r === 'many' ? 'たくさん送っていただき、ありがとうございます。しばらく（6時間ほど）してから、また送ってください'
+    toast(r === 'queued' ? '送れませんでした。電波のあるところで、もう一度押してください' : r === 'many' ? 'たくさん送っていただき、ありがとうございます。しばらく（6時間ほど）してから、また送ってください'
       : r === 'off' ? 'いまは受け付けていません' : r === 'old' ? 'サーバーの準備がまだできていません。区域係に伝えてください' : '送れませんでした。もう一度押してください');
   }
   /** 'ok'・'queued'・'many'・'off'・'old'（サーバーが古い）・'fail' */
-  async function post(item, fromQueue) {
+  async function post(item, noQueue) {
     try {
-      await api('iken_send', { cid: item.cid, kind: item.kind, text: item.text, ctx: item.ctx }, { timeout: 30000 });
+      await api('iken_send', { cid: item.cid, kind: item.kind, text: item.text, ctx: item.ctx, pn: item.pn || 0 }, { timeout: 30000 });
       return 'ok';
     } catch (e) {
       const c = e && (e.code || e.message);
       if (c === 'many' || c === 'off') return c;
       if (c === 'unknown_action') return 'old';
       if (c === 'bad_request' || c === 'auth') return 'fail';
-      if (e && e.retry) { if (!fromQueue) queue(item); return 'queued'; }
+      if (e && e.retry) { if (!noQueue) queue(item); return 'queued'; }
       return 'fail';
     }
+  }
+  /** 写真を1枚送る。電波の問題なら3回まで送り直す（同じ番号は1枚だけ入る） */
+  async function sendPhoto(cid, i, b64) {
+    for (let k = 0; k < 3; k++) {
+      try { await api('iken_photo', { cid, i, data: b64 }, { timeout: 60000 }); return true; }
+      catch (e) { if (!(e && e.retry)) return false; await new Promise(r => setTimeout(r, 1500 * (k + 1))); }
+    }
+    return false;
   }
   function queue(item) {
     let q = []; try { q = JSON.parse(lsGet(QKEY) || '[]'); } catch (e) { q = []; }
@@ -207,6 +268,7 @@
       ${L.length ? L.map(x => `<div class="setrow" style="display:block">
           <p style="margin:0 0 4px"><b>${esc(KIND_NAME[x.kind] || x.kind)}</b>　<small class="hint">${esc(fmtAt(x.at))}・${esc(plain(x.who) || '（名前なし）')}（${esc(x.role)}）・${esc(ST_NAME[x.status] || x.status)}</small></p>
           <p style="margin:0 0 6px;white-space:pre-wrap;word-break:break-word">${esc(plain(x.text))}</p>
+          ${x.pc ? `<button type="button" class="btn small" data-ikph="${esc(x.id)}" data-ikpn="${Number(x.pc) || 0}" style="margin:0 0 6px">写真を見る（${Number(x.pc) || 0}枚）</button>` : ''}
           <p class="hint" style="margin:0 0 6px">${esc([VIEW_NAME[x.scr] || x.scr, x.ver, MODE_NAME[x.mode], DEV_NAME[x.dev], x.net === 'off' ? '電波なし' : '', plain(x.err)].filter(Boolean).join('・'))}</p>
           <div class="seg" role="group" aria-label="状態">${['doing', 'done', 'skip', 'new'].map(s => `<button type="button" data-ikmark="${esc(x.id)}" data-ikst="${s}" aria-pressed="${x.status === s}">${ST_NAME[s]}</button>`).join('')}</div>
         </div>`).join('') : '<div class="empty">ここに出す声はありません</div>'}`;
@@ -216,6 +278,7 @@
     $$('[data-ikf]').forEach(b => { b.onclick = () => { filt = b.dataset.ikf; renderAdmin(); }; });
     const rl = $('#ikReload'); if (rl) rl.onclick = load;
     const cp = $('#ikCopy'); if (cp) cp.onclick = copyForAi;
+    $$('[data-ikph]').forEach(b => { b.onclick = () => showPhotos(b.dataset.ikph, Number(b.dataset.ikpn) || 0); });
     $$('[data-ikmark]').forEach(b => {
       b.onclick = async () => {
         const id = b.dataset.ikmark, s = b.dataset.ikst, x = (items || []).find(y => y.id === id);
@@ -226,6 +289,18 @@
         } catch (e) { toast('変えられませんでした。もう一度押してください'); }
       };
     });
+  }
+  async function showPhotos(id, n) {
+    setSheet(`<h2>写真（${n}枚）</h2><div id="ikPh">${Array.from({ length: n }, (_, i) => `<p class="hint" id="ikPh${i}">${i + 1}枚目を読み込んでいます…</p>`).join('')}</div>
+      <div class="row"><button type="button" class="btn primary" data-close>閉じる</button></div>`);
+    for (let i = 0; i < n; i++) {
+      const el = $('#ikPh' + i); if (!el) return; // 閉じた
+      try {
+        const r = await api('iken_photo_get', { id, i }, { timeout: 60000 });
+        if (!/^\/9j\//.test(String(r.data || ''))) throw new Error('photo');
+        el.outerHTML = `<img src="data:image/jpeg;base64,${r.data}" alt="写真 ${i + 1}" style="display:block;width:100%;height:auto;border-radius:10px;margin:0 0 10px">`;
+      } catch (e) { el.textContent = `${i + 1}枚目は読み込めませんでした`; }
+    }
   }
   function aiText(L) {
     const d = new Date();
@@ -245,7 +320,7 @@
 
 ## データ（id｜日時｜種類｜送った人の役割｜直前の画面｜版｜表示｜端末｜電波｜直前のエラー｜状態）
 `;
-    return head + L.map(x => `- ${x.id.slice(-6)}｜${x.at.slice(0, 16).replace('T', ' ')}（UTC）｜${KIND_NAME[x.kind] || x.kind}｜${x.role}｜${VIEW_NAME[x.scr] || x.scr || '—'}｜${x.ver || '—'}｜${MODE_NAME[x.mode] || '—'}｜${DEV_NAME[x.dev] || '—'}｜${x.net === 'off' ? 'なし' : x.net === 'on' ? 'あり' : '—'}｜${plain(x.err) || 'なし'}｜${ST_NAME[x.status] || x.status}
+    return head + L.map(x => `- ${x.id.slice(-6)}｜${x.at.slice(0, 16).replace('T', ' ')}（UTC）｜${KIND_NAME[x.kind] || x.kind}｜${x.role}｜${VIEW_NAME[x.scr] || x.scr || '—'}｜${x.ver || '—'}｜${MODE_NAME[x.mode] || '—'}｜${DEV_NAME[x.dev] || '—'}｜${x.net === 'off' ? 'なし' : x.net === 'on' ? 'あり' : '—'}｜${plain(x.err) || 'なし'}｜${ST_NAME[x.status] || x.status}${x.pc ? `｜写真 ${x.pc}枚（係が別に渡す）` : ''}
   本文：${plain(x.text).replace(/\s*\n\s*/g, ' ／ ')}`).join('\n') + '\n';
   }
   async function copyForAi() {
