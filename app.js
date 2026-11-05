@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.119';
+var APP_JS_VER = '2026.13.120';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2688,6 +2688,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.120', items: [
+    ['人', '「今日回る人をえらぶ」で、ほかのグループの人をグループごとに分けて出すようにしました。']
+  ] },
   { v: '2026.13.119', items: [
     ['印', 'iPhone・iPadでホーム画面のアイコンから開いたときも、印刷できるようにしました。「共有して印刷する」を押して、出てきた画面の「プリント」を押してください。'],
     ['係', '区域カード（S-12）の印刷で、「印刷する」のボタンを画面の下にいつも出すようにしました。']
@@ -3719,13 +3722,21 @@ function openHelpers(tid, cid) {
   const cand = D().users.filter(u => !u.inactive && u.id !== me().id && !curIds.has(u.id)).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
   const row = u => `<label class="check" data-name="${esc(u.name)}"><input type="checkbox" data-hadd="${esc(u.id)}"${grp && u.group === grp ? ' data-ing="1"' : ''}>${esc(u.name)}</label>`;
   const others = grp && !allU ? cand.filter(u => u.group !== grp) : cand;
+  // ほかの人は、グループごとに見出しを付けて分ける（グループの決まっていない人はいちばん下・こまったこと o72dgm・2026.13.120）
+  const othersHtml = () => {
+    const gs = groupsAll().filter(g => others.some(u => u.group === g));
+    const none = others.filter(u => !u.group || !gs.includes(u.group));
+    const blk = (label, us) => `<div data-hg role="group" aria-label="${label}（${us.length}人）"><div class="hgrp hsub"><b>${label}（${us.length}人）</b></div>${us.map(row).join('')}</div>`;
+    if (!grp || !gs.length) return others.map(row).join(''); // 区域ひとつの「一緒に回る人」と、グループを使っていないときは、今までどおり名前順だけ
+    return gs.map(g => blk(`${esc(g)}グループ`, others.filter(u => u.group === g))).join('') + (none.length ? blk('グループなし', none) : '');
+  };
   setSheet(headHtml(t, c ? `今日回る人をえらぶ（留守宅カード・${slotShort(c.slot)}）` : grp ? '今日回る人をえらぶ' : '一緒に回る人', `${fmtDay(new Date().toISOString())}の終わりまで`) + `
     ${cur.length ? `<p class="q">${grp ? '今日回る人' : '今日一緒に回る人'}（${cur.length}人）</p>` + cur.map(h => `<div class="setrow"><b>${esc(uname(h.uid))}さん</b><button class="btn small danger" data-hdel="${h.uid}">外す</button></div>`).join('') : ''}
     ${room > 0 ? `<p class="q">加える人をえらぶ</p>
       <label class="field"><span>名前でさがす</span><input type="text" id="hQ" placeholder="名前の一部を入れる" autocomplete="off"></label>
       <div id="hList">
         ${gm.length ? `<div class="hgrp"><b>${esc(grp)}グループ（${gm.length}人）</b><button type="button" class="btn small" id="hAllG">全員えらぶ</button></div>${gm.map(row).join('')}` : ''}
-        ${others.length ? (gm.length ? `<details class="hother"><summary class="hgrp"><b>ほかの人（${others.length}人）</b></summary>${others.map(row).join('')}</details>` : others.map(row).join('')) : ''}
+        ${others.length ? (gm.length ? `<details class="hother"><summary class="hgrp"><b>ほかの人（${others.length}人）</b></summary>${othersHtml()}</details>` : othersHtml()) : ''}
         ${!cand.length ? '<p class="muted">加えられる人がいません。</p>' : ''}
       </div>
       <p class="hint">あと${room}人まで加えられます。</p>
@@ -3753,6 +3764,7 @@ function openHelpers(tid, cid) {
   $('#hQ').oninput = e => {
     const q = e.target.value.trim();
     $$('#hList [data-name]').forEach(l => { l.hidden = !!q && !l.dataset.name.includes(q); });
+    $$('#hList [data-hg]').forEach(b => { b.hidden = !$$('[data-name]', b).some(l => !l.hidden); }); // 当てはまる人がいないグループは、見出しごと隠す
     if (q) $$('#hList details').forEach(d => { d.open = true; }); // 名前でさがすときは、ほかの人も見る
   };
   // えらんだまま閉じるときは確かめる（加え忘れを防ぐ・M9。外側を押したときも・監査5 L-1）
