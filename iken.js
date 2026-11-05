@@ -269,6 +269,7 @@
           <p style="margin:0 0 4px"><b>${esc(KIND_NAME[x.kind] || x.kind)}</b>　<small class="hint">${esc(fmtAt(x.at))}・${esc(plain(x.who) || '（名前なし）')}（${esc(x.role)}）・${esc(ST_NAME[x.status] || x.status)}</small></p>
           <p style="margin:0 0 6px;white-space:pre-wrap;word-break:break-word">${esc(plain(x.text))}</p>
           ${x.pc ? `<button type="button" class="btn small" data-ikph="${esc(x.id)}" data-ikpn="${Number(x.pc) || 0}" style="margin:0 0 6px">写真を見る（${Number(x.pc) || 0}枚）</button>` : ''}
+          ${Number(x.pn) > (Number(x.pc) || 0) ? `<p class="hint" style="margin:0 0 6px">写真は${Number(x.pn)}枚のうち${Number(x.pc) || 0}枚が届いています</p>` : ''}
           <p class="hint" style="margin:0 0 6px">${esc([VIEW_NAME[x.scr] || x.scr, x.ver, MODE_NAME[x.mode], DEV_NAME[x.dev], x.net === 'off' ? '電波なし' : '', plain(x.err)].filter(Boolean).join('・'))}</p>
           <div class="seg" role="group" aria-label="状態">${['doing', 'done', 'skip', 'new'].map(s => `<button type="button" data-ikmark="${esc(x.id)}" data-ikst="${s}" aria-pressed="${x.status === s}">${ST_NAME[s]}</button>`).join('')}</div>
         </div>`).join('') : '<div class="empty">ここに出す声はありません</div>'}`;
