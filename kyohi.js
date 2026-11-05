@@ -346,7 +346,7 @@
       <h2 class="sec">訪問しない家</h2>
       <p class="hint">理由を書かない印です。地図に灰色の「ー」が出て、だれも訪問しません（区域の数にも入りません）。<br>付けるときは、家の画面の「この家を編集」（部屋は「この部屋の編集」）の「この家の印」で「訪問しない」をえらびます。</p>
       ${capSkip() ? `<label class="btn block">住所の一覧から入れる（エクセル・CSV・PDF）<input type="file" id="skXl" accept=".xlsx,.xls,.csv,.tsv,.txt,.pdf,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
-      <p class="hint">緊急連絡先の一覧などから、<b>住所の列だけ</b>を使います（氏名・電話番号は読み込みません）。1軒ずつ地図で確かめてから付けます。</p>` : ''}
+      <p class="hint">緊急連絡先の一覧などから、住所の列だけを使います（氏名・電話番号は読み込みません）。1軒ずつ地図で確かめてから付けます。</p>` : ''}
       ${!gs.length ? '<p class="dnc-none">訪問しない家はまだありません。</p>' : gs.map(x => `<details class="dncg"${gs.length === 1 || ui.open.has('sk:' + x.key) ? ' open' : ''} data-skg="${esc(x.key)}"><summary>${x.no ? `<span class="stamp sm${noCls(x.no)}">${esc(x.no)}</span>` : '<span class="stamp sm">？</span>'}
           <span class="nm" data-notr>${x.t ? esc(x.t.name) : '区域の線の外'}</span><span class="cnt">${x.es.length}件</span></summary>
           ${x.es.map(e => `<button type="button" class="dncrow" data-skk="${esc(e.k)}"><i class="pin st-skip">ー</i><span class="tx"><b data-notr>${esc(placeName(e))}</b><small><span>係が設定</span>${e.v.at ? '・' + fmtDay(e.v.at) : ''}</small></span><span class="chev" aria-hidden="true">›</span></button>`).join('')}</details>`).join('')}`);
@@ -1020,12 +1020,21 @@
       if (L && L.pg === it.pg && Math.abs(L.y - it.y) <= Math.max(2, L.h * 0.5)) L.its.push(it);
       else lines.push({ pg: it.pg, y: it.y, h: it.h, its: [it] });
     });
+    // 列のはじまり：多くの行で同じ x からはじまる文字片（列の間が狭くても、ここでセルを分ける）
+    const st = [];
+    lines.forEach(L => L.its.forEach(it => st.push(it.x)));
+    st.sort((a, b) => a - b);
+    const grp = [];
+    st.forEach(x => { const g = grp[grp.length - 1]; if (g && x - g.last <= 3) { g.n++; g.last = x; g.sum += x; } else grp.push({ n: 1, last: x, sum: x }); });
+    const need = Math.max(3, Math.ceil(lines.length * 0.4));
+    const colStart = grp.filter(g => g.n >= need).map(g => g.sum / g.n);
+    const atCol = x => colStart.some(c => Math.abs(c - x) <= 3);
     const rows = lines.map(L => {
       L.its.sort((a, b) => a.x - b.x);
       const cells = [];
       L.its.forEach(it => {
-        const c = cells[cells.length - 1];
-        if (c && it.x - c.end <= Math.max(5, it.h * 1.2)) { c.s += it.x - c.end > it.h * 0.3 ? ' ' + it.s : it.s; c.end = it.x + it.w; }
+        const c = cells[cells.length - 1]; // 列のはじまりで、前の文字との間が少しでもあいていれば、別のセルにする
+        if (c && !(atCol(it.x) && it.x - c.end > 1) && it.x - c.end <= Math.max(5, it.h * 1.2)) { c.s += it.x - c.end > it.h * 0.3 ? ' ' + it.s : it.s; c.end = it.x + it.w; }
         else cells.push({ s: it.s, x: it.x, end: it.x + it.w });
       });
       return cells;
@@ -1047,6 +1056,8 @@
       return out;
     });
   }
+  /* 住所のあとに電話番号が続いていたら、そこから先は捨てる（訪問しないモード） */
+  const skCutRaw = t => String(t || '').replace(/(^|[\s　])\(?0\d{1,4}\)?[-ー‐－ ]\d{1,4}[-ー‐－ ]\d{3,4}.*$/, '').trim();
   const PDF_MAX_PAGES = 100;
   async function readPdfRows(file) {
     await loadScript(LIB.pdf);
@@ -1080,7 +1091,7 @@
       let hi = top.findIndex(r => r.some(c => HEAD_A.test(c)));
       if (hi < 0) hi = top.findIndex(r => r.some(c => HEAD_A2.test(c) && !looksAddr(c)));
       // 見出しの名前に「住所」がなくても、1行目が文字だけで、下の行に住所がある形なら、1行目を見出しにする
-      if (hi < 0 && top.length > 1 && !top[0].some(looksAddr) && top[0].every(c => !c || !/^\d+$/.test(c)) && top.slice(1, 6).some(r => r.some(looksAddr))) hi = 0;
+      if (hi < 0 && !state.skip && top.length > 1 && !top[0].some(looksAddr) && top[0].every(c => !c || !/^\d+$/.test(c)) && top.slice(1, 6).some(r => r.some(looksAddr))) hi = 0;
       const head = hi >= 0 ? top[hi] : [];
       let rows = data.slice(hi + 1);
       if (state.pdf && head.length) { const hs = head.join('|'); rows = rows.filter(r => r.map(xlNorm).join('|') !== hs); } // ページごとにくり返される見出し行
@@ -1096,7 +1107,7 @@
         const r = await readPdfRows(file);
         if (!r.chars) { infoSheet('PDFの文字が読めませんでした', 'このPDFは、写真（画像）のようです。文字を選べるPDFか、エクセル・CSVのファイルを選んでください。'); return; }
         if (r.cut) toast(`ページが多いので、はじめの ${PDF_MAX_PAGES}ページだけを読みました`);
-        addSheet('PDF', r.rows, { total: 0, pdf: true });
+        addSheet('PDF', r.rows, { total: 0, pdf: true, skip: !!opts.skip });
       } else {
         await loadScript(LIB.xlsx);
         const isText = /\.(csv|tsv|txt)$/i.test(file.name || '') || /^text\//.test(file.type || '');
@@ -1104,7 +1115,7 @@
         const wb = isText
           ? window.XLSX.read(await fileText(file), { type: 'string', raw: true })
           : window.XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
-        const state = { total: 0 };
+        const state = { total: 0, skip: !!opts.skip };
         wb.SheetNames.forEach(n => addSheet(n, window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }), state));
       }
     } catch (e) {
@@ -1144,7 +1155,7 @@
       S.rows.forEach(r => {
         const s = S.sheets[r.si], ac = colOf(s, st.a), nc = colOf(s, st.n);
         r.ac = ac >= 0 ? ac : r.cells.findIndex(looksAddr);
-        r.raw = r.ac >= 0 ? r.cells[r.ac] || '' : '';
+        r.raw = r.ac >= 0 ? (SK ? skCutRaw(r.cells[r.ac]) : r.cells[r.ac]) || '' : '';
         r.nc = nc;
         const no = nc >= 0 ? normNo(r.cells[nc]) : s.sheetNo;
         r.no = NO_RE.test(no) ? no : '';
@@ -1208,7 +1219,7 @@
     function paintCount(nShown) {
       const c = counts(), el = $('#dxCnt'), go = $('#dxNext');
       if (nShown === undefined) nShown = shownIdx().length;
-      if (el) el.innerHTML = SK ? `えらんだ住所 <b>${c.n}</b>（表示中 ${nShown}件／住所が読めた ${S.rows.filter(r => r.ok).length}件）${S.rows.some(r => !r.ok) ? `<br><small class="muted">住所のない行 ${S.rows.filter(r => !r.ok).length}行は使いません</small>` : ''}` : `えらんだ行 <b>${c.n}</b>（表示中 ${nShown}行／ぜんぶ ${S.rows.length}行）` +
+      if (el) el.innerHTML = SK ? `えらんだ住所 ${c.n}件（表示中 ${nShown}件／住所が読めた ${S.rows.filter(r => r.ok).length}件）${S.rows.some(r => !r.ok) ? `<br><small class="muted">住所のない行 ${S.rows.filter(r => !r.ok).length}行は使いません</small>` : ''}` : `えらんだ行 <b>${c.n}</b>（表示中 ${nShown}行／ぜんぶ ${S.rows.length}行）` +
         (c.nHave ? `<br>うち登録ずみの住所 ${c.nHave}件は、${st.mode === 'over' ? '<b>上書きします</b>' : '<b>入れません</b>'}` : '');
       if (go) { go.disabled = !c.go; go.textContent = c.go ? `えらんだ ${c.go}件で次へ` : (c.n ? '新しく入れる住所がありません' : '行をえらんでください'); }
     }
@@ -1216,7 +1227,7 @@
       const opts = [];
       for (let i = 0; i < width; i++) opts.push(i);
       setSheet(headHtml(null, SK ? '訪問しない家の住所をえらぶ' : '取り込む行をえらぶ', esc(S.fileName)) + `
-        ${SK ? '<p class="hint">使うのは<b>住所の列だけ</b>です。氏名や電話番号などのほかの列は、<b>画面に出さず、保存も送信もしません</b>。住所の文字も、この端末の中だけで使い、保存しません。</p>' : '<p class="hint">住所の列と区域番号の列だけを使います。ほかの列は、えらびやすいように画面に出すだけで、<b>保存も送信もしません</b>。</p>'}
+        ${SK ? '<p class="hint">使うのは住所の列だけです。氏名や電話番号などのほかの列は、画面に出さず、保存も送信もしません。住所の文字も、この端末の中だけで使い、保存しません。</p>' : '<p class="hint">住所の列と区域番号の列だけを使います。ほかの列は、えらびやすいように画面に出すだけで、<b>保存も送信もしません</b>。</p>'}
         <div class="dx-cols">
           <label class="field"><span>住所の列</span><select class="dnc-sel" id="dxA">
             <option value="-1"${st.a.i < 0 ? ' selected' : ''}>自動（住所らしいセル）</option>
@@ -1227,6 +1238,7 @@
         </div>
         ${st.a.i >= 0 && sampleOf(st.a.i) ? `<p class="muted dx-sample">住所の列の例：<span data-notr>${esc(sampleOf(st.a.i).slice(0, 60))}</span></p>` : ''}
         ${st.note ? `<div class="notice info">${esc(st.note)}</div>` : ''}
+        ${SK && !S.rows.some(r => r.ok) ? '<div class="notice warn"><b>住所が読めませんでした。</b><br>「住所の列」をえらび直してください。PDFで読めないときは、エクセルかCSVのファイルでためしてください。</div>' : ''}
         <input type="search" class="dnc-q" id="dxQ" placeholder="${SK ? '住所の文字でしぼりこむ（例：高安）' : 'この文字をふくむ行だけ表示（例：拒否）'}" value="${esc(st.q)}" aria-label="しぼりこむ文字">
         <div class="dx-tools">
           <button type="button" class="btn small" id="dxAll">表示中をすべてえらぶ</button>
@@ -1307,8 +1319,8 @@
     const unfound = list.filter(e => !cbs.has(e));
     if (opts.skip && unfound.length && opts.geo === undefined) { // 訪問しない：住所の文字を外に送るかどうかは、そのつど係がえらぶ
       setSheet(headHtml(null, '見つからない住所があります', esc(fileName)) + `
-        <div class="notice info">端末の地図（地番の地図）で場所が分かったのは <b>${list.length - unfound.length}件</b>。のこり <b>${unfound.length}件</b>は分かりませんでした。</div>
-        <p class="hint">国土地理院の住所検索に、<b>住所の文字だけ</b>を送って調べることもできます（氏名など、ほかのものは送りません）。送らないときは、この ${unfound.length}件は地図に付けられません。</p>
+        <div class="notice info">端末の地図（地番の地図）で場所が分かったのは ${list.length - unfound.length}件。のこり ${unfound.length}件は分かりませんでした。</div>
+        <p class="hint">国土地理院の住所検索に、住所の文字だけを送って調べることもできます（氏名など、ほかのものは送りません）。通信の状態によっては、この会衆のサーバーを通して送ります。送らないときは、この ${unfound.length}件は地図に付けられません。</p>
         <button type="button" class="btn primary block" id="skGeoYes">住所の文字を送って調べる</button>
         <button type="button" class="btn block" id="skGeoNo">送らない</button>
         <button type="button" class="btn block" data-close>やめる</button>`);
@@ -1359,8 +1371,8 @@
     const P = xlPrepare(rows, muni, 'over'); // 住所を保存しないので、登録ずみの拒否の住所でも除かない（家の印の有無はあとで見る）
     const noMuni = P.ok.filter(e => e.noMuni).length;
     setSheet(headHtml(null, '住所から場所を調べる', esc(fileName)) + `
-      <div class="notice info">調べる住所は <b>${P.ok.length}件</b> です。${P.dup ? `<br>同じ住所の重なり ${P.dup}件は1件にまとめます。` : ''}</div>
-      <p class="hint">まず<b>この端末の中</b>の地番の地図で土地を調べます（住所の文字は外に送りません）。分からない住所があったときだけ、国土地理院に送るかどうかをおたずねします。</p>
+      <div class="notice info">調べる住所は ${P.ok.length}件です。${P.dup ? `<br>同じ住所の重なり ${P.dup}件は1件にまとめます。` : ''}</div>
+      <p class="hint">まずこの端末の中の地番の地図で土地を調べます（住所の文字は外に送りません）。分からない住所があったときだけ、国土地理院に送るかどうかをおたずねします。</p>
       ${noMuni ? `<label class="field"><span>市町村が書いていない住所（${noMuni}件）の市町村</span><select id="dxMuni" class="dnc-sel">${XL_MUNI_LIST.slice().sort().map(m => `<option${m === muni ? ' selected' : ''}>${m}</option>`).join('')}</select></label>` : ''}
       ${P.bad.length ? `<details class="dncfold"><summary>読めなかった住所（${P.bad.length}件）</summary><p class="hint">番地のない住所などです。これは入れません。</p><ul>${P.bad.slice(0, 200).map(x => `<li data-notr>${esc(x)}</li>`).join('')}</ul></details>` : ''}
       <button type="button" class="btn primary block" id="dxGo"${P.ok.length ? '' : ' disabled'}>場所を調べる（${P.ok.length}件）</button>
@@ -1372,21 +1384,25 @@
   const skCaution = k => !!((D().caution || {})[k]);
   function skStart(plan, fileName) {
     const seen = new Set(), items = [], away = [];
-    let have = 0;
+    let have = 0, watch = 0;
     plan.forEach(p => {
       if (p.pl.kind !== 'house') { away.push(p.e.a); return; }
       const k = K(p.pl.h.id, p.pl.unit);
       if (seen.has(k)) return;
       seen.add(k);
       if (D().dnc[k] !== undefined || skCaution(k)) { have++; return; }
-      items.push({ a: p.e.a, h: p.pl.h, unit: p.pl.unit, k });
+      if ((D().follows || {})[k]) { watch++; return; } // 見守り中（再訪問）の家は、一括では変えない
+      const weak = p.cbOld ? '今の地図にない古い地番で見つけた場所です。' : (p.pos && p.pos.good === false) ? 'だいたいの場所です。' : '';
+      items.push({ a: p.e.a, h: p.pl.h, unit: p.pl.unit, k, weak });
     });
     setSheet(headHtml(null, '訪問しない家を、地図で確かめる', esc(fileName)) + `
       <div class="tiles"><div class="tile"><b>${items.length}</b><span>地図で確かめる</span></div>
         <div class="tile"><b>${away.length}</b><span>家につながらない</span></div>
-        ${have ? `<div class="tile"><b>${have}</b><span>すでに印がある</span></div>` : ''}</div>
-      <p class="hint">1軒ずつ、地図の上で「この家で合っていますか？」とおたずねします。<b>「合っている」を押した家だけ</b>に「訪問しない」が付きます。自動では付けません。</p>
+        ${have ? `<div class="tile"><b>${have}</b><span>すでに印がある</span></div>` : ''}
+        ${watch ? `<div class="tile"><b>${watch}</b><span>見守り中の家</span></div>` : ''}</div>
+      <p class="hint">1軒ずつ、地図の上で「この家で合っていますか？」とおたずねします。「合っている」を押した家だけに「訪問しない」が付きます。自動では付けません。</p>
       ${have ? '<p class="hint">すでに拒否・訪問しない・注意の印がある家は、変えません。</p>' : ''}
+      ${watch ? '<p class="hint">見守り中（再訪問）の家は、記録を消さないために入れません。必要なら家の画面から1軒ずつ付けてください。</p>' : ''}
       ${away.length ? `<details class="dncfold"><summary>家につながらなかった住所（${away.length}件）</summary><p class="hint">この住所は入れません。地図で家を開いて、「この家の印」から1軒ずつ付けられます。</p><ul>${away.slice(0, 300).map(x => `<li data-notr>${esc(x)}</li>`).join('')}</ul></details>` : ''}
       <button type="button" class="btn primary block" id="skMapGo"${items.length ? '' : ' disabled'}>地図で確かめはじめる（${items.length}件）</button>
       <button type="button" class="btn block" data-close>やめる</button>`);
@@ -1403,7 +1419,7 @@
     if (!pick || pick.kind !== 'skipimp') return;
     while (pick.i < pick.items.length) { // 消えた家・もう印が付いた家はとばす
       const it = pick.items[pick.i];
-      if (houseById(it.h.id) && D().dnc[it.k] === undefined && !skCaution(it.k)) break;
+      if (houseById(it.h.id) && D().dnc[it.k] === undefined && !skCaution(it.k) && !(D().follows || {})[it.k]) break;
       pick.i++;
     }
     if (pick.i >= pick.items.length) {
@@ -1414,18 +1430,21 @@
     }
     const it = pick.items[pick.i];
     pick.it = it;
-    const left = pick.items.length - pick.i, h = it.h;
-    const what = h.type === 'apt' ? `${esc(h.label || '集合住宅')} ${esc(unitTitle(h, it.unit))}` : '家';
+    const left = pick.items.length - pick.i, h = houseById(it.h.id) || it.h;
+    pick.at = Date.now(); // 押しまちがい（ダブルタップ）を防ぐ：出してすぐのボタンは受けない
+    const what = h.type === 'apt' ? '部屋' : '家', room = h.type === 'apt' ? `<span class="muted" data-notr>${esc(h.label || '集合住宅')} ${esc(unitTitle(h, it.unit))}</span><br>` : '';
     setRing(h.lat, h.lng, 0);
     map.setView([h.lat, h.lng], 19);
     renderDncPins();
-    setBar(`<p><span class="prog">あと${left}件</span><span class="addr" data-notr><b>${esc(it.a)}</b></span><br><b>この${what}で合っていますか？</b><br><small class="muted">ちがうときは、正しい家の印をタップしてください。</small></p>
+    setBar(`<p><span class="prog">あと${left}件</span><span class="addr" data-notr><b>${esc(it.a)}</b></span><br>${room}<b>この${what}で合っていますか？</b><br>${it.weak ? `<small class="warn">${it.weak}地図で、よく確かめてください。</small><br>` : ''}<small class="muted">ちがうときは、正しい家の印をタップしてください。</small></p>
       <div class="row"><button type="button" class="btn small primary" data-dncb="ok">合っている</button><button type="button" class="btn small" data-dncb="skip">とばす</button><button type="button" class="btn small" data-dncb="end">おわる</button></div>`);
   }
   /* 訪問しないを付ける（家・部屋）。付けたら次へ */
-  function skDo(h, unit) {
+  function skDo(h0, unit) {
+    const h = houseById(h0.id) || h0;
     const k = K(h.id, unit || '');
     if (D().dnc[k] !== undefined || skCaution(k)) { toast('この家（部屋）には、もう印があります'); return; }
+    if ((D().follows || {})[k]) { toast('この家は見守り中（再訪問）なので、一括では付けません。家の画面から付けてください'); return; }
     const name = h.type === 'apt' ? `${h.label || '集合住宅'} ${unitTitle(h, unit)}` : (h.label || 'この家');
     cmI(`${name}を「訪問しない」にしました`, () => {
       if (D().dnc[k] !== undefined) return;
@@ -1437,6 +1456,7 @@
   }
   function skBar(a) {
     if (a === 'end') { skFinish(); return; }
+    if ((a === 'ok' || a === 'skip') && pick.at && Date.now() - pick.at < 600) return; // 出してすぐは受けない（ダブルタップで次の家に付かないように）
     if (a === 'skip') { pick.skipped++; pick.i++; skShow(); return; }
     if (a === 'ok' && pick.it) skDo(pick.it.h, pick.it.unit);
   }
