@@ -143,6 +143,7 @@ async function main() {
       };
       const safe = s => String(s).replace(/[\\/:*?"<>|]/g, '_');
       const dnc = D().dnc || {};
+      const sk = v => (!v ? 0 : v && typeof v === 'object' && v.q && !v.p ? 2 : 1); // 拒否＝1・訪問しない＝2（切りかえたら作り直す・監査 HS-A4）
       const terrs = D().territories.filter(t => !t.dummy).slice().sort(byNo);
       const lines = await sha(JSON.stringify(polyTerrs().map(t => [t.id, t.no, t.polygon]))); // となりの区域の線も地図に出るため
       const byT = new Map();
@@ -150,7 +151,7 @@ async function main() {
       const sigs = {};
       for (const t of terrs) {
         const hs = (byT.get(t.id) || []).map(h => [h.id, h.lat, h.lng, h.type, h.label || '', h.units || [], h.kind || '', !!h.lock,
-          h.uk || null, h.ul || null, !!h.prov, dnc[K(h.id, '')] ? 1 : 0, (h.units || []).filter(u => dnc[K(h.id, u)])])
+          h.uk || null, h.ul || null, !!h.prov, sk(dnc[K(h.id, '')]), (h.units || []).filter(u => dnc[K(h.id, u)]).map(u => u + (sk(dnc[K(h.id, u)]) === 2 ? ':q' : ''))])
           .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
         sigs[t.id] = await sha(JSON.stringify([LAYOUT, t.no, t.name || '', t.polygon || null, lines, hs]));
       }

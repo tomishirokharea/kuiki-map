@@ -202,7 +202,9 @@
     const d = D();
     const apt = d.houses.filter(h => h.type === 'apt');
     return {
-      visits: d.visits.length, dnc: Object.keys(d.dnc || {}).filter(k => { const v = d.dnc[k]; return k.indexOf('|') > 0 && !(v && typeof v === 'object' && (v.a || v.s)); }).length, // 住所のある拒否は残すので数えない follows: Object.keys(d.follows || {}).length,
+      // 住所のある拒否（と訪問しない）は残すので数えない。前はこの説明が follows まで行の終わりのコメントに入れてしまい、確認の「再訪問 ○件」が出ていなかった（再監査 R-2）
+      visits: d.visits.length, dnc: Object.keys(d.dnc || {}).filter(k => { const v = d.dnc[k]; return k.indexOf('|') > 0 && !(v && typeof v === 'object' && (v.a || v.s)); }).length,
+      follows: Object.keys(d.follows || {}).length,
       cards: (d.awayCards || []).length, apt: apt.length, houses: d.houses.length, prov: d.houses.filter(h => h.prov).length,
       imp: apt.filter(isNewImp).length, legacy: apt.filter(isLegacyNew).length
     };
@@ -212,11 +214,13 @@
     opt = opt || {};
     d.visits = []; d.follows = {}; d.awayCards = [];
     // 拒否：訪問で記録したものは消す。取り込み・係が追加した住所のある拒否は、場所だけの拒否にして残す（kyohi.js）
-    Object.keys(d.dnc || {}).forEach(k => { if (k.indexOf('|') < 0) return; if (typeof dncDrop === 'function') dncDrop(k); else delete d.dnc[k]; });
+    Object.keys(d.dnc || {}).forEach(k => { if (k.indexOf('|') < 0 || isSkipV(d.dnc[k])) return; if (typeof dncDrop === 'function') dncDrop(k); else delete d.dnc[k]; }); // 訪問しない（係が付けた印）は、訪問の記録ではないので残す
     // 取り込みで新しく置いた家は、家ごと消す（元からあった家は残して、ふつうの家にもどす）
     d.houses = d.houses.filter(h => !(isNewImp(h) || (opt.legacy && isLegacyNew(h))));
     d.houses.forEach(h => {
       if (h.type === 'apt') {
+        skipToHouse(h); // 訪問しないの部屋があれば、ふつうの家にもどしても訪問しない（再監査 HS-A8）
+        h.units.forEach(u => { if (isSkipV(d.dnc[K(h.id, u)])) delete d.dnc[K(h.id, u)]; });
         h.type = 'house'; h.units = []; h.label = '';
         delete h.lock; delete h.uk; delete h.ul; delete h.kind; delete h.ban;
       } else delete h.ban;
@@ -234,7 +238,9 @@
     const inApt = k => { const i = k.lastIndexOf('|'); return i > 0 && ids.has(k.slice(0, i)) && k.slice(i + 1) !== ''; };
     return {
       apt: apt.length, imp: apt.filter(isNewImp).length, legacy: apt.filter(isLegacyNew).length, roomV,
-      roomD: Object.keys(d.dnc || {}).filter(inApt).length, roomF: Object.keys(d.follows || {}).filter(inApt).length
+      // 訪問しないは家の印に移して残すので、拒否の数に入れない（監査 HS-A9）
+      roomD: Object.keys(d.dnc || {}).filter(k => inApt(k) && !isSkipV(d.dnc[k])).length,
+      roomF: Object.keys(d.follows || {}).filter(inApt).length
     };
   }
   function resetApts(opt) {
@@ -244,6 +250,7 @@
     const apt = new Set(d.houses.filter(h => h.type === 'apt').map(h => h.id));
     const inApt = k => { const i = k.lastIndexOf('|'); if (i <= 0) return false; const id = k.slice(0, i); return gone.has(id) || (apt.has(id) && k.slice(i + 1) !== ''); };
     d.visits = d.visits.filter(v => !(gone.has(v.houseId) || (apt.has(v.houseId) && v.unit)));
+    d.houses.forEach(h => { if (h.type === 'apt' && !gone.has(h.id)) skipToHouse(h); }); // 訪問しないの部屋のある建物は、ふつうの家にもどしても訪問しない（監査 HS-A8）
     Object.keys(d.dnc || {}).forEach(k => { if (inApt(k)) { if (typeof dncDrop === 'function') dncDrop(k); else delete d.dnc[k]; } });
     Object.keys(d.follows || {}).forEach(k => { if (inApt(k)) delete d.follows[k]; });
     d.houses = d.houses.filter(h => !gone.has(h.id));

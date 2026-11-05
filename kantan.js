@@ -318,7 +318,9 @@
       let b = headHtml(t, title, sub);
       if (fromBuilding) b += '<button class="btn small" id="backBld">← 部屋の入力にもどる</button>';
       // 大事なお知らせだけ（どれも1〜2行）
-      if (dnc) {
+      if (dnc && typeof isSkipV === 'function' && isSkipV(dnc)) {
+        b += skipNoteHtml(what, isAdmin());
+      } else if (dnc) {
         b += `<div class="notice refnote"><b>拒否の${what}です。訪問しないでください。</b>${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : ''}</div>`;
       } else if (other) {
         b += `<div class="notice warn"><b>ほかの人が再訪問している${what}です。</b>${blocked ? '訪問は控えてください。<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
@@ -356,7 +358,7 @@
       $$('[data-back]', S2).forEach(x => x.onclick = () => { st.step = x.dataset.back; paint(); });
       const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
       on('backBld', () => openAptSeq(hid, unit));
-      on('unDnc', () => { commit('拒否マークを外しました', () => { delete D().dnc[k]; }); paint(); });
+      on('unDnc', () => { commit(dncSkip(k) ? '訪問しない印を外しました' : '拒否マークを外しました', () => { delete D().dnc[k]; }); paint(); });
       on('shOverride', () => { st.override = true; paint(); });
     };
     paint();
@@ -478,7 +480,7 @@
   function simpleLegend() {
     const box = document.getElementById('legendInfo'); if (!box) return;
     const key = (cls, mark, label) => `<span><i class="pin mini st-plain${cls}">${mark}</i>${label}</span>`;
-    const keys = `<p class="keys">${key('', '', 'まだ訪ねていない家')}${key(' done', '<u>✓</u>', '訪ねた家')}${key(' prev', '<u class="b">✓</u>', '最近会えた家')}<span><i class="pin mini st-dnc">拒</i>拒否（訪問しない）</span></p>`;
+    const keys = `<p class="keys">${key('', '', 'まだ訪ねていない家')}${key(' done', '<u>✓</u>', '訪ねた家')}${key(' prev', '<u class="b">✓</u>', '最近会えた家')}<span><i class="pin mini st-dnc">拒</i>拒否（断られた家）</span><span><i class="pin mini st-skip">ー</i>訪問しない</span></p>`; // 監査 HS-A3・HS-A10
     const r = typeof roundTerr !== 'undefined' && roundTerr ? roundInfo(roundTerr) : null;
     if (!r) { box.innerHTML = keys; return; }
     const n = r.c, own = r.t.holder === me().id, lead = !own && typeof isLead === 'function' && isLead(r.t);

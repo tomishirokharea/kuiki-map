@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.121';
+var APP_JS_VER = '2026.13.122';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -89,6 +89,8 @@ const ST_LABEL = { new: '未訪問', met: '会えた', away: '留守', refused: 
 const ST_CHAR = { new: '未', met: '会', away: '留', refused: '拒', dnc: '拒' };
 
 /* 結果の選択：会えた／留守（「また訪ねたいか」を記録しない設定のときは、拒否もここに置く） */
+/* 訪問しないの家・部屋・世帯のお知らせ（記録の画面。理由は出さない）。what：家・部屋・世帯 */
+const skipNoteHtml = (what, admin) => `<div class="notice skipnote"><b>この${what}は訪問しない${what}です（区域係が設定）。</b>${what === '家' ? '' : 'ほかは訪ねられます。'}${admin ? '<span class="actions"><button class="btn small" id="unDnc">訪問しない印を外す</button></span>' : ''}</div>`;
 const refuseBtnHtml = () => `<button class="choice refbtn" data-int="拒否"><i class="pin st-dnc">拒</i>拒否<small>もう来ないでほしいと言われた</small></button>`;
 function resultChoicesHtml(awaySub) {
   return `<div class="choices two">
@@ -294,7 +296,7 @@ function makeDemo() {
     { id: 'p4', kind: 'p', terrId: 't2', year: svcYearOf(new Date(now - 365 * DAY)), c: dAgo(420), at: iso(now), by: 'u3' }
   ];
   return { version: 4, users, territories, houses, visits, dnc, follows, released, requests, awayCards: [], returns, s13, schedules,
-    settings: { remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, awayCap: 3, awayNoRepeat: 1, awayScope: 0 }, currentUser: 'u1' };
+    settings: { remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, awayCap: 3, awayNoRepeat: 1, awayScope: 0, capDncQ: 1 }, currentUser: 'u1' };
 }
 
 /* ---------- 保存 ----------
@@ -2346,6 +2348,26 @@ function parseKey(k) { const i = k.indexOf('|'); return [k.slice(0, i), k.slice(
    値：true（訪問で記録した拒否）か { a: 住所, s: 登録元（xl・kml・adm）, at, lat, lng, p: 1（場所だけ）, appx: 1（場所はだいたい）, auto: 1（自動でつないだ）, t: 区域id, no: 区域番号 }
    くわしくは kyohi.js */
 const isPinKey = k => String(k).indexOf('|') < 0;
+/* 訪問しない（2026-11-05・HS）：区域係が付ける、理由を記録しない印。拒否（dnc）の値に q:1（家につながったキーだけ）。
+   拒否と同じように訪問・数の対象から外す（D().dnc[k] があれば外れる）。見せ方と「拒否の数・一覧」だけ分ける。
+   capSkip：新しいサーバー（設定に capDncQ:1）のときだけ付けられる（古いサーバーは q を捨てて、ふつうの拒否にしてしまうため） */
+const isSkipV = v => !!(v && typeof v === 'object' && v.q && !v.p);
+const dncSkip = k => isSkipV(D().dnc[k]);
+const capSkip = () => !!(D().settings && Number(D().settings.capDncQ) === 1);
+/* 家の種類を変えるとき（一戸建て→アパート・二世帯、もどす）、訪問しない印を家と部屋のあいだで移す（監査 HS-A8）。
+   commit の中で、部屋（units）を変えたあとに呼ぶ */
+function skipToUnits(h) { // 家の印 → 部屋ぜんぶ
+  const k0 = K(h.id, ''), v = D().dnc[k0];
+  if (!isSkipV(v) || !h.units.length) return;
+  delete D().dnc[k0];
+  h.units.forEach(u => { const k = K(h.id, u); D().dnc[k] = Object.assign({}, v, { at: new Date().toISOString() }); delete D().follows[k]; delete D().released[k]; });
+}
+function skipToHouse(h) { // 部屋のどれかが訪問しない → 家の印（部屋を消す前に呼ぶ）
+  const v = h.units.map(u => D().dnc[K(h.id, u)]).find(isSkipV);
+  if (v) D().dnc[K(h.id, '')] = Object.assign({}, v, { at: new Date().toISOString() });
+}
+const hasSkip = h => !!h && (dncSkip(K(h.id, '')) || (h.units || []).some(u => dncSkip(K(h.id, u)))); // この家（部屋のどれか）に訪問しない印
+const dncRefN = () => { let n = 0; for (const k in D().dnc) if (!isSkipV(D().dnc[k])) n++; return n; }; // 拒否の数（訪問しないは入れない）
 const dncTerrOf = d => (d && d.t && terrById(d.t) ? d.t : d && isFinite(d.lat) && d.lat != null ? terrOf(d.lat, d.lng) : null); // 場所だけの拒否の区域
 function dncPins() { // 場所だけの拒否（地図に出せるもの）
   const out = [], m = D().dnc || {};
@@ -2357,6 +2379,7 @@ function dncDrop(k, h, keepPlain) {
   const m = D().dnc, v = m[k];
   if (v === undefined) return;
   delete m[k];
+  if (isSkipV(v)) return; // 訪問しないの印は、家と一緒に消す（場所だけの拒否にしない）
   h = h || houseById(parseKey(k)[0]);
   // 住所のない拒否（伝道者が付けた true など）も、区域係が家を消すとき（keepPlain）は、家の位置に場所だけの印として残す（H8・D5）。
   // 場所だけの印は区域係しか作れない（サーバーも止める）ので、係以外の画面では今までどおり（住所のある拒否だけ）。
@@ -2688,6 +2711,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.122', items: [
+    ['ー', '地図に灰色の「ー」が出る家・部屋は、区域係が「訪問しない」にした家です。訪ねなくてよく、区域の数にも入りません。']
+  ] },
   { v: '2026.13.121', items: [
     ['人', '名前の一覧を、あいうえお順に並べられるようにしました。区域係が名前のよみ（ひらがな）を入れると、その人はあいうえお順に並び、名前でさがすときもひらがなで見つかります。']
   ] },
@@ -3647,11 +3673,12 @@ function houseIcon(h, ff, locked) {
       if (ks.length && ks.every(k => pinState(k, since) !== 'plain')) st = 'done';
     }
     const left = aptTodo(h, since);
-    const rj = targets(h).some(u => D().dnc[K(h.id, u)]) ? '<b class="rj">拒</b>' : '';
+    const rj = targets(h).some(u => { const k = K(h.id, u); return D().dnc[k] && !dncSkip(k); }) ? '<b class="rj">拒</b>' : '';
+    const sk = targets(h).some(u => dncSkip(K(h.id, u))) ? '<b class="sk" title="訪問しない">ー</b>' : ''; // 訪問しない部屋（灰色の「ー」）
     const cau = !locked && window.chuiHas && window.chuiHas(h) ? '<b class="cau" title="注意">！</b>' : ''; // 注意（chui.js）
     const ak = aptKind(h);
     const nameTag = ''; // 名前は、renderHouses で別の札として出す（小さな点のときも出せるように）
-    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${cau}${locked ? '' : kindBadge(ak) + lockBadge(h) + banBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
+    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${sk}${cau}${locked ? '' : kindBadge(ak) + lockBadge(h) + banBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
   }
   const k = K(h.id, ''), s = pinState(k, since), fo = '';
   // 選んでいないときも、今回訪ねた家（会えた・留守）は薄く＋緑のチェックにする
@@ -3659,7 +3686,8 @@ function houseIcon(h, ff, locked) {
   const hk = kindOf(h);
   const cau = !locked && s !== 'dnc' && window.chuiHas && window.chuiHas(h) ? '<b class="cau" title="注意">！</b>' : ''; // 注意（chui.js）
   const sm = s === 'dnc' ? ' sm' : '', px = s === 'dnc' ? 26 : 34; // 拒否の家は、大きくしすぎない（2026.13.26）
-  return L.divIcon({ className: '', html: `<div class="pin st-${s}${sm}${h.prov ? ' prov' : ''}${hk !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">${PIN_CHAR[s]}${fo}${doneMark(st)}${nb}${cau}${locked ? '' : kindBadge(hk)}</div>`, iconSize: [px, px], iconAnchor: [px / 2, px / 2] });
+  const skp = s === 'dnc' && dncSkip(k); // 訪問しない：灰色の「ー」（拒否と同じ大きさ）
+  return L.divIcon({ className: '', html: `<div class="pin st-${skp ? 'skip' : s}${sm}${h.prov ? ' prov' : ''}${hk !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">${skp ? 'ー' : PIN_CHAR[s]}${fo}${doneMark(st)}${nb}${cau}${locked ? '' : kindBadge(hk)}</div>`, iconSize: [px, px], iconAnchor: [px / 2, px / 2] });
 }
 /* ---------- 一緒に回る人（グループ） ----------
    区域の担当者が、今日の終わりまで仲間を加える。データは区域の helpers に入れる：
@@ -4146,6 +4174,7 @@ const DOT = {
   done: { fillColor: '#2E9E7E', color: '#fff', weight: 1.5 },
   prev: { fillColor: '#1565C0', color: '#fff', weight: 1.5 },
   dnc: { fillColor: '#C62828', color: '#fff', weight: 1.5 },
+  skip: { fillColor: '#6B7280', color: '#fff', weight: 1.5 }, // 訪問しない（灰色）
   lock: { fillColor: '#C9CFCC', color: '#9AA5A0', weight: 1.5 }
 };
 function dotStyle(h, ff, locked) {
@@ -4154,7 +4183,7 @@ function dotStyle(h, ff, locked) {
   const since = periodStart(h), ks = targets(h).map(u => K(h.id, u));
   if (!ks.length) return { s: Object.assign({ radius: r }, DOT.plain), o: 1 };
   const one = k => {
-    if (D().dnc[k]) return 'dnc';
+    if (D().dnc[k]) return dncSkip(k) ? 'skip' : 'dnc';
     const f = ff ? String(ff(k) || '').split(' ')[0] : null; // 'hl fade' のように、あとに「薄く」の印が付くことがある
     if (f === 'dim') return 'dim';
     if (f === 'done') return 'done';
@@ -4165,7 +4194,7 @@ function dotStyle(h, ff, locked) {
   };
   const sts = ks.map(one);
   // 集合住宅：まだの部屋が1つでもあれば「まだ」、全部すんでいれば「すんだ」
-  const st = sts.includes('plain') ? 'plain' : sts.every(x => x === 'dnc') ? 'dnc'
+  const st = sts.includes('plain') ? 'plain' : sts.every(x => x === 'skip') ? 'skip' : sts.every(x => x === 'dnc' || x === 'skip') ? 'dnc'
     : sts.every(x => x === 'dim') ? 'dim' : sts.includes('done') ? 'done' : sts.includes('prev') ? 'prev' : 'plain';
   if (st === 'dim') return { s: Object.assign({ radius: r }, DOT.plain), o: 0.3 };
   const faded = !!ff && ks.filter(k => !D().dnc[k]).every(k => String(ff(k) || '').indexOf(' fade') > 0); // 全部の部屋が「薄く」のとき
@@ -4555,7 +4584,8 @@ function openTarget(hid, unit, fromBuilding, review) {
     const blocked = (dnc && !isAdmin()) || (other && !isAdmin() && !st.override && recentMet(k));
     let b = headHtml(t, title, sub);
     if (fromBuilding) b += `<button class="btn small" id="backBld">← 建物の編集にもどる</button>`;
-    if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() && dnc.a ? `<br><small>住所：<span data-notr>${esc(dnc.a)}</span>${dnc.auto ? '（住所から自動でつないだ家です）' : ''}</small>` : ''}${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
+    if (dnc && isSkipV(dnc)) b += skipNoteHtml(unit ? '部屋' : '家', isAdmin());
+    else if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() && dnc.a ? `<br><small>住所：<span data-notr>${esc(dnc.a)}</span>${dnc.auto ? '（住所から自動でつないだ家です）' : ''}</small>` : ''}${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
     if (h.ban) b += banNotice(h);
     if (unit) b += bldMemoHtml(h);
     if (window.chuiNotice) b += window.chuiNotice(h, unit); // 注意（！）。特別区域で回る家のお知らせも、ここに続けて出す（tokubetsu.js）
@@ -4646,7 +4676,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     $$('[data-back]', S).forEach(x => x.onclick = () => { st.step = x.dataset.back; paint(); });
     const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
     on('backBld', () => openBuilding(hid, unit));
-    on('unDnc', () => { commitIn([hid], '拒否マークを外しました', () => { delete D().dnc[k]; }); paint(); });
+    on('unDnc', () => { commitIn([hid], dncSkip(k) ? '訪問しない印を外しました' : '拒否マークを外しました', () => { delete D().dnc[k]; }); paint(); });
     on('shRelease', async () => { await followAction('release', k); paint(); });
     on('shStop', () => openReleaseSheet(k, false));
     on('shMemo', () => openMemo(k, paint));
@@ -4928,7 +4958,7 @@ function saveVisit(hid, unit, result, extra, keepOpen, onUndo) {
     const f = D().follows[k];
     if (f && f.by === me().id) f.touchedAt = now; // 受け持ち本人の記録で期限を延ばす
     if (follow) startFollow(k, me().id);
-    if (extra.dnc) { D().dnc[k] = D().dnc[k] || true; delete D().follows[k]; delete D().released[k]; } // 係が入れた住所は残す
+    if (extra.dnc) { D().dnc[k] = D().dnc[k] && !isSkipV(D().dnc[k]) ? D().dnc[k] : true; delete D().follows[k]; delete D().released[k]; } // 係が入れた住所は残す。訪問しないの家で「拒否」と記録したら拒否にする
     const hp = houseById(hid); if (hp && hp.prov) delete hp.prov; // 拒否・再訪問つきの記録でも、仮の家は「ある家」になる（H8。会えた・留守と同じ）
   }, onUndo);
 }
@@ -6113,7 +6143,7 @@ function seqStepsHtml(st, k) {
   if (st.step === 'dnc') return refuseStepHtml(true);
   return '';
 }
-const UST_GLYPH = { met: '会', away: '留', refused: '拒', dnc: '拒' }, UST_NAME = { met: '会えた', away: '留守', refused: '拒否', dnc: '拒否' };
+const UST_GLYPH = { met: '会', away: '留', refused: '拒', dnc: '拒', skip: 'ー' }, UST_NAME = { met: '会えた', away: '留守', refused: '拒否', dnc: '拒否', skip: '訪問しない部屋' };
 /* 続けて入力：今の部屋の見出しから「とばして次へ」までが画面に入るように、下から出る画面を動かす。
    部屋の一覧が長い建物で、部屋を押したり記録したりするたびに、ボタンが画面の外に出ないように（点検④U2） */
 function seqShowRoom(S) {
@@ -6156,8 +6186,8 @@ function openAptSeq(hid, startUnit) {
     // 部屋のボタン：前回の結果は色だけでなく「会・留・拒」の字でも見せる。部屋が多い建物は階ごとに分ける（点検④U3）
     const chip = u => {
       // 色と字は、見出しと同じ「今の巡回（受け取ってから）」の結果で出す。前の巡回の結果は出さない（総点検 L5・2026.13.105）
-      const i = h.units.indexOf(u), s0 = statusOf(K(hid, u)), s = s0 === 'dnc' || !inRound || visitedSince(K(hid, u), since) ? s0 : 'new', uk = unitKind(h, u), g = UST_GLYPH[s];
-      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? '（前回 ' + UST_NAME[s] + '）' : ''}へ">${kindBadge(uk)}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
+      const i = h.units.indexOf(u), s0 = statusOf(K(hid, u)), s1 = s0 === 'dnc' || !inRound || visitedSince(K(hid, u), since) ? s0 : 'new', s = s1 === 'dnc' && dncSkip(K(hid, u)) ? 'skip' : s1, uk = unitKind(h, u), g = UST_GLYPH[s];
+      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? (s === 'skip' ? '（' + UST_NAME[s] + '）' : '（前回 ' + UST_NAME[s] + '）') : ''}へ">${kindBadge(uk)}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
     };
     const groups = h.units.length > 10 ? unitGroups(h) : [];
     b += groups.length > 1
@@ -6177,7 +6207,8 @@ function openAptSeq(hid, startUnit) {
       b += `<p class="muted">${last ? `前回：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}` : 'はじめて訪ねる部屋'}</p>`;
       if (window.fixLineHtml) b += window.fixLineHtml(k); // 今日つけた記録を直す（naoshi.js。不具合C：2026-11-04まで、この画面には出ていなかった）
       b += recentOtherHtml(k);
-      if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の部屋です。</b>訪問しないで、次の部屋へ進んでください。</div>`;
+      if (dncSkip(k)) b += skipNoteHtml('部屋', false).replace('ほかは訪ねられます。', '次の部屋へ進んでください。');
+      else if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の部屋です。</b>訪問しないで、次の部屋へ進んでください。</div>`;
       else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="seqOverride">それでも記録する</button></span></div>`;
       else b += seqStepsHtml(st, k);
       b += `<div class="seqnav">
@@ -6225,6 +6256,7 @@ function openAptSeq(hid, startUnit) {
 /* ---------- 一戸建てを、アパート・マンションに変える ---------- */
 function openConvertApt(hid) {
   const h = houseById(hid); if (!h || h.type !== 'house') return;
+  if (!isAdmin() && hasSkip(h)) { toast('訪問しないの家の種類は、区域係だけが変えられます'); return; }
   const t = terrById(h.terrId), n = visitsOf(K(hid, '')).length;
   const f = { label: h.label || '', n: newNaming(), lock: false };
   const keep = () => {
@@ -6251,6 +6283,7 @@ function openConvertApt(hid) {
       closeSheet();
       commitIn([hid], `${label || '建物'}をアパート・マンションにしました（${us.length}部屋）`, () => {
         h.type = 'apt'; h.units = us; h.label = label;
+        skipToUnits(h); // 訪問しないの家なら、部屋ぜんぶを訪問しないに（監査 HS-A8）
         if (f.lock) h.lock = true; else delete h.lock;
         delete h.prov; delete h.uk; delete h.ul; // 確かめた建物なので「仮の家」ではなくなる
       });
@@ -6544,14 +6577,15 @@ function openAddForm(ll, tid, editId) {
     lab.onfocus = show;
     lab.oninput = () => { f.label = lab.value; show(); };
   };
+  const typeLock = !!eh && !isAdmin() && hasSkip(eh); // 訪問しないの家の種類は、区域係だけが変えられる（監査 HS-A8）
   const paint = () => {
     const apt = f.type === 'apt';
     setSheet(headHtml(t, eh ? 'この家を編集' : 'ここに追加します', t ? `区域${esc(t.no)}　${esc(t.name)}` : '区域は、線を完成したときに決まります') + `
       <p class="q">建物の種類</p>
       <div class="choices two">
-        <button class="choice${!apt ? ' on' : ''}" data-type="house" aria-pressed="${!apt}"><i class="pin st-new">家</i>一戸建て</button>
-        <button class="choice${apt ? ' on' : ''}" data-type="apt" aria-pressed="${apt}"><i class="pin apt">集</i>アパート・マンション</button>
-      </div>
+        <button class="choice${!apt ? ' on' : ''}" data-type="house" aria-pressed="${!apt}"${typeLock ? ' disabled' : ''}><i class="pin st-new">家</i>一戸建て</button>
+        <button class="choice${apt ? ' on' : ''}" data-type="apt" aria-pressed="${apt}"${typeLock ? ' disabled' : ''}><i class="pin apt">集</i>アパート・マンション</button>
+      </div>${typeLock ? '<p class="hint">訪問しないの家なので、建物の種類は区域係だけが変えられます。</p>' : ''}
       ${apt ? `<label class="check locrow"><input type="checkbox" id="fLock"${f.lock ? ' checked' : ''}>オートロックの建物</label>
       <p class="hint">あとからでも、建物の編集で変えられます。</p>` : ''}
       ${apt && f.cand ? `<div class="aw-from"><b>候補：${esc(f.cand.n || '（名前なし）')}</b><button id="fCandOff">はずす</button></div>
@@ -6599,6 +6633,7 @@ function openAddForm(ll, tid, editId) {
           if (f.kind !== 'home') h.kind = f.kind; else delete h.kind;
           if (f.type === 'apt') {
             h.type = 'apt'; h.units = us;
+            skipToUnits(h); // 訪問しないの家なら、部屋ぜんぶを訪問しないに（監査 HS-A8）
             if (f.lock) h.lock = true; else delete h.lock;
             delete h.prov; delete h.uk; delete h.ul; // 確かめた建物なので「仮の家」ではなくなる
             setCand(h);
@@ -7727,7 +7762,7 @@ function xlCommit(plan) {
         const h = { id: 'h' + uid(), terrId: t.id, type: g.units.length ? 'apt' : 'house', lat: Math.round(g.pos.lat * 1e6) / 1e6, lng: Math.round(g.pos.lng * 1e6) / 1e6,
           label: g.label || '', units: g.units.slice(0, 300), createdAt: now, createdBy: me().id };
         D().houses.push(h); nH++; // 同じ取り込みの中の家どうしは比べない（同じ丁目の家は、近くに並べてあるため）
-        g.dnc.forEach(u => { D().dnc[K(h.id, u)] = true; });
+        g.dnc.forEach(u => { D().dnc[K(h.id, u)] = true; }); // 新しく足した家（訪問しないの印はまだない）
         if (!g.pos.good) check.push({ id: h.id, q: g.q.replace(/^沖縄県/, ''), no: p.s.no });
       });
     });
@@ -11775,7 +11810,7 @@ function renderAdmin() {
   const outside = D().houses.filter(h => !h.terrId).length;
   const lent = ts.filter(isLent).length;
   const over = ts.filter(pastDue).length;
-  const dncN = Object.keys(D().dnc).length;
+  const dncN = dncRefN(); // 訪問しないは拒否の数に入れない
   const provN = D().houses.filter(h => h.prov).length;
   const tile = (k, cls, num, label) => `<button type="button" class="tile${cls}" data-tl="${k}"><b>${num}</b>${label}<span class="tmore">内訳 ›</span></button>`;
   $('#adTiles').innerHTML = tile('terr', '', ts.length, `区域（貸出中 ${lent}）`) +
@@ -11886,12 +11921,13 @@ function openStatList(key) {
     const per = new Map(); let pin = 0;
     for (const k in D().dnc) {
       const v = D().dnc[k];
+      if (isSkipV(v)) continue; // 訪問しないは拒否に入れない
       let tid = null;
       if (isPinKey(k)) { tid = dncTerrOf(v); pin++; }
       else { const h = houseById(k.split('|')[0]); tid = h ? h.terrId : null; }
       per.set(tid || '', (per.get(tid || '') || 0) + 1);
     }
-    title = `拒否の家・部屋 ${Object.keys(D().dnc).length}`;
+    title = `拒否の家・部屋 ${dncRefN()}`;
     hint = '区域ごとの数です。くわしい一覧（住所・地図で確かめる）は「拒否・！」タブにあります。';
     const rows = ts.filter(t => per.get(t.id)).map(t => statRow(t, `拒否 ${per.get(t.id)}`));
     body = `<button type="button" class="btn block" data-tldnc>「拒否・！」の一覧を開く</button>${rows.join('')}${per.get('') ? `<p class="muted">区域の外：${per.get('')}</p>` : ''}`;
@@ -14905,6 +14941,7 @@ function s12QrSvg(c, P, mm, f) {
     `<text x="${f(x0 + bw / 2)}" y="${f(y0 + mm(side + 0.6) + mm(cap) / 2)}" font-size="${mm(cap * 0.78)}" font-weight="700" fill="#000" text-anchor="middle" dominant-baseline="central" textLength="${f(bw - mm(1.2))}" lengthAdjust="spacingAndGlyphs">Googleマップで道順</text></g>`;
 }
 const s12Dnc = () => D().dnc || {};
+const s12Ref = (dnc, k) => !!dnc[k] && !isSkipV(dnc[k]); // 拒否（訪問しないはのぞく）
 /* 名前のある建物（「名前を出す範囲」が「地図に見えている全体」のとき、ほかの区域の建物の名前も出すため） */
 let s12LabeledMemo = null;
 function s12Labeled() {
@@ -14914,14 +14951,16 @@ function s12Labeled() {
 }
 function s12RefCount(c) {
   const dnc = s12Dnc();
-  return c.hs.reduce((n, h) => n + (h.type === 'apt' ? h.units.filter(u => dnc[K(h.id, u)]).length : (dnc[K(h.id, '')] ? 1 : 0)), 0) +
+  return c.hs.reduce((n, h) => n + (h.type === 'apt' ? h.units.filter(u => s12Ref(dnc, K(h.id, u))).length : (s12Ref(dnc, K(h.id, '')) ? 1 : 0)), 0) +
     dncPins().filter(([, d]) => dncTerrOf(d) === c.t.id).length;
 }
+const s12HasSkip = c => { const dnc = s12Dnc(); return c.hs.some(h => targets(h).concat(h.type === 'apt' ? [] : ['']).some(u => isSkipV(dnc[K(h.id, u)]))); };
 /* 凡例の小さな印 */
 const S12_ICO = {
   house: '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="3" fill="#fff" stroke="#222" stroke-width="1"/></svg>',
   kind: '<svg viewBox="0 0 10 10"><rect x="1.8" y="1.8" width="6.4" height="6.4" fill="#fff" stroke="#222" stroke-width="1"/></svg>',
   apt: '<svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9" rx="1.5" fill="#263238"/><text x="5" y="5.3" font-size="7" font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="central">1</text></svg>',
+  skip: '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4.4" fill="#6B7280"/><path d="M2.6 5h4.8" stroke="#fff" stroke-width="1.4"/></svg>',
   ref: '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4.4" fill="#D32F2F"/><path d="M3.2 3.2l3.6 3.6M6.8 3.2l-3.6 3.6" stroke="#fff" stroke-width="1.3"/></svg>',
   line: '<svg viewBox="0 0 10 10"><path d="M0 5h10" stroke="#C62828" stroke-width="2.4"/></svg>'
 };
@@ -14964,10 +15003,17 @@ function s12MapSvg(c, tileUrl) {
     if (!inView(x, y)) return;
     if (h.type === 'apt') {
       const n = aptNo.get(h.id), w = mm(String(n).length > 1 ? 4.6 : 3.6), hh = mm(3.6);
-      const anyRef = h.units.some(u => dnc[K(h.id, u)]) || dnc[K(h.id, '')];
+      const anyRef = h.units.some(u => s12Ref(dnc, K(h.id, u))) || s12Ref(dnc, K(h.id, ''));
+      const anySkip = h.units.some(u => isSkipV(dnc[K(h.id, u)]));
       L3.push(`<rect x="${f(x - w / 2)}" y="${f(y - hh / 2)}" width="${w}" height="${hh}" rx="${mm(0.6)}" fill="#263238" stroke="#fff" stroke-width="${mm(0.3)}"/>` +
         `<text x="${x}" y="${f(y + mm(0.1))}" font-size="${mm(2.6)}" font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="central">${n}</text>` +
-        (anyRef ? `<circle cx="${f(x + w / 2)}" cy="${f(y - hh / 2)}" r="${mm(0.8)}" fill="#D32F2F" stroke="#fff" stroke-width="${mm(0.25)}"/>` : ''));
+        (anyRef ? `<circle cx="${f(x + w / 2)}" cy="${f(y - hh / 2)}" r="${mm(0.8)}" fill="#D32F2F" stroke="#fff" stroke-width="${mm(0.25)}"/>` : '') +
+        (anySkip ? `<g class="s12skip-a"><circle cx="${f(x + w / 2)}" cy="${f(y + hh / 2)}" r="${mm(0.8)}" fill="#6B7280" stroke="#fff" stroke-width="${mm(0.25)}"/>` +
+          `<path d="M${f(x + w / 2 - mm(0.4))},${f(y + hh / 2)} H${f(x + w / 2 + mm(0.4))}" stroke="#fff" stroke-width="${mm(0.3)}"/></g>` : ''));
+    } else if (isSkipV(dnc[K(h.id, '')])) { // 訪問しない：灰色の丸に「ー」（理由は出さない）
+      const r = mm(1.25), a = mm(0.6);
+      L4.push(`<g class="s12skip"><circle cx="${x}" cy="${y}" r="${r}" fill="#6B7280" stroke="#fff" stroke-width="${mm(0.3)}"/>` +
+        `<path d="M${f(x - a)},${y} H${f(x + a)}" stroke="#fff" stroke-width="${mm(0.4)}"/></g>`);
     } else if (dnc[K(h.id, '')]) {
       const r = mm(1.25), a = mm(0.55);
       L4.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="#D32F2F" stroke="#fff" stroke-width="${mm(0.3)}"/>` +
@@ -15031,7 +15077,7 @@ function s12FrontHtml(c, tileUrl, stamp) {
     <p class="s12ttl">区域地図のカード</p>
     <div class="s12row"><span>場所</span><span class="ln">${esc(t.name || '')}</span><span>区域番号</span><span class="ln no">${esc(t.no)}</span></div>
     <div class="s12map">${s12MapSvg(c, tileUrl)}</div>
-    <div class="s12ft"><span class="lg">${S12_ICO.line}区域の線 ${S12_ICO.house}家 ${S12_ICO.kind}住居以外 ${S12_ICO.apt}集合住宅（番号は裏面） ${S12_ICO.ref}拒否（訪問しない）</span>
+    <div class="s12ft"><span class="lg">${S12_ICO.line}区域の線 ${S12_ICO.house}家 ${S12_ICO.kind}住居以外 ${S12_ICO.apt}集合住宅（番号は裏面） ${s12HasSkip(c) ? `${S12_ICO.ref}拒否 ${S12_ICO.skip}訪問しない家` : `${S12_ICO.ref}拒否（訪問しない）`}</span>
       <span class="dt">家${nH}・集合住宅${c.apts.length}・拒否${s12RefCount(c)}${c.spOut ? `・特別区域で回る${c.spOut}（地図に出さない）` : ''}／${stamp}時点</span></div>
     <p class="s12note">封筒に入れて持ち歩き、汚さないようにしてください。回り終えたら区域係に知らせてください。</p>
   </div>`;
@@ -15040,7 +15086,7 @@ function s12BackHtml(c, S, fs) {
   const t = c.t, dnc = s12Dnc();
   const room = (h, u) => {
     const uk = unitKind(h, u);
-    return `<span class="rm${dnc[K(h.id, u)] ? ' x' : ''}">${esc(uName(h, u))}${uk !== 'home' ? `<small>${S12_KCH[uk] || ''}</small>` : ''}</span>`;
+    return `<span class="rm${isSkipV(dnc[K(h.id, u)]) ? ' k' : dnc[K(h.id, u)] ? ' x' : ''}">${isSkipV(dnc[K(h.id, u)]) ? 'ー' : ''}${esc(uName(h, u))}${uk !== 'home' ? `<small>${S12_KCH[uk] || ''}</small>` : ''}</span>`;
   };
   const body = !c.apts.length ? '<p class="s12empty">この区域には、集合住宅の登録はありません。</p>' : c.apts.map((h, i) => {
     const groups = unitGroups(h);
@@ -15048,12 +15094,12 @@ function s12BackHtml(c, S, fs) {
       : groups.length > 1 ? groups.map(([g, us]) => `<div class="fl"><span class="fn">${esc(g || 'そのほか')}</span><span class="rs">${us.map(u => room(h, u)).join('')}</span></div>`).join('')
       : `<div class="fl one"><span class="rs">${h.units.map(u => room(h, u)).join('')}</span></div>`;
     const info = [kindOf(h) !== 'home' ? kindName(kindOf(h)) : '', h.lock ? 'オートロック' : '', h.ac === 'ev' ? 'エレベーターあり' : h.ac === 'no' || h.ac === 'st' ? 'エレベーターなし' : '', `${h.units.length}部屋`].filter(Boolean).join('・');
-    return `<div class="ab"><p class="an"><i>${i + 1}</i>${esc(h.label || '集合住宅')}<small>${info}</small>${dnc[K(h.id, '')] ? '<b class="rm x">建物ごと拒否</b>' : ''}</p>${rows}</div>`;
+    return `<div class="ab"><p class="an"><i>${i + 1}</i>${esc(h.label || '集合住宅')}<small>${info}</small>${s12Ref(dnc, K(h.id, '')) ? '<b class="rm x">建物ごと拒否</b>' : ''}</p>${rows}</div>`;
   }).join('');
   return `<div class="s12card back">
     <p class="s12bh"><b>区域番号 ${esc(t.no)}</b>${t.name ? `<span class="nm">${esc(t.name)}</span>` : ''}<span class="r">集合住宅（番号は表の地図）</span></p>
     <div class="s12apts" data-s12fit="${esc(t.id)}" style="column-count:${S.backCols};font-size:${fs}pt">${body}</div>
-    ${c.apts.length ? `<p class="s12ft"><span class="lg">例：<span class="rm x">101</span> 拒否の部屋（訪問しない）${c.apts.some(h => h.units.some(u => unitKind(h, u) !== 'home')) ? '　社・店など：住居以外の部屋' : ''}</span></p>` : ''}
+    ${c.apts.length ? `<p class="s12ft"><span class="lg">例：<span class="rm x">101</span> ${s12HasSkip(c) ? '拒否の部屋　<span class="rm k">ー102</span> 訪問しない部屋' : '拒否の部屋（訪問しない）'}${c.apts.some(h => h.units.some(u => unitKind(h, u) !== 'home')) ? '　社・店など：住居以外の部屋' : ''}</span></p>` : ''}
   </div>`;
 }
 /* 裏面の文字の大きさ：部屋が多い区域は、入りきるまで小さくする */

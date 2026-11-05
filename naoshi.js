@@ -243,7 +243,7 @@
     // 「この家を編集」の画面の下（場所を直す・削除と同じ所）に置く（改善案A9・2026-10-25）
     if (title && title.textContent === 'この家を編集') {
       const sep = S.querySelector('.aw-sep'), asHouse = S.querySelector('[data-type="house"][aria-pressed="true"]');
-      if (sep && asHouse && !curTgt.unit && h.type === 'house' && !isSimple() && !S.querySelector('#fDuplex')) {
+      if (sep && asHouse && !curTgt.unit && h.type === 'house' && !isSimple() && !S.querySelector('#fDuplex') && (isAdmin() || !hasSkip(h))) { // 訪問しないの家は区域係だけ（監査 HS-A8）
         const hid0 = curTgt.hid;
         sep.insertAdjacentHTML('afterbegin', '<button class="btn block" id="fDuplex">二世帯住宅にする</button>');
         S.querySelector('#fDuplex').onclick = () => openDuplexConvert(hid0);
@@ -281,11 +281,12 @@
   const sideName = u => `${u}の世帯`;
 
   /* ---------- 地図の印 ---------- */
-  const FILL = { todo: '#FFFFFF', done: '#E5F2EE', met: '#E3ECF6', away: '#FFF4CC', ref: '#C62828', faint: '#E6EAEE', lock: '#C9CFCC' };
+  const FILL = { todo: '#FFFFFF', done: '#E5F2EE', met: '#E3ECF6', away: '#FFF4CC', ref: '#C62828', skip: '#6B7280', faint: '#E6EAEE', lock: '#C9CFCC' };
   const MARK = { done: '#0E7C66', met: '#2F5D8A' };
   function bandIcon(x, y, st, s) {
     if (st === 'done' || st === 'met') return `<path d="M${x - 3.6 * s},${y + 0.2 * s} l${2.6 * s},${2.7 * s} l${4.8 * s},${-5.4 * s}" fill="none" stroke="${MARK[st]}" stroke-width="${2.3 * s}" stroke-linecap="round" stroke-linejoin="round"/>`;
     if (st === 'ref') return `<path d="M${x - 2.8 * s},${y - 2.8 * s} l${5.6 * s},${5.6 * s} M${x + 2.8 * s},${y - 2.8 * s} l${-5.6 * s},${5.6 * s}" stroke="#fff" stroke-width="${2 * s}" stroke-linecap="round"/>`;
+    if (st === 'skip') return `<path d="M${x - 3 * s},${y} h${6 * s}" stroke="#fff" stroke-width="${2.2 * s}" stroke-linecap="round"/>`; // 訪問しない
     if (st === 'away') return `<text x="${x}" y="${y + 3.2 * s}" font-size="${8.5 * s}" text-anchor="middle" fill="#7A5C00" font-weight="700">留</text>`;
     return '';
   }
@@ -317,7 +318,7 @@
   function unitState(h, u, ff, since, locked) {
     if (locked) return 'lock';
     const k = K(h.id, u);
-    if (D().dnc[k]) return 'ref';
+    if (D().dnc[k]) return dncSkip(k) ? 'skip' : 'ref';
     if (ff) {
       const f = ff(k);
       if (f === 'dim') return 'faint';
@@ -376,7 +377,8 @@
         b += fixLineHtml(k);
         b += recentOtherHtml(k);
         if (window.chuiNotice) b += window.chuiNotice(h, u); // 注意（！）
-        if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の世帯です。</b>訪問しないでください。${h.units.length > 1 ? 'ほかの世帯は訪ねられます。' : ''}</div>`;
+        if (dncSkip(k)) b += skipNoteHtml('世帯', false);
+        else if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の世帯です。</b>訪問しないでください。${h.units.length > 1 ? 'ほかの世帯は訪ねられます。' : ''}</div>`;
         else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="duOverride">それでも記録する</button></span></div>`;
         else b += st.step === 'result' ? resultChoicesHtml('') : seqStepsHtml(st, k);
         b += '<button class="btn block" data-close>閉じる</button>';
@@ -435,6 +437,7 @@
   function openDuplexConvert(hid) {
     if (typeof simpleBlock === 'function' && simpleBlock('二世帯住宅に変えることは')) return;
     const h = houseById(hid); if (!h || h.type !== 'house') return;
+    if (!isAdmin() && hasSkip(h)) { toast('訪問しないの家の種類は、区域係だけが変えられます'); return; } // 再監査 HS-A8
     const t = terrById(h.terrId), k0 = K(hid, '');
     // 世帯に分ける記録：今日の自分の記録（直せる記録は移す）と、受け取ってから（今の巡回）の自分の記録（写す）。
     // 以前は今日の記録だけで、回っている途中で変えると、前の日の記録が残らず両方の世帯が「まだ」になった（総点検 L14・2026.13.105）
@@ -478,6 +481,7 @@
       const fn = () => {
         const h2 = houseById(hid); if (!h2) return;
         h2.type = 'apt'; h2.units = units; h2.mu = mu;
+        skipToUnits(h2); // 訪問しないの家なら、世帯ぜんぶを訪問しないに（監査 HS-A8）
         if (!h2.label) h2.label = '二世帯住宅';
         delete h2.prov; delete h2.uk; delete h2.ul; delete h2.lock;
         fixable.forEach(v => {
@@ -506,6 +510,7 @@
     closeSheet();
     commit('1軒の家にもどしました', () => {
       const h2 = houseById(hid); if (!h2) return;
+      skipToHouse(h2); // 訪問しないの世帯があれば、1軒の家を訪問しないに（監査 HS-A8）
       h2.units.forEach(u => { const k = K(hid, u); if (typeof dncDrop === 'function') dncDrop(k, h2); else delete D().dnc[k]; delete D().follows[k]; delete D().released[k]; });
       h2.type = 'house'; h2.units = []; delete h2.mu;
       if (h2.label === '二世帯住宅') h2.label = '';

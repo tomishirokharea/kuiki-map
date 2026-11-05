@@ -795,7 +795,7 @@
   }
   function dncCounts() {
     let visit = 0, imp = 0, room = 0;
-    for (const k in D().dnc) { const v = D().dnc[k]; if (v && typeof v === 'object' && v.room) room++; else if (v && typeof v === 'object' && (v.s || v.a)) imp++; else visit++; }
+    for (const k in D().dnc) { const v = D().dnc[k]; if (isSkipV(v)) continue; if (v && typeof v === 'object' && v.room) room++; else if (v && typeof v === 'object' && (v.s || v.a)) imp++; else visit++; }
     return { visit, imp, room, all: visit + imp + room };
   }
   const itemPlace = it => `${it.a || it.src || '（名前なし）'}${it.room ? '　' + (/\d$/.test(it.room) ? it.room + '号室' : it.room) : ''}`;
@@ -818,7 +818,7 @@
     const tids = new Set();
     st.items.forEach(it => { if (it.use && !st.offFolders.has(it.folder || '')) { const id = terrOf(it.lat, it.lng); if (id) tids.add(id); } });
     let dnc = 0, cau = 0;
-    for (const k in D().dnc) if (tids.has(dncTidOf(k, D().dnc[k]))) dnc++;
+    for (const k in D().dnc) if (!isSkipV(D().dnc[k]) && tids.has(dncTidOf(k, D().dnc[k]))) dnc++; // 訪問しないは消さないので数えない
     for (const k in C()) { const v = C()[k]; if (v && v.s === 'kml' && tids.has(dncTidOf(k, v))) cau++; }
     return { tids, dnc, cau };
   }
@@ -1001,11 +1001,11 @@
       // 2) 拒否・注意（今あるものを消す）
       const cm = C();
       if (mode === 'all') {
-        if (st.replaceDnc) { D().dnc = {}; }
+        if (st.replaceDnc) { const keep = {}; Object.keys(D().dnc).forEach(k => { if (isSkipV(D().dnc[k])) keep[k] = D().dnc[k]; }); D().dnc = keep; } // 訪問しない（係が付けた印）は残す
         Object.keys(cm).forEach(k => { if (cm[k] && cm[k].s === 'kml') delete cm[k]; });
       } else if (st.pinWay === 'replace') {
         const tids = pinScope(st).tids;
-        Object.keys(D().dnc).forEach(k => { if (tids.has(dncTidOf(k, D().dnc[k]))) { delete D().dnc[k]; res.delD++; } });
+        Object.keys(D().dnc).forEach(k => { if (!isSkipV(D().dnc[k]) && tids.has(dncTidOf(k, D().dnc[k]))) { delete D().dnc[k]; res.delD++; } }); // 訪問しないは残す
         Object.keys(cm).forEach(k => { if (cm[k] && cm[k].s === 'kml' && tids.has(dncTidOf(k, cm[k]))) { delete cm[k]; res.delC++; } });
       }
       // 足すときは、同じ家・同じ場所（3m以内・同じ部屋）の拒否・注意を、もう一度入れない
@@ -1036,13 +1036,13 @@
         const pl = api.placeOne(near, pos, '', true);
         if (pl.kind === 'house') {
           const h = pl.h, k = K(h.id, '');
-          if (it.kind === 'warn') { if (addOnly && cm[k]) { res.skip++; return; } cm[k] = { s: 'kml', at }; if (it.note) cm[k].n = it.note; res.cau++; }
-          else { if (addOnly && D().dnc[k]) { res.skip++; return; } D().dnc[k] = Object.assign(base, { lat: r6(h.lat), lng: r6(h.lng), auto: 1 }); delete D().follows[k]; delete D().released[k]; delete cm[k]; res.dnc++; }
+          if (it.kind === 'warn') { if ((addOnly && cm[k]) || isSkipV(D().dnc[k])) { res.skip++; return; } /* 訪問しないの家に、取り込みで注意の文を付けない（監査 HS-A7） */ cm[k] = { s: 'kml', at }; if (it.note) cm[k].n = it.note; res.cau++; }
+          else { if ((addOnly && D().dnc[k]) || isSkipV(D().dnc[k])) { res.skip++; return; } /* 訪問しないの家は、拒否で上書きしない */ D().dnc[k] = Object.assign(base, { lat: r6(h.lat), lng: r6(h.lng), auto: 1 }); delete D().follows[k]; delete D().released[k]; delete cm[k]; res.dnc++; }
           return;
         }
         if (it.kind === 'warn') { // 近くにアパートがあれば、建物ぜんたいの注意にする
           const apt = near(it.lat, it.lng, 15).find(([h]) => h.type === 'apt');
-          if (apt) { const k = K(apt[0].id, ''); if (addOnly && cm[k]) { res.skip++; return; } cm[k] = { s: 'kml', at }; if (it.note) cm[k].n = it.note; res.cau++; return; }
+          if (apt) { const k = K(apt[0].id, ''); if ((addOnly && cm[k]) || hasSkip(apt[0])) { res.skip++; return; } /* 訪問しないの部屋のある建物には付けない（監査 HS-A7） */ cm[k] = { s: 'kml', at }; if (it.note) cm[k].n = it.note; res.cau++; return; }
         }
         const o = Object.assign(base, { p: 1, lat: r6(it.lat), lng: r6(it.lng) });
         const tid = terrOf(it.lat, it.lng); if (tid) o.t = tid;

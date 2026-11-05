@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.121"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
+<meta name="app-version" content="2026.13.122"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="config.js"></script><!-- GASのURLと、会衆ごとの設定はこのファイルに書きます（無ければ試作モード） -->
-<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><script src="i18n-es-guruchu.js"></script><script src="i18n-es-meibo.js"></script><script src="i18n-es-shikai.js"></script><script src="i18n-es-tenken.js"></script><script src="i18n-es-kaizen.js"></script><script src="i18n-es-osusume.js"></script><script src="i18n-es-houkoku.js"></script><script src="i18n-es-joukyou.js"></script><!-- スペイン語の辞書 / Diccionario español -->
+<script src="i18n-es.js"></script><script src="i18n-es-chizu.js"></script><script src="i18n-es-kyoukai.js"></script><script src="i18n-es-tokubetsu.js"></script><script src="i18n-es-guruchu.js"></script><script src="i18n-es-meibo.js"></script><script src="i18n-es-shikai.js"></script><script src="i18n-es-tenken.js"></script><script src="i18n-es-kaizen.js"></script><script src="i18n-es-osusume.js"></script><script src="i18n-es-houkoku.js"></script><script src="i18n-es-joukyou.js"></script><script src="i18n-es-shinai.js"></script><!-- スペイン語の辞書 / Diccionario español -->
 <script src="i18n.js"></script><!-- 言語の切りかえ / Cambio de idioma -->
 <script src="app-head.js"></script>
 <style>
@@ -160,6 +160,9 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .st-away{background:var(--away);color:#1F1A00}
 .st-refused{background:var(--ref);color:#fff}
 .st-dnc{background:var(--ref);color:#fff;box-shadow:0 0 0 2px #fff,0 0 0 5px var(--ref)}
+.st-skip{background:#6B7280;color:#fff;font-weight:900;box-shadow:0 0 0 2px #fff,0 0 0 4px #6B7280}
+.pin.st-skip.sm{width:26px;height:26px;font-size:15px;border-width:2px;box-shadow:0 0 0 1.5px #6B7280,0 1px 2px #0005}
+.notice.skipnote{background:#F1F3F5;border:2px solid #6B7280;color:#1F2933}
 .st-temp{background:var(--draw);color:#fff}
 .pin em,.unit em{position:absolute;left:-10px;bottom:-9px;background:var(--follow);color:#fff;font-style:normal;font-size:12px;font-weight:700;border-radius:6px;padding:1px 4px;border:2px solid #fff;line-height:1.2}
 .unit em{left:4px;top:4px;bottom:auto}
@@ -340,6 +343,7 @@ button.tile:focus-visible{outline:3px solid var(--brand-ink);outline-offset:2px}
 .pin b.rc{position:absolute;right:-13px;top:-13px;min-width:22px;height:22px;border-radius:99px;background:#00796B;color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;border:2px solid #fff;padding:0 3px;line-height:1}
 .pin.apt b.rc{top:auto;bottom:-13px;right:-13px}
 .pin b.rj{position:absolute;right:-14px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:99px;background:var(--ref);color:#fff;font-size:11px;display:grid;place-items:center;border:2px solid #fff}
+.pin b.sk{position:absolute;right:-14px;top:auto;bottom:-10px;width:20px;height:20px;border-radius:99px;background:#6B7280;color:#fff;font-size:11px;display:grid;place-items:center;border:2px solid #fff}
 .refnote{background:var(--ref-bg);border:2px solid var(--ref);color:#7f1d1d}
 .btn.refok{background:var(--ref);border-color:var(--ref);color:#fff}
 .pin.later{opacity:1} /* まだ訪ねていない家は薄くしない（薄い＝訪ねた家、と見分けるため） */
@@ -661,6 +665,7 @@ body.strong .pin.st-plain{border-width:4px}
 .s12apts .rs{display:flex;flex-wrap:wrap;gap:.5mm}
 .s12card .rm{display:inline-block;border:.2mm solid #000;border-radius:.4mm;padding:0 .35em;min-width:1.6em;text-align:center;line-height:1.35}
 .s12card .rm.x{background:#000;color:#fff}
+.s12card .rm.k{background:#6B7280;color:#fff;text-decoration:line-through}
 .s12card .rm small{font-size:.8em;margin-left:.15em}
 .s12apts .an .rm{margin-left:.6em;font-size:.85em}
 .s12empty,.s12apts .nr{color:#333}
@@ -1610,7 +1615,8 @@ body.renshu #btnUpd{display:none!important}
           <span><i class="pin st-met done">会<u>✓</u></i>訪ねて、会えた家</span>
           <span><i class="pin st-away done">留<u>✓</u></i>訪ねて、留守だった家</span>
           <span><i class="pin st-plain prev"><u class="b">✓</u></i>最近会えた家・ほかの人が会えた家（青いチェック。とばしてよい）</span>
-          <span><i class="pin st-dnc">拒</i>拒否（訪問しない）</span>
+          <span><i class="pin st-dnc">拒</i>拒否（断られた家）</span>
+          <span class="lg-skip"><i class="pin st-skip">ー</i>訪問しない（区域係が設定）</span>
           <span><i class="pin apt">集<i>3</i></i>集合住宅（数字はまだの部屋）</span>
             <span><i class="pin st-plain"><s>1</s></i>おすすめの順番</span>
           <span><i class="pin st-plain locked"></i>自分の区域以外（選べません）</span>
