@@ -7,6 +7,12 @@
 window.KUIKI_I18N = window.KUIKI_I18N || {};
 window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "訪問しない": "Omitida",
+"拒否（断られた家）": "No visitar (rechazó la visita)",
+"拒否の部屋": "Departamento «No visitar»",
+"訪問しない部屋": "Departamento omitido",
+"訪問しないの家なので、建物の種類は区域係だけが変えられます。": "Es una casa omitida; solo el encargado de territorios puede cambiar el tipo de edificio.",
+"訪問しないの家の種類は、区域係だけが変えられます": "Solo el encargado de territorios puede cambiar el tipo de una casa omitida",
+"この家は「訪問しない」の家なので、拒否の印は入れずに外しました": "Esta casa está marcada como «Omitida»; no se agregó la marca «No visitar»",
 "訪問しない {0}": "Omitidas {0}",
 "訪問しない（区域係が設定）": "Omitida (la marcó el encargado de territorios)",
 "訪問しない家": "Casas omitidas",

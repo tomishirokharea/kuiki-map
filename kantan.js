@@ -480,7 +480,7 @@
   function simpleLegend() {
     const box = document.getElementById('legendInfo'); if (!box) return;
     const key = (cls, mark, label) => `<span><i class="pin mini st-plain${cls}">${mark}</i>${label}</span>`;
-    const keys = `<p class="keys">${key('', '', 'まだ訪ねていない家')}${key(' done', '<u>✓</u>', '訪ねた家')}${key(' prev', '<u class="b">✓</u>', '最近会えた家')}<span><i class="pin mini st-dnc">拒</i>拒否（訪問しない）</span></p>`;
+    const keys = `<p class="keys">${key('', '', 'まだ訪ねていない家')}${key(' done', '<u>✓</u>', '訪ねた家')}${key(' prev', '<u class="b">✓</u>', '最近会えた家')}<span><i class="pin mini st-dnc">拒</i>拒否（断られた家）</span><span><i class="pin mini st-skip">ー</i>訪問しない</span></p>`; // 監査 HS-A3・HS-A10
     const r = typeof roundTerr !== 'undefined' && roundTerr ? roundInfo(roundTerr) : null;
     if (!r) { box.innerHTML = keys; return; }
     const n = r.c, own = r.t.holder === me().id, lead = !own && typeof isLead === 'function' && isLead(r.t);

@@ -243,7 +243,7 @@
     // 「この家を編集」の画面の下（場所を直す・削除と同じ所）に置く（改善案A9・2026-10-25）
     if (title && title.textContent === 'この家を編集') {
       const sep = S.querySelector('.aw-sep'), asHouse = S.querySelector('[data-type="house"][aria-pressed="true"]');
-      if (sep && asHouse && !curTgt.unit && h.type === 'house' && !isSimple() && !S.querySelector('#fDuplex')) {
+      if (sep && asHouse && !curTgt.unit && h.type === 'house' && !isSimple() && !S.querySelector('#fDuplex') && (isAdmin() || !hasSkip(h))) { // 訪問しないの家は区域係だけ（監査 HS-A8）
         const hid0 = curTgt.hid;
         sep.insertAdjacentHTML('afterbegin', '<button class="btn block" id="fDuplex">二世帯住宅にする</button>');
         S.querySelector('#fDuplex').onclick = () => openDuplexConvert(hid0);
@@ -480,6 +480,7 @@
       const fn = () => {
         const h2 = houseById(hid); if (!h2) return;
         h2.type = 'apt'; h2.units = units; h2.mu = mu;
+        skipToUnits(h2); // 訪問しないの家なら、世帯ぜんぶを訪問しないに（監査 HS-A8）
         if (!h2.label) h2.label = '二世帯住宅';
         delete h2.prov; delete h2.uk; delete h2.ul; delete h2.lock;
         fixable.forEach(v => {
@@ -508,6 +509,7 @@
     closeSheet();
     commit('1軒の家にもどしました', () => {
       const h2 = houseById(hid); if (!h2) return;
+      skipToHouse(h2); // 訪問しないの世帯があれば、1軒の家を訪問しないに（監査 HS-A8）
       h2.units.forEach(u => { const k = K(hid, u); if (typeof dncDrop === 'function') dncDrop(k, h2); else delete D().dnc[k]; delete D().follows[k]; delete D().released[k]; });
       h2.type = 'house'; h2.units = []; delete h2.mu;
       if (h2.label === '二世帯住宅') h2.label = '';

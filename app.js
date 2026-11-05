@@ -2354,6 +2354,19 @@ const isPinKey = k => String(k).indexOf('|') < 0;
 const isSkipV = v => !!(v && typeof v === 'object' && v.q && !v.p);
 const dncSkip = k => isSkipV(D().dnc[k]);
 const capSkip = () => !!(D().settings && Number(D().settings.capDncQ) === 1);
+/* 家の種類を変えるとき（一戸建て→アパート・二世帯、もどす）、訪問しない印を家と部屋のあいだで移す（監査 HS-A8）。
+   commit の中で、部屋（units）を変えたあとに呼ぶ */
+function skipToUnits(h) { // 家の印 → 部屋ぜんぶ
+  const k0 = K(h.id, ''), v = D().dnc[k0];
+  if (!isSkipV(v) || !h.units.length) return;
+  delete D().dnc[k0];
+  h.units.forEach(u => { const k = K(h.id, u); D().dnc[k] = Object.assign({}, v, { at: new Date().toISOString() }); delete D().follows[k]; delete D().released[k]; });
+}
+function skipToHouse(h) { // 部屋のどれかが訪問しない → 家の印（部屋を消す前に呼ぶ）
+  const v = h.units.map(u => D().dnc[K(h.id, u)]).find(isSkipV);
+  if (v) D().dnc[K(h.id, '')] = Object.assign({}, v, { at: new Date().toISOString() });
+}
+const hasSkip = h => !!h && (dncSkip(K(h.id, '')) || (h.units || []).some(u => dncSkip(K(h.id, u)))); // この家（部屋のどれか）に訪問しない印
 const dncRefN = () => { let n = 0; for (const k in D().dnc) if (!isSkipV(D().dnc[k])) n++; return n; }; // 拒否の数（訪問しないは入れない）
 const dncTerrOf = d => (d && d.t && terrById(d.t) ? d.t : d && isFinite(d.lat) && d.lat != null ? terrOf(d.lat, d.lng) : null); // 場所だけの拒否の区域
 function dncPins() { // 場所だけの拒否（地図に出せるもの）
@@ -6130,7 +6143,7 @@ function seqStepsHtml(st, k) {
   if (st.step === 'dnc') return refuseStepHtml(true);
   return '';
 }
-const UST_GLYPH = { met: '会', away: '留', refused: '拒', dnc: '拒', skip: 'ー' }, UST_NAME = { met: '会えた', away: '留守', refused: '拒否', dnc: '拒否', skip: '訪問しない' };
+const UST_GLYPH = { met: '会', away: '留', refused: '拒', dnc: '拒', skip: 'ー' }, UST_NAME = { met: '会えた', away: '留守', refused: '拒否', dnc: '拒否', skip: '訪問しない部屋' };
 /* 続けて入力：今の部屋の見出しから「とばして次へ」までが画面に入るように、下から出る画面を動かす。
    部屋の一覧が長い建物で、部屋を押したり記録したりするたびに、ボタンが画面の外に出ないように（点検④U2） */
 function seqShowRoom(S) {
@@ -6174,7 +6187,7 @@ function openAptSeq(hid, startUnit) {
     const chip = u => {
       // 色と字は、見出しと同じ「今の巡回（受け取ってから）」の結果で出す。前の巡回の結果は出さない（総点検 L5・2026.13.105）
       const i = h.units.indexOf(u), s0 = statusOf(K(hid, u)), s1 = s0 === 'dnc' || !inRound || visitedSince(K(hid, u), since) ? s0 : 'new', s = s1 === 'dnc' && dncSkip(K(hid, u)) ? 'skip' : s1, uk = unitKind(h, u), g = UST_GLYPH[s];
-      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? '（前回 ' + UST_NAME[s] + '）' : ''}へ">${kindBadge(uk)}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
+      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? (s === 'skip' ? '（' + UST_NAME[s] + '）' : '（前回 ' + UST_NAME[s] + '）') : ''}へ">${kindBadge(uk)}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
     };
     const groups = h.units.length > 10 ? unitGroups(h) : [];
     b += groups.length > 1
@@ -6243,6 +6256,7 @@ function openAptSeq(hid, startUnit) {
 /* ---------- 一戸建てを、アパート・マンションに変える ---------- */
 function openConvertApt(hid) {
   const h = houseById(hid); if (!h || h.type !== 'house') return;
+  if (!isAdmin() && hasSkip(h)) { toast('訪問しないの家の種類は、区域係だけが変えられます'); return; }
   const t = terrById(h.terrId), n = visitsOf(K(hid, '')).length;
   const f = { label: h.label || '', n: newNaming(), lock: false };
   const keep = () => {
@@ -6269,6 +6283,7 @@ function openConvertApt(hid) {
       closeSheet();
       commitIn([hid], `${label || '建物'}をアパート・マンションにしました（${us.length}部屋）`, () => {
         h.type = 'apt'; h.units = us; h.label = label;
+        skipToUnits(h); // 訪問しないの家なら、部屋ぜんぶを訪問しないに（監査 HS-A8）
         if (f.lock) h.lock = true; else delete h.lock;
         delete h.prov; delete h.uk; delete h.ul; // 確かめた建物なので「仮の家」ではなくなる
       });
@@ -6562,14 +6577,15 @@ function openAddForm(ll, tid, editId) {
     lab.onfocus = show;
     lab.oninput = () => { f.label = lab.value; show(); };
   };
+  const typeLock = !!eh && !isAdmin() && hasSkip(eh); // 訪問しないの家の種類は、区域係だけが変えられる（監査 HS-A8）
   const paint = () => {
     const apt = f.type === 'apt';
     setSheet(headHtml(t, eh ? 'この家を編集' : 'ここに追加します', t ? `区域${esc(t.no)}　${esc(t.name)}` : '区域は、線を完成したときに決まります') + `
       <p class="q">建物の種類</p>
       <div class="choices two">
-        <button class="choice${!apt ? ' on' : ''}" data-type="house" aria-pressed="${!apt}"><i class="pin st-new">家</i>一戸建て</button>
-        <button class="choice${apt ? ' on' : ''}" data-type="apt" aria-pressed="${apt}"><i class="pin apt">集</i>アパート・マンション</button>
-      </div>
+        <button class="choice${!apt ? ' on' : ''}" data-type="house" aria-pressed="${!apt}"${typeLock ? ' disabled' : ''}><i class="pin st-new">家</i>一戸建て</button>
+        <button class="choice${apt ? ' on' : ''}" data-type="apt" aria-pressed="${apt}"${typeLock ? ' disabled' : ''}><i class="pin apt">集</i>アパート・マンション</button>
+      </div>${typeLock ? '<p class="hint">訪問しないの家なので、建物の種類は区域係だけが変えられます。</p>' : ''}
       ${apt ? `<label class="check locrow"><input type="checkbox" id="fLock"${f.lock ? ' checked' : ''}>オートロックの建物</label>
       <p class="hint">あとからでも、建物の編集で変えられます。</p>` : ''}
       ${apt && f.cand ? `<div class="aw-from"><b>候補：${esc(f.cand.n || '（名前なし）')}</b><button id="fCandOff">はずす</button></div>
@@ -6617,6 +6633,7 @@ function openAddForm(ll, tid, editId) {
           if (f.kind !== 'home') h.kind = f.kind; else delete h.kind;
           if (f.type === 'apt') {
             h.type = 'apt'; h.units = us;
+            skipToUnits(h); // 訪問しないの家なら、部屋ぜんぶを訪問しないに（監査 HS-A8）
             if (f.lock) h.lock = true; else delete h.lock;
             delete h.prov; delete h.uk; delete h.ul; // 確かめた建物なので「仮の家」ではなくなる
             setCand(h);
@@ -14991,7 +15008,8 @@ function s12MapSvg(c, tileUrl) {
       L3.push(`<rect x="${f(x - w / 2)}" y="${f(y - hh / 2)}" width="${w}" height="${hh}" rx="${mm(0.6)}" fill="#263238" stroke="#fff" stroke-width="${mm(0.3)}"/>` +
         `<text x="${x}" y="${f(y + mm(0.1))}" font-size="${mm(2.6)}" font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="central">${n}</text>` +
         (anyRef ? `<circle cx="${f(x + w / 2)}" cy="${f(y - hh / 2)}" r="${mm(0.8)}" fill="#D32F2F" stroke="#fff" stroke-width="${mm(0.25)}"/>` : '') +
-        (anySkip ? `<circle class="s12skip-a" cx="${f(x + w / 2)}" cy="${f(y + hh / 2)}" r="${mm(0.8)}" fill="#6B7280" stroke="#fff" stroke-width="${mm(0.25)}"/>` : ''));
+        (anySkip ? `<g class="s12skip-a"><circle cx="${f(x + w / 2)}" cy="${f(y + hh / 2)}" r="${mm(0.8)}" fill="#6B7280" stroke="#fff" stroke-width="${mm(0.25)}"/>` +
+          `<path d="M${f(x + w / 2 - mm(0.4))},${f(y + hh / 2)} H${f(x + w / 2 + mm(0.4))}" stroke="#fff" stroke-width="${mm(0.3)}"/></g>` : ''));
     } else if (isSkipV(dnc[K(h.id, '')])) { // 訪問しない：灰色の丸に「ー」（理由は出さない）
       const r = mm(1.25), a = mm(0.6);
       L4.push(`<g class="s12skip"><circle cx="${x}" cy="${y}" r="${r}" fill="#6B7280" stroke="#fff" stroke-width="${mm(0.3)}"/>` +
@@ -15068,7 +15086,7 @@ function s12BackHtml(c, S, fs) {
   const t = c.t, dnc = s12Dnc();
   const room = (h, u) => {
     const uk = unitKind(h, u);
-    return `<span class="rm${isSkipV(dnc[K(h.id, u)]) ? ' k' : dnc[K(h.id, u)] ? ' x' : ''}">${esc(uName(h, u))}${uk !== 'home' ? `<small>${S12_KCH[uk] || ''}</small>` : ''}</span>`;
+    return `<span class="rm${isSkipV(dnc[K(h.id, u)]) ? ' k' : dnc[K(h.id, u)] ? ' x' : ''}">${isSkipV(dnc[K(h.id, u)]) ? 'ー' : ''}${esc(uName(h, u))}${uk !== 'home' ? `<small>${S12_KCH[uk] || ''}</small>` : ''}</span>`;
   };
   const body = !c.apts.length ? '<p class="s12empty">この区域には、集合住宅の登録はありません。</p>' : c.apts.map((h, i) => {
     const groups = unitGroups(h);
@@ -15081,7 +15099,7 @@ function s12BackHtml(c, S, fs) {
   return `<div class="s12card back">
     <p class="s12bh"><b>区域番号 ${esc(t.no)}</b>${t.name ? `<span class="nm">${esc(t.name)}</span>` : ''}<span class="r">集合住宅（番号は表の地図）</span></p>
     <div class="s12apts" data-s12fit="${esc(t.id)}" style="column-count:${S.backCols};font-size:${fs}pt">${body}</div>
-    ${c.apts.length ? `<p class="s12ft"><span class="lg">例：<span class="rm x">101</span> 拒否の部屋（訪問しない）${c.apts.some(h => h.units.some(u => unitKind(h, u) !== 'home')) ? '　社・店など：住居以外の部屋' : ''}</span></p>` : ''}
+    ${c.apts.length ? `<p class="s12ft"><span class="lg">例：<span class="rm x">101</span> ${s12HasSkip(c) ? '拒否の部屋　<span class="rm k">ー102</span> 訪問しない部屋' : '拒否の部屋（訪問しない）'}${c.apts.some(h => h.units.some(u => unitKind(h, u) !== 'home')) ? '　社・店など：住居以外の部屋' : ''}</span></p>` : ''}
   </div>`;
 }
 /* 裏面の文字の大きさ：部屋が多い区域は、入りきるまで小さくする */

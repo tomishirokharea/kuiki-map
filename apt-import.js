@@ -234,7 +234,7 @@
     const inApt = k => { const i = k.lastIndexOf('|'); return i > 0 && ids.has(k.slice(0, i)) && k.slice(i + 1) !== ''; };
     return {
       apt: apt.length, imp: apt.filter(isNewImp).length, legacy: apt.filter(isLegacyNew).length, roomV,
-      roomD: Object.keys(d.dnc || {}).filter(inApt).length, roomF: Object.keys(d.follows || {}).filter(inApt).length
+      roomD: Object.keys(d.dnc || {}).filter(k => inApt(k) && !isSkipV(d.dnc[k])).length, // 訪問しないは家の印に移して残す（監査 HS-A9） roomF: Object.keys(d.follows || {}).filter(inApt).length
     };
   }
   function resetApts(opt) {
@@ -244,6 +244,7 @@
     const apt = new Set(d.houses.filter(h => h.type === 'apt').map(h => h.id));
     const inApt = k => { const i = k.lastIndexOf('|'); if (i <= 0) return false; const id = k.slice(0, i); return gone.has(id) || (apt.has(id) && k.slice(i + 1) !== ''); };
     d.visits = d.visits.filter(v => !(gone.has(v.houseId) || (apt.has(v.houseId) && v.unit)));
+    d.houses.forEach(h => { if (h.type === 'apt' && !gone.has(h.id)) skipToHouse(h); }); // 訪問しないの部屋のある建物は、ふつうの家にもどしても訪問しない（監査 HS-A8）
     Object.keys(d.dnc || {}).forEach(k => { if (inApt(k)) { if (typeof dncDrop === 'function') dncDrop(k); else delete d.dnc[k]; } });
     Object.keys(d.follows || {}).forEach(k => { if (inApt(k)) delete d.follows[k]; });
     d.houses = d.houses.filter(h => !gone.has(h.id));

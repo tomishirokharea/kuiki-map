@@ -1036,13 +1036,13 @@
         const pl = api.placeOne(near, pos, '', true);
         if (pl.kind === 'house') {
           const h = pl.h, k = K(h.id, '');
-          if (it.kind === 'warn') { if (addOnly && cm[k]) { res.skip++; return; } cm[k] = { s: 'kml', at }; if (it.note) cm[k].n = it.note; res.cau++; }
+          if (it.kind === 'warn') { if ((addOnly && cm[k]) || isSkipV(D().dnc[k])) { res.skip++; return; } /* 訪問しないの家に、取り込みで注意の文を付けない（監査 HS-A7） */ cm[k] = { s: 'kml', at }; if (it.note) cm[k].n = it.note; res.cau++; }
           else { if ((addOnly && D().dnc[k]) || isSkipV(D().dnc[k])) { res.skip++; return; } /* 訪問しないの家は、拒否で上書きしない */ D().dnc[k] = Object.assign(base, { lat: r6(h.lat), lng: r6(h.lng), auto: 1 }); delete D().follows[k]; delete D().released[k]; delete cm[k]; res.dnc++; }
           return;
         }
         if (it.kind === 'warn') { // 近くにアパートがあれば、建物ぜんたいの注意にする
           const apt = near(it.lat, it.lng, 15).find(([h]) => h.type === 'apt');
-          if (apt) { const k = K(apt[0].id, ''); if (addOnly && cm[k]) { res.skip++; return; } cm[k] = { s: 'kml', at }; if (it.note) cm[k].n = it.note; res.cau++; return; }
+          if (apt) { const k = K(apt[0].id, ''); if ((addOnly && cm[k]) || hasSkip(apt[0])) { res.skip++; return; } /* 訪問しないの部屋のある建物には付けない（監査 HS-A7） */ cm[k] = { s: 'kml', at }; if (it.note) cm[k].n = it.note; res.cau++; return; }
         }
         const o = Object.assign(base, { p: 1, lat: r6(it.lat), lng: r6(it.lng) });
         const tid = terrOf(it.lat, it.lng); if (tid) o.t = tid;

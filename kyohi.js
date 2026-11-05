@@ -333,7 +333,7 @@
     for (const k in D().dnc) {
       if (!isSkipV(D().dnc[k]) || isPinKey(k)) continue;
       const [hid, unit] = parseKey(k), h = houseById(hid);
-      if (h) out.push({ k, v: D().dnc[k], h, unit, tid: h.terrId || null, lat: h.lat, lng: h.lng });
+      if (h && (unit ? h.units.includes(unit) : h.type !== 'apt')) out.push({ k, v: D().dnc[k], h, unit, tid: h.terrId || null, lat: h.lat, lng: h.lng }); // もうない部屋の印は出さない
     }
     return out;
   }
@@ -685,6 +685,11 @@
       const from = pick.cur;
       if (!from || !D().dnc[from]) { reviewNext(false); return; }
       if (from === k) { if (D().dnc[k].auto) confirmAuto(k); reviewNext(true); return; }
+      if (dncSkip(k)) { // 訪問しないの家・部屋：拒否には変えない（理由になりうるメモを持ちこまない・監査 HS-A6）
+        cmI('この家は「訪問しない」の家なので、拒否の印は入れずに外しました', () => { delete D().dnc[from]; });
+        reviewNext(true);
+        return;
+      }
       cmI(`${name}を拒否の家にしました`, () => moveTo(from, h, unit));
       reviewNext(true);
       return;
