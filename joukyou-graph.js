@@ -336,7 +336,7 @@
   function geom(n, unit, availW) {
     const T = 22, B = unit === 'day' ? 58 : 42, H = T + PH + B, plotW = Math.max(160, availW - AX);
     const slot = Math.max(SLOT_MIN, Math.min(SLOT_MAX, plotW / Math.max(1, n)));
-    const bw = Math.min(30, Math.floor(slot * 0.36));
+    const bw = Math.min(28, Math.floor(slot * 0.34)); // 2本の割合の数字（11px）が重ならない幅
     return { T, B, H, slot, bw, W: Math.ceil(slot * n), plotW };
   }
 
@@ -365,7 +365,7 @@
         out.push(`<rect x="${x}" y="${y}" width="${bw}" height="${h}" fill="#fff" stroke="${COL[c]}" stroke-width="1.5"/>`);
         if (t.met) { const hm = Math.max(1.5, t.met / max * PH); out.push(`<rect x="${x}" y="${Y(0) - hm}" width="${bw}" height="${hm}" fill="${MFILL[c]}" stroke="${COL[c]}" stroke-width="1"/>`); }
         const rr = rate(t, FEW_BAR);
-        if (!rr.few) out.push(`<text x="${x + bw / 2}" y="${y - 4}" font-size="12" font-weight="700" text-anchor="middle" style="fill:${COL[c]}">${rr.pct}%</text>`);
+        if (!rr.few) out.push(`<text x="${x + bw / 2}" y="${y - 4}" font-size="11" font-weight="700" text-anchor="middle" style="fill:${COL[c]}">${rr.pct}%</text>`);
       });
       if (b.current) out.push(`<rect x="${px - 3}" y="${Math.min(top - 18, Y(0) - 8)}" width="${bw * 2 + gap + 6}" height="${Y(0) - Math.min(top - 18, Y(0) - 8) + 2}" fill="none" stroke="#17324D" stroke-width="1.5" stroke-dasharray="3 2"/>`);
       if (b.key === st.selKey) out.push(`<rect x="${x0 + 1.5}" y="${T - 20}" width="${slot - 3}" height="${PH + 20 + 4}" fill="none" stroke="#17324D" stroke-width="2.5" rx="6"/>`);
@@ -420,7 +420,6 @@
       <div class="seg jg-seg" role="group" aria-label="期間">${PERIODS.map(p => `<button type="button" data-jgper="${p[0]}" aria-pressed="${p[0] === st.period}">${p[1]}</button>`).join('')}</div>
       <div class="jg-sum">${line('area')}${line('card')}</div>
       ${has ? `<div class="jg-wrap">${axisSvg(geo, mx)}<div class="jg-sc" id="jgSc">${chartSvg(bars, mx, geo, g.unit, r)}</div></div>` : '<div class="empty">この期間に、訪ねた記録はありません</div>'}
-      <p class="sr-only" id="jgSel" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"></p>
       ${LEGEND()}
       ${has ? `<p class="hint"><span>棒（その日の列）を押すと、区域ごとの内訳が出ます。内訳の区域を押すと、その区域のカルテが開きます。</span>${geo.W > geo.plotW ? '<span>入りきらない日は、グラフを横に動かすと見られます。</span>' : ''}${g.unit === 'day' ? '<span>訪ねた記録のない日は、のせていません。</span>' : ''}</p>` : ''}
       ${notes.map(x => `<p class="hint">${esc(x)}</p>`).join('')}
@@ -450,6 +449,8 @@
   }
   // えらんだ棒は、番号ではなく棒の key（日付）で覚える。記録が届いて棒が増えても、同じ日を指す（監査 M-1）
   const idxOf = key => (st.bars && key ? st.bars.findIndex(b => b.key === key) : -1);
+  // その日より前で、いちばん近い棒（ないときは -1）。その日がなくなったとき（記録を取り消した・日をまたいだ）に使う
+  const nearIdx = key => { let n = -1; (st.bars || []).forEach((b, j) => { if (b.key <= key) n = j; }); return n; };
   function select(key) {
     if (!st.bars) return;
     st.selKey = key || '';
@@ -483,10 +484,15 @@
   }
   // 内訳を開く。key：棒の key（日付）。その日がもうないとき（日をまたいだ・記録を取り消した）は、その前でいちばん近い棒
   function openBar(key, keep) {
+    // 記録が届いて、まだ数え直していないとき（数秒に1回にまとめている間）は、先に数え直す。上の合計と区域ごとの数をそろえる（再監査 N-3）
+    if (st.agg && dataSig() !== st.agg.sig) {
+      compute(true);
+      if (shown()) draw(false); else { const x = barsOf(st.agg.r, st.period); st.bars = x.bars; st.unit = x.g.unit; st.r = st.agg.r; }
+    }
     const bars = st.bars, r = st.r, unit = st.unit;
     if (!bars || !bars.length || typeof setSheet !== 'function') return;
     let i = idxOf(key);
-    if (i < 0) { i = 0; for (let j = 0; j < bars.length; j++) if (bars[j].key <= key) i = j; }
+    if (i < 0) i = Math.max(0, nearIdx(key));
     const b = bars[i];
     key = b.key;
     const det = detailOf(b);
@@ -514,7 +520,11 @@
     setSheet(html);
     const S = $id('sheet'); if (!S) return;
     S.querySelectorAll('[data-jgt]').forEach(x => { x.onclick = () => KM.openKarte(x.dataset.jgt, () => openBar(key)); });
-    S.querySelectorAll('[data-jgnav]').forEach(x => { x.onclick = () => { const L = st.bars || [], j = idxOf(key) + Number(x.dataset.jgnav); if (j >= 0 && j < L.length) openBar(L[j].key, true); }; });
+    S.querySelectorAll('[data-jgnav]').forEach(x => { x.onclick = () => { // 開いている日がなくなっていたら、その前の近い棒を基準にする（再監査 N-1）
+      const L = st.bars || [], d = Number(x.dataset.jgnav), c = idxOf(key), n = nearIdx(key);
+      const j = c >= 0 ? c + d : d < 0 ? n : n + 1;
+      if (j >= 0 && j < L.length) openBar(L[j].key, true);
+    }; });
     if (shown()) select(key); else st.selKey = key; // グラフでも、えらんだ日に枠を付ける
   }
 
@@ -524,7 +534,7 @@
     let box = $id('adJG');
     if (!box) {
       box = document.createElement('div'); box.id = 'adJG';
-      box.innerHTML = '<h2 class="sec" data-hqk="joukyouGraph">区域カードと留守宅カード</h2><div id="jgBody"><p class="hint">集計しています…</p></div>';
+      box.innerHTML = '<h2 class="sec" data-hqk="joukyouGraph">区域カードと留守宅カード</h2><div id="jgBody"><p class="hint">集計しています…</p></div><p id="jgSel" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0"></p>'; // 読み上げの場所は描き直さない
       const ref = $id('adAch');
       if (ref && ref.parentNode) ref.parentNode.insertBefore(box, ref.nextSibling); else pane.appendChild(box);
       box.addEventListener('click', e => {

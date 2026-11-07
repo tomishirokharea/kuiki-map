@@ -293,6 +293,7 @@
         try {
           await api('iken_mark', { ids: [id], status: s }, { timeout: 30000 });
           x.status = s; marks.push({ id, s, seq: ++markSeq }); if (marks.length > 50) marks.shift();
+          const y = (items || []).find(z => z.id === id); if (y) y.status = s; // 送っている間に一覧が読み直されていても、今の一覧に入れる（再監査 N-2）
           renderAdmin(); toast(`「${ST_NAME[s]}」にしました`);
         } catch (e) { toast('変えられませんでした。もう一度押してください'); }
       };
