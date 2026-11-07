@@ -54,5 +54,35 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 /* 更新のお知らせ（2026.13.113） */
 "正式に完了した区域が、完了のあとに家や部屋を足したときに、自動の確かめで「途中の返却」にもどらないようにしました。": "Un territorio terminado oficialmente ya no vuelve a «devuelto sin terminar» en la comprobación automática cuando se añaden casas o habitaciones después de terminarlo.",
 /* 更新のお知らせ（2026.13.116） */
-"地図の区域の番号を見やすくしました。縮めたときは番号が重ならないように出し分け、枝番は「14-3」の形にそろえました。": "Los números de territorio del mapa ahora se leen mejor: al alejar el mapa ya no se amontonan, y las subdivisiones se muestran siempre como «14-3»."
+"地図の区域の番号を見やすくしました。縮めたときは番号が重ならないように出し分け、枝番は「14-3」の形にそろえました。": "Los números de territorio del mapa ahora se leen mejor: al alejar el mapa ya no se amontonan, y las subdivisiones se muestran siempre como «14-3».",
+/* 2本並べのグラフ・区域ごとの内訳（2026.13.124） */
+"会衆全体の「訪ねた家の数」です。日ごとに、区域カード（左）と留守宅カード（右）の棒を並べて、どちらがよく会えているかをくらべます。": "Número de casas visitadas en toda la congregación. Cada día se muestran juntas la barra de la tarjeta de territorio (izquierda) y la de la tarjeta de ausentes (derecha) para comparar con cuál se encuentra más gente.",
+"区域カードと留守宅カードの、訪ねた数と会えた数の棒グラフ。棒を押すか、左右の矢印キーでえらんで決定キーを押すと、区域ごとの内訳が出ます": "Gráfico de barras de casas visitadas y En casa con la tarjeta de territorio y la tarjeta de ausentes. Toque una barra, o elíjala con las flechas y pulse Intro, para ver el detalle por territorio",
+"左：区域カード（青）": "Izquierda: tarjeta de territorio (azul)",
+"右：留守宅カード（橙の斜線）": "Derecha: tarjeta de ausentes (naranja con rayas)",
+"枠の高さ＝訪ねた軒数・塗った部分＝会えた軒数・棒の上の数字＝会えた割合": "Altura del marco = visitadas · parte rellena = En casa · número encima = porcentaje En casa",
+"この期間に、訪ねた記録はありません": "No hay visitas en este período",
+"棒（その日の列）を押すと、区域ごとの内訳が出ます。内訳の区域を押すと、その区域のカルテが開きます。": "Toque una barra (la columna del día) para ver el detalle por territorio. Toque un territorio del detalle para abrir su ficha.",
+"入りきらない日は、グラフを横に動かすと見られます。": "Deslice el gráfico hacia los lados para ver los días que no caben.",
+"訪ねた記録のない日は、のせていません。": "No se muestran los días sin visitas.",
+"留守宅カードの家は、もともと会いにくかった家です。割合が区域カードより低くても、役に立っていないとは限りません。": "Las casas de la tarjeta de ausentes ya eran difíciles de encontrar. Aunque el porcentaje sea menor que el de la tarjeta de territorio, no significa que no sirva.",
+"集まりのあった日：{0}日": "Días con reunión: {0}",
+"区域を押すと、その区域のカルテが開きます。多く訪ねた区域から並べています。": "Toque un territorio para abrir su ficha. Están ordenados de más a menos casas visitadas.",
+"区域カード（{0}区域）": "Tarjeta de territorio ({0} territorios)",
+"留守宅カード（{0}区域）": "Tarjeta de ausentes ({0} territorios)",
+"分けられない記録（{0}区域）": "Registros sin separar ({0} territorios)",
+"印のない古い記録です。区域カードか留守宅カードかは分けられません。": "Son registros antiguos sin marca. No se puede saber si fueron con tarjeta de territorio o de ausentes.",
+"今はない区域": "Territorio que ya no existe",
+"‹ 前の日": "‹ Día anterior",
+"次の日 ›": "Día siguiente ›",
+"‹ 前の週": "‹ Semana anterior",
+"次の週 ›": "Semana siguiente ›",
+"‹ 前の月": "‹ Mes anterior",
+"次の月 ›": "Mes siguiente ›",
+/* 今日の「こまったこと・提案」のお知らせ（2026.13.124） */
+"こまったこと・提案が {0}件、まだ対応していません": "{0} problemas o sugerencias todavía sin atender",
+"いちばん新しいもの：": "Lo más reciente: ",
+/* 更新のお知らせ（2026.13.124） */
+"区域係の状況の「区域カードと留守宅カード」のグラフを、日ごとに2本の棒を並べる形にしました。棒を押すと区域ごとの内訳、区域を押すとカルテが開きます。": "La gráfica «Tarjetas de territorio y de ausentes» de la situación del encargado ahora muestra dos barras juntas por día. Toque una barra para ver el detalle por territorio y un territorio para abrir su ficha.",
+"「こまったこと・提案」に、まだ対応していない声があるときは、区域係の「今日」にお知らせが出ます。押すと一覧に進みます。": "Cuando hay problemas o sugerencias sin atender, aparece un aviso en «Hoy» del encargado de territorios. Tóquelo para ir a la lista."
 });

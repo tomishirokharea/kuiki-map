@@ -8,6 +8,7 @@
      AI でまとめるための情報（直前に見ていた画面・版・モード・端末・電波・30分以内の通信のエラー）は、アプリが自動で付ける。
      付ける情報は「一緒に送る情報」で見られる。住所・記録の中身は付けない。
    ・電波がないときは、この端末に取っておき（5件まで）、電波が戻ったら送る。
+   ・区域係の画面「今日」：未対応の声があれば「今日の対応」に1行。「見る」で下の一覧（まだのもの）に飛ぶ（2026-11-07）
    ・区域係の画面「設定・データ」：受け付ける／受け付けない・送れる人・届いた声の一覧（状態：未対応・対応中・済・見送り）・
      「AIに渡す形でコピー」（指示文と一緒に。送った人の名前は外し、役割だけ残す）。
    ========================================================= */
@@ -336,5 +337,39 @@
     const a = $('#ikAi'); if (a) { a.focus(); a.select(); }
   }
 
-  window.IkenR = { home, open, renderAdmin, flush, _aiText: aiText, _ctx: ctx };
+  /* ---- 区域係の「今日」：まだ対応していない声のお知らせ（2026-11-07） ----
+     ・状態が「未対応」の声があれば、「今日の対応」に1行出す（schedule.js の todayItems）。「見る」で「設定」の「こまったこと・提案」（まだのもの）に飛ぶ
+     ・「対応中・済・見送り」にすると消える（未対応の数だけを数える）
+     ・届いた声は、係が今日を開いているときだけ、10分に1回まで読みに行く（サーバーを混ませない）。受け付けない設定のときは読みに行かない */
+  const POLL_MS = 10 * 60000;
+  let pollAt = 0, polling = false;
+  const fresh = L => (L || []).filter(x => x && x.status === 'new');
+  /** 今日の対応に出す中身。出すものがなければ null */
+  function todayInfo() {
+    if (!LIVE || !D() || !isAdmin()) return null;
+    if (Number(st().ikenOn) === 1) setTimeout(poll, 0);
+    const N = fresh(items);
+    if (!N.length) return null;
+    const x = N.slice().sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))[0];
+    const t = plain(x.text).replace(/\s+/g, ' ').trim(), head = t.length > 40 ? t.slice(0, 40) + '…' : t;
+    return { n: N.length, sub: `<span>いちばん新しいもの：</span><span>${esc(KIND_NAME[x.kind] || x.kind)}</span><span>・</span><span>${esc(fmtAt(x.at))}</span><span>・</span>${plain(x.who) ? `<span data-notr>${esc(plain(x.who))}</span>` : '<span>（名前なし）</span>'}${head ? `<br><span data-notr>「${esc(head)}」</span>` : ''}` };
+  }
+  async function poll() {
+    if (polling || loading || Date.now() - pollAt < POLL_MS || navigator.onLine === false) return;
+    if (typeof currentView !== 'undefined' && currentView !== 'admin') return;
+    if (typeof adPane !== 'undefined' && adPane !== 'inbox') return;
+    polling = true; pollAt = Date.now();
+    try {
+      const before = fresh(items).map(x => x.id).join(',');
+      const r = await api('iken_list', {}, { timeout: 45000 });
+      items = r.items || [];
+      // 未対応が変わったときだけ、今日を描き直す（下から出る画面を開いている間は、次に描くときに出す）
+      if (fresh(items).map(x => x.id).join(',') !== before && adPane === 'inbox' && currentView === 'admin' && $('#sheet').hidden) window.renderAdmin();
+    } catch (e) { /* 読めないときは、お知らせを出さないだけ（次の10分後にもう一度） */ }
+    finally { polling = false; }
+  }
+  // 今日の対応の「見る」：一覧を「まだのもの」にしてから飛ぶ（飛ぶのは schedule.js の data-tgo）
+  document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-ikgo]')) filt = 'open'; }, true);
+
+  window.IkenR = { home, open, renderAdmin, flush, todayInfo, _aiText: aiText, _ctx: ctx };
 })();

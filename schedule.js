@@ -1321,6 +1321,9 @@ button.ktag{cursor:pointer}
       row('#00796B', `${esc(uname(t.holder))}さんが、区域${esc(t.no)}を自分で受け取りました`, `${fmtDay(t.selfTakenAt)}に受け取り（今 ${heldCount(t.holder)}枚）`,
         `<button type="button" class="btn small primary" data-ttaken="${esc(t.id)}">確認した</button><button type="button" class="btn small" data-topen="${esc(t.id)}">地図</button>`);
     });
+    // 4b まだ対応していない「こまったこと・提案」（iken.js・2026-11-07）。「見る」で設定の一覧（まだのもの）へ
+    const ik = window.IkenR && IkenR.todayInfo ? IkenR.todayInfo() : null;
+    if (ik) row('#6A1B9A', `こまったこと・提案が ${ik.n}件、まだ対応していません`, ik.sub, go('set', 'adIken', '見る').replace('<button ', '<button data-ikgo '));
     // 5 今月中に出したい区域
     if (m.need.length) row('#C2410C', `今月中に出したい区域　${m.need.length}区域`, `出さないと1年の期限に間に合いません：区域${listNos(m.need.map(d => d.t))}`, go('status', 'adDue') + karteBtns(m.need.map(d => d.t), 2));
     // 6 1年の期限
