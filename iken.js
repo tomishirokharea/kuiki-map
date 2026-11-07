@@ -234,6 +234,10 @@
 
   /* ---- 区域係：設定と、届いた声 ---- */
   let items = null, filt = 'open', loading = false;
+  // 読み込みの途中で状態を変えたとき、あとから届いた古い一覧で元にもどらないよう、変えた分を重ねる（監査 M-2）
+  let markSeq = 0;
+  const marks = [];
+  const withMarks = (L, seq0) => { marks.forEach(m => { if (m.seq > seq0) { const x = L.find(y => y.id === m.id); if (x) x.status = m.s; } }); return L; };
   function renderAdmin() {
     const box = $('#adIken'); if (!box) return;
     if (!LIVE) { box.innerHTML = ''; return; }
@@ -253,7 +257,8 @@
     if (loading) return;
     loading = true;
     const box = $('#ikList'); if (box) box.innerHTML = '<p class="hint">読み込んでいます…</p>';
-    try { const r = await api('iken_list', {}, { timeout: 45000 }); items = r.items || []; }
+    const seq0 = markSeq;
+    try { const r = await api('iken_list', {}, { timeout: 45000 }); items = withMarks(r.items || [], seq0); }
     catch (e) { items = null; toast(e && e.code === 'unknown_action' ? 'サーバーの準備がまだできていません（サーバーの更新が必要です）' : '読み込めませんでした。電波を確かめて、もう一度押してください'); }
     finally { loading = false; }
     renderAdmin();
@@ -287,7 +292,8 @@
         if (!x || x.status === s) return;
         try {
           await api('iken_mark', { ids: [id], status: s }, { timeout: 30000 });
-          x.status = s; renderAdmin(); toast(`「${ST_NAME[s]}」にしました`);
+          x.status = s; marks.push({ id, s, seq: ++markSeq }); if (marks.length > 50) marks.shift();
+          renderAdmin(); toast(`「${ST_NAME[s]}」にしました`);
         } catch (e) { toast('変えられませんでした。もう一度押してください'); }
       };
     });
@@ -351,7 +357,7 @@
     const N = fresh(items);
     if (!N.length) return null;
     const x = N.slice().sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))[0];
-    const t = plain(x.text).replace(/\s+/g, ' ').trim(), head = t.length > 40 ? t.slice(0, 40) + '…' : t;
+    const t = Array.from(plain(x.text).replace(/\s+/g, ' ').trim()), head = t.length > 40 ? t.slice(0, 40).join('') + '…' : t.join(''); // 絵文字を半分に切らない
     return { n: N.length, sub: `<span>いちばん新しいもの：</span><span>${esc(KIND_NAME[x.kind] || x.kind)}</span><span>・</span><span>${esc(fmtAt(x.at))}</span><span>・</span>${plain(x.who) ? `<span data-notr>${esc(plain(x.who))}</span>` : '<span>（名前なし）</span>'}${head ? `<br><span data-notr>「${esc(head)}」</span>` : ''}` };
   }
   async function poll() {
@@ -361,8 +367,8 @@
     polling = true; pollAt = Date.now();
     try {
       const before = fresh(items).map(x => x.id).join(',');
-      const r = await api('iken_list', {}, { timeout: 45000 });
-      items = r.items || [];
+      const seq0 = markSeq, r = await api('iken_list', {}, { timeout: 45000 });
+      items = withMarks(r.items || [], seq0);
       // 未対応が変わったときだけ、今日を描き直す（下から出る画面を開いている間は、次に描くときに出す）
       if (fresh(items).map(x => x.id).join(',') !== before && adPane === 'inbox' && currentView === 'admin' && $('#sheet').hidden) window.renderAdmin();
     } catch (e) { /* 読めないときは、お知らせを出さないだけ（次の10分後にもう一度） */ }
