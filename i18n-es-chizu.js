@@ -112,5 +112,6 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "取りこまない行（{0}件）": "Filas que no se importan ({0})",
 "ほか {0}件": "y {0} más",
 "目印の描画": "Dibujo de puntos de referencia",
-"目印の描画（{0}件）": "Dibujo de puntos de referencia ({0})"
+"目印の描画（{0}件）": "Dibujo de puntos de referencia ({0})",
+"家の編集で一戸建てをアパート・マンションに変えるときにも、エレベーター（あり・なし）と建物のメモを入れられるようにしました。": "Al editar una casa y cambiarla a apartamento, ahora también se puede indicar el ascensor (sí/no) y la nota del edificio."
 });
