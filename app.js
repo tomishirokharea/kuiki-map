@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.131';
+var APP_JS_VER = '2026.13.132';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2756,6 +2756,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.132', items: [
+    ['集', '家の編集で一戸建てをアパート・マンションに変えるときにも、エレベーター（あり・なし）と建物のメモを入れられるようにしました。']
+  ] },
   { v: '2026.13.131', items: [
     ['地', '地図で、まだだれも持っていない区域をタップすると、その区域のくわしい情報（軒数・前回の返却など）が出て、その場で「受け取る」か「係に頼む」ができるようになりました。']
   ] },
@@ -6711,21 +6714,28 @@ function openAddForm(ll, tid, editId) {
   if (editId && !eh) return;
   if (eh) { ll = { lat: eh.lat, lng: eh.lng }; tid = eh.terrId; }
   const t = tid ? terrById(tid) : null;
-  const f = { type: 'apt', label: '', n: Object.assign(newNaming(), { rooms: [2, 4] }), kind: 'home', lock: false, cand: null, ban: '', mk: {} };
+  const f = { type: 'apt', label: '', n: Object.assign(newNaming(), { rooms: [2, 4] }), kind: 'home', lock: false, cand: null, ban: '', mk: {}, ac: '', bn: '', noteOpen: false };
   if (mode === 'draw' && drawTap === 'house') f.type = 'house';
-  if (eh) { f.type = eh.type; f.label = eh.label || ''; f.kind = kindOf(eh); f.lock = !!eh.lock; }
+  if (eh) { f.type = eh.type; f.label = eh.label || ''; f.kind = kindOf(eh); f.lock = !!eh.lock; f.ac = eh.ac || ''; f.bn = eh.bn || ''; }
+  const ac0 = f.ac, bn0 = f.bn; // 候補をはずしたときに、元へもどす
+  const cleanBn = v => String(v || '').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 200);
   const recN = eh ? visitsOf(K(eh.id, '')).length : 0;
   const nrm = x => String(x || '').replace(/[\s　]/g, '').toLowerCase();
   const keep = () => {
     if (window.chuiMark) window.chuiMark.keep(f.mk); // この家の印（chui.js）
     const l = $('#fLabel'); if (l) f.label = l.value;
     const lk2 = $('#fLock'); if (lk2) f.lock = lk2.checked;
+    const ac2 = $('#fAc'); if (ac2) f.ac = ac2.value;
+    const nt2 = $('#fNote'); if (nt2) f.bn = nt2.value;
+    const nb2 = $('#fNoteBox'); if (nb2) f.noteOpen = nb2.open;
     namingKeep(f.n);
   };
   // 建物名の欄：付近の候補（エクセルの建物）を出す。えらんでも、そのまま入力してもよい
   const pickCand = c => {
     keep();
     f.cand = c; f.label = c.n || f.label; f.lock = !!c.k; f.ban = c.b || '';
+    if (c.ac) f.ac = c.ac;                                          // 一覧のエレベーター・縦階段
+    if (c.m && !f.bn.trim()) { f.bn = cleanBn(c.m); f.noteOpen = true; } // 一覧の備考を、建物のメモに
     if (c.r && c.r.length) { f.n.nm = 'free'; f.n.manual = c.r.join(' '); } // 旧区域カードの部屋（apt-heya.js）
     else if (f.n.nm === 'floor' && c.f) f.n.rooms = Array.from({ length: Math.min(40, c.f) }, (_, i) => i === 0 && c.g === 0 ? 0 : (f.n.rooms[i] != null && f.n.rooms[i] > 0 ? f.n.rooms[i] : (f.n.rooms[f.n.rooms.length - 1] || 2)));
     paint();
@@ -6756,6 +6766,11 @@ function openAddForm(ll, tid, editId) {
         <button class="choice${apt ? ' on' : ''}" data-type="apt" aria-pressed="${apt}"${typeLock ? ' disabled' : ''}><i class="pin apt">集</i>アパート・マンション</button>
       </div>${typeLock ? '<p class="hint">訪問しないの家なので、建物の種類は区域係だけが変えられます。</p>' : ''}
       ${apt ? `<label class="check locrow"><input type="checkbox" id="fLock"${f.lock ? ' checked' : ''}>オートロックの建物</label>
+      <label class="field"><span>エレベーター</span><select id="fAc" class="big" aria-label="エレベーター">${[['', 'まだ確かめていない'], ['ev', 'あり'], ['no', 'なし（階段だけ）'], ['st', 'なし（縦階段：階段ごとに上り下り）']].map(o => `<option value="${o[0]}"${f.ac === o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select>
+        <small class="hint">分かったら直してください。高齢の方が回る建物をえらぶときに使います。</small></label>
+      <details class="more" id="fNoteBox"${f.noteOpen || f.bn ? ' open' : ''}><summary>建物のメモ</summary>
+        <label class="field bnote"><textarea id="fNote" maxlength="200" rows="3" aria-label="建物のメモ" placeholder="例：1階は店、2階は駐車場。奥の階段からも入れる">${esc(f.bn)}</textarea></label>
+        <p class="hint" style="margin-top:-6px">部屋を入力する画面の上に出ます。<b>住んでいる人の名前・国籍・年齢・病気などは書かないでください。</b></p></details>
       <p class="hint">あとからでも、建物の編集で変えられます。</p>` : ''}
       ${apt && f.cand ? `<div class="aw-from"><b>候補：${esc(f.cand.n || '（名前なし）')}</b><button id="fCandOff">はずす</button></div>
         ${f.ban ? `<div class="notice refnote"><b>${f.ban === 'no' ? '立入禁止の建物です。' : '手紙のみの建物です。'}</b></div>` : ''}` : ''}
@@ -6777,21 +6792,34 @@ function openAddForm(ll, tid, editId) {
     $$('[data-type]', S).forEach(x => x.onclick = () => { keep(); f.type = x.dataset.type; paint(); });
     $$('[data-kind]', S).forEach(x => x.onclick = () => { keep(); f.kind = x.dataset.kind; paint(); });
     if ($('#fLock')) $('#fLock').onchange = e => { f.lock = e.target.checked; };
-    if (f.type === 'apt') { const l = $('#fLabel'), lk = $('#fLock'); bindNaming(f.n, () => { if (l) f.label = l.value; if (lk) f.lock = lk.checked; namingKeep(f.n); paint(); }); }
+    if ($('#fAc')) $('#fAc').onchange = e => { f.ac = e.target.value; };
+    if ($('#fNote')) $('#fNote').oninput = e => { f.bn = e.target.value; };
+    if (f.type === 'apt') bindNaming(f.n, () => { keep(); paint(); });
     bindCands();
     if (eh && window.chuiMark) window.chuiMark.bind(S, f.mk, () => { keep(); paint(); });
-    if ($('#fCandOff')) $('#fCandOff').onclick = () => { keep(); f.cand = null; f.ban = ''; paint(); };
+    if ($('#fCandOff')) $('#fCandOff').onclick = () => {
+      keep();
+      if (f.cand && f.cand.ac && f.ac === f.cand.ac) f.ac = ac0;                 // 候補から入ったものは、はずすと元にもどす
+      if (f.cand && f.cand.m && cleanBn(f.bn) === cleanBn(f.cand.m)) { f.bn = bn0; f.noteOpen = false; }
+      f.cand = null; f.ban = ''; paint();
+    };
     if ($('#fMove')) $('#fMove').onclick = () => startMoveHouse(editId);
     if ($('#fDel')) $('#fDel').onclick = async () => {
       if (!isAdmin()) { closeSheet(); openDelRequest(eh); return; }
       if (!await ask(`この家と、その記録をすべて削除します。${houseRecText(eh)}よろしいですか？`)) return;
       closeSheet(); deleteHouse(editId);
     };
-    $('#fSave').onclick = () => {
+    $('#fSave').onclick = async () => {
       keep();
       const label = f.label.trim();
       const us = f.type === 'apt' ? genUnits(f.n) : [];
       if (f.type === 'apt' && !us.length) { toast('部屋の名前を入れてください'); return; }
+      const bn = cleanBn(f.bn);
+      if (f.type === 'apt' && bn && bn !== cleanBn(bn0)) { // 建物の編集と同じ確かめ（apt-import.js の bldSens）
+        const w = window.bldSens ? window.bldSens(bn) : [];
+        if (w.length && !await ask(`メモに「${w.join('・')}」とあります。建物のメモは、みんなが見ます。住んでいる人のこと（名前・国籍・年齢・病気など）が入っていなければ、このまま保存してください。`, { title: 'このまま保存しますか？', body: `メモに「${w.join('・')}」とあります。建物のメモは、くわしい表示の人みんなが見ます。住んでいる人のこと（名前・国籍・年齢・病気など）が入っていなければ、このまま保存してください。`, ok: '保存する', danger: false })) return;
+      }
+      const setBld = h => { if (f.type !== 'apt') return; if (f.ac) h.ac = f.ac; else delete h.ac; if (bn) h.bn = bn; else delete h.bn; }; // エレベーターと建物のメモ
       closeSheet();
       const setCand = h => { if (f.type === 'apt' && f.cand) { h.cid = f.cand.i; if (f.ban) h.ban = f.ban; } }; // 選んだ候補は、次から出ない
       if (eh) {
@@ -6804,6 +6832,7 @@ function openAddForm(ll, tid, editId) {
             h.type = 'apt'; h.units = us;
             skipToUnits(h); // 訪問しないの家なら、部屋ぜんぶを訪問しないに（監査 HS-A8）
             if (f.lock) h.lock = true; else delete h.lock;
+            setBld(h);
             delete h.prov; delete h.uk; delete h.ul; // 確かめた建物なので「仮の家」ではなくなる
             setCand(h);
           }
@@ -6816,6 +6845,7 @@ function openAddForm(ll, tid, editId) {
         const nh = { id: 'h' + uid(), terrId: tid, type: f.type, lat: ll.lat, lng: ll.lng, label, units: us, createdAt: new Date().toISOString(), createdBy: me().id };
         if (f.kind !== 'home') nh.kind = f.kind;
         if (f.type === 'apt' && f.lock) nh.lock = true;
+        setBld(nh);
         setCand(nh);
         D().houses.push(nh);
       });
