@@ -105,5 +105,26 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "この印は、もうありません": "Esta marca ya no existe",
 "この家は「訪問しない」の家です。拒否にするときは「訪問しない」の一覧から変えてください": "Esta casa está marcada como «Omitida». Para cambiarla a «No visitar», hágalo desde la lista de omitidas",
 "訪問しない家（区域係が付ける・理由なし）": "Casas omitidas (las marca el encargado; sin motivo)",
-"地図に灰色の「ー」が出る家・部屋は、区域係が「訪問しない」にした家です。訪ねなくてよく、区域の数にも入りません。": "Las casas y departamentos con una «ー» gris en el mapa son los que el encargado de territorios marcó como «Omitida». No hay que visitarlos y no se cuentan en el territorio."
+"地図に灰色の「ー」が出る家・部屋は、区域係が「訪問しない」にした家です。訪ねなくてよく、区域の数にも入りません。": "Las casas y departamentos con una «ー» gris en el mapa son los que el encargado de territorios marcó como «Omitida». No hay que visitarlos y no se cuentan en el territorio.",
+/* 区域カードの「印刷・送る」（chizu-okuru.js・2026-11-08） */
+"区域{0}の地図": "Mapa del territorio {0}",
+"区域の線・家・拒否の印が入った地図を、A4の紙1枚にします。": "Se hace un mapa en una hoja A4 con el límite del territorio, las casas y las marcas de «No visitar».",
+"下半分に、集合住宅の部屋の一覧が入ります。": "En la mitad de abajo va la lista de departamentos de los edificios.",
+"PDFで送る（LINEなど）": "Enviar en PDF (LINE, etc.)",
+"PDFを保存する": "Guardar PDF",
+"印刷する": "Imprimir",
+"区域の奉仕のためだけに使ってください。回り終えたら、送ったPDFや印刷した紙は消して（捨てて）ください。": "Úselo solo para predicar en el territorio. Al terminar, borre el PDF enviado o deseche la hoja impresa.",
+"この区域の地図は、印刷・送ることができません": "No puede imprimir ni enviar el mapa de este territorio",
+"地図の画像{0}枚を受け取れませんでした。電波のよい所で、もう一度ためしてください": "No se pudieron recibir {0} imágenes del mapa. Inténtelo de nuevo donde haya buena señal",
+"集合住宅の部屋が多く、全部は入りきりませんでした": "Hay muchos departamentos y no cupieron todos",
+"PDFを作っています…": "Creando el PDF…",
+"少しお待ちください。": "Espere un momento.",
+"PDFを作れませんでした。「印刷する」から、印刷の画面で「PDFとして保存」をえらんでください": "No se pudo crear el PDF. Toque «Imprimir» y, en la pantalla de impresión, elija «Guardar como PDF»",
+"PDFができました": "El PDF está listo",
+"区域{0}の地図（A4・1ページ・{1}）": "Mapa del territorio {0} (A4, 1 página, {1})",
+"「送る」を押すと共有の画面が出ます。LINE をえらんで、送る相手をえらんでください。": "Al tocar «Enviar» aparece la pantalla para compartir. Elija LINE y luego a quién enviarlo.",
+"「保存する」を押すと、PDFが保存されます。": "Al tocar «Guardar», se guarda el PDF.",
+"送る（LINEなど）": "Enviar (LINE, etc.)",
+"保存する": "Guardar",
+"区域カードに「印刷」のボタンを足しました。その区域の地図をA4の紙1枚にして、印刷したり、PDFにしてLINEなどで送ったりできます。": "Las tarjetas de territorio tienen un nuevo botón «Imprimir». Hace el mapa del territorio en una hoja A4 para imprimirlo o enviarlo en PDF por LINE, etc."
 });
