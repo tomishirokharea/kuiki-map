@@ -43,7 +43,7 @@
 
   /* 1区域の紙面（A4たて1枚）を作る。
      集合住宅の部屋の一覧は、入るのに要る高さだけ下に取り（多くても半分）、残りはすべて地図にする */
-  const PAGE_H = 296.5, FRONT_EXTRA = 40, BACK_EXTRA = 24; // 地図・部屋の一覧のほかに要る高さ（見出し・凡例・余白。mm）
+  const PAGE_H = 296.5, FRONT_EXTRA = 40, BACK_EXTRA = 26; // 地図・部屋の一覧のほかに要る高さ（見出し・凡例・余白。mm）
   function backNeed(c, base) {
     const box = document.createElement('div');
     box.className = 'pdoc s12measure a5';
@@ -64,12 +64,13 @@
     c = s12Prep(t, Object.assign({}, base, { mapH }), byT);
     const { tileUrl, bad } = await s12Load([c]);
     const now = new Date(), stamp = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
-    const front = s12FrontHtml(c, tileUrl, stamp, NOTE);
+    // A4 1枚では、部屋の一覧は同じ面の下にある（S-12 の「裏面」「表の地図」を言いかえる）
+    const front = s12FrontHtml(c, tileUrl, stamp, NOTE).replace('集合住宅（番号は裏面）', '集合住宅（番号は下の一覧）');
     let back = '', over = false;
     if (backH) {
       const S = Object.assign({}, base);
       const fit = s12FitBacks([c], S, 'a5'); // 半分に入りきらないときだけ、文字を小さくする
-      back = s12BackHtml(c, S, fit.size.get(t.id) || base.font);
+      back = s12BackHtml(c, S, fit.size.get(t.id) || base.font).replace('集合住宅（番号は表の地図）', '集合住宅（番号は上の地図）');
       over = fit.over.length > 0;
     }
     const st = `grid-template-rows:${frontH}mm${backH ? ` ${backH}mm` : ''};--kmmap:${mapH}mm;--kmapt:${Math.max(30, backH - BACK_EXTRA)}mm`;
@@ -89,13 +90,13 @@
       } else {
         showBlocking('PDFを作っています…', '少しお待ちください。', true);
         let blob;
-        try { blob = await pdfFromHtml(p.html); } finally { hideBlocking(); }
+        try { blob = await Promise.race([pdfFromHtml(p.html), wait(30000).then(() => { throw new Error('timeout'); })]); } finally { hideBlocking(); } // 画像にする処理が止まっても、待つ画面が消えるように
         ready(t, new File([blob], fileName(t), { type: 'application/pdf' }));
       }
       if (warn.length) setTimeout(() => toast(warn.join('。')), how === 'print' ? 3800 : 600);
     } catch (e) {
       hideBlocking();
-      toast('PDFを作れませんでした。「印刷する」から、印刷の画面で「PDFとして保存」をえらんでください');
+      toast(how === 'print' ? '印刷の準備がうまくいきませんでした。もう一度ためしてください' : 'PDFを作れませんでした。「印刷する」から、印刷の画面で「PDFとして保存」をえらんでください');
     } finally { busy = false; }
   }
 

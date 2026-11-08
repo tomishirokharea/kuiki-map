@@ -7932,7 +7932,7 @@ function cardHtml(t, own, helper) {
       `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${!t.group ? '区域' : isAllUse(t) ? '全体' : 'グループ'}</small>${esc(t.no)}</span>`,
       esc(t.name), (t.group ? `<span class="gbadge">${esc(useName(t))}の区域</span> ` : '') + who)}
     ${extra ? `<div class="tbody">${extra}</div>` : ''}
-    <div class="actions">${(own || lead) && groupOk ? `<button class="btn" data-helpers="${esc(t.id)}">${t.group ? '今日回る人をえらぶ' : '一緒に回る人'}</button>` : ''}<button class="btn" data-mapsend="${esc(t.id)}">印刷</button>${(own || lead) && groupOk ? `${t.group ? `<button class="btn primary" data-parts="${esc(t.id)}">回る範囲を分ける</button>` : ''}` : ''}${own ? `<button class="btn" data-return="${esc(t.id)}">返す</button>` : ''}${lead ? `<button class="btn" data-leadquit="${esc(t.id)}">司会をやめる</button>` : ''}</div>
+    <div class="actions">${(own || lead) && groupOk ? `<button class="btn" data-helpers="${esc(t.id)}">${t.group ? '今日回る人をえらぶ' : '一緒に回る人'}</button>` : ''}${own || helper || isAdmin() ? `<button class="btn" data-mapsend="${esc(t.id)}">印刷</button>` : ''}${(own || lead) && groupOk ? `${t.group ? `<button class="btn primary" data-parts="${esc(t.id)}">回る範囲を分ける</button>` : ''}` : ''}${own ? `<button class="btn" data-return="${esc(t.id)}">返す</button>` : ''}${lead ? `<button class="btn" data-leadquit="${esc(t.id)}">司会をやめる</button>` : ''}</div>
   </article>`;
 }
 let cardTab = 'mine';
