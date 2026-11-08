@@ -2044,6 +2044,8 @@ body.duemode .terr-label:not(.duelab){display:none}
     // 今の画面に出ている家の印・名前の大きさを、そのまま障害物として使う（拡大・回転・文字の大きさに合わせられる）
     const obs = houseObstacles();
     const hitR = (r, list) => list.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1]);
+    const tlEl = document.getElementById('mapTools'), cbEl = document.getElementById('cardBar');
+    const topM = tlEl && !tlEl.hidden ? tlEl.offsetHeight + 8 : 0, botM = cbEl && !cbEl.hidden ? cbEl.offsetHeight + 8 : 0;
     const unscr = pt => map.containerPointToLatLng(map._kmRad ? c0.add(rotPt(pt.subtract(c0), -map._kmRad)) : pt);
     for (const it of items) {
       const w = cp ? 10 + 9 * it.text.length : 18 + 11 * it.text.length, h = cp ? 24 : 36;
@@ -2057,7 +2059,7 @@ body.duemode .terr-label:not(.duelab){display:none}
           for (let i = 0; i < n && !found; i++) {
             const a = -Math.PI / 2 + i * 2 * Math.PI / n; // 上から時計回り
             const pt = L.point(it.p.x + Math.cos(a) * rad * (w > h ? 1.3 : 1), it.p.y + Math.sin(a) * rad);
-            if (pt.x < w / 2 || pt.y < h / 2 || pt.x > sz.x - w / 2 || pt.y > sz.y - h / 2) continue;
+            if (pt.x < w / 2 || pt.y < topM + h / 2 || pt.x > sz.x - w / 2 || pt.y > sz.y - botM - h / 2) continue; // 上の「区域をえらぶ」の列・下の帯の下にはずらさない（監査 Low）
             const rr = rectAt(pt);
             if (hitR(rr, obs) || hitR(rr, placed)) continue;
             const ll = unscr(pt);
