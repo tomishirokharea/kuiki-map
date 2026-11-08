@@ -2206,7 +2206,9 @@ function undoChange(pre, post, preVisits, postIds) {
     const a = pre[c] || {}, b = post[c] || {};
     new Set(Object.keys(a).concat(Object.keys(b))).forEach(k => {
       if (same(a[k], b[k])) return;
-      if (k in a) d[c][k] = a[k]; else delete d[c][k];
+      // 外国語（係以外の端末）：言語を知らないので、もどす値に r を付けて送る。サーバーが控えた言語にもどす（監査 H2）
+      if (k in a) d[c][k] = c === 'langs' && a[k] && typeof a[k] === 'object' && !a[k].l ? Object.assign({}, a[k], { r: 1 }) : a[k];
+      else delete d[c][k];
     });
   });
   if (!same(pre.settings, post.settings)) d.settings = pre.settings;
@@ -2403,6 +2405,7 @@ function langToUnits(h) {
 function langToHouse(h) {
   const v = h.units.map(u => langV(K(h.id, u))).find(x => x && x.l);
   if (v) D().langs[K(h.id, '')] = { l: v.l, at: new Date().toISOString() };
+  if (v) h.units.forEach(u => { delete D().langs[K(h.id, u)]; }); // 部屋の印は残さない（監査 M6）
 }
 /* 言語の札（地図・一覧）：区域係には言語の頭文字、係以外は「外」 */
 const langMark = k => { const v = langV(k); return v && v.l && LANG_IDX[v.l] >= 0 ? LANGS[LANG_IDX[v.l]][2] : '外'; };
@@ -3818,8 +3821,9 @@ function houseIcon(h, ff, locked) {
     const sk = targets(h).some(u => skipAt(K(h.id, u))) ? '<b class="sk" title="訪問しない">ー</b>' : ''; // 訪問しない部屋（灰色の「ー」）
     const cau = !locked && window.chuiHas && window.chuiHas(h) ? '<b class="cau" title="注意">！</b>' : ''; // 注意（chui.js）
     const ak = aptKind(h);
+    const lgK = ak === 'home' ? targets(h).map(u => K(h.id, u)).find(isLangKey) : null; // 外国語の部屋がある建物は、建物の印にも「外」（監査 M4）
     const nameTag = ''; // 名前は、renderHouses で別の札として出す（小さな点のときも出せるように）
-    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${sk}${cau}${locked ? '' : kindBadge(ak) + lockBadge(h) + banBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
+    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${sk}${cau}${locked ? '' : (lgK ? kindBadge('lang', lgK) : kindBadge(ak)) + lockBadge(h) + banBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
   }
   const k = K(h.id, ''), s = pinState(k, since), fo = '';
   // 選んでいないときも、今回訪ねた家（会えた・留守）は薄く＋緑のチェックにする
@@ -6130,7 +6134,7 @@ function dropUnitData(h, us) {
   us.forEach(u => {
     if (h.ul) delete h.ul[u];
     if (h.uk) delete h.uk[u];
-    const k = K(h.id, u); dncDrop(k, h); delete D().follows[k]; delete D().released[k];
+    const k = K(h.id, u); dncDrop(k, h); delete D().follows[k]; delete D().released[k]; delete D().langs[k];
   });
   if (h.ul && !Object.keys(h.ul).length) delete h.ul;
   if (h.uk && !Object.keys(h.uk).length) delete h.uk;
@@ -6344,7 +6348,7 @@ function openUnitBulkDel(hid) {
         us.forEach(u => {
           if (h2.ul) delete h2.ul[u];
           if (h2.uk) delete h2.uk[u];
-          const k = K(hid, u); dncDrop(k, h2); delete D().follows[k]; delete D().released[k];
+          const k = K(hid, u); dncDrop(k, h2); delete D().follows[k]; delete D().released[k]; delete D().langs[k];
         });
         if (h2.ul && !Object.keys(h2.ul).length) delete h2.ul;
         if (h2.uk && !Object.keys(h2.uk).length) delete h2.uk;
@@ -6416,8 +6420,8 @@ function openAptSeq(hid, startUnit) {
     // 部屋のボタン：前回の結果は色だけでなく「会・留・拒」の字でも見せる。部屋が多い建物は階ごとに分ける（点検④U3）
     const chip = u => {
       // 色と字は、見出しと同じ「今の巡回（受け取ってから）」の結果で出す。前の巡回の結果は出さない（総点検 L5・2026.13.105）
-      const i = h.units.indexOf(u), s0 = statusOf(K(hid, u)), s1 = s0 === 'dnc' || !inRound || visitedSince(K(hid, u), since) ? s0 : 'new', s = s1 === 'dnc' && dncSkip(K(hid, u)) ? 'skip' : s1, uk = unitKind(h, u), g = UST_GLYPH[s];
-      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}${!mine ? '' : isMine(u) ? ' mine' : ' notmine'}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${isMine(u) ? '' : '（ほかの人の範囲）'}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? (s === 'skip' ? '（' + UST_NAME[s] + '）' : '（前回 ' + UST_NAME[s] + '）') : ''}へ">${kindBadge(uk)}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
+      const i = h.units.indexOf(u), s0 = statusOf(K(hid, u)), s1 = s0 === 'dnc' || !inRound || visitedSince(K(hid, u), since) ? s0 : 'new', s = s1 === 'dnc' && skipAt(K(hid, u)) ? 'skip' : s1, uk = dispUnitKind(h, u), g = UST_GLYPH[s];
+      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}${!mine ? '' : isMine(u) ? ' mine' : ' notmine'}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${isMine(u) ? '' : '（ほかの人の範囲）'}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? (s === 'skip' ? '（' + UST_NAME[s] + '）' : '（前回 ' + UST_NAME[s] + '）') : ''}へ">${kindBadge(uk, K(hid, u))}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
     };
     const groups = h.units.length > 10 ? unitGroups(h) : [];
     if (mine) b += `<div class="notice minepart"><b>あなたの範囲：${esc(roomsText(h, h.units.filter(isMine)))}</b><br><span class="mk"></span>緑のわくの部屋を回ります。うすい部屋は、ほかの人の範囲です。</div>`;

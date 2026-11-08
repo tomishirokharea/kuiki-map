@@ -512,7 +512,7 @@
     commit('1軒の家にもどしました', () => {
       const h2 = houseById(hid); if (!h2) return;
       skipToHouse(h2); // 訪問しないの世帯があれば、1軒の家を訪問しないに（監査 HS-A8）
-      h2.units.forEach(u => { const k = K(hid, u); if (typeof dncDrop === 'function') dncDrop(k, h2); else delete D().dnc[k]; delete D().follows[k]; delete D().released[k]; });
+      h2.units.forEach(u => { const k = K(hid, u); if (typeof dncDrop === 'function') dncDrop(k, h2); else delete D().dnc[k]; delete D().follows[k]; delete D().released[k]; if (D().langs) delete D().langs[k]; });
       h2.type = 'house'; h2.units = []; delete h2.mu;
       if (h2.label === '二世帯住宅') h2.label = '';
     });
