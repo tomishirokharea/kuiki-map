@@ -2114,8 +2114,8 @@ const isAdmin = () => me().role === 'admin';
 /* 家の削除・拒否の取り消し・家の編集ができる人：区域係、または区域係が「家と拒否の管理」を任せた人（mgr）。
    この3つの入口だけに使う。係の画面のタブ・貸し出し・設定・点検・S-13・目印などは isAdmin() のまま（サーバーも同じ決まりで止める） */
 const isMgr = () => isAdmin() || me().mgr === true;
-/* その家を（申請なしで）消せるか。家と拒否の管理の人でも、訪問しない・外国語の印のある家は区域係だけ（印を外す回り道にしないため。サーバーも止める） */
-const mgrCanDel = h => isAdmin() || (isMgr() && !!h && !hasSkip(h) && !hasLang(h));
+/* その家を（申請なしで）消せるか。家と拒否の管理の人でも、訪問しない印のある家は区域係だけ（印を外す回り道にしないため。サーバーも止める） */
+const mgrCanDel = h => isAdmin() || (isMgr() && !!h && !hasSkip(h));
 const targets = h => h.type === 'apt' ? h.units : [''];
 const banNo = h => !!h && h.type === 'apt' && h.ban === 'no'; // 立入禁止の建物（手紙のみ letter は今までどおり回る家に数える）
 const K = (hid, unit) => hid + '|' + (unit || '');
@@ -4496,7 +4496,7 @@ async function onHouseTap(id) {
     const rec = houseRecText(h);
     // 仮の家（記録・拒否・注意・再訪問のどれもない）は、確認なしですぐ消す。まちがえたら、下の「取り消す」でもどせる（H8）
     if (h.prov && !rec && (isMgr() || myTerr(terrById(h.terrId)))) { delCount++; updateAddBar(); dropProvHouse(h.id, true); return; }
-    if (isMgr() && !mgrCanDel(h)) { toast('訪問しない・外国語の印のある家は、区域係だけが消せます。削除の申請をしてください'); openDelRequest(h); return; }
+    if (isMgr() && !mgrCanDel(h)) { toast('訪問しない印のある家は、区域係だけが消せます。削除の申請をしてください'); openDelRequest(h); return; }
     if (!isMgr()) { if (h.prov && rec) toast('記録や拒否・注意・再訪問のある家は、区域係だけが消せます。削除の申請をしてください'); openDelRequest(h); return; } // 伝道者は申請になる（家と拒否の管理を任された人は、区域係と同じ）
     const name = h.type === 'apt' ? `${h.label || '集合住宅'}（${h.units.length}部屋）` : (h.label || 'この家');
     if (rec && !await ask(`「${name}」を消します。${rec}よろしいですか？`)) return; // 記録・印のある家だけ確かめる（H8）
@@ -5213,7 +5213,7 @@ function simpleBlock(what) {
 }
 function deleteHouse(hid) {
   if (simpleBlock('家を削除')) return;
-  { const h = houseById(hid); if (!mgrCanDel(h)) { if (h) { if (isMgr()) toast('訪問しない・外国語の印のある家は、区域係だけが消せます。削除の申請をしてください'); openDelRequest(h); } return; } } // 伝道者は申請だけ（区域係が確認して消す。家と拒否の管理を任された人は、そのまま消せる）
+  { const h = houseById(hid); if (!mgrCanDel(h)) { if (h) { if (isMgr()) toast('訪問しない印のある家は、区域係だけが消せます。削除の申請をしてください'); openDelRequest(h); } return; } } // 伝道者は申請だけ（区域係が確認して消す。家と拒否の管理を任された人は、そのまま消せる）
   commit('削除しました', () => deleteHouseData(hid));
 }
 function deleteHouseData(hid) {
@@ -6289,7 +6289,7 @@ function openBuilding(hid, startSel) {
       const h2 = houseById(hid), u = st.sel; if (!h2 || !u) return;
       const rec = unitHasRec(hid, u);
       if (rec && !isMgr()) { toast('記録のある部屋は、区域係だけが消せます'); return; }
-      if (!isAdmin() && (dncSkip(K(hid, u)) || isLangKey(K(hid, u)))) { toast('訪問しない・外国語の印のある部屋は、区域係だけが消せます'); return; } // サーバーも止める（監査 M-2）
+      if (isMgr() && !isAdmin() && dncSkip(K(hid, u))) { toast('訪問しない印のある部屋は、区域係だけが消せます'); return; } // 家と拒否の管理の人だけ（サーバーも止める・監査 M-2）
       if (rec) {
         const n = visitsOf(K(hid, u)).length, dn = D().dnc[K(hid, u)] && !dncSkip(K(hid, u));
         if (!await ask(`${unitTitle(h2, u)}を消します。${n ? `この部屋の記録${n}件も見えなくなります。` : ''}${dn ? '拒否は、場所だけの印として残します。' : ''}よろしいですか？`)) return;
