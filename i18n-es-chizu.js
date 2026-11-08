@@ -5,6 +5,12 @@
    ========================================================= */
 window.KUIKI_I18N = window.KUIKI_I18N || {};
 window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
+"地図で、まだだれも持っていない区域をタップすると、その区域のくわしい情報（軒数・前回の返却など）が出て、その場で「受け取る」か「係に頼む」ができるようになりました。": "En el mapa, al tocar un territorio que nadie tiene, se muestran sus detalles (casas, última devolución, etc.) y puede «Recibir» o «Pedir al encargado» ahí mismo.",
+"この区域は、係に申し込み中です。係が決めると、区域カードの一覧に加わります。": "Ya pidió este territorio al encargado. Cuando lo decida, aparecerá en su lista de tarjetas.",
+"受け取ると、すぐにあなたのカードになります。": "Al recibirlo, será su tarjeta de inmediato.",
+"自分で受け取れる枚数に届いています。係に頼むと、係が決めてから届きます。": "Ya alcanzó el número que puede recibir por su cuenta. Si lo pide al encargado, llegará cuando él lo decida.",
+"係が貸し出す区域です。係に頼むと、係が決めてから届きます。": "El encargado asigna este territorio. Si lo pide, llegará cuando él lo decida.",
+"個人の区域としてもらいます。": "Se recibe como territorio personal.",
 "見やすい地図": "Mapa claro",
 "地名の多い地図": "Mapa con más nombres",
 "地図の種類": "Tipo de mapa",
