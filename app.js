@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.130';
+var APP_JS_VER = '2026.13.131';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2756,6 +2756,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.131', items: [
+    ['地', '地図で、まだだれも持っていない区域をタップすると、その区域のくわしい情報（軒数・前回の返却など）が出て、その場で「受け取る」か「係に頼む」ができるようになりました。']
+  ] },
   { v: '2026.13.130', items: [
     ['集', '部屋ごとに範囲をわたされた人の画面で、自分の部屋を緑のわくで囲み、ほかの人の部屋はうすく表示するようにしました。団地は階ごとに分けて並べます。'],
     ['集', '「この範囲をわたす人」の画面で、「この範囲をわたす」ボタンをいつも画面の下に出すようにしました。名前をえらんだら、すぐに押せます。']
@@ -3517,6 +3520,7 @@ function initMap() {
     else if (mode === 'part') partTap(e.latlng);
     else if (mode === 'sen' && window.kyoukai) window.kyoukai.click(e.latlng);
     else if (mode === 'tok' && window.tokubetsu) window.tokubetsu.click(e.latlng); // 特別区域の分け方（tokubetsu.js）
+    else if (mode === 'normal' && e.sourceTarget === map) terrTapAt(e); // 家の印などに当たらなかったタップは、区域のタップ（terrTapAt）
   });
   map.on('moveend', renderHouses);
   bindLongPress(); // 長押し（パソコンは右クリック）した場所への道順を、Googleマップで開けるようにする
@@ -4017,28 +4021,48 @@ function renderParents(cur) {
     L.polygon(t.pp, { color: '#1E3A5F', weight: on ? 6 : 4.5, opacity: curT && !on ? 0.45 : 0.9, fill: false, interactive: false }).addTo(terrLayer);
   });
 }
+/* 区域の線の中をタップしたとき */
+function onTerrTap(t, e, keep) {
+  // 家の場所を直しているときは、区域の中をタップしても、家をその場所に動かす（区域の線が先にタップを受け取り、家が動かなかった・2026-11-04）
+  if (moveTap(e)) return;
+  // 地図で場所をえらんでいるとき（集まりの場所・目印・グループの中心など）は、区域の中をタップしても、その場所をえらぶ
+  if (pickPlace) { const f = pickPlace; pickPlace = null; f(e.latlng); return; }
+  const cur = selTerrId();
+  // まだだれも持っていない区域は、もう一度押しても外さず、くわしい情報の画面をまた出す（閉じたあとに押し直す人のため）
+  if (t.id === cur && !isAdmin() && !myTerr(t) && !t.holder && window.openTerrPick && window.openTerrPick(t.id)) return;
+  if (keep && t.id === cur) return; // 家の印のそばを押しそこねたときに、えらんでいる区域（回る表示）が外れないように
+  selectTerr(t.id === cur ? null : t.id, { toast: t.id !== cur, tap: true });
+}
+/* 家の点の層（canvas）が区域の線より上にあり、区域の中のタップが線に届かない（2026-11-08 に分かった）。
+   家の印に当たらなかったタップ（map の click）は、ここで、その場所の区域のタップとして扱う。上に描いた区域（枝番）を先に見る */
+let terrTaps = [];
+function terrTapAt(e) {
+  for (let i = terrTaps.length - 1; i >= 0; i--) {
+    const t = terrTaps[i];
+    if (t && okPoly(t.polygon) && inPoly(e.latlng.lat, e.latlng.lng, t.polygon)) { onTerrTap(t, e, true); return true; }
+  }
+  return false;
+}
 function renderTerrs() {
   terrLayer.clearLayers();
+  terrTaps = [];
   const cur = selTerrId();
   const tapOk = mode === 'normal'; // 線引き・家の追加のときは、地図のタップを区域の選択に使わない
   const lock = lockOn(), okT = lock ? openTerrIds() : null;
+  // 灰色でも、まだだれも持っていない「区域をもらう」一覧の区域は、線をタップして、くわしい情報を見て受け取る・係に頼むができる（2026-11-08。中の家は今までどおり記録できない）
+  const pickT = lock && tapOk ? new Set(freeTerrs().filter(t => !t.holder).map(t => t.id)) : null;
   const list = polyTerrs().slice().sort((a, b) => (b.rest ? 1 : 0) - (a.rest ? 1 : 0)); // 親の残りの部分は下に描く（枝番を押せるように）
   for (const t of list) {
     const on = t.id === cur, dim = !!cur && !on; // えらんだ区域以外は薄く
     const gray = lock && !okT.has(t.id);          // 選べない区域は灰色
+    const tap = tapOk && (!gray || pickT.has(t.id)); // 灰色でも、もらえる区域は線をタップできる
     const col = gray ? '#9AA5A0' : terrLineColor();
     const poly = L.polygon(t.polygon, {
       color: col, weight: terrLineWidth(on), opacity: dim ? 0.3 : 1,
       fillColor: col, fillOpacity: gray ? 0.12 : on ? 0.07 : 0.02,
-      interactive: tapOk && !gray, bubblingMouseEvents: false
+      interactive: tap, bubblingMouseEvents: false
     }).addTo(terrLayer);
-    if (tapOk && !gray) poly.on('click', e => {
-      // 家の場所を直しているときは、区域の中をタップしても、家をその場所に動かす（区域の線が先にタップを受け取り、家が動かなかった・2026-11-04）
-      if (moveTap(e)) return;
-      // 地図で場所をえらんでいるとき（集まりの場所・目印・グループの中心など）は、区域の中をタップしても、その場所をえらぶ
-      if (pickPlace) { const f = pickPlace; pickPlace = null; f(e.latlng); return; }
-      selectTerr(t.id === cur ? null : t.id, { toast: t.id !== cur });
-    });
+    if (tap) { poly.on('click', e => onTerrTap(t, e)); terrTaps.push(t); }
     // 区域の番号の札は schedule.js の paintDueMap で出す（縮尺に合わせて・重ならないように・2026-11-04）
     // 今日わたした範囲（担当者には全部、わたされた人には自分の範囲だけ）
     const mp = myPart(t), hold = canLead(t); // 今日の司会にも、わたした範囲を全部見せる
@@ -4079,6 +4103,8 @@ function selectTerr(id, opts) {
   syncTerrJump();
   renderTerrs(); renderHouses();
   if (t && o.fit) setTimeout(() => fitTerr(id), 80);
+  // 地図で区域をタップしたとき：まだだれも持っていない区域なら、くわしい情報と「受け取る・係に頼む」の画面を出す（schedule.js の openTerrPick・2026-11-08）
+  if (t && o.tap && !isAdmin() && !myTerr(t) && !t.holder && window.openTerrPick && window.openTerrPick(t.id)) return;
   if (t && !isAdmin() && !myTerr(t) && !t.holder && isFree(t)) {
     // 自由に受け取ってよい区域：その場で受け取れるようにする
     toast(`区域${t.no}は、自由に受け取ってよい区域です`, null, { label: '受け取る', fn: () => { reqForGroup = false; takeTerr(t.id); } });

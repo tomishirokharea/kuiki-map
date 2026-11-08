@@ -640,6 +640,29 @@ button.ktag{cursor:pointer}
   // 簡単モード：はじめは5件と「もっと見る」（10/09 の指示書3.4・改善案A2）。並べ方を変えたとき・地図で見てもどったときは、開いたまま
   const REQ_FIRST = 5;
   let reqMore = false;
+  /* 「区域をもらう」一覧の1区域分の中身。一覧と、地図で区域をタップしたときの画面（openTerrPick）で同じものを使う（2026-11-08） */
+  function reqInfoCore(x, showD, back) {
+    const { t, last, n, dist, yg } = x;
+    return `<p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${showD ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, back)}`;
+  }
+  const reqName = t => { const nm = String(t.name || '').trim(); return nm && nm !== '区域' + t.no && nm !== String(t.no) ? `区域${esc(t.no)}<span class="kp-nm">${esc(nm)}</span>` : `区域${esc(t.no)}`; };
+  const reqState = x => {
+    const c = typeof window.tsuzukiFree === 'function' ? window.tsuzukiFree(x.t) : null; // 前の人が訪ねた家があるときだけ「続きから」
+    if (c && c.done > 0) return `続きから　あと${c.todo}軒`;
+    return x.last ? `前回の返却：${fmtDay(x.last)}` : 'まだ回ったことがない区域です';
+  };
+  function reqTags(x, rainHit, back) {
+    const t = x.t, out = [];
+    const ev = typeof evSummary === 'function' ? evSummary(t) : '';
+    if (ev) out.push(`<span class="ktag">${esc(ev)}</span>`);
+    else if (rainHit && aptCardRank(t) < 2) out.push(`<span class="ktag">${aptCardRank(t) === 0 ? '集合住宅・エレベーターあり' : '集合住宅が多い'}</span>`);
+    const ml = meetLabel(t); if (ml) out.push(`<span class="ktag">${esc(ml)}</span>`);
+    const p = prof(t);
+    if (p && KTYPE[p.type]) out.push(`<button type="button" class="ktag" data-prof="${esc(t.id)}" data-back="${esc(back)}">${KTYPE[p.type]} ›</button>`);
+    const tags = out.slice(0, 2);
+    if (x.sx && x.sx.pin) tags.unshift('<span class="ktag kurg">急ぎ</span>');
+    return tags.length ? `<p class="ktags">${tags.join('')}</p>` : '';
+  }
   window.openRequestSheet = function (g) {
     if (g !== undefined) { reqForGroup = !!g; reqUse = 'grp'; reqMore = false; } // 開き直したときは、グループ奉仕から（簡単モードは、はじめの5件から）
     if (!canGroupTerr()) reqForGroup = false;
@@ -669,8 +692,7 @@ button.ktag{cursor:pointer}
     const canGet = x => isFree(x.t) && canTake;
     const askWhy = x => canGet(x) ? '' : `<p class="muted">${isFree(x.t) ? '持てる枚数に届いています' : '係が貸し出す区域です'}</p>`;
     // くわしい表示の各行（簡単モードでは「くわしく」の中に入れる）
-    const infoHtml = x => { const { t, last, n, dist, yg } = x; return `${reqSort === 'reco' ? recoLine(x) : ''}
-          <p class="muted">${n}軒・部屋　${last ? `前回返却した日 ${fmtDay(last)}` : 'まだ回ったことがない区域'}${partialTag(t) ? ' ' + partialTag(t) : ''}${showDist(x) ? `　ここから約${fmtDist(dist)}` : ''}</p>${yg && yg.pct != null && !yg.city ? `<p class="muted">${yg.manual ? `若い世代 ${yg.pct}%（区域係が手直し）` : yg.city ? '' : `若い世代 ${yg.pct}%（会えた記録 ${yg.n}件から）`}</p>` : ''}${profLine(t, 'req')}`; };
+    const infoHtml = x => `${reqSort === 'reco' ? recoLine(x) : ''}${reqInfoCore(x, showDist(x), 'req')}`;
     const btnsHtml = x => { const t = x.t; return `<div class="pickbtns">${canGet(x)
           ? `<button class="btn small primary" data-take="${esc(t.id)}">受け取る</button>`
           : askOk ? `<button class="btn small" data-ask="${esc(t.id)}">係に頼む</button>` : ''}
@@ -682,28 +704,10 @@ button.ktag{cursor:pointer}
         ${btnsHtml(x)}
       </article>`; };
     /* 簡単モード（2026-10-22）：1区域＝見出しと軒数・状態1行・目印2つまで・ボタン。数字や統計は「くわしく」の中 */
-    const kName = t => { const nm = String(t.name || '').trim(); return nm && nm !== '区域' + t.no && nm !== String(t.no) ? `区域${esc(t.no)}<span class="kp-nm">${esc(nm)}</span>` : `区域${esc(t.no)}`; };
-    const kState = x => {
-      const c = typeof window.tsuzukiFree === 'function' ? window.tsuzukiFree(x.t) : null; // 前の人が訪ねた家があるときだけ「続きから」
-      if (c && c.done > 0) return `続きから　あと${c.todo}軒`;
-      return x.last ? `前回の返却：${fmtDay(x.last)}` : 'まだ回ったことがない区域です';
-    };
-    const kTags = x => {
-      const t = x.t, out = [];
-      const ev = typeof evSummary === 'function' ? evSummary(t) : '';
-      if (ev) out.push(`<span class="ktag">${esc(ev)}</span>`);
-      else if (rainHit && aptCardRank(t) < 2) out.push(`<span class="ktag">${aptCardRank(t) === 0 ? '集合住宅・エレベーターあり' : '集合住宅が多い'}</span>`);
-      const ml = meetLabel(t); if (ml) out.push(`<span class="ktag">${esc(ml)}</span>`);
-      const p = prof(t);
-      if (p && KTYPE[p.type]) out.push(`<button type="button" class="ktag" data-prof="${esc(t.id)}" data-back="req">${KTYPE[p.type]} ›</button>`);
-      const tags = out.slice(0, 2);
-      if (x.sx && x.sx.pin) tags.unshift('<span class="ktag kurg">急ぎ</span>');
-      return tags.length ? `<p class="ktags">${tags.join('')}</p>` : '';
-    };
     const kRow = x => `<article class="pick kpick">
-        <div class="kp-head"><b>${kName(x.t)}</b><span class="kp-n">${x.n}軒</span></div>
-        <p class="kp-st">${kState(x)}${showDist(x) ? `<span class="kp-dist">ここから約${fmtDist(x.dist)}</span>` : ''}</p>
-        ${kTags(x)}${askWhy(x)}
+        <div class="kp-head"><b>${reqName(x.t)}</b><span class="kp-n">${x.n}軒</span></div>
+        <p class="kp-st">${reqState(x)}${showDist(x) ? `<span class="kp-dist">ここから約${fmtDist(x.dist)}</span>` : ''}</p>
+        ${reqTags(x, rainHit, 'req')}${askWhy(x)}
         ${btnsHtml(x)}
         <details class="kp-more"><summary>くわしく</summary>${infoHtml(x)}</details>
       </article>`;
@@ -779,6 +783,62 @@ button.ktag{cursor:pointer}
         take: can || askOk ? () => { reqForGroup = G0; reqUse = U0; if (can) takeTerr(x.t.id); else askTerr(x.t.id); } : null, // 断られるときは「受け取る・係に頼む」を出さない
         sub: `${x.n}軒・部屋　${x.last ? `前回返却した日 ${fmtDay(x.last)}` : 'まだ回ったことがない区域'}` });
     });
+  };
+
+  /* 地図で区域をタップしたとき：「区域をもらう」一覧の1区域分と同じ中身を出し、その場で受け取る・係に頼む（2026-11-08）
+     ・出すのは、まだだれも持っていない区域のうち「区域をもらう」一覧に出る区域だけ（貸出中・貸出中止・紙の記録で貸出中は出さない）
+     ・ボタンの出し分けは一覧と同じ。受け取りは takeTerr、申し込みは askTerr が最後に確かめる（申し込み制はそのまま）
+     ・地図からもらうのは個人の区域（集まりで使う区域は、今までどおり一覧から）
+     ・計算はこの1区域だけ（家3万件でも重くしない）
+     ・出さなかったとき false を返す（app.js の selectTerr が、今までのお知らせを出す） */
+  window.openTerrPick = function (tid) {
+    const t = terrById(tid);
+    if (!t || t.holder || (typeof isAdmin === 'function' && isAdmin()) || myTerr(t)) return false;
+    if (!freeTerrs().some(x => x.id === t.id)) return false;
+    reqForGroup = false; reqUse = 'grp';
+    const SIMPLE = typeof isSimple === 'function' && isSimple();
+    const full = !hasRoom(false), askOk = !full && canAsk(false);
+    const can = isFree(t) && canTakeFree(false);
+    const pend = myPendings().some(p => !p.forGroup && p.terrId === t.id);
+    const poly = okPoly(t.polygon) ? t.polygon : null;
+    const x = { t, last: lastBackOf(t), n: unitN(t), dist: myPos && poly ? distM(myPos, center(poly)) : null, yg: null, sx: null };
+    const back = 'tinfo:' + t.id;
+    const rain = typeof isRainy === 'function' && isRainy();
+    const nm = String(t.name || '').trim();
+    const sub = nm && nm !== '区域' + t.no && nm !== String(t.no) ? esc(nm) : '';
+    const info = SIMPLE
+      ? `<p class="kp-st">${reqState(x)}${x.dist != null ? `<span class="kp-dist">ここから約${fmtDist(x.dist)}</span>` : ''}</p>
+         ${reqTags(x, rain, back)}
+         <details class="kp-more"><summary>くわしく</summary>${reqInfoCore(x, false, back)}</details>`
+      : `${typeof evTag === 'function' ? evTag(t) : ''}${reqTags(x, rain, back)}${reqInfoCore(x, x.dist != null, back)}`;
+    // 状態とボタン（一覧と同じ決まり。断られるボタンは出さない）
+    let note = '', btn = '';
+    if (pend) note = '<div class="notice info">この区域は、係に申し込み中です。係が決めると、区域カードの一覧に加わります。</div>';
+    else if (full) note = `<div class="notice warn">個人の区域は${holdMax(false)}枚までです（申し込み中もふくみます）。<br>区域を返すと、またもらえます。</div>`;
+    else if (can) { note = '<p class="hint hint-must">受け取ると、すぐにあなたのカードになります。</p>'; btn = `<button class="btn block primary" data-tiTake>受け取る</button>`; }
+    else if (!askOk) note = `<div class="notice warn">個人の申し込みは、${reqLimit(false)}件までです。係の返事を待ってください</div>`;
+    else {
+      note = isFree(t)
+        ? `<p class="hint hint-must">自分で受け取れる枚数に届いています。係に頼むと、係が決めてから届きます。</p>`
+        : '<p class="hint hint-must">係が貸し出す区域です。係に頼むと、係が決めてから届きます。</p>';
+      btn = '<button class="btn block primary" data-tiAsk>係に頼む</button>';
+    }
+    const who = canGroupTerr() && btn ? '<p class="muted">個人の区域としてもらいます。</p>' : '';
+    setSheet(headHtml(t, `区域${esc(t.no)}`, sub) + `
+      <div class="tinfo">${info}</div>
+      ${note}${who}${btn}
+      ${window.openTerrInfo ? '<button type="button" class="btn block" data-tiYousu>この区域のようす</button>' : ''}
+      <button class="btn block" data-close>閉じる</button>`);
+    const S = $('#sheet');
+    // 「区域○のようす」（kangaeru.js）を開き、下の「閉じる」を「もどる」にして、この画面にもどれるようにする
+    if ($('[data-tiYousu]', S)) $('[data-tiYousu]', S).onclick = () => {
+      window.openTerrInfo(t.id);
+      const b = $$('#sheet [data-close]').find(x => !x.classList.contains('icon-btn'));
+      if (b) { b.removeAttribute('data-close'); b.textContent = 'もどる'; b.onclick = () => window.openTerrPick(t.id); }
+    };
+    if ($('[data-tiTake]', S)) $('[data-tiTake]', S).onclick = () => { reqForGroup = false; reqUse = 'grp'; takeTerr(t.id); };
+    if ($('[data-tiAsk]', S)) $('[data-tiAsk]', S).onclick = () => { reqForGroup = false; reqUse = 'grp'; askTerr(t.id); };
+    return true;
   };
 
   /* =========================================================
@@ -903,6 +963,7 @@ button.ktag{cursor:pointer}
     $('#profBack').onclick = () => {
       if (back === 'req') window.openRequestSheet();
       else if (back === 'away') window.openAwayPick(awayG);
+      else if (back && back.indexOf('tinfo:') === 0 && window.openTerrPick) window.openTerrPick(back.slice(6));
       else if (back && back.indexOf('karte:') === 0) openKarte(back.slice(6));
       else closeSheet();
     };
