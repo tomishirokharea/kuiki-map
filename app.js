@@ -15656,13 +15656,13 @@ function retapView(name) {
 /* 係の画面の中のタブ（監督は「予定」と「人・グループ」だけ） */
 let adPane = 'inbox';
 function setAdPane(v) {
-  const allowed = isAdmin() ? ['inbox', 'terr', 'sched', 'status', 'dnc', 'people', 'set'] : ['sched', 'people'];
+  const allowed = isAdmin() ? ['inbox', 'terr', 'status', 'dnc', 'people', 'set'] : ['sched', 'people'];
   adPane = allowed.includes(v) ? v : allowed[0];
-  // 「状況」は「区域」タブの中の切りかえ（上のタブは「区域」が選ばれたまま）
-  const tabOf = p => (p === 'status' || p === 'dnc' ? 'terr' : p);
-  $$('#adTabs [data-ap]').forEach(b => { b.hidden = b.dataset.ap === 'status' || !allowed.includes(b.dataset.ap); b.setAttribute('aria-pressed', String(b.dataset.ap === tabOf(adPane))); });
+  // 上のタブは5つ（今日・区域・状況・人・設定）。「家の印」は「区域」タブの中の切りかえ。予定（sched）は区域係には出さない（監督だけ）
+  const tabOf = p => (p === 'dnc' ? 'terr' : p);
+  $$('#adTabs [data-ap]').forEach(b => { b.hidden = !allowed.includes(b.dataset.ap); b.setAttribute('aria-pressed', String(b.dataset.ap === tabOf(adPane))); });
   const sub = $('#adTerrSub');
-  if (sub) { sub.hidden = tabOf(adPane) !== 'terr'; $$('[data-ap]', sub).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ap === adPane))); }
+  if (sub) { sub.hidden = tabOf(adPane) !== 'terr' || !isAdmin(); $$('[data-ap]', sub).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ap === adPane))); }
   $('#adTabs').style.gridTemplateColumns = allowed.length === 2 ? 'repeat(2,1fr)' : '';
   $$('#view-admin .apane').forEach(p => { const k = p.dataset.apane; p.hidden = !(k === adPane || (adPane === 'status' && k === 'status2')); });
 }

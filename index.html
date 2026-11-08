@@ -1734,17 +1734,15 @@ body.renshu #btnUpd{display:none!important}
         <div class="seg subtabs atabs" id="adTabs" role="group" aria-label="係の画面の切りかえ">
           <button type="button" data-ap="inbox" aria-pressed="true">今日<b class="cnt" id="apCnt" hidden title="申し込み・承認・確認を待っているもの">0</b></button>
           <button type="button" data-ap="terr" aria-pressed="false">区域</button>
-          <button type="button" data-ap="sched" aria-pressed="false">予定</button>
-          <button type="button" data-ap="status" aria-pressed="false" hidden>状況</button>
+          <button type="button" data-ap="sched" aria-pressed="false" hidden>予定</button>
+          <button type="button" data-ap="status" aria-pressed="false">状況</button>
           <button type="button" data-ap="people" aria-pressed="false" aria-label="人とグループ">人</button>
           <button type="button" data-ap="set" aria-pressed="false" aria-label="設定">設定</button>
         </div>
-        <!-- 「区域」タブの中の切りかえ（一覧／状況）。状況は「区域」タブの中に入れた -->
+        <!-- 「区域」タブの中の切りかえ（一覧／家の印）。状況は上のタブ。予定のタブは監督だけに出す（区域係には出さない） -->
         <div class="seg adsub" id="adTerrSub" role="group" aria-label="区域の見かた" hidden>
           <button type="button" data-ap="terr" aria-pressed="true">一覧</button>
-          <button type="button" data-ap="status" aria-pressed="false">状況</button>
           <button type="button" data-ap="dnc" aria-pressed="false">家の印</button>
-          <button type="button" data-admap>期限の地図</button>
         </div>
         <div id="adTopBar"></div>
         <div class="apane" data-apane="inbox">

@@ -238,8 +238,8 @@
     const nSeg = 2 + (showSk ? 1 : 0) + (showLg ? 1 : 0);
     const seg = window.renderChuiAdmin ? `<div class="ch-seg${nSeg === 4 ? ' four' : nSeg === 3 ? ' three' : ''}" role="group" aria-label="拒否・注意・訪問しない・外国語の切りかえ">
         <button type="button" data-dncmode="dnc" aria-pressed="${ui.mode === 'dnc'}"><i class="pin st-dnc">拒</i>拒否 ${dncRefN()}</button>
-        <button type="button" data-dncmode="warn" aria-pressed="${ui.mode === 'warn'}"><i class="pin st-cau">！</i>注意 ${window.chuiCount()}</button>
-        ${showSk ? `<button type="button" data-dncmode="skip" aria-pressed="${ui.mode === 'skip'}"><i class="pin st-skip">ー</i>訪問しない ${skN}</button>` : ''}
+        <button type="button" data-dncmode="warn" aria-pressed="${ui.mode === 'warn'}"><i class="pin st-cau">！</i>注意（！） ${window.chuiCount()}</button>
+        ${showSk ? `<button type="button" data-dncmode="skip" aria-pressed="${ui.mode === 'skip'}"><i class="pin st-skip">ー</i>訪問しない（ー） ${skN}</button>` : ''}
         ${showLg ? `<button type="button" data-dncmode="lang" aria-pressed="${ui.mode === 'lang'}"><i class="pin st-new">外</i>外国語 ${lgN}</button>` : ''}</div>` : '';
     const bindSeg = () => $$('[data-dncmode]', box).forEach(b => b.onclick = () => { ui.mode = b.dataset.dncmode; renderDncAdmin(); });
     if (ui.mode === 'warn' && window.renderChuiAdmin) { box.innerHTML = seg; bindSeg(); window.renderChuiAdmin(box); return; }
