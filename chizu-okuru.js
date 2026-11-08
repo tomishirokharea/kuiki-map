@@ -52,40 +52,20 @@
     if ($('#msPrint')) $('#msPrint').onclick = () => run(t, 'print');
   }
 
-  /* 1区域の紙面（A4たて1枚）を作る。
-     集合住宅の部屋の一覧は、入るのに要る高さだけ下に取り（多くても半分）、残りはすべて地図にする */
-  const PAGE_H = 296.5, FRONT_EXTRA = 40, BACK_EXTRA = 26; // 地図・部屋の一覧のほかに要る高さ（見出し・凡例・余白。mm）
-  function backNeed(c, base) {
-    const box = document.createElement('div');
-    box.className = 'pdoc s12measure a5';
-    box.innerHTML = s12BackHtml(c, base, base.font);
-    document.body.appendChild(box);
-    const el = box.querySelector('.s12apts');
-    el.style.height = 'auto';
-    const mm = el.scrollHeight / PX_MM;
-    box.remove();
-    return mm + BACK_EXTRA;
-  }
+  /* 1区域の紙面（A4たて1枚）を作る。上半分に地図、下半分に集合住宅の部屋の一覧（2026.13.128）。
+     真ん中で折って使えるように、いつもちょうど半分ずつ（係の S-12 の A5 と同じ大きさ）。真ん中の左右に折り目の印 */
   async function pageHtml(t) {
     const byT = new Map([[t.id, housesOf(t.id)]]); // 家の索引を使う（3万件を全部は見ない）
-    const base = S12_SIZE.a5;
-    let c = s12Prep(t, base, byT);
-    const backH = c.apts.length ? Math.min(PAGE_H / 2, Math.max(60, Math.ceil(backNeed(c, base)))) : 0;
-    const frontH = PAGE_H - backH, mapH = Math.round(frontH - FRONT_EXTRA);
-    c = s12Prep(t, Object.assign({}, base, { mapH }), byT);
+    const S = S12_SIZE.a5;
+    const c = s12Prep(t, S, byT);
     const { tileUrl, bad } = await s12Load([c]);
     const now = new Date(), stamp = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
     // A4 1枚では、部屋の一覧は同じ面の下にある（S-12 の「裏面」「表の地図」を言いかえる）
     const front = s12FrontHtml(c, tileUrl, stamp, NOTE).replace('集合住宅（番号は裏面）', '集合住宅（番号は下の一覧）');
-    let back = '', over = false;
-    if (backH) {
-      const S = Object.assign({}, base);
-      const fit = s12FitBacks([c], S, 'a5'); // 半分に入りきらないときだけ、文字を小さくする
-      back = s12BackHtml(c, S, fit.size.get(t.id) || base.font).replace('集合住宅（番号は表の地図）', '集合住宅（番号は上の地図）');
-      over = fit.over.length > 0;
-    }
-    const st = `grid-template-rows:${frontH}mm${backH ? ` ${backH}mm` : ''};--kmmap:${mapH}mm;--kmapt:${Math.max(30, backH - BACK_EXTRA)}mm`;
-    return { html: `<div class="s12doc"><div class="s12sheet a5 kmsend" style="${st}">${front}${back}</div></div>`, bad, over };
+    const fit = s12FitBacks([c], S, 'a5'); // 下半分に入りきらないときだけ、文字を小さくする
+    const back = s12BackHtml(c, S, fit.size.get(t.id) || S.font).replace('集合住宅（番号は表の地図）', '集合住宅（番号は上の地図）');
+    const marks = '<i class="cm h l"></i><i class="cm h r"></i>';
+    return { html: `<div class="s12doc"><div class="s12sheet a5 kmsend">${front}${back}${marks}</div></div>`, bad, over: fit.over.length > 0 };
   }
 
   async function run(t, how) {

@@ -131,6 +131,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "共有する": "Compartir",
 "区域カードの「印刷」で、スマートフォンは「共有する」1つにしました。共有の画面から、LINE で送ることも、「プリント」で印刷することもできます。": "En «Imprimir» de las tarjetas de territorio, en el teléfono ahora hay un solo botón «Compartir». Desde la pantalla para compartir puede enviarlo por LINE o imprimirlo con «Imprimir».",
 "スマートフォンで区域カードの「印刷」を押すと、すぐに共有の画面が出るようにしました（LINE で送る・「プリント」で印刷する）。": "En el teléfono, al tocar «Imprimir» en la tarjeta de territorio, ahora aparece enseguida la pantalla para compartir (enviar por LINE o imprimir con «Imprimir»).",
+"区域カードの「印刷」の紙を、A4のちょうど上半分に地図、下半分に集合住宅の一覧にしました。真ん中で折って使えます。": "La hoja de «Imprimir» de las tarjetas de territorio ahora tiene el mapa en la mitad de arriba y la lista de edificios en la mitad de abajo de la A4. Se puede doblar por la mitad.",
 "PDFができました": "El PDF está listo",
 "区域{0}の地図（A4・1ページ・{1}）": "Mapa del territorio {0} (A4, 1 página, {1})",
 "「送る」を押すと共有の画面が出ます。LINE をえらんで、送る相手をえらんでください。": "Al tocar «Enviar» aparece la pantalla para compartir. Elija LINE y luego a quién enviarlo.",
