@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.124';
+var APP_JS_VER = '2026.13.125';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2711,6 +2711,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.125', items: [
+    ['印', '区域カードに「印刷」のボタンを足しました。その区域の地図をA4の紙1枚にして、印刷したり、PDFにしてLINEなどで送ったりできます。']
+  ] },
   { v: '2026.13.124', items: [
     ['係', '区域係の状況の「区域カードと留守宅カード」のグラフを、日ごとに2本の棒を並べる形にしました。棒を押すと区域ごとの内訳、区域を押すとカルテが開きます。'],
     ['係', '「こまったこと・提案」に、まだ対応していない声があるときは、区域係の「今日」にお知らせが出ます。押すと一覧に進みます。']
@@ -7929,7 +7932,7 @@ function cardHtml(t, own, helper) {
       `<span class="stamp${noCls(t.no)}${t.group ? ' grp' : ''}"><small>${!t.group ? '区域' : isAllUse(t) ? '全体' : 'グループ'}</small>${esc(t.no)}</span>`,
       esc(t.name), (t.group ? `<span class="gbadge">${esc(useName(t))}の区域</span> ` : '') + who)}
     ${extra ? `<div class="tbody">${extra}</div>` : ''}
-    <div class="actions">${(own || lead) && groupOk ? `<button class="btn" data-helpers="${esc(t.id)}">${t.group ? '今日回る人をえらぶ' : '一緒に回る人'}</button>${t.group ? `<button class="btn primary" data-parts="${esc(t.id)}">回る範囲を分ける</button>` : ''}` : ''}${own ? `<button class="btn" data-return="${esc(t.id)}">返す</button>` : ''}${lead ? `<button class="btn" data-leadquit="${esc(t.id)}">司会をやめる</button>` : ''}</div>
+    <div class="actions">${(own || lead) && groupOk ? `<button class="btn" data-helpers="${esc(t.id)}">${t.group ? '今日回る人をえらぶ' : '一緒に回る人'}</button>` : ''}${own || helper || isAdmin() ? `<button class="btn" data-mapsend="${esc(t.id)}">印刷</button>` : ''}${(own || lead) && groupOk ? `${t.group ? `<button class="btn primary" data-parts="${esc(t.id)}">回る範囲を分ける</button>` : ''}` : ''}${own ? `<button class="btn" data-return="${esc(t.id)}">返す</button>` : ''}${lead ? `<button class="btn" data-leadquit="${esc(t.id)}">司会をやめる</button>` : ''}</div>
   </article>`;
 }
 let cardTab = 'mine';
@@ -15078,7 +15081,7 @@ function s12MapSvg(c, tileUrl) {
   s += s12QrSvg(c, P, mm, f);
   return s + '</svg>';
 }
-function s12FrontHtml(c, tileUrl, stamp) {
+function s12FrontHtml(c, tileUrl, stamp, note) {
   const t = c.t, nH = c.hs.filter(h => h.type !== 'apt').length;
   return `<div class="s12card">
     <p class="s12ttl">区域地図のカード</p>
@@ -15086,7 +15089,7 @@ function s12FrontHtml(c, tileUrl, stamp) {
     <div class="s12map">${s12MapSvg(c, tileUrl)}</div>
     <div class="s12ft"><span class="lg">${S12_ICO.line}区域の線 ${S12_ICO.house}家 ${S12_ICO.kind}住居以外 ${S12_ICO.apt}集合住宅（番号は裏面） ${s12HasSkip(c) ? `${S12_ICO.ref}拒否 ${S12_ICO.skip}訪問しない家` : `${S12_ICO.ref}拒否（訪問しない）`}</span>
       <span class="dt">家${nH}・集合住宅${c.apts.length}・拒否${s12RefCount(c)}${c.spOut ? `・特別区域で回る${c.spOut}（地図に出さない）` : ''}／${stamp}時点</span></div>
-    <p class="s12note">封筒に入れて持ち歩き、汚さないようにしてください。回り終えたら区域係に知らせてください。</p>
+    <p class="s12note">${note || '封筒に入れて持ち歩き、汚さないようにしてください。回り終えたら区域係に知らせてください。'}</p>
   </div>`;
 }
 function s12BackHtml(c, S, fs) {
@@ -15136,18 +15139,9 @@ function s12SheetsHtml(fronts, backs, S, sz) {
   }
   return out;
 }
-let s12Busy = false;
-async function printS12(ids, sz, back) {
-  if (s12Busy) return;
-  s12Busy = true;
-  try { await printS12Run(ids, sz, back); } finally { s12Busy = false; }
-}
-async function printS12Run(ids, sz, back) {
-  const S = S12_SIZE[sz];
-  const byT = new Map();
-  D().houses.forEach(h => { if (!h.terrId) return; let a = byT.get(h.terrId); if (!a) byT.set(h.terrId, a = []); a.push(h); });
-  const cards = ids.map(terrById).filter(Boolean).sort(byNo).map(t => s12Prep(t, S, byT));
-  if (!cards.length) return;
+/* 区域カードの地図の画像をまとめて受け取る（係の印刷と、区域カードの「印刷・送る」で使う）。
+   一度受け取った画像は S12_TILES に残るので、2回目からは通信しない */
+async function s12Load(cards) {
   const urls = [...new Set(cards.flatMap(c => c.tiles.map(x => x.url)))];
   closeSheet();
   const got = new Map();
@@ -15164,8 +15158,22 @@ async function printS12Run(ids, sz, back) {
     };
     await Promise.all(Array.from({ length: Math.min(6, urls.length) }, worker));
   } finally { hideBlocking(); }
+  return { tileUrl: u => got.get(u), bad };
+}
+let s12Busy = false;
+async function printS12(ids, sz, back) {
+  if (s12Busy) return;
+  s12Busy = true;
+  try { await printS12Run(ids, sz, back); } finally { s12Busy = false; }
+}
+async function printS12Run(ids, sz, back) {
+  const S = S12_SIZE[sz];
+  const byT = new Map();
+  D().houses.forEach(h => { if (!h.terrId) return; let a = byT.get(h.terrId); if (!a) byT.set(h.terrId, a = []); a.push(h); });
+  const cards = ids.map(terrById).filter(Boolean).sort(byNo).map(t => s12Prep(t, S, byT));
+  if (!cards.length) return;
+  const { tileUrl, bad } = await s12Load(cards);
   const now = new Date(), stamp = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
-  const tileUrl = u => got.get(u);
   const fronts = cards.map(c => s12FrontHtml(c, tileUrl, stamp));
   let backs = null, over = [];
   if (back) {
@@ -15478,6 +15486,7 @@ function bindStatic() {
     }
     else if ((x = q('[data-return]'))) openReturnSheet(x.dataset.return);
     else if ((x = q('[data-helpers]'))) openHelpers(x.dataset.helpers);
+    else if ((x = q('[data-mapsend]'))) openMapSend(x.dataset.mapsend); // 区域の地図を印刷・PDFで送る（chizu-okuru.js）
     else if ((x = q('[data-parts]'))) startPartSplit(x.dataset.parts); // 一覧を出さずに、すぐ地図で分ける
     else if (q('[data-awaypick]')) openAwayPick();
     else if (q('[data-gawaypick]')) { reqUse = 'grp'; openAwayPick(true); } // グループ奉仕から（画面で全体の集まりに切りかえられる）

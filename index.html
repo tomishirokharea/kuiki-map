@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.124"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
+<meta name="app-version" content="2026.13.125"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -669,6 +669,9 @@ body.strong .pin.st-plain{border-width:4px}
 .s12card .rm small{font-size:.8em;margin-left:.15em}
 .s12apts .an .rm{margin-left:.6em;font-size:.85em}
 .s12empty,.s12apts .nr{color:#333}
+/* 区域カードの「印刷・送る」（chizu-okuru.js）：A4たて1枚。部屋の一覧は要る高さだけ・残りは地図 */
+.kmsend .s12map{height:var(--kmmap)}
+.kmsend .s12apts{height:var(--kmapt)}
 /* ===== 区域カードの中のタブ ===== */
 .subtabs{display:flex;width:100%;margin:2px 0 12px}
 .subtabs button{flex:1;min-height:56px;font-size:17px;position:relative}
@@ -1835,7 +1838,7 @@ body.renshu #btnUpd{display:none!important}
 <div id="joinScreen" hidden></div>
 <div id="blocker" hidden><div class="blockbox" role="alert"><h2 id="blockTitle"></h2><p id="blockMsg"></p><div class="ldprog light" id="blockProg" hidden></div><p class="muted" id="blockDetail" hidden></p><button type="button" class="btn primary block" id="blockRetry" hidden>もう一度読み込む</button></div></div>
 
-<script src="app.js"></script>
+<script src="app.js"></script><script src="chizu-okuru.js"></script><!-- 区域カードの「印刷・送る」（2026-11-08） -->
 <script src="tsuzuki.js"></script>  
 <script src="schedule.js"></script>
 <script src="kantan.js"></script>

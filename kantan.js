@@ -246,7 +246,7 @@
         ${own && typeof paperHandOf === 'function' && paperHandOf(t) ? '<p class="muted">紙のカードから引き継いだ区域です（紙で回った家は、数に入っていません）</p>' : ''}
         ${mp ? `<p class="hint-strong">今日のあなたの範囲があります（${esc(partMates(mp).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）</p>` : ''}
         ${ld ? `<div class="leadline"><p><span class="leadtag">今日の司会</span><b>${esc(uname(ld.uid))}さん</b></p><button type="button" class="btn small" data-leadoff="${esc(t.id)}">司会を外す</button></div>` : ''}</div>
-      ${own ? `<div class="actions"><button class="btn primary" data-open="${esc(t.id)}">地図をひらく</button><button class="btn" data-return="${esc(t.id)}">返す</button></div>` : ''}
+      ${own ? `<div class="actions"><button class="btn primary" data-open="${esc(t.id)}">地図をひらく</button><button class="btn" data-return="${esc(t.id)}">返す</button><button class="btn" data-mapsend="${esc(t.id)}">印刷</button></div>` : `<div class="actions"><button class="btn" data-mapsend="${esc(t.id)}">印刷</button></div>`}
       ${grpRow}
     </article>`;
   };
