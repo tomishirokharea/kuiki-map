@@ -21,24 +21,28 @@
     const uid = me().id;
     return t.holder === uid || helpersOf(t).some(h => h.uid === uid) || isLead(t);
   }
-  const fileName = t => `区域${String(t.no).replace(/[\\/:*?"<>|\s]/g, '')}_地図.pdf`;
-  const canShareFile = () => typeof File !== 'undefined' && !!navigator.canShare &&
-    (() => { try { return navigator.canShare({ files: [new File([''], 'a.pdf', { type: 'application/pdf' })] }); } catch (e) { return false; } })();
+  const fileName = (t, ext) => `区域${String(t.no).replace(/[\\/:*?"<>|\s]/g, '')}_地図.${ext}`;
+  /* スマホでは、紙面を「画像」にして共有の画面に出す（区域係の印刷と同じ）。
+     PDF だと iPhone の共有の画面に LINE が出ないことがあるため。画像なら LINE も「プリント」も出る（2026.13.126） */
+  const canShareImg = () => isMobile() && typeof File !== 'undefined' && !!navigator.canShare &&
+    (() => { try { return navigator.canShare({ files: [new File([''], 'a.jpg', { type: 'image/jpeg' })] }); } catch (e) { return false; } })();
+  const isAndroid = () => /Android/.test(navigator.userAgent);
 
   function openMapSend(id) {
     const t = terrById(id);
     if (!canSend(t)) { toast('この区域の地図は、印刷・送ることができません'); return; }
-    const share = isMobile() && canShareFile();
+    const share = canShareImg();
     setSheet(`<h2>区域${esc(t.no)}の地図</h2>
       <p class="muted">${esc(t.name || '')}</p>
       <p>区域の線・家・拒否の印が入った地図を、A4の紙1枚にします。</p>
       ${housesOf(t.id).some(h => h.type === 'apt') ? '<p>下半分に、集合住宅の部屋の一覧が入ります。</p>' : ''}
-      <button type="button" class="btn primary block" id="msPdf">${share ? 'PDFで送る（LINEなど）' : 'PDFを保存する'}</button>
-      <button type="button" class="btn block" id="msPrint" style="margin-top:10px">印刷する</button>
+      ${share ? '<button type="button" class="btn primary block" id="msImg">共有する（LINE・印刷など）</button>' : '<button type="button" class="btn primary block" id="msPdf">PDFを保存する</button>'}
+      ${!share || isAndroid() ? '<button type="button" class="btn block" id="msPrint" style="margin-top:10px">印刷する</button>' : ''}
       <p class="hint">${NOTE}</p>
       <button type="button" class="btn block" data-close>閉じる</button>`);
-    $('#msPdf').onclick = () => run(t, 'pdf');
-    $('#msPrint').onclick = () => run(t, 'print');
+    if ($('#msImg')) $('#msImg').onclick = () => run(t, 'img');
+    if ($('#msPdf')) $('#msPdf').onclick = () => run(t, 'pdf');
+    if ($('#msPrint')) $('#msPrint').onclick = () => run(t, 'print');
   }
 
   /* 1区域の紙面（A4たて1枚）を作る。
@@ -88,34 +92,36 @@
       if (how === 'print') {
         printDoc(p.html, false, '@page{size:A4 portrait;margin:0}');
       } else {
-        showBlocking('PDFを作っています…', '少しお待ちください。', true);
-        let blob;
-        try { blob = await Promise.race([pdfFromHtml(p.html), wait(30000).then(() => { throw new Error('timeout'); })]); } finally { hideBlocking(); } // 画像にする処理が止まっても、待つ画面が消えるように
-        ready(t, new File([blob], fileName(t), { type: 'application/pdf' }));
+        const img = how === 'img';
+        showBlocking(img ? '地図を画像にしています…' : 'PDFを作っています…', '少しお待ちください。', true);
+        let jpg;
+        try { jpg = await Promise.race([jpegFromHtml(p.html), wait(30000).then(() => { throw new Error('timeout'); })]); } finally { hideBlocking(); } // 画像にする処理が止まっても、待つ画面が消えるように
+        ready(t, img ? new File([jpg], fileName(t, 'jpg'), { type: 'image/jpeg' }) : new File([pdfOfJpegBytes(jpg)], fileName(t, 'pdf'), { type: 'application/pdf' }));
       }
       if (warn.length) setTimeout(() => toast(warn.join('。')), how === 'print' ? 3800 : 600);
     } catch (e) {
       hideBlocking();
-      toast(how === 'print' ? '印刷の準備がうまくいきませんでした。もう一度ためしてください' : 'PDFを作れませんでした。「印刷する」から、印刷の画面で「PDFとして保存」をえらんでください');
+      toast(how === 'pdf' ? 'PDFを作れませんでした。「印刷する」から、印刷の画面で「PDFとして保存」をえらんでください' : '印刷の準備がうまくいきませんでした。もう一度ためしてください');
     } finally { busy = false; }
   }
 
-  /* できたPDFを送る・保存する。共有の画面は、押したその場で出す必要があるので、ボタンを1つはさむ */
+  /* できた画像・PDFを共有する・保存する。共有の画面は、押したその場で出す必要があるので、ボタンを1つはさむ */
   function ready(t, file) {
-    const share = isMobile() && navigator.canShare && navigator.canShare({ files: [file] });
+    const img = file.type === 'image/jpeg';
+    const share = img && navigator.canShare && navigator.canShare({ files: [file] });
     let el = $('#printReady');
     if (!el) { el = document.createElement('div'); el.id = 'printReady'; document.body.appendChild(el); }
-    const kb = Math.max(1, Math.round(file.size / 1024));
-    el.innerHTML = `<div class="blockbox" role="dialog" aria-modal="true" aria-labelledby="msTitle"><h2 id="msTitle">PDFができました</h2>
-      <p>区域${esc(t.no)}の地図（A4・1ページ・${kb >= 1024 ? (kb / 1024).toFixed(1) + 'MB' : kb + 'KB'}）</p>
-      <p class="hint">${share ? '「送る」を押すと共有の画面が出ます。LINE をえらんで、送る相手をえらんでください。' : '「保存する」を押すと、PDFが保存されます。'}</p>
-      <button type="button" class="btn primary block" id="msGo">${share ? '送る（LINEなど）' : '保存する'}</button>
+    el.innerHTML = `<div class="blockbox" role="dialog" aria-modal="true" aria-labelledby="msTitle"><h2 id="msTitle">準備ができました</h2>
+      <p>区域${esc(t.no)}の地図（A4・1ページ）</p>
+      <p>${share ? '「共有する」を押すと、共有の画面が出ます。LINE で送るときは「LINE」、印刷するときは「プリント」をえらんでください。' : '「保存する」を押すと、PDFが保存されます。'}</p>
+      <button type="button" class="btn primary block" id="msGo">${share ? '共有する' : '保存する'}</button>
       <button type="button" class="btn block" id="msNo">閉じる</button></div>`;
     el.hidden = false;
     const close = () => { el.hidden = true; };
     $('#msNo').onclick = close;
     $('#msGo').onclick = () => {
       if (share) {
+        // 共有の画面を閉じただけ（AbortError）のときは、この画面を残して、もう一度押せるようにする
         navigator.share({ files: [file] }).then(close, e => { if (!e || e.name !== 'AbortError') { save(file); close(); } });
       } else { save(file); close(); }
     };
@@ -128,8 +134,8 @@
     setTimeout(() => URL.revokeObjectURL(u), 60000);
   }
 
-  /* 紙面を画像（JPEG）にして、PDF に包む */
-  async function pdfFromHtml(html) {
+  /* 紙面を画像（JPEG のバイト列）にする */
+  async function jpegFromHtml(html) {
     const host = document.createElement('div');
     host.className = 'pdoc';
     host.style.cssText = 'position:fixed;left:-99999px;top:0;background:#fff';
@@ -142,11 +148,13 @@
       }
       const el = host.querySelector('.s12sheet');
       const w = Math.ceil(el.offsetWidth), h = Math.ceil(el.offsetHeight);
-      const jpg = new Uint8Array(await (await pageJpeg(el, w, h)).arrayBuffer());
-      const sz = jpegSize(jpg);
-      if (!sz) throw new Error('jpeg');
-      return pdfOfJpeg(jpg, sz.w, sz.h);
+      return new Uint8Array(await (await pageJpeg(el, w, h)).arrayBuffer());
     } finally { host.remove(); }
+  }
+  function pdfOfJpegBytes(jpg) {
+    const sz = jpegSize(jpg);
+    if (!sz) throw new Error('jpeg');
+    return pdfOfJpeg(jpg, sz.w, sz.h);
   }
   /* JPEG の幅・高さを読む（SOF の印） */
   function jpegSize(b) {
