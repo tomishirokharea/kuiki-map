@@ -6717,7 +6717,7 @@ function openAddForm(ll, tid, editId) {
   const f = { type: 'apt', label: '', n: Object.assign(newNaming(), { rooms: [2, 4] }), kind: 'home', lock: false, cand: null, ban: '', mk: {}, ac: '', bn: '', noteOpen: false };
   if (mode === 'draw' && drawTap === 'house') f.type = 'house';
   if (eh) { f.type = eh.type; f.label = eh.label || ''; f.kind = kindOf(eh); f.lock = !!eh.lock; f.ac = eh.ac || ''; f.bn = eh.bn || ''; }
-  const ac0 = f.ac, bn0 = f.bn; // 候補をはずしたときに、元へもどす
+  const bn0 = f.bn; // 保存のときの確かめ（変えたメモだけ）
   const cleanBn = v => String(v || '').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 200);
   const recN = eh ? visitsOf(K(eh.id, '')).length : 0;
   const nrm = x => String(x || '').replace(/[\s　]/g, '').toLowerCase();
@@ -6731,10 +6731,20 @@ function openAddForm(ll, tid, editId) {
     namingKeep(f.n);
   };
   // 建物名の欄：付近の候補（エクセルの建物）を出す。えらんでも、そのまま入力してもよい
+  // 候補から入ったエレベーター・メモを、えらぶ前の入力にもどす（自分で直したものは、そのまま）
+  const unpick = () => {
+    const c = f.cand, pv = f.prev;
+    if (!c || !pv) return;
+    if (c.ac && f.ac === c.ac) f.ac = pv.ac;
+    if (c.m && cleanBn(f.bn) === cleanBn(c.m)) { f.bn = pv.bn; f.noteOpen = pv.noteOpen; }
+    f.prev = null;
+  };
   const pickCand = c => {
     keep();
+    unpick(); // 前にえらんだ候補のエレベーター・メモは、先に元へもどす（監査 M-1）
+    f.prev = { ac: f.ac, bn: f.bn, noteOpen: f.noteOpen }; // えらぶ前の入力（はずすと、ここへもどす。監査 L-1）
     f.cand = c; f.label = c.n || f.label; f.lock = !!c.k; f.ban = c.b || '';
-    if (c.ac) f.ac = c.ac;                                          // 一覧のエレベーター・縦階段
+    f.ac = c.ac || f.ac;                                            // 一覧のエレベーター・縦階段
     if (c.m && !f.bn.trim()) { f.bn = cleanBn(c.m); f.noteOpen = true; } // 一覧の備考を、建物のメモに
     if (c.r && c.r.length) { f.n.nm = 'free'; f.n.manual = c.r.join(' '); } // 旧区域カードの部屋（apt-heya.js）
     else if (f.n.nm === 'floor' && c.f) f.n.rooms = Array.from({ length: Math.min(40, c.f) }, (_, i) => i === 0 && c.g === 0 ? 0 : (f.n.rooms[i] != null && f.n.rooms[i] > 0 ? f.n.rooms[i] : (f.n.rooms[f.n.rooms.length - 1] || 2)));
@@ -6799,8 +6809,7 @@ function openAddForm(ll, tid, editId) {
     if (eh && window.chuiMark) window.chuiMark.bind(S, f.mk, () => { keep(); paint(); });
     if ($('#fCandOff')) $('#fCandOff').onclick = () => {
       keep();
-      if (f.cand && f.cand.ac && f.ac === f.cand.ac) f.ac = ac0;                 // 候補から入ったものは、はずすと元にもどす
-      if (f.cand && f.cand.m && cleanBn(f.bn) === cleanBn(f.cand.m)) { f.bn = bn0; f.noteOpen = false; }
+      unpick(); // 候補から入ったものは、はずすと元にもどす
       f.cand = null; f.ban = ''; paint();
     };
     if ($('#fMove')) $('#fMove').onclick = () => startMoveHouse(editId);
