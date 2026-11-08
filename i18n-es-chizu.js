@@ -113,5 +113,13 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "ほか {0}件": "y {0} más",
 "目印の描画": "Dibujo de puntos de referencia",
 "目印の描画（{0}件）": "Dibujo de puntos de referencia ({0})",
-"家の編集で一戸建てをアパート・マンションに変えるときにも、エレベーター（あり・なし）と建物のメモを入れられるようにしました。": "Al editar una casa y cambiarla a apartamento, ahora también se puede indicar el ascensor (sí/no) y la nota del edificio."
+"家の編集で一戸建てをアパート・マンションに変えるときにも、エレベーター（あり・なし）と建物のメモを入れられるようにしました。": "Al editar una casa y cambiarla a apartamento, ahora también se puede indicar el ascensor (sí/no) y la nota del edificio.",
+"注意": "Aviso",
+"この家の印": "Marca de esta casa",
+"この部屋の印": "Marca de este departamento",
+"この建物ぜんたいの印": "Marca de todo el edificio",
+"夜勤・犬など": "turno de noche, perro…",
+"断られた": "rechazó la visita",
+"理由は書かない": "sin motivo",
+"家の編集の「この家の印」の見出しに「？」を付け、押すと、注意・拒否をどんなときに、どう使うかが出るようにしました。印のボタンの下にも「夜勤・犬など」のような一言を出します。": "En «Marca de esta casa» (editar la casa) hay un «?» que explica cuándo y cómo usar Aviso y No visitar. Bajo cada botón aparece una pista corta, como «turno de noche, perro…».",
 });

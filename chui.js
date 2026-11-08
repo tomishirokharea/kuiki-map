@@ -46,6 +46,7 @@
   .mk-chips.two,.mk-chips.four{grid-template-columns:repeat(2,1fr)}
   .mk-chips button{min-height:58px;border-radius:12px;border:2px solid var(--line);background:#fff;font:inherit;font-weight:700;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;line-height:1.1}
   .mk-chips button .pin{width:26px;height:26px;font-size:14px;border-width:2px}
+  .mk-chips button .mk-sub{font-size:14px;font-weight:600;color:var(--ink2,#4A5F73);line-height:1.2}
   .mk-chips button[aria-pressed="true"]{border-color:var(--brand-ink);background:var(--terr-soft);box-shadow:inset 0 0 0 1px var(--brand-ink)}
   .mk-chips button:disabled{opacity:.45}
   .mk-box textarea{width:100%;min-height:72px;font-size:17px;border:2px solid var(--line);border-radius:12px;padding:8px 10px;font-family:inherit;background:#fff;color:var(--ink)}
@@ -123,15 +124,17 @@
     const o = opt || {}, cur = markOf(k), lockDnc = (cur === 'dnc' || cur === 'skip') && !isAdmin();
     const kind = st.kind || cur;
     const showSkip = !o.noDnc && (canSkip() || cur === 'skip');
-    const chip = (v, icon, lab) => ((v === 'dnc' || v === 'skip') && o.noDnc ? '' : v === 'skip' && !showSkip ? '' : `<button type="button" data-mk="${v}" aria-pressed="${kind === v}"${lockDnc && v !== cur ? ' disabled' : ''}>${icon}<span>${lab}</span></button>`);
+    // sub：ボタンの下の一言（押さなくても、どんなときに使うかが分かるように。2026.13.134）
+    const chip = (v, icon, lab, sub) => ((v === 'dnc' || v === 'skip') && o.noDnc ? '' : v === 'skip' && !showSkip ? '' : `<button type="button" data-mk="${v}" aria-pressed="${kind === v}"${lockDnc && v !== cur ? ' disabled' : ''}>${icon}<span>${lab}</span>${sub ? ` <small class="mk-sub">${sub}</small>` : ''}</button>`);
     const n = st.n != null ? st.n : ((C()[k] && C()[k].n) || '');
     const what = o.noDnc ? '建物ぜんたい' : k.split('|')[1] ? '部屋' : '家';
-    return `<fieldset class="mk-box"><legend>この${what}の印</legend>
+    // 見出しの「？」（help.js の houseMark）。伝道者も押せる
+    return `<fieldset class="mk-box"><legend>この${what}の印${typeof window.helpBtn === 'function' ? window.helpBtn(o.noDnc ? 'bldgMark' : 'houseMark') : ''}</legend>
       <div class="mk-chips${o.noDnc ? ' two' : showSkip ? ' four' : ''}" role="group" aria-label="印の種類">
         ${chip('none', '<i class="pin st-new"></i>', 'なし')}
-        ${chip('warn', '<i class="pin st-cau">！</i>', '注意')}
-        ${chip('dnc', '<i class="pin st-dnc">拒</i>', '拒否')}
-        ${chip('skip', '<i class="pin st-skip">ー</i>', '訪問しない')}
+        ${chip('warn', '<i class="pin st-cau">！</i>', '注意', '夜勤・犬など')}
+        ${chip('dnc', '<i class="pin st-dnc">拒</i>', '拒否', '断られた')}
+        ${chip('skip', '<i class="pin st-skip">ー</i>', '訪問しない', '理由は書かない')}
       </div>
       ${kind === 'skip' && cur !== 'skip' ? `<p class="hint">「訪問しない」は、理由を書かない印です。地図に灰色の「ー」が出て、この${what}はだれも訪問しません（数にも入りません）。外せるのは区域係だけです。</p>` : ''}
       ${kind === 'warn' ? `<label class="field"><span>注意の内容（なくてもよい）</span>
