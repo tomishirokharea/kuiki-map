@@ -28,10 +28,17 @@
     (() => { try { return navigator.canShare({ files: [new File([''], 'a.jpg', { type: 'image/jpeg' })] }); } catch (e) { return false; } })();
   const isAndroid = () => /Android/.test(navigator.userAgent);
 
+  /* 作った画像は、この画面を開いているあいだ10分だけ取っておく（同じ日のうち）。
+     2回目からは、押したその場で共有の画面を出せる（作り直す待ちがない） */
+  const IMG = new Map(), KEEP = 10 * 60 * 1000;
+  const cachedImg = t => { const c = IMG.get(t.id); return c && c.day === ymd(new Date()) && Date.now() - c.at < KEEP ? c.file : null; };
+
   function openMapSend(id) {
     const t = terrById(id);
     if (!canSend(t)) { toast('この区域の地図は、印刷・送ることができません'); return; }
     const share = canShareImg();
+    // スマホ：間の画面を出さずに、すぐ共有の画面へ（2026.13.127）
+    if (share) { const f = cachedImg(t); if (f) shareNow(t, f); else run(t, 'img'); return; }
     setSheet(`<h2>区域${esc(t.no)}の地図</h2>
       <p class="muted">${esc(t.name || '')}</p>
       <p>区域の線・家・拒否の印が入った地図を、A4の紙1枚にします。</p>
@@ -96,13 +103,28 @@
         showBlocking(img ? '地図を画像にしています…' : 'PDFを作っています…', '少しお待ちください。', true);
         let jpg;
         try { jpg = await Promise.race([jpegFromHtml(p.html), wait(30000).then(() => { throw new Error('timeout'); })]); } finally { hideBlocking(); } // 画像にする処理が止まっても、待つ画面が消えるように
-        ready(t, img ? new File([jpg], fileName(t, 'jpg'), { type: 'image/jpeg' }) : new File([pdfOfJpegBytes(jpg)], fileName(t, 'pdf'), { type: 'application/pdf' }));
+        if (img) {
+          const f = new File([jpg], fileName(t, 'jpg'), { type: 'image/jpeg' });
+          if (!p.bad) IMG.set(t.id, { file: f, at: Date.now(), day: ymd(new Date()) }); // 地図が欠けた画像は取っておかない
+          shareNow(t, f);
+        } else ready(t, new File([pdfOfJpegBytes(jpg)], fileName(t, 'pdf'), { type: 'application/pdf' }));
       }
       if (warn.length) setTimeout(() => toast(warn.join('。')), how === 'print' ? 3800 : 600);
     } catch (e) {
       hideBlocking();
       toast(how === 'pdf' ? 'PDFを作れませんでした。「印刷する」から、印刷の画面で「PDFとして保存」をえらんでください' : '印刷の準備がうまくいきませんでした。もう一度ためしてください');
     } finally { busy = false; }
+  }
+
+  /* すぐ共有の画面を出す。画像を作るのに時間がかかり、ブラウザに「押したその場ではない」と止められたときだけ、
+     「共有する」ボタンの画面を出す。共有の画面を閉じただけのときは何もしない（Android は「印刷する」を選べる画面を出す） */
+  function shareNow(t, file) {
+    let p;
+    try { p = navigator.share({ files: [file] }); } catch (e) { ready(t, file); return; }
+    p.then(() => {}, e => {
+      if (e && e.name === 'AbortError') { if (isAndroid()) ready(t, file); return; }
+      ready(t, file);
+    });
   }
 
   /* できた画像・PDFを共有する・保存する。共有の画面は、押したその場で出す必要があるので、ボタンを1つはさむ */
@@ -115,10 +137,12 @@
       <p>区域${esc(t.no)}の地図（A4・1ページ）</p>
       <p>${share ? '「共有する」を押すと、共有の画面が出ます。LINE で送るときは「LINE」、印刷するときは「プリント」をえらんでください。' : '「保存する」を押すと、PDFが保存されます。'}</p>
       <button type="button" class="btn primary block" id="msGo">${share ? '共有する' : '保存する'}</button>
+      ${share && isAndroid() ? '<button type="button" class="btn block" id="msPr">印刷する</button>' : ''}
       <button type="button" class="btn block" id="msNo">閉じる</button></div>`;
     el.hidden = false;
     const close = () => { el.hidden = true; };
     $('#msNo').onclick = close;
+    if ($('#msPr')) $('#msPr').onclick = () => { close(); run(t, 'print'); };
     $('#msGo').onclick = () => {
       if (share) {
         // 共有の画面を閉じただけ（AbortError）のときは、この画面を残して、もう一度押せるようにする
