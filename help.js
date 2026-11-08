@@ -34,9 +34,14 @@
 
     ja: {
       /* ---- 家の編集＞この家の印（chui.js。伝道者も見る。設定ではないので dt・def はない） ---- */
+      bldgMark: { t: 'この建物ぜんたいの印',
+        what: 'アパート・マンションの建物ぜんたいについて、訪ねる人みんなに前もって知らせたいことを、地図の建物の印で伝えるものです。訪問の結果（会えた・留守）の記録とは別のものです。部屋ごとの印は、部屋の画面でえらびます。',
+        change: '「！注意」にすると、地図のこの建物に朱色の「！」が付き、だれかがこの建物の部屋をタップすると、記録の画面に注意の内容が出ます。「なし」にすると、印が外れます。',
+        ex: '「入口の犬に注意」「管理人さんから、夜の訪問は控えるように言われた」など、建物のどの部屋にも当てはまることを書きます。',
+        tip: '注意の内容は、この建物を訪ねる人みんなが見ます。名前・病気・家庭の事情など、個人のことは書かないでください。1つの部屋のことは、建物ではなく、その部屋の印に書いてください。' },
       houseMark: { t: 'この家の印',
-        what: '次にこの家を訪ねる人に、前もって知らせたいことを、地図の家の印で伝えるものです。訪問の結果（会えた・留守）の記録とは別のものです。',
-        change: '「！注意」にすると、地図のこの家に朱色の「！」が付き、だれかがこの家をタップすると、記録の画面のいちばん上に注意の内容が出ます。「拒否」にすると、地図に「拒」が出て、だれも訪問しなくなります。拒否を外せるのは区域係だけです。「なし」にすると、印が外れます。',
+        what: '次にこの家（アパートの部屋）を訪ねる人に、前もって知らせたいことを、地図の家の印で伝えるものです。訪問の結果（会えた・留守）の記録とは別のものです。',
+        change: '「！注意」にすると、地図のこの家に朱色の「！」が付き、だれかがこの家をタップすると、記録の画面の上に注意の内容が出ます。「拒否」にすると、地図に「拒」が出て、だれも訪問しなくなります。拒否を外せるのは区域係だけです。「なし」にすると、印が外れます。',
         ex: '「夜勤なので、昼は寝ています」と言われたら、「！注意」をえらび、注意の内容に「夜勤（昼は寝ている）」と書いて保存します。次に訪ねる人は、地図の「！」を見て、夕方に訪ねるなどの工夫ができます。「犬がいる」「午前中は控える」なども同じです。',
         tip: '注意の内容は、この家を訪ねる人みんなが見ます。名前・病気・家庭の事情など、個人のことは書かないでください。訪問をはっきり断られたときは「拒否」です。どれにするか迷うときは「！注意」にして、区域係に相談してください。' },
       /* ---- 設定・データ＞奉仕報告（houkoku.js・s21.gs） ---- */
@@ -399,8 +404,13 @@
     },
 
     es: {
+      bldgMark: { t: 'Marca de todo el edificio',
+        what: 'Sirve para avisar, con una marca en el mapa, lo que todos deben saber antes de visitar este edificio de departamentos. Es distinto del resultado de la visita. La marca de cada departamento se elige en la pantalla del departamento.',
+        change: 'Con «Aviso», el edificio muestra un «!» naranja en el mapa y, al tocar un departamento, el aviso aparece en la pantalla de registro. Con «ninguno», se quita la marca.',
+        ex: '«Cuidado con el perro de la entrada», «el administrador pidió no visitar de noche»: cosas que valen para todos los departamentos.',
+        tip: 'Todos los que visiten el edificio verán el aviso. No escriba nombres, enfermedades ni asuntos familiares. Lo que es de un solo departamento, escríbalo en la marca de ese departamento.' },
       houseMark: { t: 'Marca de esta casa',
-        what: 'Sirve para avisar, con una marca en el mapa, lo que conviene saber antes de visitar esta casa. Es distinto del resultado de la visita (atendió, no estaba).',
+        what: 'Sirve para avisar, con una marca en el mapa, lo que conviene saber antes de visitar esta casa (o departamento). Es distinto del resultado de la visita (atendió, no estaba).',
         change: 'Con «Aviso», la casa muestra un «!» naranja en el mapa y, al tocarla, el aviso aparece arriba en la pantalla de registro. Con «No visitar», aparece la marca de «No visitar» y nadie la visita; solo el encargado de territorios puede quitarla. Con «ninguno», se quita la marca.',
         ex: 'Si le dicen «trabajo de noche y duermo de día», elija «Aviso» y escriba «Turno de noche (duerme de día)». Quien visite después verá el «!» y podrá ir, por ejemplo, por la tarde. Lo mismo para «hay un perro» o «evitar la mañana».',
         tip: 'Todos los que visiten esta casa verán el aviso. No escriba nombres, enfermedades ni asuntos familiares. Si rechazaron la visita claramente, use «No visitar». Si duda, elija «Aviso» y consulte al encargado de territorios.' },
