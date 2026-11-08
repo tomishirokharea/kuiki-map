@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.128';
+var APP_JS_VER = '2026.13.129';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -1754,7 +1754,7 @@ function asgNoticeHtml() {
   const seen = asgSeen();
   return todayAsgs().filter(a => a.keys.some(k => !seen.has(k))).map(a => `<div class="notice info asgnote">
     <b>${a.label ? esc(a.label) : `区域${esc(a.t.no)}`}を、今日いっしょに回るように、たのまれました</b><br>
-    ${esc(uname(a.by))}さんから${a.p ? `・回る範囲があります（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}
+    ${esc(uname(a.by))}さんから${a.p ? `・回る範囲があります（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}${a.p && partRoomsNote(a.p) ? `<br>${esc(partRoomsNote(a.p))}` : ''}
     <span class="actions"><button class="btn small primary" data-asgopen="${esc(a.t.id)}"${a.card ? ` data-asgcard="${esc(a.card)}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
       <button class="btn small" data-asgok="${esc(a.keys.join(' '))}">わかりました</button></span></div>`).join('');
 }
@@ -2433,25 +2433,62 @@ const partsOf = t => ((t && Array.isArray(t.parts) ? t.parts : []).filter(p => p
 const myPart = t => partsOf(t).filter(p => (p.uids || []).includes(me().id)).sort((a, b) => (a.at < b.at ? 1 : -1))[0] || null;
 const partMates = p => (p.uids || []).filter(u => u !== me().id);
 const partName = p => (p.uids || []).map(u => uname(u) + 'さん').join('・');
-function partHouseCount(t, p) {
-  let n = 0;
-  housesOf(t.id).forEach(h => { if (inPoly(h.lat, h.lng, p.poly)) n += targets(h).length; });
-  return n;
+/* 集合住宅の部屋ごとの分け方（2026-11-08・heya-wake.js）
+   parts の1件に rooms: { 建物のid: [部屋, ...] } を持たせると、その建物は「えらんだ部屋だけ」がその範囲になる。
+   ro: 1 は「部屋だけの範囲」（囲みなし。poly は建物のまわりの小さな四角で、地図の札と道案内のためだけに使う）。
+   ほかの範囲で部屋をえらばれた部屋は、囲みの中にあっても、その範囲には入れない（部屋をえらんだほうが勝つ） */
+function partHas(p, h, u, all) {
+  const r = p.rooms && p.rooms[h.id];
+  if (Array.isArray(r)) return r.includes(u);
+  if (h.type === 'apt' && all && all.some(q => q !== p && q.rooms && Array.isArray(q.rooms[h.id]) && q.rooms[h.id].includes(u))) return false;
+  return !p.ro && okPoly(p.poly) && inPoly(h.lat, h.lng, p.poly);
 }
-/* 範囲の中身（一戸建ての軒数と、アパート名ごとの部屋数）。keys があれば留守宅カードなどその家・部屋だけを数える */
-function partContents(t, poly, keys) {
+/* 部屋の名前を、短く読める形に（全部の部屋／「3〜5階」／「301・302」） */
+function roomsText(h, us) {
+  if (!h || !us || !us.length) return '';
+  if (us.length >= h.units.length && h.units.every(u => us.includes(u))) return `全部の部屋（${us.length}部屋）`;
+  const set = new Set(us), out = [];
+  let run = null; // 続いた「全部の部屋がえらばれた階」をまとめる
+  const flush = () => { if (run) { out.push(run.a === run.b ? run.a : `${run.a.replace(/階$/, '')}〜${run.b}`); run = null; } };
+  const gs = unitGroups(h).slice().reverse(); // 下の階から
+  gs.forEach(([g, gu]) => {
+    const pick = gu.filter(u => set.has(u));
+    if (!pick.length) { flush(); return; }
+    if (g && /^\d+階$/.test(g) && pick.length === gu.length) { if (run) run.b = g; else run = { a: g, b: g }; return; }
+    flush();
+    pick.forEach(u => out.push(uName(h, u)));
+  });
+  flush();
+  const txt = out.length > 8 ? out.slice(0, 7).join('・') + `ほか` : out.join('・');
+  return `${txt}（${us.length}部屋）`;
+}
+/* 部屋だけの範囲を地図に出す：建物ごとに輪と札（「あなたの範囲 12部屋」／「○○さん 12部屋」） */
+function partRoomMarks(p, own) {
+  Object.keys(p.rooms || {}).forEach(hid => {
+    const h = houseById(hid); if (!h) return;
+    const col = own ? '#00796B' : '#C2410C';
+    L.circleMarker([h.lat, h.lng], { radius: 24, color: col, weight: 4, dashArray: own ? null : '6 5', fillColor: col, fillOpacity: own ? 0.1 : 0.05, interactive: false }).addTo(terrLayer);
+    L.marker([h.lat, h.lng], { icon: L.divIcon({ className: 'part-label', html: `<span>${esc((own ? 'あなたの範囲' : partName(p)) + ' ' + p.rooms[hid].length + '部屋')}</span>`, iconSize: [0, 0], iconAnchor: [0, -30] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
+  });
+}
+/* わたされた人向け：その範囲の部屋の説明（「県営上田団地1号棟の 301〜504」）。なければ '' */
+function partRoomsNote(p) {
+  if (!p || !p.rooms) return '';
+  return Object.keys(p.rooms).map(hid => { const h = houseById(hid); return h && p.rooms[hid].length ? `${h.label || '集合住宅'}の ${roomsText(h, p.rooms[hid])}` : ''; }).filter(Boolean).join('、');
+}
+/* 範囲の中身（一戸建ての軒数と、アパート名ごとの部屋数）。keys があれば留守宅カードなどその家・部屋だけを数える。
+   part は { poly, rooms, ro }。all はその区域（カード）の範囲の全部（ほかの範囲でえらばれた部屋を除くため） */
+function partContents(t, part, keys, all) {
   const apts = new Map(); let houses = 0, total = 0;
-  const add = (h, n) => {
-    total += n;
-    if (h.type === 'apt') { const a = apts.get(h.id) || { name: h.label || '集合住宅', n: 0 }; a.n += n; apts.set(h.id, a); }
-    else houses += n;
+  const add = (h, u) => {
+    total++;
+    if (h.type === 'apt') { const a = apts.get(h.id) || { name: h.label || '集合住宅', n: 0, us: [], h }; a.n++; a.us.push(u); apts.set(h.id, a); }
+    else houses++;
   };
-  if (keys) {
-    const cnt = new Map();
-    keys.forEach(k => { const hid = parseKey(k)[0]; cnt.set(hid, (cnt.get(hid) || 0) + 1); });
-    cnt.forEach((n, hid) => { const h = houseById(hid); if (h && inPoly(h.lat, h.lng, poly)) add(h, n); });
-  } else housesOf(t.id).forEach(h => { if (inPoly(h.lat, h.lng, poly)) add(h, targets(h).length); });
-  return { houses, apts: [...apts.values()].sort((a, b) => b.n - a.n), total };
+  if (keys) keys.forEach(k => { const [hid, u] = parseKey(k), h = houseById(hid); if (h && partHas(part, h, u, all)) add(h, u); });
+  else housesOf(t.id).forEach(h => targets(h).forEach(u => { if (partHas(part, h, u, all)) add(h, u); }));
+  apts.forEach(a => { a.sel = !!(part.rooms && part.rooms[a.h.id]); if (a.sel) a.name += ' ' + roomsText(a.h, a.us).replace(/（\d+部屋）$/, ''); });
+  return { houses, apts: [...apts.values()].sort((a, b) => (b.sel - a.sel) || (b.n - a.n)), total };
 }
 function partContentsHtml(c, max) {
   if (!c.total) return '<div class="partsum muted">この範囲には、家の印がありません</div>';
@@ -2711,6 +2748,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.129', items: [
+    ['集', '「回る範囲を分ける」で、集合住宅をタップすると部屋が並び、指でなぞってえらべるようにしました。団地の「3〜5階」など、部屋ごとにわたせます。わたされた人の画面にも、自分の部屋が出ます。']
+  ] },
   { v: '2026.13.128', items: [
     ['印', '区域カードの「印刷」の紙を、A4のちょうど上半分に地図、下半分に集合住宅の一覧にしました。真ん中で折って使えます。']
   ] },
@@ -3940,7 +3980,7 @@ function renderLegend() {
       <button data-rmode="reco" aria-pressed="${m === 'reco'}">おすすめ順</button>
       <button data-rmode="progress" aria-pressed="${m === 'progress'}">進み具合</button>
     </div>
-    ${mp2 ? `<p class="okmsg"><b>今日のあなたの範囲</b>　${esc(partMates(mp2).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と回ります（緑の線の中）</p>
+    ${mp2 ? `<p class="okmsg"><b>今日のあなたの範囲</b>　${esc(partMates(mp2).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と回ります（${mp2.ro ? esc(partRoomsNote(mp2)) : '緑の線の中'}）</p>
       <div class="row"><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=${center(mp2.poly)[0].toFixed(6)},${center(mp2.poly)[1].toFixed(6)}" target="_blank" rel="noopener">Googleマップでこの範囲へ</a></div>` : ''}
     ${(own || lead) && ps2.length ? `<p class="muted">今日わたした範囲：${ps2.map(p => esc(partName(p))).join(' ／ ')}</p>` : ''}
     ${body}
@@ -3994,6 +4034,7 @@ function renderTerrs() {
       if (!hold && (!mp || p.id !== mp.id)) return;
       if (!okPoly(p.poly)) return;
       const own = mp && p.id === mp.id;
+      if (p.ro) { partRoomMarks(p, own); return; } // 部屋だけの範囲：建物に輪と「部屋」の札（四角は出さない）
       L.polygon(p.poly, { color: own ? '#00796B' : '#C2410C', weight: 4, dashArray: own ? null : '8 6',
         fillColor: own ? '#00796B' : '#C2410C', fillOpacity: own ? 0.08 : 0.05, interactive: false }).addTo(terrLayer);
       L.marker(labelPoint(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
@@ -4007,6 +4048,7 @@ function renderTerrs() {
     partsOf(fc).forEach(p => {
       if ((!hold && (!mp || p.id !== mp.id)) || !okPoly(p.poly)) return;
       const own = mp && p.id === mp.id;
+      if (p.ro) { partRoomMarks(p, own); return; } // 部屋だけの範囲：建物に輪と「部屋」の札（四角は出さない）
       L.polygon(p.poly, { color: own ? '#00796B' : '#C2410C', weight: 4, dashArray: own ? null : '8 6',
         fillColor: own ? '#00796B' : '#C2410C', fillOpacity: own ? 0.08 : 0.05, interactive: false }).addTo(terrLayer);
       L.marker(labelPoint(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
@@ -4312,6 +4354,7 @@ async function onHouseTap(id) {
   const h = houseById(id); if (!h) return;
   if (window.dncPickHouse && window.dncPickHouse(id)) return; // 区域係が拒否の家を地図でえらんでいるとき（kyohi.js）
   if (mode === 'part') { // 回る範囲を分けている最中：記録の画面は出さない
+    if (partDraw && window.heyaWake && window.heyaWake.can(h)) { window.heyaWake.open(h.id); return; } // 集合住宅：部屋ごとに分ける（heya-wake.js）
     if (partDraw && partDraw.tool !== 'pen') partTap(L.latLng(h.lat, h.lng));
     return;
   }
@@ -4393,7 +4436,7 @@ function startPartSplit(tid) {
   if (!canLead(t)) { toast('この区域の担当者（今日の司会）だけが分けられます'); return; }
   showView('map');
   selectTerr(tid, { fit: true });
-  partDraw = { tid, pts: [], tool: lsGet('kuiki_parttool') === 'pen' ? 'pen' : 'tap' };
+  partDraw = { tid, pts: [], rooms: {}, tool: lsGet('kuiki_parttool') === 'pen' ? 'pen' : 'tap' };
   setMode('part');
   setPartTool(partDraw.tool);
   renderPartDraw();
@@ -4405,13 +4448,26 @@ function startCardSplit(cid) {
   if (!c || !c.group || c.by !== me().id || c.endedAt) { toast('このカードを持つ人だけが分けられます'); return; }
   if (c.mode !== 'split') { toast('「分ける」を選ぶと、範囲を分けられます'); return; }
   openAwayCard(cid);
-  partDraw = { tid: c.terrId, cid, pts: [], tool: lsGet('kuiki_parttool') === 'pen' ? 'pen' : 'tap' };
+  partDraw = { tid: c.terrId, cid, pts: [], rooms: {}, tool: lsGet('kuiki_parttool') === 'pen' ? 'pen' : 'tap' };
   setMode('part');
   setPartTool(partDraw.tool);
   renderPartDraw();
   toast('地図をタップして、わたす範囲を囲んでください');
 }
 const partObj = pd => (pd.cid ? D().awayCards.find(x => x.id === pd.cid) : terrById(pd.tid)); // 分ける相手：区域、またはグループの留守宅カード
+const draftRooms = pd => Object.keys(pd.rooms || {}).filter(hid => pd.rooms[hid].length && houseById(hid)); // 部屋をえらんだ建物
+/* 今つくっている範囲（囲み＋えらんだ部屋）。囲みがなく部屋だけなら ro（部屋だけの範囲） */
+function draftPart(pd) {
+  const rooms = {}; draftRooms(pd).forEach(hid => { rooms[hid] = pd.rooms[hid].slice(); });
+  const has = Object.keys(rooms).length, poly = pd.pts.length >= 3;
+  if (!poly && !has) return null;
+  if (poly) return has ? { poly: pd.pts.slice(), rooms } : { poly: pd.pts.slice() };
+  // 部屋だけ：建物のまわりの小さな四角（地図の札・Googleマップの道案内のため。家の判定には使わない）
+  const hs = Object.keys(rooms).map(houseById), m = 0.00012; // 約13m
+  const la = hs.map(h => h.lat), ln = hs.map(h => h.lng);
+  const s0 = Math.min(...la) - m, n0 = Math.max(...la) + m, w0 = Math.min(...ln) - m, e0 = Math.max(...ln) + m;
+  return { poly: [[s0, w0], [n0, w0], [n0, e0], [s0, e0]], rooms, ro: 1 };
+}
 function endPartSplit() {
   penOff();
   partDraw = null;
@@ -4468,7 +4524,12 @@ function penOn() {
     if (!penStroke) return;
     const st = penStroke; penStroke = null;
     if (penLine) { map.removeLayer(penLine); penLine = null; }
-    if (st.length < 8) { toast('もう少し大きく、ぐるっと囲んでください'); return; }
+    if (st.length < 8) {
+      // 指でなぞるときも、集合住宅をちょんとタップしたら、部屋ごとに分ける画面を出す（heya-wake.js）
+      const hit = window.heyaWake && st.px.length && window.heyaWake.hitAt(st.px[0]);
+      if (hit) { window.heyaWake.open(hit.id); return; }
+      toast('もう少し大きく、ぐるっと囲んでください'); return;
+    }
     partDraw.pts = simplifyRing(st.map(ll => [ll.lat, ll.lng]), 0.5);
     let tol = 1; // 点が多いときは、形を少しずつゆるめて60点までにする
     while (partDraw.pts.length > 60 && tol < 200) { partDraw.pts = simplifyRing(st.map(ll => [ll.lat, ll.lng]), tol); tol *= 1.6; }
@@ -4495,6 +4556,11 @@ function renderPartDraw() {
   partLayer.clearLayers();
   if (!partDraw) { updatePartBar(); return; }
   const pts = partDraw.pts;
+  draftRooms(partDraw).forEach(hid => { // 部屋をえらんだ建物：オレンジの輪と「8部屋」の札
+    const h = houseById(hid);
+    L.circleMarker([h.lat, h.lng], { radius: 24, color: '#C2410C', weight: 4, fillColor: '#C2410C', fillOpacity: 0.15, interactive: false }).addTo(partLayer);
+    L.marker([h.lat, h.lng], { icon: L.divIcon({ className: 'part-label', html: `<span>${partDraw.rooms[hid].length}部屋</span>`, iconSize: [0, 0], iconAnchor: [0, -30] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(partLayer);
+  });
   if (pts.length >= 2) {
     L.polygon(pts, { color: '#C2410C', weight: 4, dashArray: '8 6', fillColor: '#C2410C', fillOpacity: 0.12, interactive: false }).addTo(partLayer);
   }
@@ -4504,16 +4570,18 @@ function renderPartDraw() {
 function updatePartBar() {
   const el = $('#partMsg'); if (!el) return;
   const n = partDraw ? partDraw.pts.length : 0;
+  const nr = partDraw ? draftRooms(partDraw).length : 0;
   if (partDraw && partDraw.tool === 'pen') {
     el.textContent = n >= 3 ? '囲めました。「この範囲をわたす」を押してください。なぞり直すと、囲みが入れかわります'
-      : '指で、わたす範囲をぐるっとなぞって囲みます（地図を動かすときは、2本指で）';
-  } else el.textContent = n === 0 ? '地図をタップして、範囲を囲みます'
+      : nr ? '部屋をえらびました。「この範囲をわたす」を押してください。囲みを足すときは、指でなぞります'
+      : '指で、わたす範囲をぐるっとなぞって囲みます（地図は2本指で動かします）。集合住宅はタップで部屋ごとに分けられます';
+  } else el.textContent = n === 0 ? (nr ? '部屋をえらびました。「この範囲をわたす」を押してください。囲みを足すときは、地図をタップします' : '地図をタップして、範囲を囲みます。集合住宅はタップで部屋ごとに分けられます')
     : n < 3 ? `あと${3 - n}か所タップすると、範囲になります（今 ${n}か所）`
       : `${n}か所で囲んでいます。「この範囲をわたす」を押してください`;
-  const po = partDraw ? partObj(partDraw) : null;
-  if (po && n >= 3) { // 囲んだ中の件数をその場で出す（どれくらいの量か分かるように）
-    const t = terrById(partDraw.tid), c = t && partContents(t, partDraw.pts, partDraw.cid ? po.keys : null);
-    if (c) el.textContent += `\n囲んだ中：${c.total ? `${c.total}か所（${partContentsText(c)}）` : '家の印がありません'}`;
+  const po = partDraw ? partObj(partDraw) : null, dp = partDraw && draftPart(partDraw);
+  if (po && dp) { // 囲んだ中の件数をその場で出す（どれくらいの量か分かるように）
+    const t = terrById(partDraw.tid), c = t && partContents(t, dp, partDraw.cid ? po.keys : null, partsOf(po));
+    if (c) el.textContent += `\n${n >= 3 ? '囲んだ中' : 'えらんだ部屋'}：${c.total ? `${c.total}か所（${partContentsText(c)}）` : '家の印がありません'}`;
   }
   const ps = po ? partsOf(po) : [];
   $('#partList').textContent = ps.length ? `今日わたした範囲：${ps.map(p => partName(p)).join(' ／ ')}` : '';
@@ -4521,9 +4589,10 @@ function updatePartBar() {
 }
 /* だれにわたすかをえらぶ */
 function openPartAssign() {
-  if (!partDraw || partDraw.pts.length < 3) { toast('地図を3か所以上タップして、範囲を囲んでください'); return; }
+  const dp = partDraw && draftPart(partDraw);
+  if (!dp) { toast(partDraw && partDraw.pts.length ? '地図を3か所以上タップして、範囲を囲んでください' : '範囲を囲むか、集合住宅をタップして部屋をえらんでください'); return; }
   const t = terrById(partDraw.tid), po = partObj(partDraw); if (!t || !po) return;
-  const poly = partDraw.pts.slice();
+  const poly = dp.poly;
   const taken = new Set();
   partsOf(po).forEach(p => (p.uids || []).forEach(u => taken.add(u)));
   const allU = isAllUse(po); // 全体の集まり：今日回る人を先に出す
@@ -4531,7 +4600,7 @@ function openPartAssign() {
     : po.group ? groupMembers(po.group).filter(u => u.id !== me().id).sort(byKana) : [];
   const others = D().users.filter(u => !u.inactive && u.id !== me().id && !gm.some(g => g.id === u.id)).sort(byKana);
   const row = u => `<label class="check${taken.has(u.id) ? ' dimmed' : ''}" data-name="${esc(u.name)}"${yomiAttr(u)}><input type="checkbox" data-pu="${esc(u.id)}">${esc(u.name)}${taken.has(u.id) ? '<span class="muted">（ほかの範囲に入っています）</span>' : ''}</label>`;
-  const pc = partContents(t, poly, partDraw.cid ? po.keys : null), n = pc.total;
+  const pc = partContents(t, dp, partDraw.cid ? po.keys : null, partsOf(po)), n = pc.total;
   setSheet(headHtml(t, 'この範囲をわたす人', `家・部屋 ${n}か所　今日の終わりまで`) + `
     ${partContentsHtml(pc)}
     <p class="hint">ふつうは2人1組です。えらんだ人の画面に、この範囲が今日だけ出ます。</p>
@@ -4555,15 +4624,26 @@ function openPartAssign() {
     commit(`${uids.map(u => uname(u)).join('・')}さんに範囲をわたしました（今日まで）`, () => {
       const t2 = partObj(partDraw);
       // 同じ人が前の範囲にも入っていたら、そちらからは外す（人がいなくなった範囲は消す）
+      // 今えらんだ部屋が前の範囲でもえらばれていたら、前の範囲からは外す（部屋だけの範囲で部屋がなくなったら消す）
+      const take = dp.rooms || {};
       const rest = partsOf(t2)
-        .map(x => Object.assign({}, x, { uids: (x.uids || []).filter(u => !uids.includes(u)) }))
-        .filter(x => x.uids.length);
-      t2.parts = rest.concat([{ id: 'p' + uid(), poly, uids, by: me().id, at: now, until }]);
+        .map(x => {
+          const o = Object.assign({}, x, { uids: (x.uids || []).filter(u => !uids.includes(u)) });
+          if (x.rooms) {
+            const r = {};
+            // 囲みのある範囲は、部屋が全部なくなっても空の一覧を残す（その建物は「部屋なし」のまま。囲みで全部屋にもどらないように）
+            Object.keys(x.rooms).forEach(hid => { const us = x.rooms[hid].filter(u => !(take[hid] || []).includes(u)); if (us.length || !x.ro) r[hid] = us; });
+            if (Object.keys(r).length) o.rooms = r; else delete o.rooms;
+          }
+          return o;
+        })
+        .filter(x => x.uids.length && (!x.ro || (x.rooms && Object.keys(x.rooms).some(k => x.rooms[k].length))));
+      t2.parts = rest.concat([Object.assign({ id: 'p' + uid(), poly, uids, by: me().id, at: now, until }, dp.rooms ? { rooms: dp.rooms } : {}, dp.ro ? { ro: 1 } : {})]);
       // 記録できるように「今日回る人」にも入れる
       const cur = partDraw.cid ? cardHelpers(t2) : helpersOf(t2), have = new Set(cur.map(h => h.uid));
       t2.helpers = cur.concat(uids.filter(u => !have.has(u)).map(u => ({ uid: u, until, by: me().id, at: now })));
     });
-    partDraw.pts = [];
+    partDraw.pts = []; partDraw.rooms = {};
     renderPartDraw();
     renderHouses();
   };
@@ -4573,7 +4653,7 @@ function openPartList(tid, cid) {
   const t0 = terrById(tid), t = cid ? D().awayCards.find(x => x.id === cid) : t0; if (!t0 || !t) return;
   const ps = partsOf(t);
   setSheet(headHtml(t0, '今日わたした範囲', `${ps.length}件　今日の終わりまで`) + `
-    ${ps.length ? ps.map(p => `<div class="setrow"><div><b>${esc(partName(p))}</b><br><small class="muted">${esc(partContentsText(partContents(t0, p.poly, cid ? t.keys : null)) || '家の印なし')}</small></div>
+    ${ps.length ? ps.map(p => `<div class="setrow"><div><b>${esc(partName(p))}</b><br><small class="muted">${esc(partContentsText(partContents(t0, p, cid ? t.keys : null, ps)) || '家の印なし')}</small></div>
       <button class="btn small danger" data-pdel="${esc(p.id)}">取り消す</button></div>`).join('')
       : '<div class="empty">まだありません。</div>'}
     <button class="btn primary block" id="plAdd">${partDraw && partDraw.tid === tid && partDraw.cid === cid ? '地図にもどって続けて分ける' : '＋ 地図で範囲を分ける'}</button>
@@ -6181,7 +6261,14 @@ function openAptSeq(hid, startUnit) {
   const since = unitDoneSince(h0), inRound = since !== todayIso();
   const isRef = u => !!D().dnc[K(hid, u)];
   const doneToday = u => !isRef(u) && visitedSince(K(hid, u), since); // 緑のチェックが付く部屋
-  let idx = startUnit ? Math.max(0, h0.units.indexOf(startUnit)) : h0.units.findIndex(u => !doneToday(u) && !isRef(u));
+  // 今日わたされた範囲が、この建物の一部の部屋だけのとき：自分の部屋だけを順に回る（ほかの部屋は薄く。押せば入力はできる）
+  const mine = (() => {
+    const mp = t && myPart(t); if (!mp) return null;
+    const all = partsOf(t), us = h0.units.filter(u => partHas(mp, h0, u, all));
+    return us.length && us.length < h0.units.length ? new Set(us) : null;
+  })();
+  const isMine = u => !mine || mine.has(u);
+  let idx = startUnit ? Math.max(0, h0.units.indexOf(startUnit)) : h0.units.findIndex(u => isMine(u) && !doneToday(u) && !isRef(u));
   if (idx < 0) idx = h0.units.length; // すべて入力済み
   const st = { step: 'result', age: null, interest: null, override: false, finished: idx >= h0.units.length };
   const go = i => {
@@ -6193,7 +6280,7 @@ function openAptSeq(hid, startUnit) {
   // 次に入力する部屋：まだ緑のチェックがなく、拒否でもない部屋
   const nextIdx = from => {
     const us = (houseById(hid) || h0).units;
-    for (let i = from; i < us.length; i++) if (!doneToday(us[i]) && !isRef(us[i])) return i;
+    for (let i = from; i < us.length; i++) if (isMine(us[i]) && !doneToday(us[i]) && !isRef(us[i])) return i;
     return us.length;
   };
   const save = (result, extra) => { saveVisit(hid, houseById(hid).units[idx], result, extra, true); go(nextIdx(idx + 1)); };
@@ -6206,9 +6293,10 @@ function openAptSeq(hid, startUnit) {
     const chip = u => {
       // 色と字は、見出しと同じ「今の巡回（受け取ってから）」の結果で出す。前の巡回の結果は出さない（総点検 L5・2026.13.105）
       const i = h.units.indexOf(u), s0 = statusOf(K(hid, u)), s1 = s0 === 'dnc' || !inRound || visitedSince(K(hid, u), since) ? s0 : 'new', s = s1 === 'dnc' && dncSkip(K(hid, u)) ? 'skip' : s1, uk = unitKind(h, u), g = UST_GLYPH[s];
-      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? (s === 'skip' ? '（' + UST_NAME[s] + '）' : '（前回 ' + UST_NAME[s] + '）') : ''}へ">${kindBadge(uk)}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
+      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}${isMine(u) ? '' : ' notmine'}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${isMine(u) ? '' : '（ほかの人の範囲）'}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? (s === 'skip' ? '（' + UST_NAME[s] + '）' : '（前回 ' + UST_NAME[s] + '）') : ''}へ">${kindBadge(uk)}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
     };
     const groups = h.units.length > 10 ? unitGroups(h) : [];
+    if (mine) b += `<div class="notice info"><b>あなたの範囲：${esc(roomsText(h, h.units.filter(isMine)))}</b><br>うすい部屋は、ほかの人の範囲です。</div>`;
     b += groups.length > 1
       ? `<div class="ustrips">${groups.map(([g, us]) => `<p class="ugrp">${esc(g || 'そのほか')}</p><div class="unitstrip">${us.map(chip).join('')}</div>`).join('')}</div>`
       : `<div class="unitstrip">${h.units.map(chip).join('')}</div>`;
@@ -7931,7 +8019,7 @@ function cardHtml(t, own, helper) {
       <p class="muted">${t.lentAt ? '受け取ってから' : 'この90日で'}訪問した家・部屋 ${s.visited} / ${s.n}</p>` : '') +
     (own && ld ? `<div class="leadline"><p><span class="leadtag">今日の司会</span><b>${esc(uname(ld.uid))}さん</b>（今日まで）</p><button type="button" class="btn small" data-leadoff="${esc(t.id)}">司会を外す</button></div>` : '') +
     ((own || lead) && partsOf(t).length ? `<p class="muted"><b>今日わたした範囲：</b>${partsOf(t).map(p => esc(partName(p))).join(' ／ ')}</p>` : '') +
-    (!own && !lead && myPart(t) ? `<p class="hint-strong">今日のあなたの範囲があります（${esc(partMates(myPart(t)).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）。地図をひらくと、その範囲だけが目立ちます。</p>
+    (!own && !lead && myPart(t) ? `<p class="hint-strong">今日のあなたの範囲があります（${esc(partMates(myPart(t)).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）。${partRoomsNote(myPart(t)) ? `<br>${esc(partRoomsNote(myPart(t)))}<br>` : ''}地図をひらくと、その範囲だけが目立ちます。</p>
       <p class="muted"><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=${center(myPart(t).poly)[0].toFixed(6)},${center(myPart(t).poly)[1].toFixed(6)}" target="_blank" rel="noopener">Googleマップでこの範囲へ</a></p>` : '') +
     ((own || lead) && hs.length ? `<p class="muted"><b>${t.group ? '今日回る人' : '今日一緒に回る人'}（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : '') +
     ((own || helper) && UI.cReco === 'on' ? roundHint(t) : '') +
@@ -9697,9 +9785,9 @@ function cardStates(c) {
 function cardMineSet(c) {
   if (!c.group || c.mode !== 'split') return null;
   const mp = myPart(c);
-  if (mp && okPoly(mp.poly)) {
-    const set = new Set();
-    c.keys.forEach(k => { const h = houseById(parseKey(k)[0]); if (h && inPoly(h.lat, h.lng, mp.poly)) set.add(k); });
+  if (mp && (okPoly(mp.poly) || mp.rooms)) {
+    const set = new Set(), all = partsOf(c);
+    c.keys.forEach(k => { const [hid, u] = parseKey(k), h = houseById(hid); if (h && partHas(mp, h, u, all)) set.add(k); });
     return set;
   }
   return c.by === me().id ? null : new Set();
@@ -9726,9 +9814,10 @@ function focusFn() {
   if (roundTerr && !r) roundTerr = null;
   if (!r) return null;
   const mp = myPart(r.t); // 今日の分担がある人は、その範囲の家だけを目立たせる
-  if (mp && okPoly(mp.poly)) {
+  if (mp && (okPoly(mp.poly) || mp.rooms)) {
     const inPart = new Set();
-    housesOf(r.t.id).forEach(h => { if (inPoly(h.lat, h.lng, mp.poly)) targets(h).forEach(u => inPart.add(K(h.id, u))); });
+    const all = partsOf(r.t);
+    housesOf(r.t.id).forEach(h => targets(h).forEach(u => { if (partHas(mp, h, u, all)) inPart.add(K(h.id, u)); }));
     return k => {
       const st = r.map.get(k);
       if (!inPart.has(k)) return 'dim';
@@ -10479,7 +10568,7 @@ function bindSheetSwipe() {
   let y0 = null, x0 = 0, dy = 0, on = false;
   s.addEventListener('touchstart', e => {
     // いちばん上までスクロールしているときだけ。色の輪・スライダー・入力欄・左右にスワイプする行の上では動かさない
-    if (s.scrollTop > 0 || e.touches.length !== 1 || e.target.closest('.wheel, .lbar, input, textarea, select, .swipe-body')) { y0 = null; return; }
+    if (s.scrollTop > 0 || e.touches.length !== 1 || e.target.closest('.wheel, .lbar, input, textarea, select, .swipe-body, .roomgrid')) { y0 = null; return; }
     y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; dy = 0; on = false;
   }, { passive: true });
   s.addEventListener('touchmove', e => {
@@ -15540,7 +15629,11 @@ function bindStatic() {
     if (map.getZoom() < 17) toast('場所がわかるまで地図を拡大してから、タップしてください');
   };
   $('#partUndo').onclick = () => {
-    if (!partDraw || !partDraw.pts.length) return;
+    if (!partDraw) return;
+    if (!partDraw.pts.length) { // 囲みがないときは、最後に部屋をえらんだ建物の部屋を外す
+      const hs = draftRooms(partDraw); if (!hs.length) return;
+      delete partDraw.rooms[hs[hs.length - 1]]; renderPartDraw(); return;
+    }
     if (partDraw.tool === 'pen') partDraw.pts = []; else partDraw.pts.pop(); // なぞった囲みは、まるごと消す
     renderPartDraw();
   };

@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.128"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
+<meta name="app-version" content="2026.13.129"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -859,6 +859,25 @@ html[lang="es"] .atabs button{font-size:13px;white-space:normal;line-height:1.15
 @media (max-width:374px){.tgo{width:56px}.topen{gap:8px}.topen .tname b{font-size:19px}}
 @media (hover:hover) and (pointer:fine){.topen:hover{background:var(--terr-soft)}}
 .part-label span{display:inline-block;transform:translate(-50%,-50%);background:#ffffffe6;border:2px solid var(--draw);color:var(--draw);font-weight:700;font-size:14px;border-radius:8px;padding:1px 8px;white-space:nowrap}
+/* 部屋ごとに分ける（heya-wake.js）：建物の形に部屋を並べ、タップ・なぞりでえらぶ */
+.roomgrid{margin:10px 0;touch-action:pan-y;-webkit-user-select:none;user-select:none}
+.roomgrid .rrow{display:grid;grid-template-columns:44px repeat(var(--cols),minmax(0,1fr));gap:4px;margin-bottom:4px}
+.roomgrid .rfloor{min-height:48px;border:0;border-radius:8px;background:var(--terr-soft);color:inherit;font-weight:700;font-size:14px;padding:0}
+.roomgrid .rfloor.blank{background:none}
+.roomgrid .rcell{position:relative;min-height:48px;padding:2px 1px;border:2px solid #9AA5AB;border-radius:8px;background:#fff;color:#1F2A30;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1;-webkit-touch-callout:none}
+.roomgrid .rcell b{font-size:15px}
+.roomgrid .rcell i{font-style:normal;font-size:11px;color:#5E6E77}
+.roomgrid .rcell small{font-size:10px;color:#5E6E77;max-width:100%;overflow:hidden;white-space:nowrap}
+.roomgrid .rcell.taken{border-style:dashed;background:#EEF1F2}
+.roomgrid .rcell.on{background:var(--draw);border:2px solid var(--draw);color:#fff}
+.roomgrid .rcell.on i,.roomgrid .rcell.on small{color:#fff}
+.roomgrid .rcell.on::after{content:'✔';position:absolute;right:-6px;top:-8px;width:18px;height:18px;border-radius:99px;background:#fff;color:var(--draw);font-size:12px;display:grid;place-items:center;border:2px solid var(--draw)}
+.rlegend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px;margin:4px 0 8px}
+.rlegend .lg{display:inline-block;width:16px;height:16px;border-radius:4px;border:2px solid #9AA5AB;vertical-align:-3px;margin-right:4px}
+.rlegend .lg.on{background:var(--draw);border-color:var(--draw)}
+.rlegend .lg.taken{border-style:dashed;background:#EEF1F2}
+.rcount{font-weight:700;font-size:16px;margin:8px 0;color:var(--draw)}
+.uchip.notmine{opacity:.4}
 .check.dimmed{opacity:.7}
 .partsum{margin:4px 0 10px;padding:10px 12px;border:1.5px solid var(--terr-soft);border-radius:12px;background:var(--terr-soft)}
 .partsum-h{font-size:15px;margin-bottom:4px}
@@ -1835,7 +1854,7 @@ body.renshu #btnUpd{display:none!important}
 <div id="joinScreen" hidden></div>
 <div id="blocker" hidden><div class="blockbox" role="alert"><h2 id="blockTitle"></h2><p id="blockMsg"></p><div class="ldprog light" id="blockProg" hidden></div><p class="muted" id="blockDetail" hidden></p><button type="button" class="btn primary block" id="blockRetry" hidden>もう一度読み込む</button></div></div>
 
-<script src="app.js"></script><script src="chizu-okuru.js"></script><!-- 区域カードの「印刷・送る」（2026-11-08） -->
+<script src="app.js"></script><script src="chizu-okuru.js"></script><script src="heya-wake.js"></script><!-- 区域カードの「印刷・送る」（2026-11-08） -->
 <script src="tsuzuki.js"></script>  
 <script src="schedule.js"></script>
 <script src="kantan.js"></script>
