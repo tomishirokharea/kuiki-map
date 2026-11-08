@@ -29,9 +29,11 @@
   .ch-seg.four button{flex-direction:column;gap:2px;font-size:14px;line-height:1.15;min-height:58px;padding:0 2px}
   /* 外国語の印：ほかの種別（会社の青・事業所の緑など）とまぎれない赤紫。白い字で頭文字（区域係）か「外」（2026-11-08 見やすさの直し） */
   .kb.k-lang,.pin .kb.k-lang{background:#AD1457;color:#fff}
-  .kb.k-lang i{font-style:normal;font-size:13px;font-weight:900;line-height:1;color:#fff}
-  .uchip .kb.k-lang{width:24px;height:24px;left:-9px;top:-11px}
-  .unit .kb.k-lang i{font-size:14px}
+  .kb.k-lang .lg{font-style:normal;font-size:13px;font-weight:900;line-height:1;color:#fff}
+  /* 部屋のボタンでは、角に出すと上の部屋の印に見えるので、拒・ー と同じく名前の前に並べる（2026-11-08） */
+  .uchip .kb.k-lang{position:static;display:inline-grid;vertical-align:-3px;width:20px;height:20px;margin-right:3px;border-width:0;box-shadow:none}
+  .uchip .kb.k-lang .lg{font-size:12px}
+  .unit .kb.k-lang .lg{font-size:14px}
   .langpick{margin:6px 0 4px;padding:8px 10px;border:2px solid #AD145755;border-radius:12px;background:#FCE4EC66}
   .langpick .q{margin-top:0}
   .lgset{display:grid;gap:6px;margin:6px 0 12px}
