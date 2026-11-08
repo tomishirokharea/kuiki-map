@@ -313,12 +313,14 @@
     const sub = t ? `区域${esc(t.no)}　${esc(t.name || '')}` : '区域の線の外';
     const what = unit ? '部屋' : '家';
     const paint = () => {
-      const dnc = D().dnc[k], f = fol(k), mineF = !!f && f.by === me().id, other = !!f && !mineF;
+      const dnc = typeof dncAt === 'function' ? dncAt(k) : D().dnc[k], f = fol(k), mineF = !!f && f.by === me().id, other = !!f && !mineF;
       const blocked = (dnc && !isAdmin()) || (other && !isAdmin() && !st.override && recentMet(k));
       let b = headHtml(t, title, sub);
       if (fromBuilding) b += '<button class="btn small" id="backBld">← 部屋の入力にもどる</button>';
       // 大事なお知らせだけ（どれも1〜2行）
-      if (dnc && typeof isSkipV === 'function' && isSkipV(dnc)) {
+      if (dnc && dnc.lg) {
+        b += langNoteHtml(what, k);
+      } else if (dnc && typeof isSkipV === 'function' && isSkipV(dnc)) {
         b += skipNoteHtml(what, isAdmin());
       } else if (dnc) {
         b += `<div class="notice refnote"><b>拒否の${what}です。訪問しないでください。</b>${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : ''}</div>`;

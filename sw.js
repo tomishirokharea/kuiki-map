@@ -13,7 +13,8 @@
    ・サーバー（GAS）とのやりとり・版の確認には、手を出さない
    ・招待コード（?t=）の入ったURLは保存しない（URLの ? から後ろを消して保存する）
    ========================================================= */
-const APP_CACHE = 'kuiki-app-v131'; // v131：2026.13.131（地図で区域をタップして、くわしい情報を見て受け取る・係に頼む）
+const APP_CACHE = 'kuiki-app-v132'; // v132：2026.13.132（家の種別「外国語」と言語・区域係の外国語の家の一覧）
+// v131：2026.13.131（地図で区域をタップして、くわしい情報を見て受け取る・係に頼む）
 const LIB_CACHE = 'kuiki-lib-v2'; // v2：地図の部品を CDN から vendor に移した（古い CDN の控えは消える）
 const TILE_CACHE = 'kuiki-tiles-v1';   // 地図の画像（画面側の kangaeru.js・chizu.js も同じ入れ物に入れる。名前を変えるときは両方）
 const AREA_CACHE = 'kuiki-tilearea-v1'; // 保存してよい場所（四角）
@@ -23,7 +24,7 @@ const AREA_KEY = 'https://kuiki.invalid/area';
 let AREA = undefined; // [南, 西, 北, 東]。undefined＝まだ読んでいない、null＝区域がない
 const NET_WAIT_MS = 6000;
 // 圏外用に控える、アプリのファイル（新しくファイルを足したら、ここに名前を足す）
-const APP_NAMES = ['config', 'schedule', 'kantan', 'tsuzuki', 'kangaeru', 'chizu', 'apt-import', 'apt-wizard', 'apt-heya', 'naoshi', 'kyohi', 'chui', 'kml-koushin', 'help', 'douga', 'kyoukai', 'torikomi', 'tokubetsu', 'nozoku', 'i18n', 'i18n-es', 'i18n-es-chizu', 'i18n-es-kyoukai', 'i18n-es-tokubetsu', 'guruchu', 'i18n-es-guruchu', 'meibo', 'i18n-es-meibo', 'i18n-es-shikai', 'i18n-es-tenken', 'i18n-es-kaizen', 'i18n-es-osusume', 'houkoku', 'iken', 'i18n-es-houkoku', 'joukyou-graph', 'i18n-es-joukyou', 'i18n-es-shinai', 'app', 'chizu-okuru', 'heya-wake', 'app-head', 'kimari'];
+const APP_NAMES = ['config', 'schedule', 'kantan', 'tsuzuki', 'kangaeru', 'chizu', 'apt-import', 'apt-wizard', 'apt-heya', 'naoshi', 'kyohi', 'chui', 'kml-koushin', 'help', 'douga', 'kyoukai', 'torikomi', 'tokubetsu', 'nozoku', 'i18n', 'i18n-es', 'i18n-es-chizu', 'i18n-es-kyoukai', 'i18n-es-tokubetsu', 'guruchu', 'i18n-es-guruchu', 'meibo', 'i18n-es-meibo', 'i18n-es-shikai', 'i18n-es-tenken', 'i18n-es-kaizen', 'i18n-es-osusume', 'houkoku', 'iken', 'i18n-es-houkoku', 'joukyou-graph', 'i18n-es-joukyou', 'i18n-es-shinai', 'app', 'chizu-okuru', 'heya-wake', 'app-head', 'kimari', 'gaikokugo'];
 const APP_FILES = new RegExp('/(' + APP_NAMES.join('|') + ')\\.js$');
 
 /* 新しい版を入れるとき（install）：画面のファイルを先に取って、新しい控えに入れておく（M2・2026.13.102）。

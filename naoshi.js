@@ -243,7 +243,7 @@
     // 「この家を編集」の画面の下（場所を直す・削除と同じ所）に置く（改善案A9・2026-10-25）
     if (title && title.textContent === 'この家を編集') {
       const sep = S.querySelector('.aw-sep'), asHouse = S.querySelector('[data-type="house"][aria-pressed="true"]');
-      if (sep && asHouse && !curTgt.unit && h.type === 'house' && !isSimple() && !S.querySelector('#fDuplex') && (isAdmin() || !hasSkip(h))) { // 訪問しないの家は区域係だけ（監査 HS-A8）
+      if (sep && asHouse && !curTgt.unit && h.type === 'house' && !isSimple() && !S.querySelector('#fDuplex') && (isAdmin() || (!hasSkip(h) && !hasLang(h)))) { // 訪問しないの家は区域係だけ（監査 HS-A8）
         const hid0 = curTgt.hid;
         sep.insertAdjacentHTML('afterbegin', '<button class="btn block" id="fDuplex">二世帯住宅にする</button>');
         S.querySelector('#fDuplex').onclick = () => openDuplexConvert(hid0);
@@ -318,7 +318,7 @@
   function unitState(h, u, ff, since, locked) {
     if (locked) return 'lock';
     const k = K(h.id, u);
-    if (D().dnc[k]) return dncSkip(k) ? 'skip' : 'ref';
+    if (dncAt(k)) return skipAt(k) ? 'skip' : 'ref';
     if (ff) {
       const f = ff(k);
       if (f === 'dim') return 'faint';
@@ -346,7 +346,7 @@
     const h0 = houseById(hid); if (!isDuplex(h0)) return;
     const t = terrById(h0.terrId);
     const since = unitDoneSince(h0);
-    const isRef = u => !!D().dnc[K(hid, u)];
+    const isRef = u => !!dncAt(K(hid, u));
     const doneNow = u => !isRef(u) && visitedSince(K(hid, u), since);
     const firstTodo = () => { const h = houseById(hid); return (h && h.units.find(u => !doneNow(u) && !isRef(u))) || null; };
     const st = { unit: selUnit || firstTodo(), step: 'result', age: null, interest: null, override: false };
@@ -378,6 +378,7 @@
         b += recentOtherHtml(k);
         if (window.chuiNotice) b += window.chuiNotice(h, u); // 注意（！）
         if (dncSkip(k)) b += skipNoteHtml('世帯', false);
+        else if (!D().dnc[k] && langNo(k)) b += langNoteHtml('世帯', k);
         else if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の世帯です。</b>訪問しないでください。${h.units.length > 1 ? 'ほかの世帯は訪ねられます。' : ''}</div>`;
         else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="duOverride">それでも記録する</button></span></div>`;
         else b += st.step === 'result' ? resultChoicesHtml('') : seqStepsHtml(st, k);
@@ -437,7 +438,7 @@
   function openDuplexConvert(hid) {
     if (typeof simpleBlock === 'function' && simpleBlock('二世帯住宅に変えることは')) return;
     const h = houseById(hid); if (!h || h.type !== 'house') return;
-    if (!isAdmin() && hasSkip(h)) { toast('訪問しないの家の種類は、区域係だけが変えられます'); return; } // 再監査 HS-A8
+    if (!isAdmin() && (hasSkip(h) || hasLang(h))) { toast(`${hasSkip(h) ? '訪問しない' : '外国語'}の家の種類は、区域係だけが変えられます`); return; } // 再監査 HS-A8
     const t = terrById(h.terrId), k0 = K(hid, '');
     // 世帯に分ける記録：今日の自分の記録（直せる記録は移す）と、受け取ってから（今の巡回）の自分の記録（写す）。
     // 以前は今日の記録だけで、回っている途中で変えると、前の日の記録が残らず両方の世帯が「まだ」になった（総点検 L14・2026.13.105）
