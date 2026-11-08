@@ -1737,13 +1737,13 @@ body.renshu #btnUpd{display:none!important}
           <button type="button" data-ap="sched" aria-pressed="false">予定</button>
           <button type="button" data-ap="status" aria-pressed="false" hidden>状況</button>
           <button type="button" data-ap="people" aria-pressed="false" aria-label="人とグループ">人</button>
-          <button type="button" data-ap="set" aria-pressed="false" aria-label="設定とデータ">設定</button>
+          <button type="button" data-ap="set" aria-pressed="false" aria-label="設定">設定</button>
         </div>
         <!-- 「区域」タブの中の切りかえ（一覧／状況）。状況は「区域」タブの中に入れた -->
         <div class="seg adsub" id="adTerrSub" role="group" aria-label="区域の見かた" hidden>
           <button type="button" data-ap="terr" aria-pressed="true">一覧</button>
           <button type="button" data-ap="status" aria-pressed="false">状況</button>
-          <button type="button" data-ap="dnc" aria-pressed="false">拒否・！</button>
+          <button type="button" data-ap="dnc" aria-pressed="false">家の印</button>
           <button type="button" data-admap>期限の地図</button>
         </div>
         <div id="adTopBar"></div>
@@ -1754,7 +1754,7 @@ body.renshu #btnUpd{display:none!important}
         </div>
         <div class="apane" data-apane="sched" hidden><div id="adSched"></div></div>
         <div class="apane" data-apane="people" hidden><div id="adPeople"></div></div>
-        <!-- 区域係の「状況」と設定「区域の決め」を左右に（kimari.js）。パソコン（幅1,180px以上）は右の欄、スマホは下から出る画面に出す。
+        <!-- 区域係の「状況」と設定「区域の決まり」を左右に（kimari.js）。パソコン（幅1,180px以上）は右の欄、スマホは下から出る画面に出す。
              設定の行は app.js（貸し出しと返却・そのほか・留守宅カード・完了のあとの留守宅（おすすめ））と schedule.js（手紙・提案）が、下の箱に描く -->
         <div class="krwrap" id="krWrap">
         <div class="krmain">
@@ -1783,9 +1783,9 @@ body.renshu #btnUpd{display:none!important}
         <div id="adHard"></div>
         </div>
         </div>
-        <aside class="krside" id="krSide" aria-label="区域の決め（設定）">
+        <aside class="krside" id="krSide" aria-label="区域の決まり（設定）">
         <div id="adRules" class="krules">
-          <div class="krhead"><h2 class="sec">区域の決め（設定）</h2><button type="button" class="icon-btn" data-krclose aria-label="区域の決めを閉じる">×</button></div>
+          <div class="krhead"><h2 class="sec">区域の決まり（設定）</h2><button type="button" class="icon-btn" data-krclose aria-label="区域の決まりを閉じる">×</button></div>
           <p class="hint">変えると、すぐ全員に効きます。左の状況もすぐ変わります。状況の「かかわる設定」を押すと、ここに飛びます。</p>
           <details class="krg" data-krg="lend" open><summary>貸し出しと返却</summary><div id="krLend" class="krbox"></div></details>
           <details class="krg" data-krg="away" open><summary>留守宅カード</summary><div id="krAway" class="krbox"></div></details>
@@ -1798,10 +1798,10 @@ body.renshu #btnUpd{display:none!important}
         <div class="apane" data-apane="terr" hidden>
         <h2 class="sec" data-hqk="terrList">区域の一覧</h2>
         <!-- 一覧の上は2つのボタンだけにして、一覧まですぐ届くようにする（2026-10-21）。
-             「区域の線・取り込み」は下から出る画面（torikomi.js）、「貸し出しのきまり」は状況の「区域の決め」を開く -->
+             「区域の線・取り込み」は下から出る画面（torikomi.js）、「区域の決まり」は状況の「区域の決まり」を開く -->
         <div class="tbar" id="adTerrTools">
           <button type="button" class="btn tbtn" id="adMake"><span>区域の線・取り込み</span><small>線を引く・直す・ファイル・特別区域</small></button>
-          <button type="button" class="btn tbtn" id="adTakeTgl"><span>貸し出しのきまり <i class="tgl" aria-hidden="true">›</i></span><small id="adTakeSum"></small></button>
+          <button type="button" class="btn tbtn" id="adTakeTgl"><span>区域の決まり <i class="tgl" aria-hidden="true">›</i></span><small id="adTakeSum"></small></button>
         </div>
         <!-- 下から出る画面のボタンが使う、元のボタンとファイルの入り口（画面には出さない） -->
         <div id="adMakeSrc" hidden>
@@ -1886,6 +1886,6 @@ body.renshu #btnUpd{display:none!important}
 <script src="meibo.js"></script><!-- 名簿（グループ表のPDF）から、人とグループをまとめて直す（区域係だけ・2026-10-24） -->
 <script src="guruchu.js"></script><!-- グループの中心：区域係が地図に置き、グループ奉仕の区域の近さに使う（2026-10-23） -->
 <script src="joukyou-graph.js"></script><!-- 状況の「区域カードと留守宅カード」のグラフ（schedule.js のあと・kimari.js の前に読む。2026-10-31） -->
-<script src="kimari.js"></script><!-- 区域係の「状況」と設定「区域の決め」を左右に。状況の札から設定に飛ぶ（2026-10-25・いちばん最後に読む） -->
+<script src="kimari.js"></script><!-- 区域係の「状況」と設定「区域の決まり」を左右に。状況の札から設定に飛ぶ（2026-10-25・いちばん最後に読む） -->
 </body>
 </html>

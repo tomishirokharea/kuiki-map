@@ -671,7 +671,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     const dLa = 2000 / 110540, dLn = 2000 / (111320 * Math.cos(((s + n) / 2) * Math.PI / 180));
     return [s - dLa, w - dLn, n + dLa, e + dLn];
   }
-  /* ---- 係の画面「設定・データ」：地図の目印 ---- */
+  /* ---- 係の画面「設定」：地図の目印 ---- */
   function lmListHtml() {
     let list = LM.items.slice().sort((a, b) => lmPri(a.kind) - lmPri(b.kind) || a.name.localeCompare(b.name, 'ja'));
     if (LMUI.kind) list = list.filter(x => x.kind === LMUI.kind);

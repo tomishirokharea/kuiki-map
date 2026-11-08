@@ -329,7 +329,7 @@
       <ul style="padding-left:20px;margin:4px 0"><li>名前・グループなどを直した人：${j.upd || 0}人</li><li>新しく登録した人：${j.add || 0}人</li>
         ${j.on ? `<li>もう一度使えるようにした人：${j.on}人</li>` : ''}${j.off ? `<li>使うのをやめた人：${j.off}人</li>` : ''}</ul>
       ${sk ? `<div class="notice warn">次の${sk}件は、そのままにしました。<br><span data-notr>${skList.join('<br>')}</span></div>` : ''}
-      <p class="hint">新しく登録した人は、共通リンクのQRから申し込んでもらい、「申請・承認」で、その人の名前をえらんで承認してください。更新の前の名簿は、スプレッドシートの「users_控え」に残っています。</p>
+      <p class="hint">新しく登録した人は、共通リンクのQRから申し込んでもらい、係の画面の「今日」で、その人の名前をえらんで承認してください。更新の前の名簿は、スプレッドシートの「users_控え」に残っています。</p>
       <button class="btn primary block" data-close>閉じる</button>`);
   }
 })();

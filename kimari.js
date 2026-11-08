@@ -1,13 +1,13 @@
 /* =========================================================
-   区域マップ：区域係の「状況」と設定「区域の決め」を左右に（kimari.js・2026-10-25）
+   区域マップ：区域係の「状況」と設定「区域の決まり」を左右に（kimari.js・2026-10-25）
 
    ねらい：左で問題を見つけて、右でその場で直す
    ・状況の各見出しの下に「かかわる設定」の札（短い名前と今の値）を出す
    ・札を押すと、その設定に飛んで光り、「変えると：…」「効く状況：…」を出す
-     パソコン（幅1,180px以上）：右の欄「区域の決め」／スマホ：下から出る画面（その設定だけ。「…をすべて見る」で同じグループ）
-   ・設定は「区域の決め」1か所にまとめる（貸し出しのきまり・期限の見張りの中の区域係の決め・留守宅の設定）
+     パソコン（幅1,180px以上）：右の欄「区域の決まり」／スマホ：下から出る画面（その設定だけ。「…をすべて見る」で同じグループ）
+   ・設定は「区域の決まり」1か所にまとめる（区域の決まり・期限の見張りの中の区域係の決め・留守宅の設定）
      設定の行と、押したときの処理は今までと同じ（app.js・schedule.js・tsuzuki.js が #krLend などの箱に描く）
-   ・右の欄は閉じられる（この端末に覚える）。閉じたときは、状況の上の「区域の決め（設定）を右に出す」で出す
+   ・右の欄は閉じられる（この端末に覚える）。閉じたときは、状況の上の「区域の決まり（設定）を右に出す」で出す
    ========================================================= */
 (function () {
   'use strict';
@@ -63,9 +63,9 @@
   // s：札の短い名前（「：」まで）・t：設定の行の名前（下から出る画面の見出し・お知らせ）・v：今の値・w：効く状況
   const F = {
     lendDays: { s: '返却の目安：', t: '返却の目安（受け取ってから）', v: () => `${lendDays()}日`, w: '期限の見張り（今月中に出したい区域・声かけ候補）・全体の状況（返却の目安を過ぎた貸出）' },
-    awayRetPct: { s: '留守宅の目安：', t: '留守宅を回り終えたとみなす割合', v: () => `${awayRetPct()}%`, w: '期限の見張り（正式な返却になるか → 1年の期限）・全体の状況（留守宅カードで回っている区域）' },
-    awayAgainSlot: { s: '訪ね直しの条件：', t: '留守宅を「訪ね直した」と数える条件', v: () => (typeof againSlot === 'function' && againSlot() ? '別の日・別の時間帯' : '別の日'), w: '期限の見張り（正式な返却になるか → 1年の期限）・全体の状況（留守宅カードで回っている区域）' },
-    donePct: { s: '完了の目安：', t: '区域カードを「完了」にできる目安', v: () => `${st().donePct}%`, w: '期限の見張り（正式な返却になるか → 1年の期限）' },
+    awayRetPct: { s: '留守宅の目安：', t: '留守宅を回り終えたとみなす割合', v: () => `${awayRetPct()}%`, w: '期限の見張り（正式な返却になるか → 年1回の期限）・全体の状況（留守宅カードで回っている区域）' },
+    awayAgainSlot: { s: '訪ね直しの条件：', t: '留守宅を「訪ね直した」と数える条件', v: () => (typeof againSlot === 'function' && againSlot() ? '別の日・別の時間帯' : '別の日'), w: '期限の見張り（正式な返却になるか → 年1回の期限）・全体の状況（留守宅カードで回っている区域）' },
+    donePct: { s: '完了の目安：', t: '区域カードを「完了」にできる目安', v: () => `${st().donePct}%`, w: '期限の見張り（正式な返却になるか → 年1回の期限）' },
     awayTries: { s: '留守宅を終える回数：', t: '留守宅を終える回数', v: () => `${tries()}回`, w: '手紙の候補・何度訪ねても会えない家・まだ試していない家の数' },
     extRest: { s: '寝かせる日数：', t: '寝かせる日数（完了のあと）', v: () => `${ext().rest}日`, w: '留守宅の状況（完了した区域の「寝かせ中」）' },
     extDays: { s: 'おすすめに出す期間：', t: 'おすすめに出す期間', v: () => `${ext().days}日`, w: '留守宅の状況（完了した区域の「期間が終わった」）' },
@@ -93,9 +93,9 @@
   const extN = () => { const t = document.querySelector('#adAwaySet table'); return t ? String(Math.max(0, t.querySelectorAll('tr').length - 1)) : '0'; }; // 完了した区域の数
   const NOW = {
     lendDays: () => [['声かけ候補', num('#adDue [data-duetl="pace"] b'), '件'], ['今月中に出したい区域', num('#adDue [data-duetl="need"] b'), '件'], ['返却の目安を過ぎた貸出', num('#adTiles [data-tl="over"] b'), '件']],
-    awayRetPct: () => [['1年の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
-    awayAgainSlot: () => [['1年の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
-    donePct: () => [['1年の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
+    awayRetPct: () => [['年1回の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
+    awayAgainSlot: () => [['年1回の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
+    donePct: () => [['年1回の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
     awayTries: () => [['手紙の候補', hardN(), '件']],
     extRest: () => [['完了した区域', extN(), '区域']],
     extDays: () => [['完了した区域', extN(), '区域']],
@@ -128,7 +128,7 @@
     VA.classList.toggle('kr-on', on && !sideOff());
     requestAnimationFrame(fitSide); // 高さを測るのは描いたあと（描き直しの途中で画面全体の並べ直しをさせないため）
     const b = $id('krOpenAll');
-    if (b) b.textContent = wide() && sideOff() ? '区域の決め（設定）を右に出す' : '区域の決め（設定）を開く';
+    if (b) b.textContent = wide() && sideOff() ? '区域の決まり（設定）を右に出す' : '区域の決まり（設定）を開く';
     if (inSheet() && $id('sheet').hidden) home();
   }
 
@@ -222,7 +222,7 @@
   function openSheet(key, g) {
     const f = key ? F[key] : null, row = key ? rowOf(key) : null, grp = groupOf(row) || (g ? RULES.querySelector(`details.krg[data-krg="${g}"]`) : null);
     const gl = grp ? (grp.querySelector('summary') || {}).textContent || '' : '';
-    setSheet(headHtml(null, f ? esc(f.t) : '区域の決め（設定）', f ? '区域の決め（設定）' : '変えると、すぐ全員に効きます') +
+    setSheet(headHtml(null, f ? esc(f.t) : '区域の決まり（設定）', f ? '区域の決まり（設定）' : '変えると、すぐ全員に効きます') +
       (f ? '<p class="krnow" id="krNow" aria-live="polite" hidden></p>' : '') +
       '<div id="krSlot"></div>' +
       (f && gl ? `<button type="button" class="btn block wrap" data-krall>「${esc(gl)}」の設定をすべて見る</button>` : '') +
@@ -342,7 +342,7 @@
   // 見出しごとの、たたんだときの要点
   const dueNum = k => num(`#adDue [data-duetl="${k}"] b`), tileNum = k => num(`#adTiles [data-tl="${k}"] b`);
   const SUMS = {
-    due: () => [['1年の期限を過ぎた', dueNum('over')], ['期限まで60日以内', dueNum('warn')], ['今月中に出したい', dueNum('need')], ['声かけ候補', dueNum('pace')]],
+    due: () => [['年1回の期限を過ぎた', dueNum('over')], ['期限まで60日以内', dueNum('warn')], ['今月中に出したい', dueNum('need')], ['声かけ候補', dueNum('pace')]],
     tiles: () => [['区域の数', tileNum('terr')], ['返却の目安を過ぎた貸出', tileNum('over')], ['この90日で会えた', tileNum('met')]],
     away: () => [['完了した区域', extN()]],
     hard: () => [['手紙の候補', hardN()]],
@@ -427,15 +427,15 @@
       return r;
     };
   }
-  // 下から出る画面を閉じたり、別の画面に変えたりしたときは、区域の決めを元の場所（右の欄）に戻す
+  // 下から出る画面を閉じたり、別の画面に変えたりしたときは、区域の決まりを元の場所（右の欄）に戻す
   const _setSheet = window.setSheet, _closeSheet = window.closeSheet;
   window.setSheet = function () { if (inSheet()) home(); return _setSheet.apply(this, arguments); };
   window.closeSheet = function () { const r = _closeSheet.apply(this, arguments); if (inSheet()) home(); return r; };
   if (wideMq && wideMq.addEventListener) wideMq.addEventListener('change', () => { try { sync(); paintFolds(); } catch (e) { /* 何もしない */ } });
 
-  // 状況の上（S-12 の下）に、区域の決めを開くボタン（パソコンで右の欄が出ているときは隠す）
+  // 状況の上（S-12 の下）に、区域の決まりを開くボタン（パソコンで右の欄が出ているときは隠す）
   const s12 = $id('adS12');
-  if (s12 && !$id('krOpenAll')) s12.insertAdjacentHTML('afterend', '<button type="button" class="btn block krtopbtn" id="krOpenAll">区域の決め（設定）を開く</button>');
+  if (s12 && !$id('krOpenAll')) s12.insertAdjacentHTML('afterend', '<button type="button" class="btn block krtopbtn" id="krOpenAll">区域の決まり（設定）を開く</button>');
 
   window.KR = { open, go, F };
 })();

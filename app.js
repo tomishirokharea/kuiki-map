@@ -2933,7 +2933,7 @@ const CHANGELOG = [
     ['薦', 'おすすめタブを新しくしました。回り終えた区域で、まだ会えていない家を、近くの数軒ずつ出します。カードを受け取らなくても、空いた時間に回れます'],
     ['時', '「ほかの時間帯」をえらぶと、その時間帯にまだ訪ねていない家が出ます。「予定に入れる」と、その日の終わりまで、その家をほかの人のおすすめに出しません'],
     ['地', '「今行く」「地図をひらく」を押すと、地図に区域の線と、回る家の番号が出ます'],
-    ['留', '留守宅カードは、区域が完了するまでになりました。完了したあとの残りの留守宅は、おすすめに出ます。区域係は、留守宅を「訪ね直した」と数える条件（別の日／別の日で、別の時間帯）を「区域の決め」でえらべます']
+    ['留', '留守宅カードは、区域が完了するまでになりました。完了したあとの残りの留守宅は、おすすめに出ます。区域係は、留守宅を「訪ね直した」と数える条件（別の日／別の日で、別の時間帯）を「区域の決まり」でえらべます']
   ] },
   { v: '2026.13.89', items: [
     ['時', '時間帯の「土日の夜」などを「週末の夜」と出すようにしました。土曜日だけのことではなく、土曜と日曜のどちらも入ります']
@@ -8736,7 +8736,7 @@ function renderInbox() {
 
   const st = D().settings;
   paintTakeTgl();
-  // 貸し出しのきまりの設定の行は、状況の右の「区域の決め」に出す（kimari.js・状況と設定を左右に）。
+  // 区域の決まりの設定の行は、状況の右の「区域の決まり」に出す（kimari.js・状況と設定を左右に）。
   // 状況に効くもの（返却の目安・完了の目安など）は「貸し出しと返却」に、ほかは「受け取れる枚数・一緒に回る など」に分ける
   const R = {
     lendDays: `<div class="setrow">
@@ -10241,7 +10241,7 @@ function openSlotSheet() {
 
 /* 係：完了のあとの留守宅（おすすめ）（2026-10-26。前は「返却後の留守宅カード」）
    完了した区域（S-13 に完了として記録したあと、次に区域カードとして受け取られるまで）の残りの留守宅は、留守宅カードにせず、
-   おすすめタブだけに出す。set＝設定の行（状況の右の「区域の決め」に出す）・table＝完了した区域の表（左の状況に出す）。
+   おすすめタブだけに出す。set＝設定の行（状況の右の「区域の決まり」に出す）・table＝完了した区域の表（左の状況に出す）。
    表は renderAwayAdmin で作った idx（unmetIndex の結果）を使い回す（区域ごとに unmetIndex を呼ばない） */
 function extAdminHtml(idx, rrow, stpd) {
   const x = extSet(), st = D().settings, fd = Number(st.freeAfterDays) || 0, auto = Number(st.autoFree) === 1 && fd > 0;
@@ -10300,7 +10300,7 @@ function renderAwayAdmin() {
   const stpd = (key, val, unit, label, d) => `<div class="stepper"><button type="button" data-aset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${val}${unit}</output>
     <button type="button" data-aset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div>`;
   const dayOnly = Number(st.awayDayOnly) || 0;
-  // 留守宅の設定の行は、状況の右の「区域の決め」（kimari.js）に出す。左の「留守宅の状況」には、完了した区域の表だけを出す
+  // 留守宅の設定の行は、状況の右の「区域の決まり」（kimari.js）に出す。左の「留守宅の状況」には、完了した区域の表だけを出す
   const awayBox = $('#krAway'), extBox = $('#krExt'), ex = extAdminHtml(idx, rrow, stpd);
   if (extBox) extBox.innerHTML = ex.set;
   $('#adAwaySet').innerHTML = ex.table;
@@ -11836,9 +11836,9 @@ function ageShowSetHtml() {
 function ageNoticeHtml() {
   if (!isAdmin() || !AGE_ON) return '';
   const cur = ageCur();
-  if (!cur) return `<div class="notice info">年齢データがまだありません。「設定・データ」の「年齢データを更新する」から入れると、区域ごとの会いやすい時間帯がわかります。</div>`;
+  if (!cur) return `<div class="notice info">年齢データがまだありません。「設定」の「年齢データを更新する」から入れると、区域ごとの会いやすい時間帯がわかります。</div>`;
   const base = cur.asOf || cur.savedAt;
-  if (ageStale(cur)) return `<div class="notice warn"><b>年齢データが1年以上前のものです（${esc(cur.asOf || '')}）。</b>「設定・データ」の「年齢データを更新する」から新しくしてください。</div>`;
+  if (ageStale(cur)) return `<div class="notice warn"><b>年齢データが1年以上前のものです（${esc(cur.asOf || '')}）。</b>「設定」の「年齢データを更新する」から新しくしてください。</div>`;
   return '';
 }
 function renderAgeAdmin() {
@@ -11959,7 +11959,7 @@ async function restoreAge() {
 function openAzaEdit(tid) {
   const t = terrById(tid); if (!t) return;
   const am = ageMap();
-  if (!am) { infoSheet('先に年齢データを入れてください', '「設定・データ」の「年齢データを更新する」から入れると、字をえらべるようになります。'); return; }
+  if (!am) { infoSheet('先に年齢データを入れてください', '「設定」の「年齢データを更新する」から入れると、字をえらべるようになります。'); return; }
   const names = [...am.values()].filter(a => a.k !== '__all').sort((a, b) => a.n.localeCompare(b.n, 'ja'));
   const cur = new Set(terrAza(t).map(a => a.k));
   setSheet(headHtml(t, 'この区域の字', esc(t.name)) + `
@@ -12023,7 +12023,7 @@ function bindAgeAdmin() {
 }
 
 
-/* ---------- このスマホで、動作の速さを測る（区域係の「設定・データ」） ----------
+/* ---------- このスマホで、動作の速さを測る（区域係の「設定」） ----------
    今のデータ（家・記録の件数そのまま）で、よく使う処理の時間を測る。データは変えない */
 function runPerfCheck() {
   const res = [];
@@ -12076,7 +12076,7 @@ function renderDataSet() {
     row('syncGroupSec', '一緒に回っているとき、ほかの人の記録を取りに行く間隔', '秒', 1, '短いほど早く反映されますが、サーバーが混みます。80人が同時に使っても、7秒なら余裕があります') +
     row('syncNormalSec', '区域カード・地図を見ているとき、取りに行く間隔', '秒', 5, 'ふだんの間隔です。混むときは長くしてください');
 }
-/* 「区域」タブの「貸し出しのきまり」：状況の「区域の決め」（kimari.js）の「貸し出しと返却」を開く入り口。ボタンの下に今の決めを短く出す */
+/* 「区域」タブの「区域の決まり」：状況の「区域の決まり」（kimari.js）の「貸し出しと返却」を開く入り口。ボタンの下に今の決めを短く出す */
 function paintTakeTgl() {
   const b = $('#adTakeTgl'); if (!b) return;
   const st = D().settings;
@@ -12135,7 +12135,7 @@ function renderAdmin() {
   // （前は毎回、直近180日の記録を全部数えてから隠していた。区域係の「状況」と設定を左右にする見直しで気づいた分）
 }
 /* 係の画面「区域」の一覧：1区域1行（番号・名前・持っている人か前回の返却日・状態）。行を押すとカルテが開く（改善案A4）。
-   担当を変える・貸し出しのきまり・線を直す・番号と名前・字・条件・削除などの操作は、カルテにまとめてある。
+   担当を変える・この区域の貸し出し・線を直す・番号と名前・字・条件・削除などの操作は、カルテにまとめてある。
    一覧の幅が広いとき（パソコン）は、同じ行を表にする（CSS の .tlist）。上の「さがす」と絞り込みは schedule.js */
 function renderTerrList(ts) {
   const pcount = new Map();
@@ -12155,7 +12155,7 @@ function renderTerrList(ts) {
     const over = !!due && Date.parse(due) < Date.now();
     const retAt = t.holder || pp || t.awayPoolAt ? '' : (t.completedAt && (!t.returnedAt || t.completedAt >= t.returnedAt) ? t.completedAt : '');
     const di = dueOfT(t), late = di && (di.st === 'over' || di.st === 'warn');
-    const lateTag = late ? `<span class="tag-warn">${di.st === 'over' ? '1年の期限を過ぎています' : `1年の期限まで${di.left}日`}</span>` : '';
+    const lateTag = late ? `<span class="tag-warn">${di.st === 'over' ? '年1回の期限を過ぎています' : `年1回の期限まで${di.left}日`}</span>` : '';
     // スマホの2行目：持っている人、または前回の返却
     const sub = t.holder ? `${esc(uname(t.holder))}さん${t.lentAt ? `・${daysSince(t.lentAt)}日目` : ''}${over ? '　<span class="tag-warn">返却の目安を過ぎています</span>' : ''}`
       : pp ? `紙の記録：${esc(pp.name || '名前なし')}`
@@ -12238,9 +12238,9 @@ function openStatList(key) {
       per.set(tid || '', (per.get(tid || '') || 0) + 1);
     }
     title = `拒否の家・部屋 ${dncRefN()}`;
-    hint = '区域ごとの数です。くわしい一覧（住所・地図で確かめる）は「拒否・！」タブにあります。';
+    hint = '区域ごとの数です。くわしい一覧（住所・地図で確かめる）は「家の印」タブにあります。';
     const rows = ts.filter(t => per.get(t.id)).map(t => statRow(t, `拒否 ${per.get(t.id)}`));
-    body = `<button type="button" class="btn block" data-tldnc>「拒否・！」の一覧を開く</button>${rows.join('')}${per.get('') ? `<p class="muted">区域の外：${per.get('')}</p>` : ''}`;
+    body = `<button type="button" class="btn block" data-tldnc>「家の印」の一覧を開く</button>${rows.join('')}${per.get('') ? `<p class="muted">区域の外：${per.get('')}</p>` : ''}`;
   } else if (key === 'prov') {
     const per = new Map();
     D().houses.forEach(h => { if (h.prov) per.set(h.terrId || '', (per.get(h.terrId || '') || 0) + 1); });
@@ -13671,7 +13671,7 @@ function renderRecoAdmin() {
   box.innerHTML = `<h2 class="sec">おすすめ</h2>
     <p class="hint">完了した区域（S-13 に完了として記録した区域）の残りの留守宅を、全員の画面の下のタブ「おすすめ」に、近くの数軒ずつ出します。カードを受け取らなくても、空いた時間に回れます。</p>
     ${flag('recoOn', 'おすすめを出す', '出さないにすると、全員の画面から「おすすめ」のタブが消えます', '出す', '出さない')}
-    ${on ? '<p class="hint">出す家・期間・予定で押さえる数などは、区域タブの「状況」の「区域の決め（設定）」の「完了のあとの留守宅（おすすめ）」で決めます。</p>' : ''}
+    ${on ? '<p class="hint">出す家・期間・予定で押さえる数などは、区域タブの「状況」の「区域の決まり（設定）」の「完了のあとの留守宅（おすすめ）」で決めます。</p>' : ''}
     ${flag('wxOn', '雨の日は、集合住宅を先に出す', '雨のとき、全員の「区域をもらう」（おすすめ順）では集合住宅の多い区域を、「おすすめ」タブでは集合住宅の部屋（エレベーターありが先）を、自動で先に出します。奉仕者の操作はいりません', '出す', '出さない')}
     ${on || Number(st.wxOn) !== 0 ? `<p class="hint">今の天気の判定：${!LIVE ? '試作モードでは調べません' : !WX ? 'まだ届いていません（数分後にもう一度開いてください）' : WX.off ? '夜は調べません' : WX.err ? '調べられませんでした（ふだんの並びで動いています）' : (WX.r === 1 ? '<b>雨</b>' : '雨ではない') + `（${fmtTime(new Date(WX.at))}に確認${WX.p != null ? `・2時間の降水確率 ${WX.p}%` : ''}）`}</p>` : ''}
     <h3 class="sub">おすすめから訪ねた記録（直近90日）</h3>
@@ -14281,7 +14281,7 @@ function renderPeople() {
     ${admin ? `<div class="row"><button class="btn primary" id="adUserAdd">＋ 人を追加</button>
       <button class="btn" id="adJoinQr">共通リンクのQRを見せる</button>
       ${window.MEIBO ? '<button class="btn" id="adMeibo">名簿（PDF）から更新</button>' : ''}</div>
-      <p class="hint">集まりのときは「共通リンクのQR」を見せると、みんながその場で申し込めます。申し込みは「申請・承認」で承認します。</p>` : ''}
+      <p class="hint">集まりのときは「共通リンクのQR」を見せると、みんながその場で申し込めます。申し込みは、係の画面の「今日」で承認します。</p>` : ''}
     ${noGroup ? `<div class="notice warn"><b>グループが決まっていない人が ${noGroup}人 います。</b>この人たちには、グループの集まりの予定は届きません（「全体」の予定だけが届きます）。</div>` : ''}
     ${noYomi ? `<div class="notice info"><b>よみが入っていない人が ${noYomi}人 います。</b>よみを入れると、名前があいうえお順に並び、ひらがなでもさがせます。<div class="row"><button class="btn small" id="adYomi">まとめて入れる</button></div></div>` : ''}
     ${admin ? '<p class="hint">人の行を押すと、グループ・監督・司会者・役割を直せます（直して「保存する」を押したときだけ変わります）。<br>監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>' : ''}
@@ -15919,7 +15919,7 @@ function bindStatic() {
     e.target.value = '';
   };
   $('#adSpecial').onclick = () => openSpecialSheet(null);
-  // 区域の一覧の行を押すと、その区域のカルテ（改善案A4。返却・担当・貸し出しのきまりなどの操作は、カルテの中）
+  // 区域の一覧の行を押すと、その区域のカルテ（改善案A4。返却・担当・この区域の貸し出しなどの操作は、カルテの中）
   $('#adTerrs').addEventListener('click', e => {
     const r = e.target.closest('[data-karte]'); if (!r) return;
     if (window.KM && KM.openKarte) KM.openKarte(r.dataset.karte); else openTerr(r.dataset.karte);
@@ -15936,7 +15936,7 @@ function bindStatic() {
     Store.data = makeDemo(); Store.data.currentUser = cu; Store.save();
     fillWho(); updateTabs(); renderAll(); toast('試作データに戻しました');
   };
-  // 係の画面の押したときの処理。状況の「区域の決め」（kimari.js）をスマホで下から出す画面に出したときも、同じ処理を使う
+  // 係の画面の押したときの処理。状況の「区域の決まり」（kimari.js）をスマホで下から出す画面に出したときも、同じ処理を使う
   const adminClick = e => {
     const q = sel => e.target.closest(sel);
     let x;
