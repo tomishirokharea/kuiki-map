@@ -1919,6 +1919,26 @@ body.duemode .terr-label:not(.duelab){display:none}
     dmRaf = requestAnimationFrame(() => { dmRaf = 0; try { paintDueMap(); } catch (e) { console.error(e); } });
   }
   window.repaintTerrLabels = repaintTerrLabels;
+  /* 今の画面に出ている家の印と建物の名前の四角（地図の左上からの位置）。札をずらすときの障害物 */
+  function houseObstacles() {
+    const out = [];
+    if (typeof houseLayer === 'undefined' || !houseLayer || !map) return out;
+    const box = map.getContainer().getBoundingClientRect();
+    houseLayer.eachLayer(m => {
+      const el = m && m._icon; if (!el) return;
+      const tgt = el.firstElementChild || el;
+      const b = tgt.getBoundingClientRect();
+      if (!b.width && !b.height) return;
+      if (b.right < box.left || b.bottom < box.top || b.left > box.right || b.top > box.bottom) return;
+      out.push([b.left - box.left - 8, b.top - box.top - 10, b.right - box.left + 8, b.bottom - box.top + 6]); // 角の件数・拒の丸のはみ出し分も
+    });
+    return out;
+  }
+  // 家の印を描き直したあとも、札を出し直す（家の印が出る・消えるのに合わせて、よける場所を変える）
+  if (typeof window.renderHouses === 'function') {
+    const _rh = window.renderHouses;
+    window.renderHouses = function () { const r = _rh.apply(this, arguments); repaintTerrLabels(); return r; };
+  }
   window.terrNumHidden = () => {
     try {
       const on = isAdmin() && !lkLocked() && dmState.on;
@@ -2020,10 +2040,35 @@ body.duemode .terr-label:not(.duelab){display:none}
     });
     items.sort((a, b) => a.pri - b.pri || cmpNo(a.t.no, b.t.no));
     const placed = [];
+    // 家の印・建物の名前と重ならないように、札を少しずらす（2026-11-08）。
+    // 今の画面に出ている家の印・名前の大きさを、そのまま障害物として使う（拡大・回転・文字の大きさに合わせられる）
+    const obs = houseObstacles();
+    const hitR = (r, list) => list.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1]);
+    const unscr = pt => map.containerPointToLatLng(map._kmRad ? c0.add(rotPt(pt.subtract(c0), -map._kmRad)) : pt);
     for (const it of items) {
       const w = cp ? 10 + 9 * it.text.length : 18 + 11 * it.text.length, h = cp ? 24 : 36;
-      const r = [it.p.x - w / 2 - 2, it.p.y - h / 2 - 2, it.p.x + w / 2 + 2, it.p.y + h / 2 + 2];
-      if (placed.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) continue;   // 先に置いた札と重なるものは出さない
+      const rectAt = pt => [pt.x - w / 2 - 2, pt.y - h / 2 - 2, pt.x + w / 2 + 2, pt.y + h / 2 + 2];
+      let r = rectAt(it.p);
+      if (obs.length && hitR(r, obs)) {
+        // まわりを近い順に探す（区域の線の中・ほかの札とも重ならない所）。見つからなければ今までの場所
+        let found = null;
+        for (const rad of [24, 40, 56, 76, 100, 130]) {
+          const n = rad < 50 ? 8 : 12;
+          for (let i = 0; i < n && !found; i++) {
+            const a = -Math.PI / 2 + i * 2 * Math.PI / n; // 上から時計回り
+            const pt = L.point(it.p.x + Math.cos(a) * rad * (w > h ? 1.3 : 1), it.p.y + Math.sin(a) * rad);
+            if (pt.x < w / 2 || pt.y < h / 2 || pt.x > sz.x - w / 2 || pt.y > sz.y - h / 2) continue;
+            const rr = rectAt(pt);
+            if (hitR(rr, obs) || hitR(rr, placed)) continue;
+            const ll = unscr(pt);
+            if (!inPoly(ll.lat, ll.lng, it.t.polygon)) continue;
+            found = { pt, ll, rr };
+          }
+          if (found) break;
+        }
+        if (found) { it.p = found.pt; it.ll = [found.ll.lat, found.ll.lng]; r = found.rr; }
+      }
+      if (hitR(r, placed)) continue;   // 先に置いた札と重なるものは出さない
       placed.push(r);
       const faint = !on && sel && it.t.id !== sel;
       const kind = on ? '' : it.gray ? ' gray' : it.t.group ? ' grp' : '';
