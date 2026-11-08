@@ -795,7 +795,6 @@ button.ktag{cursor:pointer}
     const t = terrById(tid);
     if (!t || t.holder || (typeof isAdmin === 'function' && isAdmin()) || myTerr(t)) return false;
     if (!freeTerrs().some(x => x.id === t.id)) return false;
-    reqForGroup = false; reqUse = 'grp';
     const SIMPLE = typeof isSimple === 'function' && isSimple();
     const full = !hasRoom(false), askOk = !full && canAsk(false);
     const can = isFree(t) && canTakeFree(false);
@@ -831,11 +830,13 @@ button.ktag{cursor:pointer}
       <button class="btn block" data-close>閉じる</button>`);
     const S = $('#sheet');
     // 「区域○のようす」（kangaeru.js）を開き、下の「閉じる」を「もどる」にして、この画面にもどれるようにする
-    if ($('[data-tiYousu]', S)) $('[data-tiYousu]', S).onclick = () => {
-      window.openTerrInfo(t.id);
+    // 期間の切りかえで「区域のようす」が描き直されても、「もどる」を付け直す
+    const backFix = () => {
       const b = $$('#sheet [data-close]').find(x => !x.classList.contains('icon-btn'));
       if (b) { b.removeAttribute('data-close'); b.textContent = 'もどる'; b.onclick = () => window.openTerrPick(t.id); }
+      $$('#sheet [data-kgper]').forEach(k => { const f = k.onclick; if (f) k.onclick = ev => { f(ev); backFix(); }; });
     };
+    if ($('[data-tiYousu]', S)) $('[data-tiYousu]', S).onclick = () => { window.openTerrInfo(t.id); backFix(); };
     if ($('[data-tiTake]', S)) $('[data-tiTake]', S).onclick = () => { reqForGroup = false; reqUse = 'grp'; takeTerr(t.id); };
     if ($('[data-tiAsk]', S)) $('[data-tiAsk]', S).onclick = () => { reqForGroup = false; reqUse = 'grp'; askTerr(t.id); };
     return true;

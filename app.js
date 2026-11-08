@@ -3553,6 +3553,7 @@ function bindLongPress() {
     timer = setTimeout(() => {
       timer = null;
       if (navigator.vibrate) { try { navigator.vibrate(15); } catch (x) { /* 何もしない */ } }
+      longPressAt = Date.now(); // 長押しのあとのタップを、区域のタップにしない（terrTapAt）
       openDirPopup(map.mouseEventToLatLng({ clientX: sx, clientY: sy })); // 地図を回していても、指の場所になる
     }, 550);
   }, true);
@@ -4035,11 +4036,17 @@ function onTerrTap(t, e, keep) {
 }
 /* 家の点の層（canvas）が区域の線より上にあり、区域の中のタップが線に届かない（2026-11-08 に分かった）。
    家の印に当たらなかったタップ（map の click）は、ここで、その場所の区域のタップとして扱う。上に描いた区域（枝番）を先に見る */
-let terrTaps = [];
+let terrTaps = [], longPressAt = 0;
 function terrTapAt(e) {
+  if (Date.now() - longPressAt < 800) return false; // 長押し（道順）のあとに来るタップ
   for (let i = terrTaps.length - 1; i >= 0; i--) {
     const t = terrTaps[i];
-    if (t && okPoly(t.polygon) && inPoly(e.latlng.lat, e.latlng.lng, t.polygon)) { onTerrTap(t, e, true); return true; }
+    if (t && okPoly(t.polygon) && inPoly(e.latlng.lat, e.latlng.lng, t.polygon)) {
+      // 自分の区域を回っている間は、ほかの区域のすき間を押しても回る表示を切りかえない。
+      // まだだれも持っていない区域なら、表示はそのままで、くわしい情報の画面だけ出す
+      if (roundTerr && t.id !== roundTerr) { if (!isAdmin() && !t.holder && !myTerr(t) && window.openTerrPick) window.openTerrPick(t.id); return true; }
+      onTerrTap(t, e, true); return true;
+    }
   }
   return false;
 }
