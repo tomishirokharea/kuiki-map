@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.129"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
+<meta name="app-version" content="2026.13.130"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -877,7 +877,17 @@ html[lang="es"] .atabs button{font-size:13px;white-space:normal;line-height:1.15
 .rlegend .lg.on{background:var(--draw);border-color:var(--draw)}
 .rlegend .lg.taken{border-style:dashed;background:#EEF1F2}
 .rcount{font-weight:700;font-size:16px;margin:8px 0;color:var(--draw)}
-.uchip.notmine{opacity:.4}
+.uchip.notmine{opacity:.35;filter:grayscale(1)}
+.uchip.mine{box-shadow:0 0 0 3px #00796B}
+.uchip.mine:not(.donec){background-image:linear-gradient(#00796B22,#00796B22)}
+/* 人をえらぶ画面の下に、いつも出ている「わたす」ボタン（名前が多くても下まで動かさなくてよい） */
+.stickfoot{position:sticky;bottom:0;margin:12px -16px 0;padding:10px 16px;background:var(--paper);border-top:1px solid #DCE3E1;box-shadow:0 -6px 12px #0000000f;z-index:2}
+.stickfoot .picked{font-size:15px;font-weight:700;margin:0 0 8px;color:var(--draw);min-height:1.3em}
+.stickfoot .row{display:flex;gap:8px}
+.stickfoot .row .btn{flex:1;margin:0}
+.stickfoot .row .btn.primary{flex:2}
+.notice.minepart{background:#E3F2EF;border:3px solid #00796B;color:#00453D}
+.notice.minepart .mk{display:inline-block;width:18px;height:14px;border-radius:4px;box-shadow:0 0 0 3px #00796B;margin:0 8px 0 3px;vertical-align:-1px}
 .check.dimmed{opacity:.7}
 .partsum{margin:4px 0 10px;padding:10px 12px;border:1.5px solid var(--terr-soft);border-radius:12px;background:var(--terr-soft)}
 .partsum-h{font-size:15px;margin-bottom:4px}

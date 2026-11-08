@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.129';
+var APP_JS_VER = '2026.13.130';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2456,7 +2456,15 @@ function roomsText(h, us) {
     if (!pick.length) { flush(); return; }
     if (g && /^\d+階$/.test(g) && pick.length === gu.length) { if (run) run.b = g; else run = { a: g, b: g }; return; }
     flush();
-    pick.forEach(u => out.push(uName(h, u)));
+    // 階（棟）の中で続いている部屋は「2-301〜2-307」とまとめる
+    let i = 0;
+    while (i < pick.length) {
+      let j = i, p0 = gu.indexOf(pick[i]);
+      while (j + 1 < pick.length && gu.indexOf(pick[j + 1]) === p0 + (j + 1 - i)) j++;
+      if (j - i >= 2) out.push(`${uName(h, pick[i])}〜${uName(h, pick[j])}`);
+      else for (let k = i; k <= j; k++) out.push(uName(h, pick[k]));
+      i = j + 1;
+    }
   });
   flush();
   const txt = out.length > 8 ? out.slice(0, 7).join('・') + `ほか` : out.join('・');
@@ -2748,6 +2756,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.130', items: [
+    ['集', '部屋ごとに範囲をわたされた人の画面で、自分の部屋を緑のわくで囲み、ほかの人の部屋はうすく表示するようにしました。団地は階ごとに分けて並べます。'],
+    ['集', '「この範囲をわたす人」の画面で、「この範囲をわたす」ボタンをいつも画面の下に出すようにしました。名前をえらんだら、すぐに押せます。']
+  ] },
   { v: '2026.13.129', items: [
     ['集', '「回る範囲を分ける」で、集合住宅をタップすると部屋が並び、指でなぞってえらべるようにしました。団地の「3〜5階」など、部屋ごとにわたせます。わたされた人の画面にも、自分の部屋が出ます。']
   ] },
@@ -4609,12 +4621,20 @@ function openPartAssign() {
       ${gm.length ? `<div class="hgrp"><b>${allU ? '今日回る人' : `${esc(po.group)}グループ`}</b></div>${gm.map(row).join('')}` : ''}
       ${others.length ? `<div class="hgrp"><b>ほかの人</b></div>${others.map(row).join('')}` : ''}
     </div>
-    <button class="btn primary block" id="puSave">この範囲をわたす</button>
-    <button class="btn block" data-close>やめる</button>`);
+    <div class="stickfoot"><p class="picked" id="puPicked" aria-live="polite"></p>
+      <div class="row"><button class="btn" data-close>やめる</button><button class="btn primary" id="puSave">この範囲をわたす</button></div></div>`);
   $('#puQ').oninput = e => {
     const q = e.target.value.trim();
     filterNames($$('#puList [data-name]'), q);
   };
+  // えらんだ人を、下のボタンの上にいつも出す（名前が多くても、えらんだらすぐ「わたす」を押せる）
+  const picked = () => {
+    const us = $$('#puList input:checked').map(x => uname(x.dataset.pu));
+    $('#puPicked').textContent = us.length ? `わたす人：${us.map(n => n + 'さん').join('・')}` : 'わたす人をえらんでください';
+    $('#puSave').disabled = !us.length;
+  };
+  $$('#puList input[data-pu]').forEach(x => x.addEventListener('change', picked));
+  picked();
   $('#puSave').onclick = () => {
     const uids = $$('#puList input:checked').map(x => x.dataset.pu);
     if (!uids.length) { toast('わたす人をえらんでください'); return; }
@@ -6288,15 +6308,16 @@ function openAptSeq(hid, startUnit) {
   const paint = () => {
     const h = houseById(hid); if (!h) { closeSheet(); return; }
     const n = h.units.length, cnt = h.units.filter(doneToday).length, need = h.units.filter(u => !isRef(u)).length;
-    let b = headHtml(t, esc(h.label || '集合住宅'), `${inRound ? '受け取ってから訪ねた部屋' : '今日入力した部屋'} ${cnt} / ${need}`);
+    const mc = mine ? h.units.filter(u => isMine(u) && doneToday(u)).length : 0, mn = mine ? h.units.filter(u => isMine(u) && !isRef(u)).length : 0;
+    let b = headHtml(t, esc(h.label || '集合住宅'), mine ? `あなたの部屋　訪ねた ${mc} / ${mn}` : `${inRound ? '受け取ってから訪ねた部屋' : '今日入力した部屋'} ${cnt} / ${need}`);
     // 部屋のボタン：前回の結果は色だけでなく「会・留・拒」の字でも見せる。部屋が多い建物は階ごとに分ける（点検④U3）
     const chip = u => {
       // 色と字は、見出しと同じ「今の巡回（受け取ってから）」の結果で出す。前の巡回の結果は出さない（総点検 L5・2026.13.105）
       const i = h.units.indexOf(u), s0 = statusOf(K(hid, u)), s1 = s0 === 'dnc' || !inRound || visitedSince(K(hid, u), since) ? s0 : 'new', s = s1 === 'dnc' && dncSkip(K(hid, u)) ? 'skip' : s1, uk = unitKind(h, u), g = UST_GLYPH[s];
-      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}${isMine(u) ? '' : ' notmine'}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${isMine(u) ? '' : '（ほかの人の範囲）'}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? (s === 'skip' ? '（' + UST_NAME[s] + '）' : '（前回 ' + UST_NAME[s] + '）') : ''}へ">${kindBadge(uk)}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
+      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}${!mine ? '' : isMine(u) ? ' mine' : ' notmine'}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${isMine(u) ? '' : '（ほかの人の範囲）'}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? (s === 'skip' ? '（' + UST_NAME[s] + '）' : '（前回 ' + UST_NAME[s] + '）') : ''}へ">${kindBadge(uk)}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
     };
     const groups = h.units.length > 10 ? unitGroups(h) : [];
-    if (mine) b += `<div class="notice info"><b>あなたの範囲：${esc(roomsText(h, h.units.filter(isMine)))}</b><br>うすい部屋は、ほかの人の範囲です。</div>`;
+    if (mine) b += `<div class="notice minepart"><b>あなたの範囲：${esc(roomsText(h, h.units.filter(isMine)))}</b><br><span class="mk"></span>緑のわくの部屋を回ります。うすい部屋は、ほかの人の範囲です。</div>`;
     b += groups.length > 1
       ? `<div class="ustrips">${groups.map(([g, us]) => `<p class="ugrp">${esc(g || 'そのほか')}</p><div class="unitstrip">${us.map(chip).join('')}</div>`).join('')}</div>`
       : `<div class="unitstrip">${h.units.map(chip).join('')}</div>`;
@@ -6495,7 +6516,15 @@ function unitGroups(h) {
     if (!g.has(key)) g.set(key, []);
     g.get(key).push(u);
   });
-  const list = [...g.entries()];
+  let list = [...g.entries()];
+  // 「2-101・2-201」のように、棟が1つだけで、部屋番号に階が入っているときは、階で分ける（2026-11-08）
+  if (list.length === 1 && h.units.length > 1) {
+    const f = new Map(), re = /^.+?[-－ー](\d{1,2})\d{2}$/;
+    if (h.units.every(u => re.test(uName(h, u)))) {
+      h.units.forEach(u => { const k = `${Number(uName(h, u).match(re)[1])}階`; if (!f.has(k)) f.set(k, []); f.get(k).push(u); });
+      if (f.size > 1) list = [...f.entries()];
+    }
+  }
   if (list.length > 1 && list.every(([k]) => /^\d+階$/.test(k))) list.reverse(); // 階は、上の階から（建物の形に近く）
   return list;
 }
