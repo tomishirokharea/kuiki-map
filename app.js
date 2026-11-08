@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.135';
+var APP_JS_VER = '2026.13.136';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -3658,7 +3658,7 @@ function aptKind(h) {
   ks.forEach(k => { cnt[k] = (cnt[k] || 0) + 1; });
   return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || 'home';
 }
-const kindBadge = (k, key) => (k === 'lang' ? `<b class="kb k-lang" title="外国語"><i>${esc(key ? langMark(key) : '外')}</i></b>` : k && k !== 'home' ? `<b class="kb k-${k}" title="${KINDS[k][0]}">${KINDS[k][1]}</b>` : '');
+const kindBadge = (k, key) => (k === 'lang' ? `<b class="kb k-lang" title="外国語"><span class="lg">${esc(key ? langMark(key) : '外')}</span></b>` : k && k !== 'home' ? `<b class="kb k-${k}" title="${KINDS[k][0]}">${KINDS[k][1]}</b>` : '');
 const lockBadge = h => (h.lock ? `<b class="lk" title="オートロック">${LOCK_SVG}</b>` : '');
 const BAN_TEXT = { no: ['禁', '立入禁止'], letter: ['手', '手紙のみ'] };
 const banBadge = h => (h.type === 'apt' && BAN_TEXT[h.ban] ? `<b class="ban${h.ban === 'letter' ? ' letter' : ''}" title="${BAN_TEXT[h.ban][1]}">${BAN_TEXT[h.ban][0]}</b>` : '');
@@ -3827,9 +3827,8 @@ function houseIcon(h, ff, locked) {
     const sk = targets(h).some(u => skipAt(K(h.id, u))) ? '<b class="sk" title="訪問しない">ー</b>' : ''; // 訪問しない部屋（灰色の「ー」）
     const cau = !locked && window.chuiHas && window.chuiHas(h) ? '<b class="cau" title="注意">！</b>' : ''; // 注意（chui.js）
     const ak = aptKind(h);
-    const lgK = ak === 'home' ? targets(h).map(u => K(h.id, u)).find(isLangKey) : null; // 外国語の部屋がある建物は、建物の印にも「外」（監査 M4）
     const nameTag = ''; // 名前は、renderHouses で別の札として出す（小さな点のときも出せるように）
-    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${sk}${cau}${locked ? '' : (lgK ? kindBadge('lang', lgK) : kindBadge(ak)) + lockBadge(h) + banBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
+    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${sk}${cau}${locked ? '' : kindBadge(ak) + lockBadge(h) + banBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
   }
   const k = K(h.id, ''), s = pinState(k, since), fo = '';
   // 選んでいないときも、今回訪ねた家（会えた・留守）は薄く＋緑のチェックにする
