@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.137';
+var APP_JS_VER = '2026.13.138';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2111,6 +2111,11 @@ function userOptions(sel, noneLabel) {
 }
 const me = () => userById(D().currentUser) || D().users[0];
 const isAdmin = () => me().role === 'admin';
+/* 家の削除・拒否の取り消し・家の編集ができる人：区域係、または区域係が「家と拒否の管理」を任せた人（mgr）。
+   この3つの入口だけに使う。係の画面のタブ・貸し出し・設定・点検・S-13・目印などは isAdmin() のまま（サーバーも同じ決まりで止める） */
+const isMgr = () => isAdmin() || me().mgr === true;
+/* その家を（申請なしで）消せるか。家と拒否の管理の人でも、訪問しない印のある家は区域係だけ（印を外す回り道にしないため。サーバーも止める） */
+const mgrCanDel = h => isAdmin() || (isMgr() && !!h && !hasSkip(h));
 const targets = h => h.type === 'apt' ? h.units : [''];
 const banNo = h => !!h && h.type === 'apt' && h.ban === 'no'; // 立入禁止の建物（手紙のみ letter は今までどおり回る家に数える）
 const K = (hid, unit) => hid + '|' + (unit || '');
@@ -2425,7 +2430,9 @@ function dncDrop(k, h, keepPlain) {
   h = h || houseById(parseKey(k)[0]);
   // 住所のない拒否（伝道者が付けた true など）も、区域係が家を消すとき（keepPlain）は、家の位置に場所だけの印として残す（H8・D5）。
   // 場所だけの印は区域係しか作れない（サーバーも止める）ので、係以外の画面では今までどおり（住所のある拒否だけ）。
+  // 家と拒否の管理を任された人の画面には、拒否の住所が届かない（伏せてある）ので、印は作らない。家を消すときは、サーバーがシートの拒否から印を作る。
   // 部屋を消す・印を注意に変えるなど、家を消さないときは今までどおり
+  if (!isAdmin()) return; // 係以外（家と拒否の管理の人も）は、場所だけの印を作らない（サーバーが受け付けないので、画面にだけ残らないように）
   const plain = !v || typeof v !== 'object' || !(v.a || v.s);
   if (plain && !(keepPlain && isAdmin() && h && h.lat != null && h.lng != null && Number.isFinite(+h.lat) && Number.isFinite(+h.lng))) return; // 位置のない家は作らない（サーバーが削除を止める）
   const o = Object.assign({}, v && typeof v === 'object' ? v : {}, { p: 1, dk: k });
@@ -2798,6 +2805,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.138', items: [
+    ['係', '家と拒否の管理を、区域係のほかの人にも任せられるようになりました。']
+  ] },
   { v: '2026.13.134', items: [
     ['！', '家の編集の「この家の印」の見出しに「？」を付け、押すと、注意・拒否をどんなときに、どう使うかが出るようにしました。印のボタンの下にも「夜勤・犬など」のような一言を出します。']
   ] },
@@ -4485,8 +4495,9 @@ async function onHouseTap(id) {
     if (addMode !== 'del') { toast('そこにはもう家があります。まちがえたときは、お知らせの「取り消す」を押してください'); return; }
     const rec = houseRecText(h);
     // 仮の家（記録・拒否・注意・再訪問のどれもない）は、確認なしですぐ消す。まちがえたら、下の「取り消す」でもどせる（H8）
-    if (h.prov && !rec && (isAdmin() || myTerr(terrById(h.terrId)))) { delCount++; updateAddBar(); dropProvHouse(h.id, true); return; }
-    if (!isAdmin()) { if (h.prov && rec) toast('記録や拒否・注意・再訪問のある家は、区域係だけが消せます。削除の申請をしてください'); openDelRequest(h); return; } // 伝道者は申請になる
+    if (h.prov && !rec && (isMgr() || myTerr(terrById(h.terrId)))) { delCount++; updateAddBar(); dropProvHouse(h.id, true); return; }
+    if (isMgr() && !mgrCanDel(h)) { toast('訪問しない印のある家は、区域係だけが消せます。削除の申請をしてください'); openDelRequest(h); return; }
+    if (!isMgr()) { if (h.prov && rec) toast('記録や拒否・注意・再訪問のある家は、区域係だけが消せます。削除の申請をしてください'); openDelRequest(h); return; } // 伝道者は申請になる（家と拒否の管理を任された人は、区域係と同じ）
     const name = h.type === 'apt' ? `${h.label || '集合住宅'}（${h.units.length}部屋）` : (h.label || 'この家');
     if (rec && !await ask(`「${name}」を消します。${rec}よろしいですか？`)) return; // 記録・印のある家だけ確かめる（H8）
     delCount++; updateAddBar();
@@ -4812,7 +4823,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (fromBuilding) b += `<button class="btn small" id="backBld">← 建物の編集にもどる</button>`;
     if (dnc && dnc.lg) b += langNoteHtml(unit ? '部屋' : '家', k);
     else if (dnc && isSkipV(dnc)) b += skipNoteHtml(unit ? '部屋' : '家', isAdmin());
-    else if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() && dnc.a ? `<br><small>住所：<span data-notr>${esc(dnc.a)}</span>${dnc.auto ? '（住所から自動でつないだ家です）' : ''}</small>` : ''}${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
+    else if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() && dnc.a ? `<br><small>住所：<span data-notr>${esc(dnc.a)}</span>${dnc.auto ? '（住所から自動でつないだ家です）' : ''}</small>` : ''}${isMgr() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
     if (h.ban) b += banNotice(h);
     if (unit) b += bldMemoHtml(h);
     if (window.chuiNotice) b += window.chuiNotice(h, unit); // 注意（！）。特別区域で回る家のお知らせも、ここに続けて出す（tokubetsu.js）
@@ -4839,7 +4850,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (h.prov) b += houseHasRec(h)
       // 記録・拒否・注意・再訪問のある仮の家は、ここでは消せない（H8。係以外はサーバーも止める）
       ? `<div class="notice warn"><b>この家は、地図のデータから自動で入れた「仮の家」です。</b>この家には、訪問の記録・拒否・注意・再訪問のどれかがあるため、ここでは消せません。家ではないときは、区域係に削除を申請してください。
-        <span class="actions"><button class="btn small" id="provAsk">${isAdmin() ? 'この家を削除する' : 'この家の削除を申請する'}</button></span></div>`
+        <span class="actions"><button class="btn small" id="provAsk">${mgrCanDel(h) ? 'この家を削除する' : 'この家の削除を申請する'}</button></span></div>`
       : `<div class="notice warn"><b>この家は、地図のデータから自動で入れた「仮の家」です。</b>ほんとうに家があるか確かめてください。記録をつけると、ふつうの家になります。
       <span class="actions"><button class="btn small danger" id="provDrop">ここは家ではない（消す）</button></span></div>`;
     if (recentMet(k)) b += `<div class="notice info"><b>最近（${daysSince(sum(k).met.at)}日前）会えた家です。</b>区域を回るときは、とばしてかまいません。</div>`;
@@ -4921,7 +4932,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     on('provDrop', () => dropProvHouse(hid));
     on('provAsk', async () => { // H8：記録・印のある仮の家（係は確かめて削除・係以外は申請）
       const h2 = houseById(hid); if (!h2) return;
-      if (!isAdmin()) { closeSheet(); openDelRequest(h2); return; }
+      if (!mgrCanDel(h2)) { closeSheet(); openDelRequest(h2); return; }
       if (!await ask(`この家と、その記録をすべて削除します。${houseRecText(h2)}よろしいですか？`)) return;
       closeSheet(); deleteHouse(hid);
     });
@@ -4959,7 +4970,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     });
     $$('[data-lang]', S).forEach(x => x.onclick = () => { st.editOpen = true; st.langPick = false; setLang(hid, unit, x.dataset.lang, paint); });
     on('fDel', async () => {
-      if (!isAdmin()) { closeSheet(); openDelRequest(h); return; }
+      if (!mgrCanDel(houseById(hid))) { closeSheet(); openDelRequest(h); return; }
       if (!await ask(`この家と、その記録をすべて削除します。${houseRecText(houseById(hid))}よろしいですか？`)) return;
       closeSheet(); deleteHouse(hid);
     });
@@ -5202,7 +5213,7 @@ function simpleBlock(what) {
 }
 function deleteHouse(hid) {
   if (simpleBlock('家を削除')) return;
-  if (!isAdmin()) { const h = houseById(hid); if (h) openDelRequest(h); return; } // 伝道者は申請だけ（区域係が確認して消す）
+  { const h = houseById(hid); if (!mgrCanDel(h)) { if (h) { if (isMgr()) toast('訪問しない印のある家は、区域係だけが消せます。削除の申請をしてください'); openDelRequest(h); } return; } } // 伝道者は申請だけ（区域係が確認して消す。家と拒否の管理を任された人は、そのまま消せる）
   commit('削除しました', () => deleteHouseData(hid));
 }
 function deleteHouseData(hid) {
@@ -6174,9 +6185,9 @@ function openBuilding(hid, startSel) {
       const rec = unitHasRec(hid, u), n = visitsOf(K(hid, u)).length;
       return `<div class="bact"><p class="bact-t"><b>${esc(unitTitle(h, u))}</b>${rec ? `<span class="muted">　記録${n ? n + '件' : 'あり'}</span>` : ''}</p>
         <div class="bact-b"><button class="btn small" id="bRenGo">名前を直す</button>
-        ${!rec || isAdmin() ? `<button class="btn small danger" id="bDelOne">この部屋を消す</button>` : ''}
+        ${!rec || isMgr() ? `<button class="btn small danger" id="bDelOne">この部屋を消す</button>` : ''}
         <button class="btn small" id="bMore">種別・記録</button></div>
-        ${rec && !isAdmin() ? '<p class="hint">記録のある部屋は、区域係だけが消せます。</p>' : ''}</div>`;
+        ${rec && !isMgr() ? '<p class="hint">記録のある部屋は、区域係だけが消せます。</p>' : ''}</div>`;
     };
     const rowHtml = (g, row) => {
       const sel = st.sel && row.units.includes(st.sel);
@@ -6222,7 +6233,7 @@ function openBuilding(hid, startSel) {
       </details>` : ''}
       ${canMoveHouse() ? '<button class="btn block" id="fMoveB" style="margin-top:14px">この建物の場所を直す</button>' : ''}
       ${delReqOf(h.id) ? '<p class="tag-warn">この建物は削除を申請中です（区域係の確認待ち）</p>'
-        : `<button class="btn small danger" id="fDel" style="margin-top:14px">${isAdmin() ? 'この建物を削除する' : 'この建物の削除を申請する'}</button>`}`);
+        : `<button class="btn small danger" id="fDel" style="margin-top:14px">${mgrCanDel(h) ? 'この建物を削除する' : 'この建物の削除を申請する'}</button>`}`);
 
     const S = $('#sheet'), on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
     $$('[data-bt]', S).forEach(x => x.onclick = () => { st.sel = st.sel === x.dataset.bt ? null : x.dataset.bt; st.ren = false; again(); });
@@ -6277,10 +6288,11 @@ function openBuilding(hid, startSel) {
       if (simpleBlock('部屋を削除')) return;
       const h2 = houseById(hid), u = st.sel; if (!h2 || !u) return;
       const rec = unitHasRec(hid, u);
-      if (rec && !isAdmin()) { toast('記録のある部屋は、区域係だけが消せます'); return; }
+      if (rec && !isMgr()) { toast('記録のある部屋は、区域係だけが消せます'); return; }
+      if (isMgr() && !isAdmin() && dncSkip(K(hid, u))) { toast('訪問しない印のある部屋は、区域係だけが消せます'); return; } // 家と拒否の管理の人だけ（サーバーも止める・監査 M-2）
       if (rec) {
-        const n = visitsOf(K(hid, u)).length;
-        if (!await ask(`${unitTitle(h2, u)}を消します。${n ? `この部屋の記録${n}件も見えなくなります。` : ''}よろしいですか？`)) return;
+        const n = visitsOf(K(hid, u)).length, dn = D().dnc[K(hid, u)] && !dncSkip(K(hid, u));
+        if (!await ask(`${unitTitle(h2, u)}を消します。${n ? `この部屋の記録${n}件も見えなくなります。` : ''}${dn ? '拒否は、場所だけの印として残します。' : ''}よろしいですか？`)) return;
       }
       const name = uName(h2, u);
       st.sel = null;
@@ -6305,7 +6317,7 @@ function openBuilding(hid, startSel) {
     on('fUnitBulk', () => openUnitBulkDel(hid));
     on('fDel', async () => {
       const h2 = houseById(hid); if (!h2) return;
-      if (!isAdmin()) { closeSheet(); openDelRequest(h2); return; }
+      if (!mgrCanDel(h2)) { closeSheet(); openDelRequest(h2); return; }
       if (!await ask(`「${h2.label || '集合住宅'}」と、すべての部屋の記録を削除します。${houseRecText(h2)}よろしいですか？`)) return;
       closeSheet(); deleteHouse(hid);
     });
@@ -6749,7 +6761,7 @@ function updateAddBar() {
   if (mini) mini.textContent = [addCount ? `追加 ${addCount}` : '', delCount ? `削除 ${delCount}` : ''].filter(Boolean).join('　');
   if ($('#addBase')) $('#addBase').textContent = baseName === 'pale' ? '写真にする' : '地図にする';
   $('#drawAddCount').textContent = addCount ? `　家 ${addCount}件追加` : '';
-  $('#addMsg').textContent = addMode === 'del' && !isAdmin() ? ADD_MSG.delReq : ADD_MSG[addMode];
+  $('#addMsg').textContent = addMode === 'del' && !isMgr() ? ADD_MSG.delReq : ADD_MSG[addMode];
   $$('#addBar [data-addmode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.addmode === addMode)));
   $('#addCount').textContent = [addCount ? `追加 ${addCount}件` : '', delCount ? `削除 ${delCount}件` : ''].filter(Boolean).join('　') || '';
   if (map) $('#map').classList.toggle('deleting', mode === 'add' && addMode === 'del');
@@ -6875,7 +6887,7 @@ function openAddForm(ll, tid, editId) {
       <button class="btn block" data-close>やめる</button>
       ${eh ? `<div class="aw-sep">${canMoveHouse() ? '<button class="btn block" id="fMove">この家の場所を直す</button>' : ''}
         ${delReqOf(eh.id) ? '<p class="tag-warn">この家は削除を申請中です（区域係の確認待ち）</p>'
-          : `<button class="btn small danger" id="fDel">${isAdmin() ? 'この家を削除する' : 'この家の削除を申請する'}</button>`}</div>` : ''}`);
+          : `<button class="btn small danger" id="fDel">${mgrCanDel(eh) ? 'この家を削除する' : 'この家の削除を申請する'}</button>`}</div>` : ''}`);
     const S = $('#sheet');
     $$('[data-type]', S).forEach(x => x.onclick = () => { keep(); f.type = x.dataset.type; paint(); });
     $$('[data-kind]', S).forEach(x => x.onclick = () => { keep(); f.kind = x.dataset.kind; paint(); });
@@ -6893,7 +6905,7 @@ function openAddForm(ll, tid, editId) {
     };
     if ($('#fMove')) $('#fMove').onclick = () => startMoveHouse(editId);
     if ($('#fDel')) $('#fDel').onclick = async () => {
-      if (!isAdmin()) { closeSheet(); openDelRequest(eh); return; }
+      if (!mgrCanDel(eh)) { closeSheet(); openDelRequest(eh); return; }
       if (!await ask(`この家と、その記録をすべて削除します。${houseRecText(eh)}よろしいですか？`)) return;
       closeSheet(); deleteHouse(editId);
     };
@@ -13977,8 +13989,9 @@ function openSchedDay(date) {
 /* ---- 人とグループ（区域係は変更できる。監督は自分のグループの人を見るだけ） ---- */
 /* 保存中の変更（id → 変えた値）。返事を待つあいだに同期で名簿が届いても、画面が元にもどって見えないように上から重ねる */
 var USER_PENDING = new Map(); // var：同期の受け取り（上のほうで定義）から、読み込みの順に関係なく見られるように
-const userPatchOf = (group, overseer, leader, role, active, yomi) => {
+const userPatchOf = (group, overseer, leader, role, active, yomi, mgr) => {
   const p = { group: group || undefined, overseer: !!overseer || undefined, leader: !!leader || undefined };
+  if (typeof mgr === 'boolean') p.mgr = mgr || undefined; // 家と拒否の管理（送らないときは、今のまま）
   if (role) p.role = role;
   if (yomi !== undefined) p.yomi = yomi || undefined; // よみは、直したときだけ（ほかの保存では今のまま）
   if (active === false) p.inactive = true;
@@ -13988,16 +14001,17 @@ function applyUserPending() {
   USER_PENDING.forEach((p, id) => { const u = userById(id); if (u) Object.assign(u, p); });
 }
 const USER_SAVING = new Map(); // id → 送っている保存（同じ人の保存は、順番に1つずつ送る。あとの変更が先に届いて古い値に戻らないように）
-function setUserGroup(u, group, overseer, leader, role, active, yomi) {
-  const patch = userPatchOf(group, overseer, leader, role, active, yomi);
+function setUserGroup(u, group, overseer, leader, role, active, yomi, mgr) {
+  const patch = userPatchOf(group, overseer, leader, role, active, yomi, mgr);
   if (!LIVE) {
     Object.assign(u, patch);
     Store.save(); toast(`${u.name}さんの設定を保存しました`);
     renderAll(); return Promise.resolve();
   }
   const id = u.id, name = u.name;
-  const before = { group: u.group, overseer: u.overseer, leader: u.leader, role: u.role, inactive: u.inactive, yomi: u.yomi };
+  const before = { group: u.group, overseer: u.overseer, leader: u.leader, role: u.role, inactive: u.inactive, yomi: u.yomi, mgr: u.mgr };
   const body = { id, group, overseer, leader };
+  if (typeof mgr === 'boolean') body.mgr = mgr;
   if (role) body.role = role;
   if (yomi !== undefined) body.yomi = yomi; // 送ったときだけサーバーが書く（古いサーバーは使わずに捨てる）
   if (active === false) body.active = false;
@@ -14026,6 +14040,11 @@ async function saveUserNow(id, name, body, patch, before) {
     const u = userById(id); if (u) { if (before.yomi) u.yomi = before.yomi; else delete u.yomi; }
     toast(j && j.yomi_col ? `${name}さんのよみは保存できませんでした（ほかの設定は保存しました）。スプレッドシートの users の11列目が、ほかに使われています`
       : `${name}さんのよみは保存できませんでした（ほかの設定は保存しました）。サーバーの更新を待って、もう一度入れてください`);
+  } else if ('mgr' in body && !(j && j.mgr)) {
+    // 家と拒否の管理を送ったのに受け取りの印がない：サーバーが古い版か、12列目がほかに使われている。mgr だけ元にもどして知らせる
+    delete patch.mgr;
+    const u = userById(id); if (u) { if (before.mgr) u.mgr = before.mgr; else delete u.mgr; }
+    toast(`${name}さんの家と拒否の管理は保存できませんでした（ほかの設定は保存しました）。サーバーの更新を待って、もう一度入れてください`);
   } else toast(`${name}さんの設定を保存しました`);
   if (USER_PENDING.get(id) === patch) { // このあとに、もう変更がないとき
     try { await refresh(true); } catch (e) { /* 次の同期で取り直す */ }
@@ -14268,7 +14287,7 @@ function renderPeople() {
     ${admin ? '<p class="hint">人の行を押すと、グループ・監督・司会者・役割を直せます（直して「保存する」を押したときだけ変わります）。<br>監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>' : ''}
     <div class="uplist">${users.map(u => {
       const who = `<span class="stamp sm" style="font-size:16px">${esc(u.group || '—')}</span>
-        <span class="tl-n"><b>${esc(u.name)}${u.role === 'admin' ? '（区域係）' : ''}${u.overseer ? ' <span class="gbadge">監督</span>' : ''}${u.leader ? ' <span class="gbadge">司会者</span>' : ''}</b></span>`;
+        <span class="tl-n"><b>${esc(u.name)}${u.role === 'admin' ? '（区域係）' : ''}${u.overseer ? ' <span class="gbadge">監督</span>' : ''}${u.leader ? ' <span class="gbadge">司会者</span>' : ''}${admin && u.mgr && u.role !== 'admin' ? ' <span class="gbadge">家の管理</span>' : ''}</b></span>`;
       // 区域係：1人1行。押すと下から出る画面で直す（改善案A5。押しまちがいでグループや役割が変わらないように）
       return admin ? `<button type="button" class="trow1" data-uedit="${esc(u.id)}">${who}<span class="tl-go" aria-hidden="true">›</span></button>` : `<div class="trow1 prow-ro">${who}</div>`;
     }).join('')}</div>`;
@@ -14285,7 +14304,7 @@ function openEditUser(id) {
   const u0 = userById(id); if (!u0 || !isAdmin()) return;
   const groups = groupsAll();
   const roleOf = u => (u.role === 'admin' ? 'admin' : 'pub');
-  const f = { role: roleOf(u0), group: u0.group || '', overseer: !!u0.overseer, leader: !!u0.leader, yomi: u0.yomi || '' };
+  const f = { role: roleOf(u0), group: u0.group || '', overseer: !!u0.overseer, leader: !!u0.leader, yomi: u0.yomi || '', mgr: !!u0.mgr };
   const paint = () => {
     const u = userById(id); if (!u) { closeSheet(); return; }
     setSheet(headHtml(null, `${esc(u.name)}さん`, yomiOn() ? '役割・グループ・よみを直します' : '役割とグループを直します') + `
@@ -14301,11 +14320,13 @@ function openEditUser(id) {
       <label class="check"><input type="checkbox" id="euOver"${f.overseer ? ' checked' : ''}>グループ監督</label>
       <label class="check"><input type="checkbox" id="euLead"${f.leader ? ' checked' : ''}>司会者</label>
       <p class="hint">監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>
+      ${f.role === 'admin' ? '' : `<label class="check"><input type="checkbox" id="euMgr"${f.mgr ? ' checked' : ''}>家と拒否の管理ができる</label>
+      <p class="hint">家の削除・拒否の削除・家の編集ができます。記録のある家や拒否も消せます。信頼できる人にだけ任せてください。</p>`}
       <button class="btn primary block" id="euSave">保存する</button>
       <button class="btn block" id="euLink">リンク・QR</button>
       ${u.id === me().id ? '' : '<div class="kops"><details><summary>この人が使うのをやめる</summary><p class="hint">この人のスマホでは、次に開いたときに区域の情報が消えます。</p><button class="btn block danger" id="euOff">使うのをやめる</button></details></div>'}
       <button class="btn block" data-close>やめる</button>`);
-    const keep = () => { f.group = $('#euGroup').value; f.overseer = $('#euOver').checked; f.leader = $('#euLead').checked; if ($('#euYomi')) f.yomi = $('#euYomi').value; };
+    const keep = () => { f.group = $('#euGroup').value; f.overseer = $('#euOver').checked; f.leader = $('#euLead').checked; if ($('#euYomi')) f.yomi = $('#euYomi').value; if ($('#euMgr')) f.mgr = $('#euMgr').checked; };
     $$('[data-eurole]', $('#sheet')).forEach(x => x.onclick = () => { keep(); f.role = x.dataset.eurole; sheetKeep = true; paint(); });
     $('#euGroup').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('#euSave').click(); } };
     $('#euSave').onclick = async () => {
@@ -14314,10 +14335,14 @@ function openEditUser(id) {
       const g = normGroup(f.group), roleCh = roleOf(u) !== f.role;
       if (yomiBad(f.yomi)) { toast('よみは、ひらがなで入れてください'); $('#euYomi').focus(); return; }
       const y = $('#euYomi') ? normYomi(f.yomi) : undefined, yomiCh = y !== undefined && y !== (u.yomi || '');
-      if (!roleCh && !yomiCh && (u.group || '') === g && !!u.overseer === f.overseer && !!u.leader === f.leader) { closeSheet(); toast('変わったところはありません'); return; }
+      const mgrNow = f.role === 'admin' ? false : f.mgr, mgrCh = f.role !== 'admin' && !!u.mgr !== mgrNow; // 区域係には付けない
+      if (!roleCh && !yomiCh && !mgrCh && (u.group || '') === g && !!u.overseer === f.overseer && !!u.leader === f.leader) { closeSheet(); toast('変わったところはありません'); return; }
       if (roleCh && !await ask(`${u.name}さんを「${f.role === 'admin' ? '区域係' : '伝道者'}」にします。よろしいですか？`)) return;
+      if (mgrCh && !await ask('', mgrNow
+        ? { title: `${u.name}さんに家と拒否の管理を任せますか？`, body: 'この人は、家の削除・拒否の削除・家の編集ができるようになります。', ok: '任せる', cancel: 'やめる', danger: false }
+        : { title: `${u.name}さんの家と拒否の管理をやめますか？`, body: 'この人は、家と拒否の管理ができなくなります。', ok: 'やめる', cancel: 'このまま', danger: true })) return;
       closeSheet();
-      setUserGroup(u, g, f.overseer, f.leader, roleCh ? f.role : undefined, undefined, yomiCh ? y : undefined);
+      setUserGroup(u, g, f.overseer, f.leader, roleCh ? f.role : undefined, undefined, yomiCh ? y : undefined, mgrCh ? mgrNow : undefined);
     };
     $('#euLink').onclick = () => { const u = userById(id); if (u) openUserLink(u, false); };
     if ($('#euOff')) $('#euOff').onclick = async () => {

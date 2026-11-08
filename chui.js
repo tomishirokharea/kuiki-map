@@ -121,7 +121,7 @@
   /* 訪問しないをえらべるのは区域係だけ（新しいサーバーのときだけ。app.js の capSkip） */
   const canSkip = () => isAdmin() && typeof capSkip === 'function' && capSkip();
   function markHtml(k, st, opt) {
-    const o = opt || {}, cur = markOf(k), lockDnc = (cur === 'dnc' || cur === 'skip') && !isAdmin();
+    const o = opt || {}, cur = markOf(k), lockDnc = (cur === 'skip' && !isAdmin()) || (cur === 'dnc' && !(typeof isMgr === 'function' ? isMgr() : isAdmin())); // 拒否を外す・変えるのは、区域係と家と拒否の管理の人。訪問しないは区域係だけ
     const kind = st.kind || cur;
     const showSkip = !o.noDnc && (canSkip() || cur === 'skip');
     // sub：ボタンの下の一言（押さなくても、どんなときに使うかが分かるように。2026.13.134）
@@ -160,7 +160,8 @@
   function markApply(h, unit, st) {
     const k = K(h.id, unit || ''), cur = markOf(k), kind = st.kind || cur;
     if (kind === cur && !(cur === 'warn' && st.n != null)) return;
-    if ((cur === 'dnc' || cur === 'skip') && kind !== cur && !isAdmin()) return;
+    if (cur === 'skip' && kind !== cur && !isAdmin()) return;
+    if (cur === 'dnc' && kind !== cur && !(typeof isMgr === 'function' ? isMgr() : isAdmin())) return;
     if (kind === 'skip' && !canSkip()) return;
     // 拒否→訪問しない・訪問しない→拒否は、印を書きかえるだけ（拒否のメモを場所だけの印に残さない）
     if (kind !== 'dnc' && kind !== 'skip' && D().dnc[k] !== undefined) { if (typeof dncDrop === 'function') dncDrop(k, h); else delete D().dnc[k]; }
