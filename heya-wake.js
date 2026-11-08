@@ -60,10 +60,10 @@
     const rows = rowsOf(h, pool);
     const cols = Math.max(...rows.map(r => r.us.length));
     const cell = (u, r, c) => {
-      const k = K(hid, u), ref = !!D().dnc[k], done = !ref && visitedSince(k, since), q = owner.get(u);
-      const sub = ref ? (dncSkip(k) ? 'ー' : '拒') : done ? '済' : '';
+      const k = K(hid, u), ref = !!dncAt(k), done = !ref && visitedSince(k, since), q = owner.get(u);
+      const sub = ref ? (skipAt(k) ? 'ー' : '拒') : done ? '済' : '';
       return `<button type="button" class="rcell${sel.has(u) ? ' on' : ''}${q ? ' taken' : ''}" data-ru="${esc(u)}" data-r="${r}" data-c="${c}" aria-pressed="${sel.has(u)}"
-        aria-label="${esc(unitTitle(h, u))}${sub ? '（' + (ref ? (dncSkip(k) ? '訪問しない' : '拒否') : '訪問済み') + '）' : ''}${q ? '（' + esc(partName(q)) + 'の範囲）' : ''}">
+        aria-label="${esc(unitTitle(h, u))}${sub ? '（' + (ref ? (skipAt(k) ? '訪問しない' : '拒否') : '訪問済み') + '）' : ''}${q ? '（' + esc(partName(q)) + 'の範囲）' : ''}">
         <b>${esc(uName(h, u))}</b>${sub ? `<i>${sub}</i>` : ''}${q ? `<small>${esc(shortName(q))}</small>` : ''}</button>`;
     };
     const grid = `<div class="roomgrid" data-hid="${esc(hid)}" style="--cols:${cols}">${rows.map((row, r) => `

@@ -253,6 +253,7 @@
     d.houses.forEach(h => { if (h.type === 'apt' && !gone.has(h.id)) skipToHouse(h); }); // 訪問しないの部屋のある建物は、ふつうの家にもどしても訪問しない（監査 HS-A8）
     Object.keys(d.dnc || {}).forEach(k => { if (inApt(k)) { if (typeof dncDrop === 'function') dncDrop(k); else delete d.dnc[k]; } });
     Object.keys(d.follows || {}).forEach(k => { if (inApt(k)) delete d.follows[k]; });
+    Object.keys(d.langs || {}).forEach(k => { if (inApt(k)) delete d.langs[k]; }); // 外国語の部屋の印も（監査 M6）
     d.houses = d.houses.filter(h => !gone.has(h.id));
     d.houses.forEach(h => {
       if (h.type === 'apt') { h.type = 'house'; h.units = []; h.label = ''; delete h.lock; delete h.uk; delete h.ul; delete h.kind; delete h.ban; }

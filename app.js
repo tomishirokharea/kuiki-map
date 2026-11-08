@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.132';
+var APP_JS_VER = '2026.13.133';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -91,6 +91,8 @@ const ST_CHAR = { new: '未', met: '会', away: '留', refused: '拒', dnc: '拒
 /* 結果の選択：会えた／留守（「また訪ねたいか」を記録しない設定のときは、拒否もここに置く） */
 /* 訪問しないの家・部屋・世帯のお知らせ（記録の画面。理由は出さない）。what：家・部屋・世帯 */
 const skipNoteHtml = (what, admin) => `<div class="notice skipnote"><b>この${what}は訪問しない${what}です（区域係が設定）。</b>${what === '家' ? '' : 'ほかは訪ねられます。'}${admin ? '<span class="actions"><button class="btn small" id="unDnc">訪問しない印を外す</button></span>' : ''}</div>`;
+/* 外国語の家で、係の設定により区域カードでは訪問しない言語のとき（2026-11-08）。言語の名前は区域係にだけ出す */
+const langNoteHtml = (what, k) => { const v = langV(k), nm = isAdmin() && v && v.l ? langName(v.l) : ''; return `<div class="notice skipnote"><b>外国語の${what}です${nm ? `（${esc(nm)}）` : ''}。</b>区域係の設定で、この言語の${what}は区域カードでは訪問しません。</div>`; };
 const refuseBtnHtml = () => `<button class="choice refbtn" data-int="拒否"><i class="pin st-dnc">拒</i>拒否<small>もう来ないでほしいと言われた</small></button>`;
 function resultChoicesHtml(awaySub) {
   return `<div class="choices two">
@@ -296,7 +298,7 @@ function makeDemo() {
     { id: 'p4', kind: 'p', terrId: 't2', year: svcYearOf(new Date(now - 365 * DAY)), c: dAgo(420), at: iso(now), by: 'u3' }
   ];
   return { version: 4, users, territories, houses, visits, dnc, follows, released, requests, awayCards: [], returns, s13, schedules,
-    settings: { remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, awayCap: 3, awayNoRepeat: 1, awayScope: 0, capDncQ: 1 }, currentUser: 'u1' };
+    settings: { remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, awayCap: 3, awayNoRepeat: 1, awayScope: 0, capDncQ: 1, capLang: 1 }, currentUser: 'u1' };
 }
 
 /* ---------- 保存 ----------
@@ -325,7 +327,7 @@ const FAILED_KEY = 'kuiki_failed'; // 何度送っても受け付けられなか
 const ORPHAN_KEY = 'kuiki_orphan', ORPHAN_DAYS = 7; // 合いことばが使えなくなったときの、まだ送っていない変更（同じ人として登録し直したら送る・点検②H-10）
 const metaSigOf = j => JSON.stringify([j.users || null, j.settings || null, j.currentUser || null]);
 const ARR_COLS = ['territories', 'houses', 'visits', 'requests', 'awayCards', 'returns', 'schedules', 'users', 's13', 'agedata', 'holds']; // holds＝おすすめの家の押さえ（今行く・予定に入れる。kangaeru.js・2026-10-26）
-const MAP_COLS = ['dnc', 'follows', 'released', 'caution']; // caution＝注意（！）の印（chui.js）
+const MAP_COLS = ['dnc', 'follows', 'released', 'caution', 'langs']; // caution＝注意（！）の印（chui.js）。langs＝外国語の家（2026-11-08）
 const RES_NAME = { m: 'met', a: 'away', r: 'refused' };
 const clone = o => JSON.parse(JSON.stringify(o));
 /* 保存場所の名札：テスト用のページ（config.js に ns: 'test' があるか、URLに「test」が入っている）は、
@@ -567,7 +569,7 @@ const Store = {
   },
   migrate() {
     const d = this.data;
-    d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {}; d.caution = d.caution || {};
+    d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {}; d.caution = d.caution || {}; d.langs = d.langs || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
     d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, wxOn: 1, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7, recoLeft: 1 }, d.settings || {});
@@ -2128,7 +2130,7 @@ const followSkipDays = () => Number(D().settings.followSkipDays || 0);
 function recentMet(k) {
   // 再訪問の家は「再訪問として最後に会えた日から○日」（係の設定）。それ以外は「最近会えた家」の日数
   const d = D().follows[k] ? followSkipDays() : skipDays();
-  if (!d || D().dnc[k]) return false;
+  if (!d || dncAt(k)) return false;
   const m = sum(k).met;
   return !!m && Date.now() - Date.parse(m.at) <= d * DAY;
 }
@@ -2204,7 +2206,9 @@ function undoChange(pre, post, preVisits, postIds) {
     const a = pre[c] || {}, b = post[c] || {};
     new Set(Object.keys(a).concat(Object.keys(b))).forEach(k => {
       if (same(a[k], b[k])) return;
-      if (k in a) d[c][k] = a[k]; else delete d[c][k];
+      // 外国語（係以外の端末）：言語を知らないので、もどす値に r を付けて送る。サーバーが控えた言語にもどす（監査 H2）
+      if (k in a) d[c][k] = c === 'langs' && a[k] && typeof a[k] === 'object' && !a[k].l ? Object.assign({}, a[k], { r: 1 }) : a[k];
+      else delete d[c][k];
     });
   });
   if (!same(pre.settings, post.settings)) d.settings = pre.settings;
@@ -2334,7 +2338,7 @@ const housesOf = tid => {
   return list;
 };
 function statusOf(k) {
-  if (D().dnc[k]) return 'dnc';
+  if (dncAt(k)) return 'dnc';
   const v = visitsOf(k)[0];
   return v ? v.result : 'new';
 }
@@ -2357,16 +2361,54 @@ const capSkip = () => !!(D().settings && Number(D().settings.capDncQ) === 1);
 /* 家の種類を変えるとき（一戸建て→アパート・二世帯、もどす）、訪問しない印を家と部屋のあいだで移す（監査 HS-A8）。
    commit の中で、部屋（units）を変えたあとに呼ぶ */
 function skipToUnits(h) { // 家の印 → 部屋ぜんぶ
+  langToUnits(h); // 外国語の印も一緒に（2026-11-08）
   const k0 = K(h.id, ''), v = D().dnc[k0];
   if (!isSkipV(v) || !h.units.length) return;
   delete D().dnc[k0];
   h.units.forEach(u => { const k = K(h.id, u); D().dnc[k] = Object.assign({}, v, { at: new Date().toISOString() }); delete D().follows[k]; delete D().released[k]; });
 }
 function skipToHouse(h) { // 部屋のどれかが訪問しない → 家の印（部屋を消す前に呼ぶ）
+  langToHouse(h); // 外国語の印も一緒に（2026-11-08）
   const v = h.units.map(u => D().dnc[K(h.id, u)]).find(isSkipV);
   if (v) D().dnc[K(h.id, '')] = Object.assign({}, v, { at: new Date().toISOString() });
 }
 const hasSkip = h => !!h && (dncSkip(K(h.id, '')) || (h.units || []).some(u => dncSkip(K(h.id, u)))); // この家（部屋のどれか）に訪問しない印
+/* 外国語の家（2026-11-08・GK）：家の編集の種別「外国語」と、その言語。D().langs に「家id|部屋」→ 値
+   ・区域係の端末：{ l: 言語, at }。係以外の端末：{ g: 1 }（外国語の家）と、訪問しない言語なら x: 1（言語はサーバーが渡さない）
+   ・係の設定 langSkip（LANGS の順のビット）で「区域カードで訪問しない」にした言語の家・部屋は、訪問しない印と同じように
+     数・留守宅・おすすめから外す（dncAt が { q:1, lg:1 } を返す）。地図の見せ方は灰色の「ー」と、外国語の印
+   ・家の種別（kind・uk）には入れない（サーバーの種別はそのまま。外国語にするときは種別を住居にもどす）
+   ・capLang：新しいサーバー（設定に capLang:1）のときだけ付けられる */
+const LANGS = [['en', '英語', '英'], ['zh', '中国語', '中'], ['ne', 'ネパール語', 'ネ'], ['es', 'スペイン語', 'ス'], ['ko', '韓国語', '韓'], ['tl', 'タガログ語', 'タ'], ['sgn', '手話', '手']];
+const LANG_IDX = Object.fromEntries(LANGS.map((x, i) => [x[0], i]));
+const langName = l => (LANG_IDX[l] >= 0 ? LANGS[LANG_IDX[l]][1] : '');
+const capLang = () => !!(D().settings && Number(D().settings.capLang) === 1);
+const langV = k => { const m = D().langs; const v = m && m[k]; return v && typeof v === 'object' ? v : null; };
+const langSkipBit = l => !!(LANG_IDX[l] >= 0 && (Number(D().settings && D().settings.langSkip) || 0) & (1 << LANG_IDX[l]));
+function langNo(k) { // 係の設定で、区域カードでは訪問しない言語の家・部屋か
+  const v = langV(k); if (!v) return false;
+  return v.l ? langSkipBit(v.l) : !!v.x;
+}
+const LANG_SKIP_V = Object.freeze({ q: 1, lg: 1 });
+/* 訪問・数の対象から外すかを見るときの拒否の値：拒否・訪問しないの印（D().dnc）か、訪問しない言語の家（LANG_SKIP_V） */
+const dncAt = k => D().dnc[k] || (langNo(k) ? LANG_SKIP_V : undefined);
+const skipAt = k => isSkipV(dncAt(k)); // 地図などの見せ方：訪問しない（印・言語）
+const isLangKey = k => !!langV(k);
+const hasLang = h => !!h && (isLangKey(K(h.id, '')) || (h.units || []).some(u => isLangKey(K(h.id, u)))); // この家（部屋のどれか）が外国語
+/* 外国語の印を、家と部屋のあいだで移す（家の種類を変えるとき。区域係だけ：係以外は言語を持たないので、種類を変えさせない） */
+function langToUnits(h) {
+  const k0 = K(h.id, ''), v = langV(k0);
+  if (!v || !v.l || !h.units.length) return;
+  delete D().langs[k0];
+  h.units.forEach(u => { D().langs[K(h.id, u)] = { l: v.l, at: new Date().toISOString() }; });
+}
+function langToHouse(h) {
+  const v = h.units.map(u => langV(K(h.id, u))).find(x => x && x.l);
+  if (v) D().langs[K(h.id, '')] = { l: v.l, at: new Date().toISOString() };
+  if (v) h.units.forEach(u => { delete D().langs[K(h.id, u)]; }); // 部屋の印は残さない（監査 M6）
+}
+/* 言語の札（地図・一覧）：区域係には言語の頭文字、係以外は「外」 */
+const langMark = k => { const v = langV(k); return v && v.l && LANG_IDX[v.l] >= 0 ? LANGS[LANG_IDX[v.l]][2] : '外'; };
 const dncRefN = () => { let n = 0; for (const k in D().dnc) if (!isSkipV(D().dnc[k])) n++; return n; }; // 拒否の数（訪問しないは入れない）
 const dncTerrOf = d => (d && d.t && terrById(d.t) ? d.t : d && isFinite(d.lat) && d.lat != null ? terrOf(d.lat, d.lng) : null); // 場所だけの拒否の区域
 function dncPins() { // 場所だけの拒否（地図に出せるもの）
@@ -2574,7 +2616,7 @@ function spIds(t) {
 const targetKind = (h, u) => (h.type === 'apt' ? unitKind(h, u) : kindOf(h));
 /* 一度も会えていない家：留守の記録はあるが、会えた・拒否の記録がない（at より前の記録だけで決める） */
 function unmetAsOf(k, at) {
-  if (D().dnc[k]) return false;
+  if (dncAt(k)) return false;
   let away = false;
   for (const v of visitsOf(k)) {
     if (at && v.at >= at) continue;
@@ -2647,7 +2689,7 @@ const specialKindsText = t => {
    ・エレベーターは、集合住宅かオートロックをえらんだときだけ出す。「一度も会えていない家だけ」は下の1行 */
 const aptSvg = () => SVG('<path d="M5 21V4h14v17"/><path d="M3 21h18"/><path d="M8.5 7.5h2M13.5 7.5h2M8.5 11h2M13.5 11h2M8.5 14.5h2M13.5 14.5h2"/><path d="M10.5 21v-3h3v3"/>');
 function spPickHtml(st) {
-  const ks = Object.keys(KINDS).filter(k => k !== 'home'), kk = st.kinds || [];
+  const ks = Object.keys(KINDS).filter(k => k !== 'home' && k !== 'lang'), kk = st.kinds || []; // 外国語は特別区域の種別にしない（GK-7）
   const chip = (key, icon, name, on) => `<button type="button" class="kchip" data-sppick="${key}" aria-pressed="${!!on}">${icon}<span>${name}</span></button>`;
   const ap = st.apt || st.lock;
   return `<p class="q">集める種別（いくつでも。どれかに当たる家を集めます）</p>
@@ -2740,7 +2782,7 @@ function terrStats(t, sinceMs) {
   const now = Date.now(); let n = 0, visited = 0, met = 0, last = null;
   for (const h of housesOf(t.id)) {
     for (const u of unitsIn(h, t)) { // 特別区域で回る家は、ふつうの区域の数に入れない
-      if (D().dnc[K(h.id, u)]) continue; // 拒否の家は数えない（区域カードの「あと○軒」と同じ・M10・2026.13.105）
+      if (dncAt(K(h.id, u))) continue; // 拒否の家（訪問しない言語の家も）は数えない（区域カードの「あと○軒」と同じ・M10・2026.13.105）
       n++;
       const s = sum(K(h.id, u));
       if (s.last) {
@@ -2756,7 +2798,7 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
-  { v: '2026.13.132', items: [
+  { v: '2026.13.133', items: [
     ['集', '家の編集で一戸建てをアパート・マンションに変えるときにも、エレベーター（あり・なし）と建物のメモを入れられるようにしました。']
   ] },
   { v: '2026.13.131', items: [
@@ -3591,12 +3633,16 @@ const KINDS = {
   conv: ['コンビニ', SVG('<path d="M4 9h16v11H4z"/><path d="M3 9l1.5-4h15L21 9"/><path d="M8 13h3v4H8z"/><path d="M14 13h2"/>')],
   care: ['介護施設', SVG('<circle cx="12" cy="5" r="2"/><path d="M12 7.5v6l3 6"/><path d="M12 13.5l-3 6"/><path d="M9 10.5h6"/><path d="M17.5 12v8"/>')],
   food: ['飲食店', SVG('<path d="M7 3v8"/><path d="M5 3v4a2 2 0 0 0 4 0V3"/><path d="M7 11v10"/><path d="M16 3c-1.7 1.2-2.5 3.2-2.5 6 0 1.4.8 2.3 2.5 2.5V21"/>')],
+  lang: ['外国語', SVG('<path d="M4 4h16v12H10l-4 4v-4H4z"/><path d="M7.5 13l2-6 2 6M8.2 11h2.6"/><path d="M13.5 8.5h4M15.5 7.5v1M14 13c2-1 3-2.6 3.3-4.5M14.6 10.6c.8 1.2 1.8 2 3 2.4"/>')], // 外国語の家（2026-11-08）。種別の値としては保存しない（D().langs）
   other: ['その他', SVG('<rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 6V4h8v2"/><circle cx="8.5" cy="13" r="1"/><circle cx="12" cy="13" r="1"/><circle cx="15.5" cy="13" r="1"/>')], // どれに当たるか迷う、住居以外の建物（2026-10-22）
 };
 const LOCK_SVG = SVG('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/>');
 const kindOf = h => (h && KINDS[h.kind] ? h.kind : 'home');
 const unitKind = (h, u) => { const m = h && h.uk; const v = m && m[u]; return KINDS[v] ? v : 'home'; };
 const kindName = k => (KINDS[k] ? KINDS[k][0] : '住居');
+/* 見せ方の種別：外国語の家（D().langs）なら 'lang'。数え方・特別区域は今までどおり kindOf・unitKind（サーバーとそろえる） */
+const dispKind = h => (h && h.type !== 'apt' && isLangKey(K(h.id, '')) ? 'lang' : kindOf(h));
+const dispUnitKind = (h, u) => (h && isLangKey(K(h.id, u)) ? 'lang' : unitKind(h, u));
 const KIND_PH = { office: '例：〇〇株式会社', shop: '例：〇〇スーパー', biz: '例：〇〇事務所', factory: '例：〇〇工場',
   school: '例：〇〇小学校', gov: '例：〇〇市役所', police: '例：〇〇警察署', fire: '例：〇〇消防署',
   hall: '例：〇〇公民館', hospital: '例：〇〇病院', care: '例：〇〇ホーム（介護施設）', conv: '例：〇〇店（コンビニ）', food: '例：食堂〇〇', other: '例：〇〇（どれに当たるか迷う建物）' };
@@ -3609,7 +3655,7 @@ function aptKind(h) {
   ks.forEach(k => { cnt[k] = (cnt[k] || 0) + 1; });
   return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || 'home';
 }
-const kindBadge = k => (k && k !== 'home' ? `<b class="kb k-${k}" title="${KINDS[k][0]}">${KINDS[k][1]}</b>` : '');
+const kindBadge = (k, key) => (k === 'lang' ? `<b class="kb k-lang" title="外国語"><i>${esc(key ? langMark(key) : '外')}</i></b>` : k && k !== 'home' ? `<b class="kb k-${k}" title="${KINDS[k][0]}">${KINDS[k][1]}</b>` : '');
 const lockBadge = h => (h.lock ? `<b class="lk" title="オートロック">${LOCK_SVG}</b>` : '');
 const BAN_TEXT = { no: ['禁', '立入禁止'], letter: ['手', '手紙のみ'] };
 const banBadge = h => (h.type === 'apt' && BAN_TEXT[h.ban] ? `<b class="ban${h.ban === 'letter' ? ' letter' : ''}" title="${BAN_TEXT[h.ban][1]}">${BAN_TEXT[h.ban][0]}</b>` : '');
@@ -3672,13 +3718,13 @@ function periodStart(h) {
   return t ? (t.lentAt || t.returnedAt || t.completedAt || '') : ''; // 担当者のいない区域は、返却・回り終えた日から
 }
 function pinState(k, since) {
-  if (D().dnc[k]) return 'dnc';
+  if (dncAt(k)) return 'dnc';
   const v = sum(k).last;
   return v && since && v.at >= since ? v.result : 'plain';
 }
 /* 集合住宅で、今回まだ訪ねていない部屋の数 */
 function aptTodo(h, since) {
-  return h.units.filter(u => { const k = K(h.id, u); return !D().dnc[k] && pinState(k, since) === 'plain' && !recentMet(k); }).length;
+  return h.units.filter(u => { const k = K(h.id, u); return !dncAt(k) && pinState(k, since) === 'plain' && !recentMet(k); }).length;
 }
 /* 広い地図で家を押したときは、記録の画面は出さずに、その家まで拡大する（ダブルタップで拡大したときの押しまちがいを防ぐ） */
 const TAP_MIN_ZOOM = 17;
@@ -3701,15 +3747,36 @@ function bindDoubleTap() {
   }, true);
 }
 /* 種別をえらぶボタン（住居・会社・店舗・事務所・工場） */
-function kindChips(cur, attr) {
-  return `<div class="kindpick">${Object.entries(KINDS).map(([k, v]) =>
+/* lo（外国語をえらべるとき）：{ key: 家id|部屋, l: えらんでいる言語（区域係だけ分かる） }。
+   「外国語」を押すと、すぐ下に言語のボタンが出る。言語をえらぶまで保存しない（GK-2） */
+function kindChips(cur, attr, lo) {
+  const useLang = !!lo && capLang();
+  const chips = `<div class="kindpick">${Object.entries(KINDS).filter(([k]) => k !== 'lang' || useLang).map(([k, v]) =>
     `<button type="button" class="kchip" data-kind="${k}"${attr || ''} aria-pressed="${(cur || 'home') === k}">${v[1]}<span>${v[0]}</span></button>`).join('')}</div>`;
+  if (!useLang || cur !== 'lang') return chips;
+  return chips + `<div class="langpick" role="group" aria-label="何語ですか">
+    <p class="q">何語ですか</p>
+    <div class="kindpick">${LANGS.map(([l, nm]) => `<button type="button" class="kchip lchip" data-lang="${l}" aria-pressed="${lo.l === l}"><span>${nm}</span></button>`).join('')}</div>
+    <p class="hint">${isAdmin() ? '言語は区域係だけに見えます。ほかの人の地図には「外国語」とだけ出ます。' : '言語は区域係だけに伝わります。地図には「外国語」とだけ出ます。'}${langV(lo.key) && !isAdmin() ? '<br>言語をえらび直したときだけ、言語が変わります。' : ''}</p></div>`;
 }
+/* 外国語の家・部屋にする（言語をえらんだとき）。種別は住居にもどす */
+function setLang(hid, unit, l, after) {
+  const h = houseById(hid); if (!h || LANG_IDX[l] === undefined) return;
+  const k = K(hid, unit || '');
+  commitIn([hid], `${unit ? unitTitle(h, unit) + 'を' : ''}外国語${isAdmin() ? '（' + langName(l) + '）' : ''}にしました`, () => {
+    if (unit) { const m = Object.assign({}, h.uk || {}); delete m[unit]; if (Object.keys(m).length) h.uk = m; else delete h.uk; }
+    else delete h.kind;
+    D().langs[k] = { l, at: new Date().toISOString() };
+  });
+  if (after) after();
+}
+const langOpt = (k, pick) => ({ key: k, l: (langV(k) || {}).l || null, pick });
 /* 建物・家の種別を保存する */
 function setHouseKind(hid, kind, after) {
   const h = houseById(hid); if (!h) return;
   commitIn([hid], `種別を「${kindName(kind)}」にしました`, () => {
     if (kind === 'home') delete h.kind; else h.kind = kind;
+    delete D().langs[K(hid, '')]; // 外国語ではなくなる
   });
   if (after) after();
 }
@@ -3720,6 +3787,7 @@ function setUnitKind(hid, unit, kind, after) {
     const m = Object.assign({}, h.uk || {});
     if (kind === 'home') delete m[unit]; else m[unit] = kind;
     if (Object.keys(m).length) h.uk = m; else delete h.uk;
+    delete D().langs[K(hid, unit)]; // 外国語ではなくなる
   });
   if (after) after();
 }
@@ -3748,25 +3816,26 @@ function houseIcon(h, ff, locked) {
       st = arr.length ? arr[0] : 'dim';
     } else if (!locked && h.units.length) {
       // すべての部屋を今回訪ねた（拒否の部屋はのぞく）ら、建物の印も薄く＋緑のチェック
-      const ks = targets(h).map(u => K(h.id, u)).filter(k => !D().dnc[k]);
+      const ks = targets(h).map(u => K(h.id, u)).filter(k => !dncAt(k));
       if (ks.length && ks.every(k => pinState(k, since) !== 'plain')) st = 'done';
     }
     const left = aptTodo(h, since);
     const rj = targets(h).some(u => { const k = K(h.id, u); return D().dnc[k] && !dncSkip(k); }) ? '<b class="rj">拒</b>' : '';
-    const sk = targets(h).some(u => dncSkip(K(h.id, u))) ? '<b class="sk" title="訪問しない">ー</b>' : ''; // 訪問しない部屋（灰色の「ー」）
+    const sk = targets(h).some(u => skipAt(K(h.id, u))) ? '<b class="sk" title="訪問しない">ー</b>' : ''; // 訪問しない部屋（灰色の「ー」）
     const cau = !locked && window.chuiHas && window.chuiHas(h) ? '<b class="cau" title="注意">！</b>' : ''; // 注意（chui.js）
     const ak = aptKind(h);
+    const lgK = ak === 'home' ? targets(h).map(u => K(h.id, u)).find(isLangKey) : null; // 外国語の部屋がある建物は、建物の印にも「外」（監査 M4）
     const nameTag = ''; // 名前は、renderHouses で別の札として出す（小さな点のときも出せるように）
-    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${sk}${cau}${locked ? '' : kindBadge(ak) + lockBadge(h) + banBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
+    return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${sk}${cau}${locked ? '' : (lgK ? kindBadge('lang', lgK) : kindBadge(ak)) + lockBadge(h) + banBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
   }
   const k = K(h.id, ''), s = pinState(k, since), fo = '';
   // 選んでいないときも、今回訪ねた家（会えた・留守）は薄く＋緑のチェックにする
   const st = locked ? null : ff ? ff(k) : (s === 'met' || s === 'away') ? (otherDone(h, k, since) ? 'prev' : 'done') : (s === 'plain' && recentMet(k) ? 'prev' : null);
-  const hk = kindOf(h);
+  const hk = dispKind(h);
   const cau = !locked && s !== 'dnc' && window.chuiHas && window.chuiHas(h) ? '<b class="cau" title="注意">！</b>' : ''; // 注意（chui.js）
   const sm = s === 'dnc' ? ' sm' : '', px = s === 'dnc' ? 26 : 34; // 拒否の家は、大きくしすぎない（2026.13.26）
-  const skp = s === 'dnc' && dncSkip(k); // 訪問しない：灰色の「ー」（拒否と同じ大きさ）
-  return L.divIcon({ className: '', html: `<div class="pin st-${skp ? 'skip' : s}${sm}${h.prov ? ' prov' : ''}${hk !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">${skp ? 'ー' : PIN_CHAR[s]}${fo}${doneMark(st)}${nb}${cau}${locked ? '' : kindBadge(hk)}</div>`, iconSize: [px, px], iconAnchor: [px / 2, px / 2] });
+  const skp = s === 'dnc' && skipAt(k); // 訪問しない：灰色の「ー」（拒否と同じ大きさ）
+  return L.divIcon({ className: '', html: `<div class="pin st-${skp ? 'skip' : s}${sm}${h.prov ? ' prov' : ''}${hk !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">${skp ? 'ー' : PIN_CHAR[s]}${fo}${doneMark(st)}${nb}${cau}${locked ? '' : kindBadge(hk, k)}</div>`, iconSize: [px, px], iconAnchor: [px / 2, px / 2] });
 }
 /* ---------- 一緒に回る人（グループ） ----------
    区域の担当者が、今日の終わりまで仲間を加える。データは区域の helpers に入れる：
@@ -4292,7 +4361,7 @@ function dotStyle(h, ff, locked) {
   const since = periodStart(h), ks = targets(h).map(u => K(h.id, u));
   if (!ks.length) return { s: Object.assign({ radius: r }, DOT.plain), o: 1 };
   const one = k => {
-    if (D().dnc[k]) return dncSkip(k) ? 'skip' : 'dnc';
+    if (dncAt(k)) return skipAt(k) ? 'skip' : 'dnc';
     const f = ff ? String(ff(k) || '').split(' ')[0] : null; // 'hl fade' のように、あとに「薄く」の印が付くことがある
     if (f === 'dim') return 'dim';
     if (f === 'done') return 'done';
@@ -4306,7 +4375,7 @@ function dotStyle(h, ff, locked) {
   const st = sts.includes('plain') ? 'plain' : sts.every(x => x === 'skip') ? 'skip' : sts.every(x => x === 'dnc' || x === 'skip') ? 'dnc'
     : sts.every(x => x === 'dim') ? 'dim' : sts.includes('done') ? 'done' : sts.includes('prev') ? 'prev' : 'plain';
   if (st === 'dim') return { s: Object.assign({ radius: r }, DOT.plain), o: 0.3 };
-  const faded = !!ff && ks.filter(k => !D().dnc[k]).every(k => String(ff(k) || '').indexOf(' fade') > 0); // 全部の部屋が「薄く」のとき
+  const faded = !!ff && ks.filter(k => !dncAt(k)).every(k => String(ff(k) || '').indexOf(' fade') > 0); // 全部の部屋が「薄く」のとき
   return { s: Object.assign({ radius: r }, DOT[st]), o: faded ? 0.45 : 1 };
 }
 function fillTerrJump() {
@@ -4732,14 +4801,15 @@ function openTarget(hid, unit, fromBuilding, review) {
   const sub = t ? `区域${t.no}　${esc(t.name)}` : '区域の線の外';
 
   const paint = () => {
-    const vs = visitsOf(k), dnc = D().dnc[k];
+    const vs = visitsOf(k), dnc = dncAt(k);
     const f = fol(k), rel = relOf(k);
     const mine = !!f && f.by === me().id, other = !!f && !mine;
     // ほかの人の再訪問の家は、係が決めた日数のあいだだけ訪問を控える
     const blocked = (dnc && !isAdmin()) || (other && !isAdmin() && !st.override && recentMet(k));
     let b = headHtml(t, title, sub);
     if (fromBuilding) b += `<button class="btn small" id="backBld">← 建物の編集にもどる</button>`;
-    if (dnc && isSkipV(dnc)) b += skipNoteHtml(unit ? '部屋' : '家', isAdmin());
+    if (dnc && dnc.lg) b += langNoteHtml(unit ? '部屋' : '家', k);
+    else if (dnc && isSkipV(dnc)) b += skipNoteHtml(unit ? '部屋' : '家', isAdmin());
     else if (dnc) b += `<div class="notice refnote"><b>拒否の${unit ? '部屋' : '家'}です。</b>訪問しないでください。${isAdmin() && dnc.a ? `<br><small>住所：<span data-notr>${esc(dnc.a)}</span>${dnc.auto ? '（住所から自動でつないだ家です）' : ''}</small>` : ''}${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : '<br>まちがいのときは区域係に相談してください。'}</div>`;
     if (h.ban) b += banNotice(h);
     if (unit) b += bldMemoHtml(h);
@@ -4796,7 +4866,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (unit) {
       b += `<details class="more"${st.editOpen || (st.mk && st.mk.kind) ? ' open' : ''}><summary>この部屋の編集</summary>
         ${window.chuiMark ? window.chuiMark.html(k, st.mk || (st.mk = {})) + '<button class="btn block" id="mkSave">この部屋の印を保存する</button>' : ''}
-        <p class="q">種別</p>${kindChips(unitKind(h, unit))}
+        <p class="q">種別</p>${kindChips(st.langPick ? 'lang' : dispUnitKind(h, unit), '', langOpt(k))}
         <p class="q">部屋の名前</p><button class="btn block" id="fRename">部屋の名前を直す（101→A-1 など）</button></details>`;
     }
     if (!unit) {
@@ -4879,9 +4949,13 @@ function openTarget(hid, unit, fromBuilding, review) {
     });
     $$('[data-kind]', S).forEach(x => x.onclick = () => {
       st.editOpen = true; // 種別をえらんだあとも、名前を入れられるように開いたままにする
+      if (x.dataset.kind === 'lang') { st.langPick = true; paint(); return; } // 言語をえらぶまで保存しない（GK-2）
+      st.langPick = false;
+      if (dispUnitKind(h, unit) === x.dataset.kind) { paint(); return; }
       if (unit) setUnitKind(hid, unit, x.dataset.kind, paint);
       else setHouseKind(hid, x.dataset.kind, paint);
     });
+    $$('[data-lang]', S).forEach(x => x.onclick = () => { st.editOpen = true; st.langPick = false; setLang(hid, unit, x.dataset.lang, paint); });
     on('fDel', async () => {
       if (!isAdmin()) { closeSheet(); openDelRequest(h); return; }
       if (!await ask(`この家と、その記録をすべて削除します。${houseRecText(houseById(hid))}よろしいですか？`)) return;
@@ -4949,7 +5023,7 @@ function nextCandidates(fromHid) {
   const seen = new Set(), out = [];
   const add = (h, why) => { if (!h || h.id === fromHid || seen.has(h.id) || skip.has(h.id)) return; seen.add(h.id); out.push({ h, why }); };
   const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
-  if (c) c.keys.filter(k => !visitedSince(k, c.at) && !D().dnc[k]).forEach(k => add(houseById(parseKey(k)[0]), 'この留守宅カードの家'));
+  if (c) c.keys.filter(k => !visitedSince(k, c.at) && !dncAt(k)).forEach(k => add(houseById(parseKey(k)[0]), 'この留守宅カードの家'));
   else if (roundTerr) {
     const r = roundInfo(roundTerr);
     if (r && roundMode() === 'reco') roundPlan(r).forEach(sp => add(sp.h, sp.reasons[0] || 'おすすめの家'));
@@ -6063,7 +6137,7 @@ function dropUnitData(h, us) {
   us.forEach(u => {
     if (h.ul) delete h.ul[u];
     if (h.uk) delete h.uk[u];
-    const k = K(h.id, u); dncDrop(k, h); delete D().follows[k]; delete D().released[k];
+    const k = K(h.id, u); dncDrop(k, h); delete D().follows[k]; delete D().released[k]; delete D().langs[k];
   });
   if (h.ul && !Object.keys(h.ul).length) delete h.ul;
   if (h.uk && !Object.keys(h.uk).length) delete h.uk;
@@ -6089,8 +6163,8 @@ function openBuilding(hid, startSel) {
     const frames = h.units.length && h.units.every(u => B_FRAME.test(u));
     const fl = lay.groups.reduce((a, g) => Math.max(a, g.rows.length ? g.rows[0].fl : 0), 0);
     const tile = u => {
-      const rec = unitHasRec(hid, u), uk = unitKind(h, u), fr = B_FRAME.test(u);
-      return `<button type="button" class="bt${st.sel === u ? ' on' : ''}${rec ? ' rec' : ''}${fr ? ' fr' : ''}" data-bt="${esc(u)}" aria-pressed="${st.sel === u}" aria-label="${esc(unitTitle(h, u))}${rec ? '（記録あり）' : ''}">${uk !== 'home' ? kindBadge(uk) : ''}${esc(uName(h, u))}${fr ? '<small>部屋はまだ</small>' : ''}</button>`;
+      const rec = unitHasRec(hid, u), uk = dispUnitKind(h, u), fr = B_FRAME.test(u);
+      return `<button type="button" class="bt${st.sel === u ? ' on' : ''}${rec ? ' rec' : ''}${fr ? ' fr' : ''}" data-bt="${esc(u)}" aria-pressed="${st.sel === u}" aria-label="${esc(unitTitle(h, u))}${rec ? '（記録あり）' : ''}">${uk !== 'home' ? kindBadge(uk, K(hid, u)) : ''}${esc(uName(h, u))}${fr ? '<small>部屋はまだ</small>' : ''}</button>`;
     };
     const actions = u => {
       if (st.ren) return `<div class="bact"><div class="inline"><input type="text" id="bRen" maxlength="12" value="${esc(uName(h, u))}" aria-label="部屋の新しい名前"><button class="btn small primary" id="bRenOk">直す</button></div>
@@ -6245,8 +6319,8 @@ function openUnitBulkDel(hid) {
   const paint = () => {
     const h = houseById(hid); if (!h) { closeSheet(); return; }
     const cell = u => {
-      const n = visitsOf(K(hid, u)).length, uk = unitKind(h, u);
-      return `<button type="button" data-bu="${esc(u)}" aria-pressed="${sel.has(u)}" aria-label="${esc(unitTitle(h, u))}${sel.has(u) ? '（えらんでいます）' : ''}">${kindBadge(uk)}${esc(uName(h, u))}<small>${n ? `記録${n}件` : '記録なし'}</small></button>`;
+      const n = visitsOf(K(hid, u)).length, uk = dispUnitKind(h, u);
+      return `<button type="button" data-bu="${esc(u)}" aria-pressed="${sel.has(u)}" aria-label="${esc(unitTitle(h, u))}${sel.has(u) ? '（えらんでいます）' : ''}">${kindBadge(uk, K(hid, u))}${esc(uName(h, u))}<small>${n ? `記録${n}件` : '記録なし'}</small></button>`;
     };
     const groups = unitGroups(h);
     const cells = groups.length > 1
@@ -6277,7 +6351,7 @@ function openUnitBulkDel(hid) {
         us.forEach(u => {
           if (h2.ul) delete h2.ul[u];
           if (h2.uk) delete h2.uk[u];
-          const k = K(hid, u); dncDrop(k, h2); delete D().follows[k]; delete D().released[k];
+          const k = K(hid, u); dncDrop(k, h2); delete D().follows[k]; delete D().released[k]; delete D().langs[k];
         });
         if (h2.ul && !Object.keys(h2.ul).length) delete h2.ul;
         if (h2.uk && !Object.keys(h2.uk).length) delete h2.uk;
@@ -6315,7 +6389,7 @@ function openAptSeq(hid, startUnit) {
   const h0 = houseById(hid); if (!h0 || !h0.units.length) return;
   const t = terrById(h0.terrId);
   const since = unitDoneSince(h0), inRound = since !== todayIso();
-  const isRef = u => !!D().dnc[K(hid, u)];
+  const isRef = u => !!dncAt(K(hid, u));
   const doneToday = u => !isRef(u) && visitedSince(K(hid, u), since); // 緑のチェックが付く部屋
   // 今日わたされた範囲が、この建物の一部の部屋だけのとき：自分の部屋だけを順に回る（ほかの部屋は薄く。押せば入力はできる）
   const mine = (() => {
@@ -6349,8 +6423,8 @@ function openAptSeq(hid, startUnit) {
     // 部屋のボタン：前回の結果は色だけでなく「会・留・拒」の字でも見せる。部屋が多い建物は階ごとに分ける（点検④U3）
     const chip = u => {
       // 色と字は、見出しと同じ「今の巡回（受け取ってから）」の結果で出す。前の巡回の結果は出さない（総点検 L5・2026.13.105）
-      const i = h.units.indexOf(u), s0 = statusOf(K(hid, u)), s1 = s0 === 'dnc' || !inRound || visitedSince(K(hid, u), since) ? s0 : 'new', s = s1 === 'dnc' && dncSkip(K(hid, u)) ? 'skip' : s1, uk = unitKind(h, u), g = UST_GLYPH[s];
-      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}${!mine ? '' : isMine(u) ? ' mine' : ' notmine'}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${isMine(u) ? '' : '（ほかの人の範囲）'}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? (s === 'skip' ? '（' + UST_NAME[s] + '）' : '（前回 ' + UST_NAME[s] + '）') : ''}へ">${kindBadge(uk)}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
+      const i = h.units.indexOf(u), s0 = statusOf(K(hid, u)), s1 = s0 === 'dnc' || !inRound || visitedSince(K(hid, u), since) ? s0 : 'new', s = s1 === 'dnc' && skipAt(K(hid, u)) ? 'skip' : s1, uk = dispUnitKind(h, u), g = UST_GLYPH[s];
+      return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}${!mine ? '' : isMine(u) ? ' mine' : ' notmine'}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${isMine(u) ? '' : '（ほかの人の範囲）'}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? (s === 'skip' ? '（' + UST_NAME[s] + '）' : '（前回 ' + UST_NAME[s] + '）') : ''}へ">${kindBadge(uk, K(hid, u))}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
     };
     const groups = h.units.length > 10 ? unitGroups(h) : [];
     if (mine) b += `<div class="notice minepart"><b>あなたの範囲：${esc(roomsText(h, h.units.filter(isMine)))}</b><br><span class="mk"></span>緑のわくの部屋を回ります。うすい部屋は、ほかの人の範囲です。</div>`;
@@ -6366,12 +6440,13 @@ function openAptSeq(hid, startUnit) {
     } else {
       const u = h.units[idx], k = K(hid, u), f = fol(k), last = visitsOf(k)[0];
       const other = !!f && f.by !== me().id;
-      const uk2 = unitKind(h, u);
-      b += `<p class="seqroom"><b>${esc(uName(h, u))}</b>${/\d$/.test(uName(h, u)) ? '号室' : ''}${uk2 !== 'home' ? ` <span class="kindtag">${kindBadge(uk2)}${kindName(uk2)}</span>` : ''} <span class="muted">（${idx + 1} / ${n}）</span></p>`;
+      const uk2 = dispUnitKind(h, u);
+      b += `<p class="seqroom"><b>${esc(uName(h, u))}</b>${/\d$/.test(uName(h, u)) ? '号室' : ''}${uk2 !== 'home' ? ` <span class="kindtag">${kindBadge(uk2, K(hid, u))}${kindName(uk2)}</span>` : ''} <span class="muted">（${idx + 1} / ${n}）</span></p>`;
       b += `<p class="muted">${last ? `前回：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}` : 'はじめて訪ねる部屋'}</p>`;
       if (window.fixLineHtml) b += window.fixLineHtml(k); // 今日つけた記録を直す（naoshi.js。不具合C：2026-11-04まで、この画面には出ていなかった）
       b += recentOtherHtml(k);
       if (dncSkip(k)) b += skipNoteHtml('部屋', false).replace('ほかは訪ねられます。', '次の部屋へ進んでください。');
+      else if (!D().dnc[k] && langNo(k)) b += langNoteHtml('部屋', k).replace('</div>', '次の部屋へ進んでください。</div>');
       else if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の部屋です。</b>訪問しないで、次の部屋へ進んでください。</div>`;
       else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="seqOverride">それでも記録する</button></span></div>`;
       else b += seqStepsHtml(st, k);
@@ -6420,7 +6495,7 @@ function openAptSeq(hid, startUnit) {
 /* ---------- 一戸建てを、アパート・マンションに変える ---------- */
 function openConvertApt(hid) {
   const h = houseById(hid); if (!h || h.type !== 'house') return;
-  if (!isAdmin() && hasSkip(h)) { toast('訪問しないの家の種類は、区域係だけが変えられます'); return; }
+  if (!isAdmin() && (hasSkip(h) || hasLang(h))) { toast(`${hasSkip(h) ? '訪問しない' : '外国語'}の家の種類は、区域係だけが変えられます`); return; }
   const t = terrById(h.terrId), n = visitsOf(K(hid, '')).length;
   const f = { label: h.label || '', n: newNaming(), lock: false };
   const keep = () => {
@@ -6716,7 +6791,8 @@ function openAddForm(ll, tid, editId) {
   const t = tid ? terrById(tid) : null;
   const f = { type: 'apt', label: '', n: Object.assign(newNaming(), { rooms: [2, 4] }), kind: 'home', lock: false, cand: null, ban: '', mk: {}, ac: '', bn: '', noteOpen: false };
   if (mode === 'draw' && drawTap === 'house') f.type = 'house';
-  if (eh) { f.type = eh.type; f.label = eh.label || ''; f.kind = kindOf(eh); f.lock = !!eh.lock; f.ac = eh.ac || ''; f.bn = eh.bn || ''; }
+  if (eh) { f.type = eh.type; f.label = eh.label || ''; f.kind = dispKind(eh); f.lock = !!eh.lock; f.ac = eh.ac || ''; f.bn = eh.bn || ''; }
+  f.lang = null; // 外国語：この画面でえらんだ言語（えらぶまでは今のまま）
   const bn0 = f.bn; // 保存のときの確かめ（変えたメモだけ）
   const cleanBn = v => String(v || '').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 200);
   const recN = eh ? visitsOf(K(eh.id, '')).length : 0;
@@ -6766,7 +6842,7 @@ function openAddForm(ll, tid, editId) {
     lab.onfocus = show;
     lab.oninput = () => { f.label = lab.value; show(); };
   };
-  const typeLock = !!eh && !isAdmin() && hasSkip(eh); // 訪問しないの家の種類は、区域係だけが変えられる（監査 HS-A8）
+  const typeLock = !!eh && !isAdmin() && (hasSkip(eh) || hasLang(eh)); // 外国語の家も（係以外は言語を持たないので、部屋に移せない・2026-11-08） // 訪問しないの家の種類は、区域係だけが変えられる（監査 HS-A8）
   const paint = () => {
     const apt = f.type === 'apt';
     setSheet(headHtml(t, eh ? 'この家を編集' : 'ここに追加します', t ? `区域${esc(t.no)}　${esc(t.name)}` : '区域は、線を完成したときに決まります') + `
@@ -6774,7 +6850,7 @@ function openAddForm(ll, tid, editId) {
       <div class="choices two">
         <button class="choice${!apt ? ' on' : ''}" data-type="house" aria-pressed="${!apt}"${typeLock ? ' disabled' : ''}><i class="pin st-new">家</i>一戸建て</button>
         <button class="choice${apt ? ' on' : ''}" data-type="apt" aria-pressed="${apt}"${typeLock ? ' disabled' : ''}><i class="pin apt">集</i>アパート・マンション</button>
-      </div>${typeLock ? '<p class="hint">訪問しないの家なので、建物の種類は区域係だけが変えられます。</p>' : ''}
+      </div>${typeLock ? `<p class="hint">${hasSkip(eh) ? '訪問しない' : '外国語'}の家なので、建物の種類は区域係だけが変えられます。</p>` : ''}
       ${apt ? `<label class="check locrow"><input type="checkbox" id="fLock"${f.lock ? ' checked' : ''}>オートロックの建物</label>
       <label class="field"><span>エレベーター</span><select id="fAc" class="big" aria-label="エレベーター">${[['', 'まだ確かめていない'], ['ev', 'あり'], ['no', 'なし（階段だけ）'], ['st', 'なし（縦階段：階段ごとに上り下り）']].map(o => `<option value="${o[0]}"${f.ac === o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select>
         <small class="hint">分かったら直してください。高齢の方が回る建物をえらぶときに使います。</small></label>
@@ -6784,11 +6860,11 @@ function openAddForm(ll, tid, editId) {
       <p class="hint">あとからでも、建物の編集で変えられます。</p>` : ''}
       ${apt && f.cand ? `<div class="aw-from"><b>候補：${esc(f.cand.n || '（名前なし）')}</b><button id="fCandOff">はずす</button></div>
         ${f.ban ? `<div class="notice refnote"><b>${f.ban === 'no' ? '立入禁止の建物です。' : '手紙のみの建物です。'}</b></div>` : ''}` : ''}
-      <label class="field"><span>${apt ? '建物名' : f.kind !== 'home' ? `${esc(kindName(f.kind))}の名前（なくてもよい）` : '目印（見た目など）'}</span>
-        <input type="text" id="fLabel" maxlength="30" value="${esc(f.label)}" placeholder="${apt ? '例：〇〇ハイツ（タップで付近の候補）' : f.kind !== 'home' ? esc(KIND_PH[f.kind] || '例：〇〇') : '例：青い門・2階建て'}">
+      <label class="field"><span>${apt ? '建物名' : f.kind !== 'home' && f.kind !== 'lang' ? `${esc(kindName(f.kind))}の名前（なくてもよい）` : '目印（見た目など）'}</span>
+        <input type="text" id="fLabel" maxlength="30" value="${esc(f.label)}" placeholder="${apt ? '例：〇〇ハイツ（タップで付近の候補）' : f.kind !== 'home' && f.kind !== 'lang' ? esc(KIND_PH[f.kind] || '例：〇〇') : '例：青い門・2階建て'}">
         <small class="hint">住んでいる人の名前は書かないでください。</small></label>
       ${apt ? '<div id="fCandBox"></div>' : ''}
-      <p class="q">${apt ? '建物ぜんたいの種別' : '種別'}</p>${kindChips(f.kind)}
+      <p class="q">${apt ? '建物ぜんたいの種別' : '種別'}</p>${kindChips(apt && f.kind === 'lang' ? 'home' : f.kind, '', apt ? null : Object.assign(langOpt(eh ? K(eh.id, '') : ''), f.lang ? { l: f.lang } : {}))}
       ${apt ? '<p class="hint">部屋ごとの種別は、あとから部屋の画面で変えられます。</p>' : ''}
       ${apt ? namingHtml(f.n) : ''}
       ${eh && apt && recN ? `<div class="notice warn">この家の記録 ${recN}件は、建物ぜんたいの記録として残り、部屋ごとの記録には入りません。</div>` : ''}
@@ -6801,6 +6877,7 @@ function openAddForm(ll, tid, editId) {
     const S = $('#sheet');
     $$('[data-type]', S).forEach(x => x.onclick = () => { keep(); f.type = x.dataset.type; paint(); });
     $$('[data-kind]', S).forEach(x => x.onclick = () => { keep(); f.kind = x.dataset.kind; paint(); });
+    $$('[data-lang]', S).forEach(x => x.onclick = () => { keep(); f.lang = x.dataset.lang; paint(); });
     if ($('#fLock')) $('#fLock').onchange = e => { f.lock = e.target.checked; };
     if ($('#fAc')) $('#fAc').onchange = e => { f.ac = e.target.value; };
     if ($('#fNote')) $('#fNote').oninput = e => { f.bn = e.target.value; };
@@ -6823,6 +6900,14 @@ function openAddForm(ll, tid, editId) {
       const label = f.label.trim();
       const us = f.type === 'apt' ? genUnits(f.n) : [];
       if (f.type === 'apt' && !us.length) { toast('部屋の名前を入れてください'); return; }
+      const asLang = f.type !== 'apt' && f.kind === 'lang' && capLang(); // 外国語の家（2026-11-08）
+      if (asLang && !f.lang && !(eh && eh.type !== 'apt' && isLangKey(K(eh.id, '')))) { toast('何語かをえらんでください'); return; }
+      const kindSave = f.kind === 'lang' ? 'home' : f.kind;
+      const langSave = (h0) => { // 一戸建ての外国語の印（えらび直したときだけ書く。係以外は言語を知らないので、えらばなければ今のまま）
+        const k0 = K(h0.id, '');
+        if (asLang) { if (f.lang) D().langs[k0] = { l: f.lang, at: new Date().toISOString() }; }
+        else if (f.type !== 'apt') delete D().langs[k0];
+      };
       const bn = cleanBn(f.bn);
       if (f.type === 'apt' && bn && bn !== cleanBn(bn0)) { // 建物の編集と同じ確かめ（apt-import.js の bldSens）
         const w = window.bldSens ? window.bldSens(bn) : [];
@@ -6836,7 +6921,8 @@ function openAddForm(ll, tid, editId) {
           const h = houseById(editId); if (!h) return;
           if (window.chuiMark) window.chuiMark.apply(h, '', f.mk); // この家の印（なし・！注意・拒否）
           h.label = label;
-          if (f.kind !== 'home') h.kind = f.kind; else delete h.kind;
+          if (kindSave !== 'home') h.kind = kindSave; else delete h.kind;
+          langSave(h);
           if (f.type === 'apt') {
             h.type = 'apt'; h.units = us;
             skipToUnits(h); // 訪問しないの家なら、部屋ぜんぶを訪問しないに（監査 HS-A8）
@@ -6852,11 +6938,12 @@ function openAddForm(ll, tid, editId) {
       addCount++; updateAddBar();
       commitIn([], f.type === 'apt' ? `集合住宅を追加しました（${us.length}部屋）` : '一戸建てを追加しました', () => { // 足した家だけを送る（改善案B2）
         const nh = { id: 'h' + uid(), terrId: tid, type: f.type, lat: ll.lat, lng: ll.lng, label, units: us, createdAt: new Date().toISOString(), createdBy: me().id };
-        if (f.kind !== 'home') nh.kind = f.kind;
+        if (kindSave !== 'home') nh.kind = kindSave;
         if (f.type === 'apt' && f.lock) nh.lock = true;
         setBld(nh);
         setCand(nh);
         D().houses.push(nh);
+        langSave(nh);
       });
     };
   };
@@ -8981,7 +9068,7 @@ function poolInfo(t) {
     for (const u of (sp ? specialTargets(h, t) : targets(h))) {
       if (!sp && coveredBySpecial(h, u)) continue;
       const k = K(h.id, u);
-      if (D().dnc[k]) continue;
+      if (dncAt(k)) continue;
       const vis1 = visitsOf(k).some(v => v.at >= since && v.at <= first);
       tot++; if (vis1) vis++;
       if (!vis1) { // 1回目に訪ねていなかった家（数えるかどうかは、下でまとめて決める）
@@ -9060,7 +9147,7 @@ function coverAt(t, since, until, adopt) {
     for (const u of us) {
       if (!sp && coveredBySpecial(h, u)) continue;
       const k = K(h.id, u);
-      if (D().dnc[k]) continue;
+      if (dncAt(k)) continue;
       const vs = visitsOf(k);
       if (aptIn && !vs.length) continue;
       if (vs.some(v => v.at >= since && v.at <= until)) { done++; total++; continue; }
@@ -9468,7 +9555,7 @@ function unmetIndex(onlyTid, rlOv) {
     if (!h.terrId) continue;
     for (const u of targets(h)) {
       const k = K(h.id, u);
-      if (D().dnc[k] || D().follows[k] || relOf(k)) continue;
+      if (dncAt(k) || D().follows[k] || relOf(k)) continue;
       if (coveredBySpecial(h, u)) continue; // 特別区域（コンビニなど）で回る家は、ふつうの区域の留守宅カードに入れない（2回訪ねないように）
       let b = bm.get(h.terrId); if (!b) { b = roundBounds(h.terrId); bm.set(h.terrId, b); }
       const x = umItem(k, h, u, b, rl, now, gapMs);
@@ -9492,7 +9579,7 @@ function leftOf(t) {
     for (const u of (sp ? specialTargets(h, t) : targets(h))) {
       if (!sp && coveredBySpecial(h, u)) continue;
       const k = K(h.id, u);
-      if (D().dnc[k] || D().follows[k] || relOf(k)) continue;
+      if (dncAt(k) || D().follows[k] || relOf(k)) continue;
       const s = sum(k);
       if (s.last && s.last.at >= st0) continue; // 巡回の中で訪ねた家（留守宅・会えた家）
       if (s.met && start && skip && Date.parse(s.met.at) >= start - skip) continue; // 区域を受け取る前に最近会えていた家（とばしてよかった家）
@@ -9509,7 +9596,7 @@ function unmetOfSpecial(t, rlOv) {
   for (const h of housesOf(t.id)) {
     for (const u of specialTargets(h, t)) {
       const k = K(h.id, u);
-      if (D().dnc[k] || D().follows[k] || relOf(k)) continue;
+      if (dncAt(k) || D().follows[k] || relOf(k)) continue;
       const x = umItem(k, h, u, b, rl, now, gapMs);
       if (x) out.push(x);
     }
@@ -9695,7 +9782,7 @@ function roundInfo(tid, anyHolder) {
       if (!sp && coveredBySpecial(h, u)) { map.set(K(h.id, u), 'sp'); c.sp++; continue; } // 特別区域（コンビニなど）で回る家は、ふつうの区域カードに入れない（地図では薄く「特」）
       const k = K(h.id, u);
       let st;
-      if (D().dnc[k]) st = 'refuse';
+      if (dncAt(k)) st = 'refuse';
       else if (first) {
         if (metBetween(k, since, first)) st = 'done';                     // 1回目で会えた
         else if (!visitedSince(k, since) && recentMet(k)) st = 'recent';  // 最近会えていたので、とばした家
@@ -9866,7 +9953,7 @@ function cardStates(c) {
   const share = !!c.group && c.mode !== 'split', mine = cardMineSet(c);
   const map = new Map(), r = { map, cur, view, hl: 0, tried: 0, done: 0, wait: !!mine && !mine.size };
   for (const k of c.keys) {
-    if (D().dnc[k]) { map.set(k, 'refuse'); continue; }
+    if (dncAt(k)) { map.set(k, 'refuse'); continue; }
     if (mine && !mine.has(k)) { map.set(k, 'dim'); continue; } // 分けたとき：自分の範囲の外
     if (visitedSince(k, c.at)) { // 緑のチェックは残す。シェアでは、ほかの人が記録した家を薄くする
       r.done++;
@@ -9909,7 +9996,7 @@ function focusFn() {
   if (focusCard && !c) focusCard = null;
   if (c) {
     const r = cardStates(c);
-    return k => r.map.get(k) || (D().dnc[k] ? 'refuse' : 'dim');
+    return k => r.map.get(k) || (dncAt(k) ? 'refuse' : 'dim');
   }
   const r = roundTerr ? roundInfo(roundTerr) : null;
   if (roundTerr && !r) roundTerr = null;
@@ -10270,7 +10357,7 @@ function computeReco() {
     const othersTerr = onlyMine && t.holder && t.holder !== me().id;
     for (const unit of targets(h)) {
       const k = K(h.id, unit);
-      if (D().dnc[k] || D().follows[k]) continue; // 受け持ち中の家は出さない
+      if (dncAt(k) || D().follows[k]) continue; // 受け持ち中の家は出さない
       const rel = relOf(k);
       if (othersTerr && !rel) continue;            // 引き継ぎ待ちはだれにでも見せる
       const s2 = sum(k), last = s2.last;
@@ -12221,7 +12308,7 @@ function leftItems() {
   for (const h of D().houses) {
     for (const unit of targets(h)) {
       const k = K(h.id, unit);
-      if (D().follows[k] || D().dnc[k]) continue;
+      if (D().follows[k] || dncAt(k)) continue;
       const m = lastInterest(k); if (!m) continue;
       const idle = daysSince(sum(k).last.at), rel = relOf(k);
       if (!rel && idle < s.remindDays) continue;
@@ -13127,7 +13214,7 @@ function myUnmetNow(n) {
   const consider = (h, u, t, tag) => {
     const k = K(h.id, u); if (seen.has(k)) return; seen.add(k);
     const f = D().follows[k];
-    if (D().dnc[k] || (f && f.by !== me().id) || recentMet(k)) return;
+    if (dncAt(k) || (f && f.by !== me().id) || recentMet(k)) return;
     const s = sum(k);
     if (!(s.n > 0 && s.unmet) || hasSlot(s.slots, cur)) return;
     list.push({ hid: h.id, u, rk: '', no: t ? t.no : '', name: targetName(h, u), why: `留守${s.awayN}回・${slotShort(cur)}はまだ訪ねていない`, tag, sc: s.awayN });
@@ -13468,7 +13555,7 @@ function computeHomeReco() {
     const d = myPos ? distM(myPos, [h.lat, h.lng]) : null;
     for (const u of targets(h)) {
       const k = K(h.id, u);
-      if (D().dnc[k] || D().follows[k] || relOf(k) || recentMet(k)) continue;
+      if (dncAt(k) || D().follows[k] || relOf(k) || recentMet(k)) continue;
       if (cardOut && othersCard.has(k)) continue;
       if (coveredBySpecial(h, u)) continue; // 特別区域（コンビニなど）で回る家は、おすすめに出さない
       const s = sum(k);
@@ -15022,7 +15109,7 @@ const S12_SIZE = {
   a6: { label: 'A6（S-12と同じ・A4に4枚）', page: 'A4 landscape', per: 4, mapW: 137, mapH: 72, kMin: 3.2, backCols: 2, font: 7.5, order: [1, 0, 3, 2], bind: '短辺とじ（短い辺で綴じる）' },
   a5: { label: 'A5（A4に2枚・地図が大きい）', page: 'A4 portrait', per: 2, mapW: 196, mapH: 108, kMin: 2.6, backCols: 3, font: 9, order: [0, 1], bind: '長辺とじ（長い辺で綴じる）' }
 };
-const S12_KCH = { office: '社', shop: '店', biz: '事', factory: '工', school: '学', gov: '役', police: '警', fire: '消' };
+const S12_KCH = { lang: '外', office: '社', shop: '店', biz: '事', factory: '工', school: '学', gov: '役', police: '警', fire: '消' };
 const S12_TILES = new Map(); // 地図の画像（一度受け取ったものは、この画面を開いているあいだ使い回す）
 let s12Opt = { size: 'a6', back: true, sel: null };
 const S12_MOBILE_MAX = 8;   // スマホで一度に印刷する区域の数
@@ -15227,10 +15314,10 @@ function s12MapSvg(c, tileUrl) {
       const r = mm(1.25), a = mm(0.55);
       L4.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="#D32F2F" stroke="#fff" stroke-width="${mm(0.3)}"/>` +
         `<path d="M${f(x - a)},${f(y - a)} L${f(x + a)},${f(y + a)} M${f(x + a)},${f(y - a)} L${f(x - a)},${f(y + a)}" stroke="#fff" stroke-width="${mm(0.35)}"/>`);
-    } else if (kindOf(h) !== 'home') {
+    } else if (dispKind(h) !== 'home') {
       const w = mm(2.1);
       L2.push(`<rect x="${f(x - w / 2)}" y="${f(y - w / 2)}" width="${w}" height="${w}" fill="#fff" stroke="#222" stroke-width="${mm(0.22)}"/>` +
-        `<text x="${x}" y="${f(y + mm(0.05))}" font-size="${mm(1.6)}" fill="#222" text-anchor="middle" dominant-baseline="central">${S12_KCH[kindOf(h)] || ''}</text>`);
+        `<text x="${x}" y="${f(y + mm(0.05))}" font-size="${mm(1.6)}" fill="#222" text-anchor="middle" dominant-baseline="central">${S12_KCH[dispKind(h)] || ''}</text>`);
     } else {
       L1.push(`<circle cx="${x}" cy="${y}" r="${mm(0.8)}" fill="#fff" stroke="${h.prov ? '#888' : '#222'}" stroke-width="${mm(0.22)}"/>`);
     }
@@ -15294,7 +15381,7 @@ function s12FrontHtml(c, tileUrl, stamp, note) {
 function s12BackHtml(c, S, fs) {
   const t = c.t, dnc = s12Dnc();
   const room = (h, u) => {
-    const uk = unitKind(h, u);
+    const uk = dispUnitKind(h, u);
     return `<span class="rm${isSkipV(dnc[K(h.id, u)]) ? ' k' : dnc[K(h.id, u)] ? ' x' : ''}">${isSkipV(dnc[K(h.id, u)]) ? 'ー' : ''}${esc(uName(h, u))}${uk !== 'home' ? `<small>${S12_KCH[uk] || ''}</small>` : ''}</span>`;
   };
   const body = !c.apts.length ? '<p class="s12empty">この区域には、集合住宅の登録はありません。</p>' : c.apts.map((h, i) => {

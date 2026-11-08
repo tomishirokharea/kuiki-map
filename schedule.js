@@ -138,7 +138,7 @@
       let n = 0, un = 0;
       housesOf(t.id).forEach(h => targets(h).forEach(u => {
         const k = K(h.id, u), s = sum(k);
-        if (!s.n || D().dnc[k]) return;
+        if (!s.n || dncAt(k)) return;
         n++; if (s.unmet) un++;
       }));
       return n ? un / n : 0;
@@ -146,7 +146,7 @@
   }
   const youngPct = t => tmemo('y', t, () => { const y = youngShare(t); return y && y.pct != null ? y.pct : null; });
   /* 区域の家・部屋の数（特別区域で回る家は数えない。terrStats(t, 0).n と同じ数を、記録を見ずに数える） */
-  const unitN = t => tmemo('n', t, () => housesOf(t.id).reduce((a, h) => a + unitsIn(h, t).filter(u => !D().dnc[K(h.id, u)]).length, 0)); // 拒否の家は数えない（M10）
+  const unitN = t => tmemo('n', t, () => housesOf(t.id).reduce((a, h) => a + unitsIn(h, t).filter(u => !dncAt(K(h.id, u))).length, 0)); // 拒否の家は数えない（M10）
   /* 会いやすい時間帯の目安（年齢データと記録から。既存の meetChance を使う） */
   function meetLabel(t) {
     return tmemo('m', t, () => {
@@ -1799,7 +1799,7 @@ button.ktag{cursor:pointer}
         if (!h.terrId || !ok.has(h.terrId)) continue;
         for (const u of targets(h)) {
           const k = K(h.id, u), s = sum(k);
-          if (D().dnc[k]) continue;
+          if (dncAt(k)) continue;
           if (!s.n) { if (h.prov && !u) { if (!prov.has(h.terrId)) prov.set(h.terrId, []); prov.get(h.terrId).push({ k, h, u }); } continue; }
           if (!s.unmet || s.awayN < CAND.minAway || slotCount(s.awaySlots) < CAND.minSlots || !(s.awaySlots & NIGHT_OR_WEEKEND)) continue;
           const vs = visitsOf(k), span = (Date.parse(s.last.at) - Date.parse(vs[vs.length - 1].at)) / DAY;

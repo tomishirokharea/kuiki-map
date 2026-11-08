@@ -232,13 +232,19 @@
     // 訪問しない（区域係が付ける・理由なし）：新しいサーバーか、もう付いている印があるときだけ出す
     const skN = skipEntries().length, showSk = capSkip() || skN > 0;
     if (ui.mode === 'skip' && !showSk) ui.mode = 'dnc';
-    const seg = window.renderChuiAdmin ? `<div class="ch-seg${showSk ? ' three' : ''}" role="group" aria-label="拒否・注意・訪問しないの切りかえ">
+    // 外国語の家（gaikokugo.js・2026-11-08）：新しいサーバーか、もう付いている家があるときだけ
+    const lgN = window.langCount ? window.langCount() : 0, showLg = !!window.renderLangAdmin && (capLang() || lgN > 0);
+    if (ui.mode === 'lang' && !showLg) ui.mode = 'dnc';
+    const nSeg = 2 + (showSk ? 1 : 0) + (showLg ? 1 : 0);
+    const seg = window.renderChuiAdmin ? `<div class="ch-seg${nSeg === 4 ? ' four' : nSeg === 3 ? ' three' : ''}" role="group" aria-label="拒否・注意・訪問しない・外国語の切りかえ">
         <button type="button" data-dncmode="dnc" aria-pressed="${ui.mode === 'dnc'}"><i class="pin st-dnc">拒</i>拒否 ${dncRefN()}</button>
         <button type="button" data-dncmode="warn" aria-pressed="${ui.mode === 'warn'}"><i class="pin st-cau">！</i>注意 ${window.chuiCount()}</button>
-        ${showSk ? `<button type="button" data-dncmode="skip" aria-pressed="${ui.mode === 'skip'}"><i class="pin st-skip">ー</i>訪問しない ${skN}</button>` : ''}</div>` : '';
+        ${showSk ? `<button type="button" data-dncmode="skip" aria-pressed="${ui.mode === 'skip'}"><i class="pin st-skip">ー</i>訪問しない ${skN}</button>` : ''}
+        ${showLg ? `<button type="button" data-dncmode="lang" aria-pressed="${ui.mode === 'lang'}"><i class="pin st-new">外</i>外国語 ${lgN}</button>` : ''}</div>` : '';
     const bindSeg = () => $$('[data-dncmode]', box).forEach(b => b.onclick = () => { ui.mode = b.dataset.dncmode; renderDncAdmin(); });
     if (ui.mode === 'warn' && window.renderChuiAdmin) { box.innerHTML = seg; bindSeg(); window.renderChuiAdmin(box); return; }
     if (ui.mode === 'skip') { box.innerHTML = seg; bindSeg(); renderSkipList(box); return; }
+    if (ui.mode === 'lang' && showLg) { box.innerHTML = seg; bindSeg(); window.renderLangAdmin(box); return; }
     const all = allEntries(), nCheck = all.filter(isCheck).length;
     if (ui.filter === 'check' && !nCheck) ui.filter = 'all';
     const q = ui.q.trim().normalize('NFKC').toLowerCase();
@@ -905,6 +911,34 @@
     return { pos: { lat: ps[0].lat, lng: ps[0].lng, good: true, chiban: true, exact }, polys: ps.map(x => x.ring), src: idx.src, asof: idx.asof };
   }
   window.chibanFind = chibanFind; // index.html のエクセル取り込みでも使う
+  /* 場所 → 地番の住所（外国語の家の一覧・gaikokugo.js。2026-11-08）。端末の中だけで調べる。
+     names：その区域の字の名前（t.aza の n）。そこから探し、なければその市町村の字を全部見る */
+  const inRing = (lat, lng, r) => {
+    let c = false;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const a = r[i], b = r[j];
+      if ((a[0] > lat) !== (b[0] > lat) && lng < (b[1] - a[1]) * (lat - a[0]) / (b[0] - a[0]) + a[1]) c = !c;
+    }
+    return c;
+  };
+  async function chibanAt(lat, lng, names) {
+    if (!isFinite(lat) || !isFinite(lng)) return '';
+    if (CB.list === undefined) { try { CB.list = await cbJson('index.json'); } catch (e) { CB.list = null; } }
+    const munis = Object.keys((CB.list && CB.list.munis) || {});
+    for (const muni of munis) {
+      const idx = await cbIndex(muni);
+      if (!idx || !idx.azas) continue;
+      const want = (names || []).map(n => String(n || '').normalize('NFKC').replace(/^(大字|字)/, '')).filter(n => idx.azas[n]);
+      const order = want.concat(Object.keys(idx.azas).filter(n => !want.includes(n)));
+      for (const town of order) {
+        const m = await cbAza(idx.code, idx.azas[town].f);
+        if (!m) continue;
+        for (const [no, ps] of m) for (const x of ps) if (x.ring.length > 2 && inRing(lat, lng, x.ring)) return `${muni}${/丁目$/.test(town) ? '' : '字'}${town}${no}`;
+      }
+    }
+    return '';
+  }
+  window.chibanAt = chibanAt;
   /* 土地の中にある家 */
   function housesIn(near, cb) {
     const out = [];

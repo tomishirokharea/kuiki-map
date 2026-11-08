@@ -356,7 +356,7 @@
       top = `<p class="q">会いやすい時間</p>` + (ts.length ? `<ol class="plan">${ts.map(x => `<li><span class="numbadge">${ts.indexOf(x) + 1}</span><p class="${simple ? 'kgbig' : ''}"><b>${dayText(x.c % 3, Math.floor(x.c / 3))}</b>　${Math.round(x.p * 100)}%</p></li>`).join('')}</ol>`
         : '<p class="muted">記録が増えると、ここに出ます。</p>');
     }
-    housesOf(tid).forEach(h => targets(h).forEach(u => { const k = K(h.id, u); if (!D().dnc[k] && isUnmet(k)) unmet++; }));
+    housesOf(tid).forEach(h => targets(h).forEach(u => { const k = K(h.id, u); if (!dncAt(k) && isUnmet(k)) unmet++; }));
     // この区域の留守宅で試した時間帯（参考。完了の条件ではない）。この区域の家だけ調べる（3万件を1周しない）。くわしい表示だけ、会えていない家があるときだけ
     let triedBox = '';
     if (!few && !simple) {
@@ -1009,7 +1009,7 @@
   }
   function openHoldMap(h) {
     if (!h) return;
-    const keys = (h.keys || []).filter(k => !D().dnc[k] && houseById(keyHid(k)));
+    const keys = (h.keys || []).filter(k => !dncAt(k) && houseById(keyHid(k)));
     openKF({ tid: h.terrId, keys, hold: h.id, since: h.at });
     if (h.kind === 'plan' && h.slot && h.slot !== curSlot()) setTimeout(() => toast(`今は${slotShort(curSlot())}です（予定は${slotShort(h.slot)}）`), 600);
   }
@@ -1049,7 +1049,7 @@
     if (!KF) return f.apply(null, a);
     roundNums = KF.nums;
     const since = KF.since, ks = KF.keys;
-    return k => (ks.has(k) ? (visitedSince(k, since) ? 'done' : 'hl') : (D().dnc[k] ? 'refuse' : 'dim'));
+    return k => (ks.has(k) ? (visitedSince(k, since) ? 'done' : 'hl') : (dncAt(k) ? 'refuse' : 'dim'));
   });
   wrapFn('openTerrIds', (f, a) => { const s = f.apply(null, a); if (KF) s.add(KF.tid); return s; });
   wrapFn('myPlaces', (f, a) => {
