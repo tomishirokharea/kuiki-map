@@ -92,10 +92,13 @@
     let drag = null;
     G.addEventListener('pointerdown', e => {
       const c = e.target.closest('[data-ru]'); if (!c || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (!e.isPrimary) { drag = null; return; } // 2本目の指：なぞるのをやめる
       drag = { r0: +c.dataset.r, c0: +c.dataset.c, add: !sel.has(c.dataset.ru), base: new Set(sel), x: e.clientX, y: e.clientY, moved: false, cell: c };
+      if (e.pointerType === 'mouse') { try { G.setPointerCapture(e.pointerId); } catch (x) { /* 何もしない */ } } // マウスを外で離しても終わるように
     });
     G.addEventListener('pointermove', e => {
       if (!drag) return;
+      if (e.pointerType === 'mouse' && e.buttons === 0) { drag = null; return; }
       if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
       drag.moved = true;
       e.preventDefault();

@@ -2462,6 +2462,15 @@ function roomsText(h, us) {
   const txt = out.length > 8 ? out.slice(0, 7).join('・') + `ほか` : out.join('・');
   return `${txt}（${us.length}部屋）`;
 }
+/* 部屋だけの範囲を地図に出す：建物ごとに輪と札（「あなたの範囲 12部屋」／「○○さん 12部屋」） */
+function partRoomMarks(p, own) {
+  Object.keys(p.rooms || {}).forEach(hid => {
+    const h = houseById(hid); if (!h) return;
+    const col = own ? '#00796B' : '#C2410C';
+    L.circleMarker([h.lat, h.lng], { radius: 24, color: col, weight: 4, dashArray: own ? null : '6 5', fillColor: col, fillOpacity: own ? 0.1 : 0.05, interactive: false }).addTo(terrLayer);
+    L.marker([h.lat, h.lng], { icon: L.divIcon({ className: 'part-label', html: `<span>${esc((own ? 'あなたの範囲' : partName(p)) + ' ' + p.rooms[hid].length + '部屋')}</span>`, iconSize: [0, 0], iconAnchor: [0, -30] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
+  });
+}
 /* わたされた人向け：その範囲の部屋の説明（「県営上田団地1号棟の 301〜504」）。なければ '' */
 function partRoomsNote(p) {
   if (!p || !p.rooms) return '';
@@ -3971,7 +3980,7 @@ function renderLegend() {
       <button data-rmode="reco" aria-pressed="${m === 'reco'}">おすすめ順</button>
       <button data-rmode="progress" aria-pressed="${m === 'progress'}">進み具合</button>
     </div>
-    ${mp2 ? `<p class="okmsg"><b>今日のあなたの範囲</b>　${esc(partMates(mp2).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と回ります（緑の線の中）</p>
+    ${mp2 ? `<p class="okmsg"><b>今日のあなたの範囲</b>　${esc(partMates(mp2).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と回ります（${mp2.ro ? esc(partRoomsNote(mp2)) : '緑の線の中'}）</p>
       <div class="row"><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=${center(mp2.poly)[0].toFixed(6)},${center(mp2.poly)[1].toFixed(6)}" target="_blank" rel="noopener">Googleマップでこの範囲へ</a></div>` : ''}
     ${(own || lead) && ps2.length ? `<p class="muted">今日わたした範囲：${ps2.map(p => esc(partName(p))).join(' ／ ')}</p>` : ''}
     ${body}
@@ -4025,6 +4034,7 @@ function renderTerrs() {
       if (!hold && (!mp || p.id !== mp.id)) return;
       if (!okPoly(p.poly)) return;
       const own = mp && p.id === mp.id;
+      if (p.ro) { partRoomMarks(p, own); return; } // 部屋だけの範囲：建物に輪と「部屋」の札（四角は出さない）
       L.polygon(p.poly, { color: own ? '#00796B' : '#C2410C', weight: 4, dashArray: own ? null : '8 6',
         fillColor: own ? '#00796B' : '#C2410C', fillOpacity: own ? 0.08 : 0.05, interactive: false }).addTo(terrLayer);
       L.marker(labelPoint(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
@@ -4038,6 +4048,7 @@ function renderTerrs() {
     partsOf(fc).forEach(p => {
       if ((!hold && (!mp || p.id !== mp.id)) || !okPoly(p.poly)) return;
       const own = mp && p.id === mp.id;
+      if (p.ro) { partRoomMarks(p, own); return; } // 部屋だけの範囲：建物に輪と「部屋」の札（四角は出さない）
       L.polygon(p.poly, { color: own ? '#00796B' : '#C2410C', weight: 4, dashArray: own ? null : '8 6',
         fillColor: own ? '#00796B' : '#C2410C', fillOpacity: own ? 0.08 : 0.05, interactive: false }).addTo(terrLayer);
       L.marker(labelPoint(p.poly), { icon: L.divIcon({ className: 'part-label', html: `<span>${esc(own ? 'あなたの範囲' : partName(p))}</span>`, iconSize: [0, 0] }), interactive: false, keyboard: false, pane: 'labelPane' }).addTo(terrLayer);
@@ -4620,12 +4631,13 @@ function openPartAssign() {
           const o = Object.assign({}, x, { uids: (x.uids || []).filter(u => !uids.includes(u)) });
           if (x.rooms) {
             const r = {};
-            Object.keys(x.rooms).forEach(hid => { const us = x.rooms[hid].filter(u => !(take[hid] || []).includes(u)); if (us.length) r[hid] = us; });
+            // 囲みのある範囲は、部屋が全部なくなっても空の一覧を残す（その建物は「部屋なし」のまま。囲みで全部屋にもどらないように）
+            Object.keys(x.rooms).forEach(hid => { const us = x.rooms[hid].filter(u => !(take[hid] || []).includes(u)); if (us.length || !x.ro) r[hid] = us; });
             if (Object.keys(r).length) o.rooms = r; else delete o.rooms;
           }
           return o;
         })
-        .filter(x => x.uids.length && (!x.ro || x.rooms));
+        .filter(x => x.uids.length && (!x.ro || (x.rooms && Object.keys(x.rooms).some(k => x.rooms[k].length))));
       t2.parts = rest.concat([Object.assign({ id: 'p' + uid(), poly, uids, by: me().id, at: now, until }, dp.rooms ? { rooms: dp.rooms } : {}, dp.ro ? { ro: 1 } : {})]);
       // 記録できるように「今日回る人」にも入れる
       const cur = partDraw.cid ? cardHelpers(t2) : helpersOf(t2), have = new Set(cur.map(h => h.uid));
