@@ -389,7 +389,7 @@
         b += `<details class="more"><summary>この建物の編集</summary>
           <p class="hint">分かれ方：${LAY_NAME[lay]}（${h.units.map(esc).join('・')}）</p>
           ${isAdmin() ? '<button class="btn block" id="duUndo">1軒の家にもどす（区域係）</button>' : '<p class="hint">1軒の家にもどすときは、区域係に頼んでください。</p>'}
-          ${delReqOf(h.id) ? '<p class="tag-warn">この建物は削除を申請中です（区域係の確認待ち）</p>' : `<button class="btn small danger" id="duDel">${(typeof isMgr === 'function' ? isMgr() : isAdmin()) ? 'この建物を削除する' : 'この建物の削除を申請する'}</button>`}
+          ${delReqOf(h.id) ? '<p class="tag-warn">この建物は削除を申請中です（区域係の確認待ち）</p>' : `<button class="btn small danger" id="duDel">${(typeof mgrCanDel === 'function' ? mgrCanDel(h) : isAdmin()) ? 'この建物を削除する' : 'この建物の削除を申請する'}</button>`}
         </details>`;
       }
       setSheet(b);
@@ -421,7 +421,7 @@
       on('duOverride', () => { st.override = true; paint(); });
       on('duUndo', () => undoDuplex(hid));
       on('duDel', async () => {
-        if (!(typeof isMgr === 'function' ? isMgr() : isAdmin())) { closeSheet(); openDelRequest(h); return; } // 家と拒否の管理の人は、区域係と同じように消せる
+        if (!(typeof mgrCanDel === 'function' ? mgrCanDel(houseById(hid)) : isAdmin())) { closeSheet(); openDelRequest(h); return; } // 家と拒否の管理の人は、区域係と同じように消せる
         if (!await ask(`この二世帯住宅と、すべての世帯の記録を削除します。${(typeof houseRecText === 'function' && houseRecText(houseById(hid))) || ''}よろしいですか？`)) return; // 件数つき（H8）
         closeSheet(); deleteHouse(hid);
       });

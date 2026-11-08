@@ -213,4 +213,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "このまま": "Dejar como está",
 "家と拒否の管理を、区域係のほかの人にも任せられるようになりました。": "Ahora el encargado puede dar a otras personas la administración de casas y «No visitar».",
 "{0}さんの家と拒否の管理は保存できませんでした（ほかの設定は保存しました）。サーバーの更新を待って、もう一度入れてください": "No se pudo guardar la administración de casas y «No visitar» de {0} (el resto se guardó). Espere a que se actualice el servidor e inténtelo de nuevo.",
+"訪問しない・外国語の印のある家は、区域係だけが消せます。削除の申請をしてください": "Las casas con marca «Omitida» o de otro idioma solo las puede borrar el encargado. Solicite el borrado.",
+"訪問しない・外国語の印のある部屋は、区域係だけが消せます": "Las unidades con marca «Omitida» o de otro idioma solo las puede borrar el encargado.",
+"拒否は、場所だけの印として残します。": "La marca «No visitar» se conservará como marca de lugar.",
 });
