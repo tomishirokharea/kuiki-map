@@ -8664,68 +8664,36 @@ function askTerr(id) {
   });
 }
 
-/* 係：申し込みと、自分で受け取られた区域（用件があるときだけ表示） */
-function renderInbox() {
-  const reqs = D().requests.filter(r => !r.type && r.status === 'pending').sort((a, b) => (a.at < b.at ? -1 : 1));
+/* 家の削除の申請の中身（「今日」の［確かめる ▼］の下に出す。見出しなし。削除する／見送るは adminClick が受ける） */
+function delReqHtml() {
   const dels = delReqs().sort((a, b) => (a.at < b.at ? -1 : 1));
-  const taken = D().territories.filter(t => t.holder && t.selfTakenAt && t.selfSeen === false);
-  const free = freeTerrs().map(t => ({ t, last: lastBackOf(t) })).sort(byLongest);
+  if (!dels.length) return '';
+  return '<p class="hint">申請した人に確認・連絡してから、「削除する」か「見送る」を選んでください。</p>' + dels.map(r => {
+    const h = houseById(r.houseId), t = terrById(h ? h.terrId : r.terrId);
+    const n = h ? targets(h).reduce((a, u) => a + sum(K(h.id, u)).n, 0) : 0;
+    const hasF = !!h && targets(h).some(u => fol(K(h.id, u)));
+    const name = h ? (h.type === 'apt' ? `${esc(h.label || '集合住宅')}（集合住宅・${h.units.length}部屋）` : `${esc(h.label || '目印なし')}（一戸建て）`) : esc(r.label || '');
+    return `<article class="ritem k-new delreq"><div>
+        <p class="who">${esc(uname(r.by))}さん</p>
+        <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> 区域${t ? esc(t.no) : '-'}　${name}</p>
+        <p class="muted">理由：${esc(r.reason || '—')}　${fmtDate(r.at)}に申請</p>
+        ${h ? `<p class="muted">訪問の記録 ${n}件${hasF ? '・<b>再訪問の受け持ちあり</b>' : ''}${h.createdBy ? `　この家を追加した人：${h.createdBy === r.by ? '申請した本人' : esc(uname(h.createdBy)) + 'さん'}` : ''}</p>`
+          : '<p class="tag-warn">この家は、すでにありません</p>'}
+      </div>${h ? `<button class="btn small" data-go="${esc(h.id)}" data-unit="">地図で見る</button>` : '<span></span>'}
+      <div class="actions span">${h ? `<button class="btn small danger" data-delok="${esc(r.id)}">削除する</button>` : ''}<button class="btn small" data-delno="${esc(r.id)}">${h ? '見送る' : '閉じる'}</button></div></article>`;
+  }).join('');
+}
+
+/* 係の画面「今日」の下に残るもの：試作版のお知らせと、最後に確認した時刻。
+   申し込み・削除の申請・自分で受け取られた区域・スマホの登録の一覧は、「今日の対応」の行になった（schedule.js の paintToday） */
+function renderInbox() {
   let html = '';
-  if (dels.length) {
-    html += `<h2 class="sec">家の削除の申請（${dels.length}件）</h2>
-      <p class="hint">申請した人に確認・連絡してから、「削除する」か「見送る」を選んでください。</p>` + dels.map(r => {
-      const h = houseById(r.houseId), t = terrById(h ? h.terrId : r.terrId);
-      const n = h ? targets(h).reduce((a, u) => a + sum(K(h.id, u)).n, 0) : 0;
-      const hasF = !!h && targets(h).some(u => fol(K(h.id, u)));
-      const name = h ? (h.type === 'apt' ? `${esc(h.label || '集合住宅')}（集合住宅・${h.units.length}部屋）` : `${esc(h.label || '目印なし')}（一戸建て）`) : esc(r.label || '');
-      return `<article class="ritem k-new delreq"><div>
-          <p class="who">${esc(uname(r.by))}さん</p>
-          <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> 区域${t ? esc(t.no) : '-'}　${name}</p>
-          <p class="muted">理由：${esc(r.reason || '—')}　${fmtDate(r.at)}に申請</p>
-          ${h ? `<p class="muted">訪問の記録 ${n}件${hasF ? '・<b>再訪問の受け持ちあり</b>' : ''}${h.createdBy ? `　この家を追加した人：${h.createdBy === r.by ? '申請した本人' : esc(uname(h.createdBy)) + 'さん'}` : ''}</p>`
-            : '<p class="tag-warn">この家は、すでにありません</p>'}
-        </div>${h ? `<button class="btn small" data-go="${esc(h.id)}" data-unit="">地図で見る</button>` : '<span></span>'}
-        <div class="actions span">${h ? `<button class="btn small danger" data-delok="${esc(r.id)}">削除する</button>` : ''}<button class="btn small" data-delno="${esc(r.id)}">${h ? '見送る' : '閉じる'}</button></div></article>`;
-    }).join('');
-  }
-  if (reqs.length) {
-    html += `<h2 class="sec">区域カードの申し込み（${reqs.length}件）</h2>
-      <p class="hint">貸し出す区域は、希望の区域か、長く回っていない区域が先に選ばれています。</p>` + reqs.map(r => {
-      const want = r.terrId ? terrById(r.terrId) : null;
-      const wantFree = !!want && !want.holder;
-      const held = D().territories.filter(t => t.holder === r.by);
-      const over = held.filter(pastDue).length;
-      const def = wantFree ? want.id : (free[0] ? free[0].t.id : '');
-      const opts = free.map(({ t, last }) =>
-        `<option value="${esc(t.id)}"${t.id === def ? ' selected' : ''}>区域${t.no}（${last ? `前回 ${fmtDay(last)}` : '回り終えた記録なし'}）</option>`).join('');
-      return `<article class="ritem k-new"><div>
-          <p class="rt">${esc(uname(r.by))}さん${r.forGroup ? ` <span class="gbadge">${r.use === 'all' ? '全体の集まり用' : `${esc(r.forGroup)}グループ用`}</span>` : ''}</p>
-          <p class="muted">希望：${want ? `区域${want.no}${wantFree ? '' : '（すでに貸出中）'}` : 'どこでもよい'}　${fmtDay(r.at)}</p>
-          <p class="muted">今持っているカード ${held.length}枚${over ? `<span class="tag-warn">返却の目安を過ぎた ${over}枚</span>` : ''}</p>
-        </div><span></span>
-        <div class="actions span">
-          ${free.length
-            ? `<label>貸し出す区域 <select data-reqterr="${esc(r.id)}">${opts}</select></label><button class="btn small primary" data-reqok="${esc(r.id)}">貸し出す</button>`
-            : '<span class="muted">空いている区域がありません。</span>'}
-          <button class="btn small" data-reqno="${esc(r.id)}">見送る</button>
-        </div></article>`;
-    }).join('');
-  }
-  if (taken.length) {
-    html += `<h2 class="sec">自分で受け取られた区域（${taken.length}件）</h2>` + taken.map(t =>
-      `<article class="ritem k-away"><div>
-        <p class="rt"><span class="stamp xs${noCls(t.no)}">${esc(t.no)}</span> ${esc(t.name)}</p>
-        <p class="muted">${esc(uname(t.holder))}さん　${fmtDay(t.selfTakenAt)}に受け取り（今 ${heldCount(t.holder)}枚）</p>
-      </div><button class="btn small" data-takenseen="${esc(t.id)}">確認した</button></article>`).join('');
-  }
   if (!LIVE && !RENSHU) html = `<div class="notice warn"><b>この画面は「試作版」です。</b>この端末の中だけのデータで動いていて、ほかの人の申し込みは届きません。<br>
     本番で使うときは、区域係から配られたリンク（GitHub Pagesのアドレス）を開いてください。</div>` + html;
   if (LIVE) html = `<div class="setrow"><span>最後に確認した時刻：<b>${Store.syncAt ? fmtTime(new Date(Store.syncAt)) : 'まだ'}</b>${Store.queue.length ? `<br><span class="tag-warn">未送信 ${Store.queue.length}件</span>` : ''}</span>
     <button type="button" class="btn small primary" id="adSync">今すぐ確認する</button></div>` + html;
   $('#adInbox').innerHTML = html;
-  const pendN = waitCount(); // 申し込み・削除の申請・自分で受け取られた区域・スマホの登録（下のタブの数字と同じ）
-  $('#adInboxEmpty').innerHTML = pendN ? '' : '<div class="empty">今、承認や申し込みを待っているものはありません。</div>';
-  $('#apCnt').textContent = pendN; $('#apCnt').hidden = !pendN;
+  $('#adInboxEmpty').innerHTML = ''; // 「今日」の数字と空のときの表示は、paintToday（schedule.js）が出す
   if ($('#adSync')) $('#adSync').onclick = async () => {
     const b = $('#adSync'); b.disabled = true; b.textContent = '確認しています…';
     try { if (Store.queue.length) await flush(); await refresh(true); await fetchDevices(true); toast('最新の状態にしました'); }
@@ -11433,31 +11401,43 @@ async function deviceAction(action, extra, okMsg) {
       break;
     }
   }
-  renderDevices(); renderQrPending(); updateAdminBadge();
+  renderDevices(); renderInbox(); renderQrPending(); updateAdminBadge();
+}
+/* スマホの登録の申し込み（番号を確かめて登録・見送る）。「今日」の行の［確かめる ▼］の下に出す（見出しなし） */
+function devPendHtml() {
+  const pend = devPending(), act = (devState.list || []).filter(d => d.status === 'active');
+  if (!pend.length) return '';
+  const actCount = uid => act.filter(d => d.uid === uid).length;
+  return '<p class="hint">本人のスマホに出ている番号と同じか、声をかけて確かめてから登録してください。</p>' + pend.map(d => {
+    if (!d.uid) return `<article class="devrow newdev"><p><b style="font-size:20px">新しいスマホ</b>　${esc(d.label)}　番号 <b class="devcode">${esc(d.code || '')}</b></p>
+      ${d.hint ? `<p>名乗った名前：<b>${esc(d.hint)}</b></p>` : ''}
+      <p class="muted">${fmtDate(d.reqAt)}にQRを読み取り</p>
+      <div class="actions"><button class="btn small primary" data-devreg="${esc(d.id)}">使う人を決めて登録</button>
+        <button class="btn small" data-dev="deny" data-id="${esc(d.id)}">見送る</button></div></article>`;
+    const n = actCount(d.uid);
+    return `<article class="devrow"><p><b style="font-size:20px">${esc(d.name)}さん</b>　${esc(d.label)}</p>
+      <p class="muted">${fmtDate(d.reqAt)}に申し込み</p>
+      ${n ? `<p class="tag-warn">この人は、すでに${n}台のスマホを使っています。本人に確認してください</p>` : ''}
+      <div class="actions"><button class="btn small primary" data-dev="approve" data-id="${esc(d.id)}">承認する</button>
+        <button class="btn small" data-dev="deny" data-id="${esc(d.id)}">見送る</button></div></article>`;
+  }).join('');
+}
+async function devActClick(b) {
+  const dec = b.dataset.dev, d = (devState.list || []).find(x => x.id === b.dataset.id);
+  if (!d) return;
+  if (dec === 'deny' && !await ask(`${d.name ? d.name + 'さんの' : 'このスマホの'}申し込みを見送ります。よろしいですか？`)) return;
+  if (dec === 'revoke' && !await ask(`${d.name}さんのスマホ（${d.label}）を使えなくします。よろしいですか？`)) return;
+  b.disabled = true;
+  deviceAction('device_decide', { id: d.id, decision: dec },
+    dec === 'approve' ? `${d.name}さんのスマホを承認しました` : dec === 'deny' ? '申し込みを見送りました' : 'スマホを使えなくしました');
 }
 function renderDevices() {
   const box = $('#adDevices');
-  if (!LIVE) { box.innerHTML = ''; return; }
+  if (!LIVE && !devState.list) { box.innerHTML = ''; return; }
   if (!devState.list) { box.innerHTML = '<p class="muted">スマホの登録の状況を読み込んでいます…</p>'; return; }
-  const pend = devPending(), act = devState.list.filter(d => d.status === 'active');
+  const act = devState.list.filter(d => d.status === 'active');
   const actCount = uid => act.filter(d => d.uid === uid).length;
   let html = '';
-  if (pend.length) {
-    html += `<h2 class="sec">スマホの登録の申し込み（${pend.length}件）</h2>
-      <p class="hint">本人のスマホに出ている番号と同じか、声をかけて確かめてから登録してください。</p>` + pend.map(d => {
-      if (!d.uid) return `<article class="devrow newdev"><p><b style="font-size:20px">新しいスマホ</b>　${esc(d.label)}　番号 <b class="devcode">${esc(d.code || '')}</b></p>
-        ${d.hint ? `<p>名乗った名前：<b>${esc(d.hint)}</b></p>` : ''}
-        <p class="muted">${fmtDate(d.reqAt)}にQRを読み取り</p>
-        <div class="actions"><button class="btn small primary" data-devreg="${esc(d.id)}">使う人を決めて登録</button>
-          <button class="btn small" data-dev="deny" data-id="${esc(d.id)}">見送る</button></div></article>`;
-      const n = actCount(d.uid);
-      return `<article class="devrow"><p><b style="font-size:20px">${esc(d.name)}さん</b>　${esc(d.label)}</p>
-        <p class="muted">${fmtDate(d.reqAt)}に申し込み</p>
-        ${n ? `<p class="tag-warn">この人は、すでに${n}台のスマホを使っています。本人に確認してください</p>` : ''}
-        <div class="actions"><button class="btn small primary" data-dev="approve" data-id="${esc(d.id)}">承認する</button>
-          <button class="btn small" data-dev="deny" data-id="${esc(d.id)}">見送る</button></div></article>`;
-    }).join('');
-  }
   html += `<details class="more"><summary>共通リンクと、登録済みのスマホ（${act.length}台）</summary>
     <h3 class="sub">共通リンク</h3>
     ${devState.joinUrl ? `<div class="linkbox"><input type="text" id="joinUrl" readonly value="${esc(devState.joinUrl)}" aria-label="共通リンク"><button class="btn small" id="joinCopy">コピー</button></div>
@@ -11476,16 +11456,7 @@ function renderDevices() {
   const open = box.querySelector('details') && box.querySelector('details').open;
   box.innerHTML = html;
   if (open) box.querySelector('details').open = true;
-  $$('[data-devreg]', box).forEach(b => b.onclick = () => openDevRegister(b.dataset.devreg, null));
-  $$('[data-dev]', box).forEach(b => b.onclick = async () => {
-    const dec = b.dataset.dev, d = devState.list.find(x => x.id === b.dataset.id);
-    if (!d) return;
-    if (dec === 'deny' && !await ask(`${d.name ? d.name + 'さんの' : 'このスマホの'}申し込みを見送ります。よろしいですか？`)) return;
-    if (dec === 'revoke' && !await ask(`${d.name}さんのスマホ（${d.label}）を使えなくします。よろしいですか？`)) return;
-    b.disabled = true;
-    deviceAction('device_decide', { id: d.id, decision: dec },
-      dec === 'approve' ? `${d.name}さんのスマホを承認しました` : dec === 'deny' ? '申し込みを見送りました' : 'スマホを使えなくしました');
-  });
+  $$('[data-dev]', box).forEach(b => b.onclick = () => devActClick(b));
   if ($('#joinCopy')) $('#joinCopy').onclick = async () => {
     const v = $('#joinUrl').value;
     try { await navigator.clipboard.writeText(v); toast('共通リンクをコピーしました'); }
@@ -11833,14 +11804,6 @@ function ageShowSetHtml() {
     <p class="hint">例：「市全体の若い世代の2.1%がこの区域にいます」／「この区域：若い世代 24%」。区域の家の数と字の割合から出す目安です。</p>`;
 }
 /* ---------- 区域係：年齢データの画面 ---------- */
-function ageNoticeHtml() {
-  if (!isAdmin() || !AGE_ON) return '';
-  const cur = ageCur();
-  if (!cur) return `<div class="notice info">年齢データがまだありません。「設定」の「年齢データを更新する」から入れると、区域ごとの会いやすい時間帯がわかります。</div>`;
-  const base = cur.asOf || cur.savedAt;
-  if (ageStale(cur)) return `<div class="notice warn"><b>年齢データが1年以上前のものです（${esc(cur.asOf || '')}）。</b>「設定」の「年齢データを更新する」から新しくしてください。</div>`;
-  return '';
-}
 function renderAgeAdmin() {
   const box = $('#adAge'); if (!box) return;
   if (!AGE_ON) { box.innerHTML = ''; box.hidden = true; return; }
@@ -12100,7 +12063,6 @@ function renderAdmin() {
   setAdPane(adPane);
   adminSweepSoon();
   renderInbox(); // 承認待ちの数（タブの数字）は、いつも数える
-  $('#adInbox').insertAdjacentHTML('afterbegin', ageNoticeHtml());
   if (adPane === 'inbox') renderDevices();
   if (adPane === 'sched') renderSchedAdmin();
   if (adPane === 'people') renderPeople();

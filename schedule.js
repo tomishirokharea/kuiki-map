@@ -1333,7 +1333,10 @@ button.ktag{cursor:pointer}
 .cv-none{border-color:#546E7A;background:#ECEFF1}.cv-none i{background:#546E7A}
 .tdnone{text-align:center;padding:22px 12px;font-size:22px;background:#fff;border:2px dashed var(--line);border-radius:14px}
 .tdnone small{display:block;font-size:15px;color:var(--ink2);margin-top:4px}
-.tdrow .duebtns{min-width:9em}.tdrow .duebtns .btn{white-space:normal}`;
+.tdrow .duebtns{min-width:9em}.tdrow .duebtns .btn{white-space:normal}
+.tdrow .tdmore{grid-column:1/-1;margin-top:4px}.tdrow .tdmore:not([open]){display:none}
+.treqsel{display:flex;flex-direction:column;gap:2px;font-size:15px}.treqsel select{min-height:50px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;background:#fff;font-size:17px;max-width:100%}
+.cover .btn{flex:none;margin-left:auto}`;
   document.head.appendChild(css4);
 
   function coverInfo() {
@@ -1353,31 +1356,39 @@ button.ktag{cursor:pointer}
   const terrBtns = (ts, max) => ts.slice(0, max || 3).map(t => `<button type="button" class="btn small" data-topen="${esc(t.id)}">区域${esc(t.no)}の地図</button>`).join('');
 
   /* 今日の対応の項目。対応がないものは作らない */
+  const reqPick = new Map(), tdOpen = new Set(); // 申し込みごとにえらんだ区域・ひらいている［確かめる ▼］
   function todayItems() {
     const out = [], now = Date.now(), ts = eligible(), m = monthStats();
     const go = (pane, anchor, label) => `<button type="button" class="btn small primary" data-tgo="${pane}" data-anchor="${anchor || ''}">${label || '見る'}</button>`;
-    const row = (tone, title, sub, btns) => out.push({ tone, title, sub, btns });
+    const row = (tone, title, sub, btns, more) => out.push({ tone, title, sub, btns, more });
+    // 「確かめる ▼」：行の下に、今までの中身（番号の確認と登録・削除する／見送る）をひらく。別の場所へは飛ばない
+    const check = key => `<button type="button" class="btn small primary" data-tmore="${key}" aria-expanded="${tdOpen.has(key)}">${tdOpen.has(key) ? '閉じる ▲' : '確かめる ▼'}</button>`;
     // 1 スマホの登録の申し込み（本人の番号を確かめる必要があるので、ここでは決めない）
-    if (LIVE && typeof devPending === 'function') {
+    if (typeof devPending === 'function' && typeof devPendHtml === 'function') {
       const n = devPending().length;
-      if (n) row('#C2410C', `スマホの登録の申し込み　${n}件`, '本人のスマホに出ている番号と同じか、確かめてから登録します', go('inbox', 'adDevices', '確かめる'));
+      if (n) row('#C2410C', `スマホの登録の申し込み　${n}件`, '本人のスマホに出ている番号と同じか、確かめてから登録します', check('dev'), { key: 'dev', html: devPendHtml() });
     }
     // 2 区域カードの申し込み（その場で貸し出せる）
     const free = freeTerrs().map(t => ({ t, last: lastBackOf(t) })).sort(byLongest);
     D().requests.filter(r => !r.type && r.status === 'pending').sort((a, b) => (a.at < b.at ? -1 : 1)).forEach(r => {
-      const selEl = document.querySelector(`[data-reqterr="${CSS.escape(String(r.id))}"]`);
       const want = r.terrId ? terrById(r.terrId) : null;
-      const pick = (selEl && terrById(selEl.value)) || (want && free.some(x => x.t.id === want.id) ? want : (free[0] ? free[0].t : null));
+      const wantFree = !!want && free.some(x => x.t.id === want.id);
+      const def = wantFree ? want.id : (free[0] ? free[0].t.id : '');
+      // 申し込みごとに、えらんだ区域を覚えておく（ほかの申し込みの行・描き直しで変わらない）。もう空いていなければ、はじめの候補に戻す
+      const mem = reqPick.get(String(r.id));
+      const pickId = mem && free.some(x => x.t.id === mem) ? mem : def;
+      const pick = pickId ? terrById(pickId) : null;
+      const opts = free.map(({ t, last }) => `<option value="${esc(t.id)}"${t.id === pickId ? ' selected' : ''}>区域${esc(t.no)}（${last ? `前回 ${esc(fmtDay(last))}` : '回り終えた記録なし'}）</option>`).join('');
       const held = D().territories.filter(t => t.holder === r.by);
       const over = held.filter(pastDue).length; // 返却の目安を過ぎたカード（前は120日で数えていた）
       row('#1565C0', `${esc(uname(r.by))}さんが、区域カードを申し込んでいます${r.forGroup ? (r.use === 'all' ? '（全体の集まり用）' : `（${esc(r.forGroup)}グループ用）`) : ''}`,
         `希望：${want ? `区域${esc(want.no)}${want.holder ? '（すでに貸出中）' : ''}` : 'どこでもよい'}　今持っているカード ${held.length}枚${over ? `<span class="tag-warn">返却の目安を過ぎた ${over}枚</span>` : ''}`,
-        (pick ? `<button type="button" class="btn small primary" data-tok="${esc(r.id)}" data-tterr="${esc(pick.id)}">区域${esc(pick.no)}を貸し出す</button>` : '<span class="muted">空いている区域がありません</span>') +
+        (pick ? `<label class="treqsel">貸し出す区域 <select data-treq="${esc(r.id)}">${opts}</select></label><button type="button" class="btn small primary" data-tok="${esc(r.id)}" data-tterr="${esc(pick.id)}">貸し出す</button>` : '<span class="muted">空いている区域がありません</span>') +
         `<button type="button" class="btn small" data-tno="${esc(r.id)}">見送る</button>`);
     });
     // 3 家の削除の申請（記録も消えるので、ここでは決めない）
     const dn = delReqs().length;
-    if (dn) row('#B3261E', `家の削除の申請　${dn}件`, '申請した人に確認してから、「削除する」か「見送る」を選びます', go('inbox', 'adInbox', '確かめる'));
+    if (dn && typeof delReqHtml === 'function') row('#B3261E', `家の削除の申請　${dn}件`, '申請した人に確認してから、「削除する」か「見送る」を選びます', check('del'), { key: 'del', html: delReqHtml() });
     // 4 自分で受け取られた区域（その場で確認できる）
     D().territories.filter(t => t.holder && t.selfTakenAt && t.selfSeen === false).forEach(t => {
       row('#00796B', `${esc(uname(t.holder))}さんが、区域${esc(t.no)}を自分で受け取りました`, `${fmtDay(t.selfTakenAt)}に受け取り（今 ${heldCount(t.holder)}枚）`,
@@ -1407,25 +1418,22 @@ button.ktag{cursor:pointer}
       stuck.slice(0, 4).map(x => `区域${esc(x.t.no)}（${x.days}日・${x.slots.slice(0, 3).map(sl => esc(slotShort(sl))).join('、')}${x.slots.length > 3 ? `など${x.slots.length}枚` : ''}）`).join('、') + (stuck.length > 4 ? `　ほか${stuck.length - 4}区域` : '') +
         '。集まりで紹介すると、受け取ってもらいやすくなります。',
       `<button type="button" class="btn small primary" data-tcardprint>紹介の紙を印刷</button>` + go('status', 'adAwaySet', '留守宅の状況'));
-    // 9 年齢データ・字
+    // 9 字（年齢データの古さ・ないことは、下の「点検で要確認」の行に1回だけ出す）
     if (typeof AGE_ON !== 'undefined' && AGE_ON) {
-      const cur = typeof ageCur === 'function' ? ageCur() : null;
-      if (!cur) row('#546E7A', '年齢データがまだありません', '入れると、会いやすい時間や地域のようすが出ます', go('set', 'adAge', '設定へ'));
-      else if (ageStale(cur)) row('#546E7A', '年齢データが古くなっています', `${esc(cur.asOf || '')}時点のデータです。新しくしてください`, go('set', 'adAge', '設定へ'));
       const bad = ts.filter(t => t.azaErr && !(t.azaManual && t.azaManual.length));
       if (bad.length) row('#546E7A', `字を調べられなかった区域　${bad.length}区域`, `区域${listNos(bad)}。「字を直す」で手で決められます`, go('terr', 'adTerrs', '区域の一覧へ'));
     }
     // 10 毎月の点検で要確認のもの
     const warns = opsItems().filter(i => i.state === 'warn');
-    if (warns.length) row('#8A6D00', `点検で要確認　${warns.length}件`, warns.map(i => esc(i.title)).join('、'), go('set', 'adOps', '点検を見る'));
+    if (warns.length) row('#8A6D00', `点検で要確認　${warns.length}件`, warns.map(i => esc(i.title) + (i.detail ? `（${i.detail}）` : '')).join('、'), go('set', 'adOps', '点検を見る'));
     return out;
   }
   function coverHtml() {
     const c = coverInfo();
     return `<div class="cover ${c.cls}" role="status"><i aria-hidden="true">${c.mark}</i>
-      <div><b>年間カバー：${c.word}</b>
-        <small>1年以内に回っていない区域：<b style="font-size:inherit">${c.over}区域</b>　／　期限まで${PIN_DAYS}日以内：${c.warn}区域</small>
-        <small>1年以内に回った区域：${c.known - c.over} / ${c.known}${c.none ? `</small><small>前回の記録なし ${c.none}区域 → S-13に転記してください` : ''}</small></div></div>`;
+      <div><b>年1回のカバー：${c.word}</b>
+        <small>回っていない区域 ${c.over}区域　／　期限まで${PIN_DAYS}日以内 ${c.warn}区域　／　1年以内に回った ${c.known - c.over} / ${c.known}${c.none ? `　／　前回の記録なし ${c.none}区域` : ''}</small></div>
+      <button type="button" class="btn small" data-tgo="status" data-anchor="adDue">状況で見る›</button></div>`;
   }
   function fixTabLabel() {
     const b = document.querySelector('#adTabs [data-ap="inbox"]');
@@ -1446,11 +1454,30 @@ button.ktag{cursor:pointer}
       box = document.createElement('div');
       box.id = 'adToday';
       pane.insertBefore(box, pane.firstChild);
+      box.addEventListener('change', e => {
+        const sel = e.target.closest && e.target.closest('[data-treq]');
+        if (!sel) return;
+        reqPick.set(String(sel.dataset.treq), sel.value);
+        const b = box.querySelector(`[data-tok="${CSS.escape(String(sel.dataset.treq))}"]`);
+        if (b) b.dataset.tterr = sel.value;
+      });
       box.addEventListener('click', e => {
         const q = s => e.target.closest(s);
         let x;
         if ((x = q('[data-tgo]'))) goPane(x.dataset.tgo, x.dataset.anchor);
-        else if ((x = q('[data-tok]'))) approveReq(x.dataset.tok, x.dataset.tterr);
+        else if ((x = q('[data-tmore]'))) {
+          const k = x.dataset.tmore, d = box.querySelector(`details[data-tmorebox="${k}"]`);
+          if (!d) return;
+          d.open = !d.open;
+          if (d.open) tdOpen.add(k); else tdOpen.delete(k);
+          x.setAttribute('aria-expanded', String(d.open)); x.textContent = d.open ? '閉じる ▲' : '確かめる ▼';
+        }
+        else if ((x = q('[data-tok]'))) {
+          const sel = box.querySelector(`[data-treq="${CSS.escape(String(x.dataset.tok))}"]`);
+          approveReq(x.dataset.tok, (sel && sel.value) || x.dataset.tterr);
+        }
+        else if ((x = q('[data-devreg]'))) openDevRegister(x.dataset.devreg, null);
+        else if ((x = q('[data-dev]'))) devActClick(x);
         else if ((x = q('[data-tno]'))) declineReq(x.dataset.tno);
         else if ((x = q('[data-ttaken]'))) {
           const t = terrById(x.dataset.ttaken);
@@ -1470,16 +1497,15 @@ button.ktag{cursor:pointer}
       });
     }
     const items = todayItems();
-    box.innerHTML = coverHtml() + aheadHtml() + `<h2 class="sec">今日の対応</h2>` + (items.length
-      ? items.map(i => `<div class="duerow tdrow" style="border-left-color:${i.tone}"><div><p><b>${i.title}</b></p><p class="muted">${i.sub}</p></div><div class="duebtns">${i.btns}</div></div>`).join('') +
-        '<p class="hint">くわしい一覧と、そのほかの操作は、この下にあります。</p>'
+    box.innerHTML = coverHtml() + `<h2 class="sec">今日の対応</h2>` + (items.length
+      ? items.map(i => `<div class="duerow tdrow" style="border-left-color:${i.tone}"><div><p><b>${i.title}</b></p><p class="muted">${i.sub}</p></div><div class="duebtns">${i.btns}</div>${i.more ? `<details class="tdmore" data-tmorebox="${i.more.key}"${tdOpen.has(i.more.key) ? ' open' : ''}><summary hidden>${i.title}</summary>${i.more.html}</details>` : ''}</div>`).join('')
       : '<div class="tdnone"><b>今日対応することはありません</b><small>新しい申し込みや、急ぎの区域はありません</small></div>') + othersDoneHtml() + lowNoticeHtml();
     // 以前の「待っているものはありません」の表示は、ここに一本化する
     const em = document.getElementById('adInboxEmpty');
     if (em) em.innerHTML = '';
     const cnt = document.getElementById('apCnt');
-    // 「今日」の数字は、人を待たせているもの（申し込み・承認・確認）の数。下のタブの数字と同じ（改善案A8。期限の近い区域などは、この一覧の中だけに出す）
-    if (cnt) { const wn = typeof waitCount === 'function' ? waitCount() : items.length; cnt.textContent = wn; cnt.hidden = !wn; }
+    // 「今日」の数字は、「今日の対応」の行の数（KS-5）。年1回のカバーの1行は数えない
+    if (cnt) { cnt.textContent = items.length; cnt.hidden = !items.length; cnt.title = '今日の対応の件数'; }
     fixTabLabel();
     loadOps(false);
   }
@@ -2650,15 +2676,6 @@ body.duemode .terr-label:not(.duelab){display:none}
     printDoc(html, false);
   }
 
-  /* ---------- （9）「今日」の見通しと成果（1〜2行） ---------- */
-  function aheadHtml() {
-    const m = monthStats(), hot = Math.max(3, Math.ceil(m.avg * 1.5));
-    const ms = m.months.slice(0, 3);
-    const a = achieveStats().months[0];
-    return `<div class="ahead"><p>これからの年1回の期限：${ms.map(x => `<span class="${x.list.length >= hot ? 'hot' : ''}">${x.label} <b>${x.list.length}</b>区域${x.list.length >= hot ? '（多い）' : ''}</span>`).join('　')}
-      <button type="button" class="btn small" data-tgo="status" data-anchor="adDue">見る</button></p>
-      <p>今月はじめて会えた家・部屋：<b>${a.first}</b>軒（うち時間帯を変えて会えた：<b>${a.changed}</b>軒）</p></div>`;
-  }
   /* 記録の少ない正式返却：係が目安未満のまま正式返却にした区域を、待ってから自動で確かめる（index.html の lowSweep）。
      「今日」タブのいちばん下に小さく出すだけ。「今日の対応」の件数には入れない。何もしなくてよい */
   function lowNoticeHtml() {
@@ -2740,7 +2757,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     } finally { decideBusy = false; }
   }
   window.approveReq = function (id, tid0) {
-    const sel = document.querySelector(`[data-reqterr="${CSS.escape(String(id))}"]`);
+    const sel = document.querySelector(`[data-treq="${CSS.escape(String(id))}"]`);
     const tid = tid0 || (sel ? sel.value : '');
     return decide(id, r => {
       const t = terrById(tid);
