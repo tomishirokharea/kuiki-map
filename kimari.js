@@ -41,7 +41,7 @@
 #view-admin .krfold-h .krfold-i:focus-visible{outline:3px solid var(--brand-ink);outline-offset:2px}
 #view-admin .kr-folded{display:none!important}
 #view-admin .krfold-sum{margin:0 0 10px;font-size:.95rem;line-height:1.6;color:var(--ink)}
-#view-admin .krfold-sum .krn{white-space:nowrap;font-weight:700}`;
+#view-admin .krfold-sum .krn{display:inline-block;max-width:100%;overflow-wrap:anywhere;font-weight:700}`;
   document.head.appendChild(css);
 
   /* ---------- 設定ごとの短い名前・今の値・効く状況 ---------- */
@@ -64,14 +64,14 @@
   // 状況の見出し（id） → ［⚙ 決まり］で開く設定。見出しの id は index.html・schedule.js で付けている（もどる先にも使う）
   const prevH = (id, tag) => { const el = $id(id); let p = el && el.previousElementSibling; while (p && p.tagName !== tag) p = p.previousElementSibling; return p; };
   const BLOCKS = [
-    { id: 'adDueH', keys: ['lendDays', 'awayRetPct', 'awayAgainSlot', 'donePct', 'awayTries'] }, // 期限の見張り
-    { id: 'adTilesH', keys: ['lendDays', 'awayRetPct'] }, // 全体の状況
-    { id: 'adAchH', keys: ['keepMonths'] }, // 会えた成果
-    { id: 'adCandH', keys: ['awayTries'] }, // 何度訪ねても会えない家
-    { id: 'adAwaySetH', keys: ['extRest', 'extDays', 'freeAfterDays'] }, // 留守宅の状況
-    { id: 'adAwaySlotsH', keys: ['awayScope', 'awayTries'] }, // まだ試していない家の数（時間帯ごと）
-    { id: 'adAwayTerrsH', keys: ['awayScope', 'awayTries'] }, // 区域ごと
-    { id: 'adHardH', keys: ['awayTries'] } // なかなか会えない家
+    { id: 'adDueH', name: '期限の見張り', keys: ['lendDays', 'awayRetPct', 'awayAgainSlot', 'donePct', 'awayTries'] }, // 期限の見張り
+    { id: 'adTilesH', name: '全体の状況', keys: ['lendDays', 'awayRetPct'] }, // 全体の状況
+    { id: 'adAchH', name: '会えた成果', keys: ['keepMonths'] }, // 会えた成果
+    { id: 'adCandH', name: '何度訪ねても会えない家', keys: ['awayTries'] }, // 何度訪ねても会えない家
+    { id: 'adAwaySetH', name: '留守宅の状況', keys: ['extRest', 'extDays', 'freeAfterDays'] }, // 留守宅の状況
+    { id: 'adAwaySlotsH', name: 'まだ試していない家の数', keys: ['awayScope', 'awayTries'] }, // まだ試していない家の数（時間帯ごと）
+    { id: 'adAwayTerrsH', name: '留守宅の区域ごと', keys: ['awayScope', 'awayTries'] }, // 区域ごと
+    { id: 'adHardH', name: 'なかなか会えない家', keys: ['awayTries'] } // なかなか会えない家
   ];
   function prevHOf(el, tag) { let p = el && el.previousElementSibling; while (p && p.tagName !== tag) p = p.previousElementSibling; return p; }
   // 状況の数字を読む（たたんだときの要点）
@@ -178,7 +178,7 @@
       const btn = document.createElement('button');
       btn.type = 'button'; btn.className = 'btn small krset';
       btn.dataset.krset = ks.join(','); btn.dataset.krfrom = b.id;
-      btn.setAttribute('aria-label', 'この見出しにかかわる区域の決まりを開く');
+      btn.setAttribute('aria-label', b.name + 'の決まりを開く'); // 見出しごとに違う名前（読み上げで8つが同じにならないように）
       btn.textContent = '⚙ 決まり';
       h.classList.add('krsh');
       const fi = h.querySelector(':scope > .krfold-i');
@@ -292,7 +292,7 @@
     if (jump && e.target && e.target.closest && e.target.closest('#adTabs [data-ap], #adTerrSub [data-ap]')) clearJump();
   }, true);
 
-  /* ---------- 変えたあと：左の変わった数字に「前 → 今」の印（10秒）・お知らせに「取り消す」 ---------- */
+  /* ---------- 変えたあと：状況の変わった数字に「前 → 今」の印（10秒）・お知らせに「取り消す」 ---------- */
   const CTL = '[data-sset],[data-kset],[data-aset],[data-dueset],[data-donepct],[data-takemax],[data-range],[data-offadd],[data-offdel]';
   let pending = null, delta = null, deltaBase = null; // deltaBase：設定タブで変えたときの、状況の数字（もどったときに「前 → 今」を出す）
   const snapNums = () => { const o = {}; document.querySelectorAll('#adDue [data-duetl], #adTiles [data-tl]').forEach(t => { const b = t.querySelector('b'); if (b) o[(t.dataset.duetl ? 'd:' + t.dataset.duetl : 't:' + t.dataset.tl)] = b.textContent.trim(); }); return o; };
@@ -446,5 +446,5 @@
   }
   if (wideMq && wideMq.addEventListener) wideMq.addEventListener('change', () => { try { paintFolds(); } catch (e) { /* 何もしない */ } });
 
-  window.KR = { open, F, PLACE };
+  window.KR = { open, F, PLACE, clear: clearJump };
 })();

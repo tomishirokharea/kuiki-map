@@ -390,7 +390,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     let box = document.getElementById('adMapKind');
     if (!box) {
       box = document.createElement('div'); box.id = 'adMapKind';
-      const host = document.getElementById('setMap'), ref = document.getElementById('adLockBox') || document.getElementById('adOpsBox');
+      const host = document.getElementById('setMap'), ref = document.getElementById('adLockBox');
       if (host) host.insertBefore(box, host.firstElementChild ? host.firstElementChild.nextSibling : null); // 設定タブの「地図（全員に効く）」の見出しのすぐ下
       else pane.insertBefore(box, ref ? ref.nextSibling : pane.firstChild);
       box.addEventListener('click', e => {
@@ -696,7 +696,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     const host = document.getElementById('setMap'), kind = document.getElementById('adMapKind');
     if (host && kind && kind.parentNode === host) host.insertBefore(box, kind.nextSibling); // 設定タブの「地図（全員に効く）」：地図の種類の下
     else if (host) host.insertBefore(box, document.getElementById('setMapEtcH'));
-    else { const ref = kind || document.getElementById('adLockBox') || document.getElementById('adOpsBox'); pane.insertBefore(box, ref ? ref.nextSibling : pane.firstChild); }
+    else { const ref = kind || document.getElementById('adLockBox'); pane.insertBefore(box, ref ? ref.nextSibling : pane.firstChild); }
     box.innerHTML = `<h2 class="sec">地図の目印（<span id="lmCount">${LM.items.length}件</span>）</h2>
       <p class="hint">会館・学校・店など、だれでも分かる公の場所だけです。登録は、地図を長押しして「ここに目印を登録」を押します。<br>${PRIV}。</p>
       <div class="chips" id="lmChips" role="group" aria-label="種類で絞りこむ">

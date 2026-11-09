@@ -1340,7 +1340,9 @@ button.ktag{cursor:pointer}
 .tdrow .duebtns{min-width:9em}.tdrow .duebtns .btn{white-space:normal}
 .tdrow .tdmore{grid-column:1/-1;margin-top:4px}.tdrow .tdmore:not([open]){display:none}
 .treqsel{display:flex;flex-direction:column;gap:2px;font-size:15px}.treqsel select{min-height:50px;border-radius:10px;border:2px solid var(--ink);padding:0 8px;background:#fff;font-size:17px;max-width:100%}
-.cover .btn{flex:none;margin-left:auto}`;
+.cover .btn{flex:none;margin-left:auto}
+@media(max-width:520px){.cover{flex-wrap:wrap}.cover>div{flex:1 1 calc(100% - 70px);min-width:0}.cover b{font-size:19px;display:block}.cover .btn{margin-left:58px}
+.tdrow{grid-template-columns:1fr}.tdrow .duebtns{min-width:0}}`;
   document.head.appendChild(css4);
 
   function coverInfo() {
@@ -2260,8 +2262,8 @@ body.duemode .terr-label:not(.duelab){display:none}
     let box = document.getElementById('adLockBox');
     if (!box) {
       box = document.createElement('div'); box.id = 'adLockBox'; box.className = 'lkset';
-      const host = document.getElementById('setDev'), ref = document.getElementById('adOpsBox'); // 設定タブの「この端末だけ」
-      if (host) host.appendChild(box); else pane.insertBefore(box, ref ? ref.nextSibling : pane.firstChild);
+      const host = document.getElementById('setDev'); // 設定タブの「この端末だけ」
+      if (host) host.appendChild(box); else pane.insertBefore(box, pane.firstChild);
       box.addEventListener('click', async e => {
         const q = s => e.target.closest(s), c = lkCfg();
         try {
@@ -2392,24 +2394,26 @@ body.duemode .terr-label:not(.duelab){display:none}
   /* ---------- （6）各画面の「この画面の使い方」 ---------- */
   const HELP = {
     inbox: ['「今日」でやること',
-      ['いちばん上の色の帯で、1年で全区域を回れているかが分かります（緑の✓なら順調）。',
+      ['「今日」には、対応することだけが出ます。ふだんの数字やグラフは「状況」にあります。',
+        'いちばん上の色の帯で、1年で全区域を回れているかが分かります（緑の✓なら順調）。「状況で見る」を押すと、くわしく見られます。',
         '「今日の対応」に出たものだけ対応すれば大丈夫です。何もなければ「今日対応することはありません」と出ます。',
-        '申し込みは「区域○を貸し出す」を押すだけです。まちがえたときは、下に出る「取り消す」で戻せます。',
-        '貸し出す前に、ほかの区域係がもう対応していないかを自動で確かめます。ほかの係が対応したことは、いちばん下に出ます。'],
+        '申し込みは、貸し出す区域をえらんで「貸し出す」を押すだけです。まちがえたときは、下に出る「取り消す」で戻せます。',
+        'ほかの区域係がもう対応したことは、いちばん下に出ます。'],
       ['毎日（奉仕に出る前）：このタブを開いて、出ているものに対応する', '毎週：「受け取られていない留守宅カード」が出ていたら、紙を印刷して集まりで紹介する']],
     terr: ['「区域」でやること',
-      ['上の欄に、番号（例：53）・名前・字・持っている人の名前を入れると、すぐ見つかります。その下のボタンで、貸出中・空いている・期限が近い区域などに絞れます。',
-        '区域の行を押すと、その区域の「カルテ」が開きます。区域の操作はカルテにまとめています（貸し出し・担当を変える・返却・貸出中止・線を直す・S-12の印刷など）。',
-        '「状況」で、期限・時間帯の表・留守宅のようすが見られます。「期限の地図」で、期限ごとに色分けした地図が見られます。',
-        '自動受け取り・枚数・返却の目安などの決まりは、「設定」の「区域の決まり」で変えられます（区域の一覧の上の「区域の決まり」からも開けます）。'],
-      ['毎月：「状況」で、期限の近い区域と「何度訪ねても会えない家」を確かめる']],
+      ['上の欄に、番号（例：53）・名前・字・持っている人の名前を入れると、すぐ見つかります。その下のボタンで、貸出中・空いている・返却の目安を過ぎた・年1回の期限が近い・特別区域などに絞れます。',
+        '区域の行を押すと、その区域の「カルテ」が開きます。貸し出し・担当を変える・返却・貸出中止・この区域だけの調整は、カルテにまとめています。',
+        '一覧の上に、「区域の線・取り込み」（線を引く・直す）、「区域割り当ての記録（S-13）」、「区域カード（S-12）」の3つのボタンがあります。',
+        '上の「一覧」と「家の印」で切りかえます。「家の印」は、拒否や注意の家の印です。'],
+      ['毎月：「状況」の期限の見張りで、期限の近い区域を確かめる']],
     status: ['「状況」でやること',
-      ['期限の見張り：全区域を1年で回るために、今月出したい区域が分かります。',
+      ['期限の見張り：全区域を1年で回るために、今月出したい区域が分かります。「地図で見る」を押すと、期限ごとに色分けした地図が開きます。',
         '時間帯の表：「区域ごと」にすると、まだ試していない枠などに「出す」ボタンが出ます。押すと、その時間帯の留守宅カードが、全員の一覧の上に「区域係のおすすめ」として出ます。',
         '会えた成果：はじめて会えた家と、時間帯を変えて会えた家の数です（会衆全体の数だけで、人ごとの数は出しません）。',
-        '区域の決まり：「設定」タブのいちばん上にあります。各見出しの下の「かかわる設定」を押すと、その設定に飛び、その場で変えられます。変えると、すぐ全員に効きます。'],
-      ['毎月：期限の見張りと、何度訪ねても会えない家を確かめる']],
-    dnc: ['「拒否」でやること',
+        '各見出しの右の「⚙ 決まり」を押すと、その数字を決めている「区域の決まり」が「設定」に開きます。変えると、すぐ全員に効きます。「← 状況にもどる」で、もとの場所に戻れます。',
+        'いちばん下の「毎月の点検」で、要確認がないか確かめます。'],
+      ['毎月：期限の見張りと、何度訪ねても会えない家を確かめる', '毎月の初め：「毎月の点検」を上から確かめる']],
+    dnc: ['「家の印」でやること',
       ['奉仕者が「拒否」と記録した家と、区域係が取り込んだ・追加した拒否が、区域ごとに並びます。区域の行を押すと開きます。',
         '「エクセル・マイマップから取り込む」で、住所の一覧（エクセル）やマイマップの拒否のピンを、まとめて入れられます。',
         '取り込んだものは、近くに家の印が1軒だけなら自動でつなぎます。迷うものは「要確認」に入り、地図には赤い点線の印で出ます。',
@@ -2420,14 +2424,15 @@ body.duemode .terr-label:not(.duelab){display:none}
       ['人の追加・グループ・役割（監督・司会者・区域係）を変えます。人の行を押すと、グループ・監督・司会者・役割を直せます（直して「保存する」を押したときだけ変わります）。',
         '上のさがす欄に、名前やよみ（ひらがな・カタカナどちらでも）を入れると、その場で絞れます。グループの札を押すと、そのグループの人だけになります。',
         '集まりのときは「共通リンクのQRを見せる」と、みんながその場で申し込めます。スマホの登録の申し込みは「今日」タブに出ます。',
-        '監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。',
-        '集まりの予定は、ホーム画面の「＋ 集まりの予定を入れる」で入れます。予定を押すと「この集まりに合う区域」も出せます。'],
-      ['毎月：名簿を見直して、「設定」タブの毎月の点検で「確認した」を押す']],
+        '「グループの中心」は、グループの人がだいたい住んでいるあたりです。置くと、グループ奉仕の区域を近い順に出せます。',
+        '集まりの予定は、ホームのカレンダーの下の「＋ 集まりの予定を入れる」で入れます（監督だけ）。予定を押すと「この集まりに合う区域」も出せます。'],
+      ['毎月：名簿を見直して、よみが入っていない人にはよみを入れる']],
     set: ['「設定」でやること',
-      ['いちばん上の「毎月の点検」で、要確認がないか確かめます。',
-        'この端末の自動ロック、年齢データ、おすすめの決まり、CSVの書き出しなどがあります。',
-        'S-12・S-13の印刷やCSVの書き出しは、だれがいつ行ったかが「書き出しの履歴」に残ります（中身は残しません）。'],
-      ['毎月の初め：点検の項目を上から確かめる']]
+      ['いちばん上の「区域の決まり」で、返却の目安・自動受け取り・1人が持てる枚数など、区域の貸し出しの決まりを変えます。よく変えるものは最初に開いてあり、ほかはまとまりごとにたたんであります。変えると、すぐ全員に効きます。',
+        '「地図」は、地図の種類や目印など、全員に効く設定です。',
+        '「この端末だけ」は、この端末の自動ロックなど、ほかの人には効かない設定です。',
+        '「データの取り込み」と「保守」には、年齢データ・CSVの書き出しなどがあります。S-12・S-13の印刷やCSVの書き出しは、だれがいつ行ったかが「書き出しの履歴」に残ります（中身は残しません）。'],
+      ['決まりを変えたいとき：「状況」の「⚙ 決まり」から開くと、関係する設定が光って分かりやすい']]
   };
   function openHelp() {
     const k = adPane === 'status2' ? 'status' : adPane, h = HELP[k] || HELP.inbox;
@@ -2555,7 +2560,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       ${t.holder ? useSelectHtml(t, 'data-kgrp') : ''}
       ${pool ? `<div class="krow"><button type="button" class="btn" data-kpoolfin>正式に返却したことにする（留守宅の訪ね直し ${pool.pct}%）</button></div>` : ''}
       <label>この区域の貸し出し <select data-klend aria-label="この区域の貸し出し">
-        <option value="auto"${lm === 'auto' ? ' selected' : ''}>きまりのとおり</option>
+        <option value="auto"${lm === 'auto' ? ' selected' : ''}>区域の決まりのとおり</option>
         <option value="open"${lm === 'open' ? ' selected' : ''}>貸出可能にする</option>
         <option value="stop"${lm === 'stop' ? ' selected' : ''}>貸出中止にする</option></select></label>
       <div class="krow"><button type="button" class="btn" data-kredraw>線を直す</button><button type="button" class="btn" data-krename>番号・名前</button>
@@ -2579,7 +2584,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     on('[data-kgrp]', 'onchange', e => setTerrUse(t, e.target.value));
     on('[data-klend]', 'onchange', e => {
       const v = e.target.value;
-      commit(v === 'stop' ? `区域${t.no}を貸出中止にしました` : v === 'open' ? `区域${t.no}を貸出可能にしました` : `区域${t.no}は、きまりのとおりに貸し出します`, () => { t.lend = v; delete t.free; });
+      commit(v === 'stop' ? `区域${t.no}を貸出中止にしました` : v === 'open' ? `区域${t.no}を貸出可能にしました` : `区域${t.no}は、区域の決まりのとおりに貸し出します`, () => { t.lend = v; delete t.free; });
       sheetKeep = true; openKarte(t.id);
     });
     on('[data-kpoolfin]', 'onclick', async () => {

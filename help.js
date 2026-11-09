@@ -181,7 +181,7 @@
         what: '区域の行を押すと、その区域のカルテが開きます。カルテの「区域の操作」の「担当を変える」「この区域の貸し出し」「使い道」で、その区域だけの扱いを変えられます。「使い道」は担当が監督・司会者のときだけ出て、個人の区域・グループ奉仕・全体の集まりから選びます（S-13には「グループ奉仕（名前）」「全体の集まり（名前）」と出ます）。一覧の上のボタンで、貸出中・空いている・期限が近い区域などに絞れます。',
         change: '担当を変えると、その人に区域カードが移ります（前の担当者はS-13に残ります）。「貸出中止」にすると、だれも受け取れません。「貸出可能」にすると、日数のきまりに関係なく受け取れます。「きまりのとおり」は上の設定どおりです。',
         ex: '工事中で入れない地域は「貸出中止」に、急いで回りたい区域は「貸出可能」にします。',
-        tip: 'ふだんは「きまりのとおり」のままにします。' },
+        tip: 'ふだんは「区域の決まりのとおり」のままにします。' },
 
       /* ---- 区域＞状況（期限の見張り・区域ごとの調整） ---- */
       youngW: { t: '若い世代の多い区域を前に出す', dt: '中',
@@ -805,7 +805,7 @@
       var row = rows[i];
       row.setAttribute('data-hq', '1'); // 1回だけ
       var k = keyOf(row); if (!k) continue;
-      if (inSheet && !SHEET_KEYS[k] && !row.closest('#adRules')) continue; // 区域の決まり（kimari.js）は、下から出る画面でも付ける
+      if (inSheet && !SHEET_KEYS[k]) continue;
       if (!HELP.ja[k]) { if (demo() && !warned[k]) { warned[k] = 1; console.info('説明のない設定：' + k); } continue; }
       var lab = row.firstElementChild; if (!lab || lab.querySelector('.qhelp')) continue;
       var br = lab.querySelector('br');
@@ -815,7 +815,7 @@
     for (var j = 0; j < heads.length; j++) {
       var h = heads[j], hk = h.getAttribute('data-hqk');
       h.setAttribute('data-hq', '1');
-      if (inSheet && !SHEET_KEYS[hk] && !h.closest('#adRules')) continue;
+      if (inSheet && !SHEET_KEYS[hk]) continue;
       if (HELP.ja[hk] && !h.querySelector('.qhelp')) h.appendChild(qBtn(hk));
     }
   }

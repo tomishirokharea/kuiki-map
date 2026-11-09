@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.138';
+var APP_JS_VER = '2026.13.139';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2805,6 +2805,14 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.139', role: 'admin', items: [
+    ['係', '係の画面の並びを見直しました。場所が変わったものは次のとおりです。'],
+    ['状', '状況は、上のタブに出ます。「区域」タブの中にあった「状況」は、上の「状況」タブになりました。'],
+    ['決', '区域の決まりは、「設定」タブのいちばん上にあります。状況の見出しの右の「⚙ 決まり」からも開けます。'],
+    ['集', '集まりの予定は、ホームのカレンダーの下から入れます。「予定」タブはなくなりました。'],
+    ['印', '「拒否・！」は、「区域」タブの「家の印」にあります。'],
+    ['今', '「今日」には、対応することだけが出ます。ふだんの数字は「状況」で見られます。']
+  ] },
   { v: '2026.13.138', items: [
     ['係', '家と拒否の管理を、区域係のほかの人にも任せられるようになりました。']
   ] },
@@ -3130,7 +3138,7 @@ function showNewsIfAny(then) {
   lsSet(SEEN_VER, verMax([seen || '0', APP_VERSION].concat(CHANGELOG.map(c => c.v))));
   if (!seen) { then(); return; } // はじめて使う人には出さない
   const who = NS ? 'test' : 'prod'; // only のあるお知らせは、テスト版・本番版のどちらかだけに出す
-  const items = CHANGELOG.filter(c => verCmp(c.v, seen) > 0 && (!c.only || c.only === who)).flatMap(c => c.items);
+  const items = CHANGELOG.filter(c => verCmp(c.v, seen) > 0 && (!c.only || c.only === who) && (!c.role || (c.role === 'admin' && (() => { try { return isAdmin(); } catch (e) { return false; } })()))).flatMap(c => c.items);
   if (!items.length) { then(); return; }
   const el = $('#news');
   el.innerHTML = `<div class="newsbox"><div class="newshead"><p>アップデートのお知らせ</p><h2>区域マップが新しくなりました</h2></div>
@@ -11841,8 +11849,8 @@ function renderAgeAdmin() {
     <p class="hint">国が公開している字ごとの集計（人口の割合）だけを使います。ファイルそのものは保存せず、計算した割合だけを残します。国勢調査は5年ごとなので、新しい調査が出たときに入れかえれば十分です。</p>
     ${cur ? ageShowSetHtml() : ''}
     <div class="setrow"><span>区域と字の対応：<b>${done} / ${ts.length}区域</b>で決まっています<br>
-      <small class="hint">${LIVE ? '区域の線を引く・直すと、数分でサーバーが自動で調べます（国土地理院の住所検索を使います。送るのは建物の位置だけです）。' : '試作版では自動で調べられません。「区域」の一覧の「字を直す」で手で決められます。'}
-      おかしいときは「区域」の一覧の「字を直す」で直せます。</small></span></div>`;
+      <small class="hint"><span>${LIVE ? '区域の線を引く・直すと、数分でサーバーが自動で調べます（国土地理院の住所検索を使います。送るのは建物の位置だけです）。' : '試作版では自動で調べられません。「区域」の一覧の「字を直す」で手で決められます。'}</span>
+      <span>おかしいときは「区域」の一覧の「字を直す」で直せます。</span></small></span></div>`;
 }
 async function onAgeFile(file) {
   let res;
@@ -15574,6 +15582,7 @@ function showView(name) {
   if (name === 'follow' && !featFollow()) name = 'cards';
   if (currentView === 'map' && name !== 'map' && mode !== 'normal') { if (draw) endDraw(); else setMode('normal'); }
   if (name !== 'map') { clearTarget(); followMap = false; hideNextPanel(); if (window.dncPickEnd) window.dncPickEnd(true); }
+  if (name !== 'admin' && window.KR && KR.clear) { try { KR.clear(); } catch (e) { /* 何もしない */ } } // 係の画面を出たら、［← 状況にもどる］と光を消す
   currentView = name;
   $$('.view').forEach(v => { v.hidden = v.id !== 'view-' + name; });
   $$('#tabs button').forEach(b => { if (b.dataset.view === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
@@ -15955,7 +15964,6 @@ function bindStatic() {
     }
   };
   $('#view-admin').addEventListener('click', adminClick);
-  $('#sheet').addEventListener('click', e => { if (e.target.closest && e.target.closest('#adRules')) adminClick(e); });
   $('#view-admin').addEventListener('change', e => {
     const s = e.target, k = s.dataset.assign || s.dataset.reassign;
     if (!k || !s.value) return;

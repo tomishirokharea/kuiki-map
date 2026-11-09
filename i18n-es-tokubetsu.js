@@ -85,7 +85,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "{0}%（{1}のうち{2}）": "{0}% ({2} de {1})",
 "拒否の家・部屋 {0}": "«No visitar»: {0}",
 "区域ごとの数です。くわしい一覧（住所・地図で確かめる）は「家の印」タブにあります。": "Cantidad por territorio. La lista detallada (direcciones y mapa) está en la pestaña «No visitar · !».",
-"「家の印」の一覧を開く": "Abrir la lista «No visitar · !»",
+"「家の印」の一覧を開く": "Abrir la lista «Marcas de las casas»",
 "拒否 {0}": "«No visitar»: {0}",
 "区域の外：{0}": "Fuera de territorio: {0}",
 "まだ確かめていない仮の家 {0}": "Casas provisionales sin confirmar: {0}",

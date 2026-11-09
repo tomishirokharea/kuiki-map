@@ -218,13 +218,17 @@
   }
   var FILTER = {
     acceptNode: function (n) {
-      if (n.nodeType === 1) return skipEl(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      if (n.nodeType === 1) {
+        if (skipEl(n)) { if (n.tagName === 'INPUT' || n.tagName === 'TEXTAREA') doAttrs(n); return NodeFilter.FILTER_REJECT; } // 入力欄の中身は訳さないが、placeholder・aria-label・title は訳す
+        return NodeFilter.FILTER_ACCEPT;
+      }
       return NodeFilter.FILTER_ACCEPT;
     }
   };
   function walk(root) {
     if (!root) return;
     if (root.nodeType === 3) { var p = root.parentElement; if (p && !blocked(p)) doText(root); return; }
+    if (root.nodeType === 1 && (root.tagName === 'INPUT' || root.tagName === 'TEXTAREA') && !blocked(root)) { doAttrs(root); return; }
     if (root.nodeType !== 1 || skipEl(root)) return;
     if (root.parentElement && blocked(root.parentElement)) return;
     doAttrs(root);

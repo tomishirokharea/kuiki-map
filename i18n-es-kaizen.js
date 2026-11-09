@@ -101,7 +101,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "区域{0}を{1}さんに（{2}グループの区域として）貸し出しました": "Territorio {0} asignado a {1} (como territorio del grupo {2})",
 "区域{0}は、今{1}さんに貸し出し中です。返却されてから1つにしてください。": "El territorio {0} está asignado ahora a {1}. Únalos cuando se devuelva.",
 "{0}さんの設定を保存できませんでした。通信を確認して、もう一度変えてください": "No se pudieron guardar los ajustes de {0}. Revise la conexión y vuelva a cambiarlos",
-/* 区域係の「状況」と設定「区域の決め」を左右に（kimari.js） */
+/* 区域係の「状況」と設定「区域の決まり」を左右に（kimari.js） */
 "区域の決まり（設定）": "Reglas de los territorios (ajustes)",
 "変えると、すぐ全員に効きます。左の状況もすぐ変わります。状況の「かかわる設定」を押すと、ここに飛びます。": "Los cambios se aplican enseguida para todos y la situación de la izquierda se actualiza. Al tocar «Ajustes relacionados» en la situación, se salta aquí.",
 "変えると、すぐ全員に効きます": "Los cambios se aplican enseguida para todos",
