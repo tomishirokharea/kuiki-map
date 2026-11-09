@@ -9849,7 +9849,9 @@ const dueOf = t => (t && t.lentAt && !dueExempt(t) ? new Date(Date.parse(t.lentA
 const dueTxt = t => (dueOf(t) ? fmtDay(dueOf(t)) : 'なし'); // 区域カードなどに出す「返却の目安」
 /* 返却の目安を過ぎた貸出か。係の画面の「状況」・内訳・「今日」・申し込みの一覧で、同じ数え方にそろえる（区域カードの「返却の目安」の日付と同じ） */
 /* 紙の記録（S-13）で貸出中の区域が、返却の目安（日数）を過ぎたか。カルテの帯と同じ */
-const paperOver = t => { const ph = paperHoldOf(t); return !!ph && Math.floor((Date.now() - new Date(String(ph.a).slice(0, 10) + 'T00:00:00').getTime()) / 864e5) > lendDays(); };
+/* 紙の記録で渡した日（YYYY-MM-DD）から何日たったか。紙の貸出の日数は、ここ1か所で数える（日付だけの文字列は、その日の0時（端末の時刻）から） */
+const paperDaysFrom = s => Math.floor((Date.now() - new Date(String(s).slice(0, 10) + 'T00:00:00').getTime()) / 864e5);
+const paperOver = t => { const ph = paperHoldOf(t); return !!ph && paperDaysFrom(ph.a) > lendDays(); };
 const overDue = t => pastDue(t) || paperOver(t);
 const pastDue = t => !!(t && t.holder && t.lentAt && dueOf(t) && Date.parse(dueOf(t)) < Date.now());
 /* 留守宅を回る段階：1回目に留守だった時間帯と、まだ訪ねていない時間帯（違う曜日・時間に訪ねると会えやすい） */
@@ -12082,7 +12084,7 @@ function renderAdmin() {
   }
   const outside = D().houses.filter(h => !h.terrId).length;
   const lent = ts.filter(isLent).length;
-  const over = ts.filter(pastDue).length;
+  const over = ts.filter(overDue).length;
   const dncN = dncRefN(); // 訪問しないは拒否の数に入れない
   const provN = D().houses.filter(h => h.prov).length;
   const tile = (k, cls, num, label) => `<button type="button" class="tile${cls}" data-tl="${k}"><b>${num}</b>${label}<span class="tmore">内訳 ›</span></button>`;
@@ -12156,15 +12158,15 @@ function openStatList(key) {
     title = `区域の数 ${ts.length}`;
     body = `<div class="tlsum"><span>貸出中</span><b>${lentT.length}</b>${paperT.length ? `<span>紙の記録で貸出中</span><b>${paperT.length}</b>` : ''}<span>留守宅カードで回っている</span><b>${pool.length}</b><span>空いている</span><b>${freeT.length}</b><span>貸出中止</span><b>${stop.length}</b>${ts.some(isSpecial) ? `<span>そのうち特別区域</span><b>${ts.filter(isSpecial).length}</b>` : ''}</div>
       ${lentT.length ? `<h3 class="sub">貸出中（${lentT.length}）</h3>${lentT.sort((a, b) => (a.lentAt < b.lentAt ? -1 : 1)).map(t => statRow(t, `${esc(uname(t.holder))}さん・${daysSince(t.lentAt)}日目`, pastDue(t))).join('')}` : ''}
-      ${paperT.length ? `<h3 class="sub">紙の記録で貸出中（${paperT.length}）</h3>${paperT.sort((a, b) => (a.paperLentAt < b.paperLentAt ? -1 : 1)).map(t => { const ph = paperHoldOf(t); return statRow(t, `${esc(ph.name || '名前なし')}・${daysSince(ph.a)}日目`, daysSince(ph.a) > lendDays()); }).join('')}` : ''}
+      ${paperT.length ? `<h3 class="sub">紙の記録で貸出中（${paperT.length}）</h3>${paperT.sort((a, b) => (a.paperLentAt < b.paperLentAt ? -1 : 1)).map(t => { const ph = paperHoldOf(t); return statRow(t, `${esc(ph.name || '名前なし')}・${paperDaysFrom(ph.a)}日目`, paperOver(t)); }).join('')}` : ''}
       ${pool.length ? `<h3 class="sub">留守宅カードで回っている（${pool.length}）</h3>${pool.map(t => { const p = poolInfo(t); return statRow(t, p ? `訪ね直し ${p.done}/${p.n}（${p.pct}%）` : ''); }).join('')}` : ''}
       ${stop.length ? `<h3 class="sub">貸出中止（${stop.length}）</h3>${stop.map(t => statRow(t, '貸出中止')).join('')}` : ''}`;
   } else if (key === 'over') {
-    const list = ts.filter(pastDue).sort((a, b) => (a.lentAt < b.lentAt ? -1 : 1));
+    const list = ts.filter(overDue).sort((a, b) => String(a.lentAt || a.paperLentAt) < String(b.lentAt || b.paperLentAt) ? -1 : 1);
     title = `返却の目安を過ぎた貸出 ${list.length}`;
     const exN = ts.filter(t => t.holder && dueExempt(t)).length;
-    hint = `受け取ってから${lendDays()}日（返却の目安）をこえている区域です。古い順です。` + (exN ? `全体の集まり・紙で渡した区域（${exN}枚）は、返却の目安なしで数えていません。` : '');
-    body = list.length ? list.map(t => { const r = roundInfo(t.id, true); return statRow(t, `${esc(uname(t.holder))}さん・${daysSince(t.lentAt)}日目${r ? `・進み具合 約${r.pct}%${r.phase === 'away' ? '（留守宅を回る段階）' : ''}` : ''}`, true); }).join('') : '<div class="empty">ありません</div>';
+    hint = `受け取ってから（紙の記録は割り当てから）${lendDays()}日（返却の目安）をこえている区域です。古い順です。` + (exN ? `全体の集まり・紙で渡した区域（${exN}枚）は、返却の目安なしで数えていません。` : '');
+    body = list.length ? list.map(t => { if (!t.holder) { const ph = paperHoldOf(t); return statRow(t, `紙の記録：${esc(ph.name || '名前なし')}・${paperDaysFrom(ph.a)}日目`, true); } const r = roundInfo(t.id, true); return statRow(t, `${esc(uname(t.holder))}さん・${daysSince(t.lentAt)}日目${r ? `・進み具合 約${r.pct}%${r.phase === 'away' ? '（留守宅を回る段階）' : ''}` : ''}`, true); }).join('') : '<div class="empty">ありません</div>';
   } else if (key === 'units') {
     let house = 0, aptB = 0, aptU = 0, biz = 0, cov = 0, prov = 0, outN = 0, outU = 0;
     const per = new Map();

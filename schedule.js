@@ -556,7 +556,7 @@
     return !done || String(t.returnedAt) > done;
   };
   /* 紙の記録で貸出中（だれが持っているかは係のスマホにだけある） */
-  window.paperHoldTxt = t => { const ph = paperHoldOf(t); return ph ? `紙の記録で貸出中${ph.name ? '：' + esc(ph.name) : ''}（${showDay(ph.a)}から・${daysFrom(ph.a)}日目）` : ''; };
+  window.paperHoldTxt = t => { const ph = paperHoldOf(t); return ph ? `紙の記録で貸出中${ph.name ? '：' + esc(ph.name) : ''}（${showDay(ph.a)}から・${paperDaysFrom(ph.a)}日目）` : ''; };
   window.autoFreeOf = function (t) {
     if (t && Number(D().settings.autoFree) === 1 && isPartial(t)) return true;
     return _autoFreeOf.apply(this, arguments);
@@ -1619,7 +1619,7 @@ button.ktag{cursor:pointer}
     } else if (paperLent(t)) {
       const ph = paperHoldOf(t), over = paperOver(t);
       cls = over ? 'cv-bad' : 'cv-ok'; mark = over ? '▲' : '✓'; word = over ? '紙の記録で貸出中（返却の目安を過ぎています）' : '紙の記録で貸出中';
-      sub = `${ph.name ? esc(ph.name) + '・' : ''}${showDay(ph.a)}に割り当て（${daysFrom(ph.a)}日目）　返却したら、S-13で完了した日付を入れてください`;
+      sub = `${ph.name ? esc(ph.name) + '・' : ''}${showDay(ph.a)}に割り当て（${paperDaysFrom(ph.a)}日目）　返却したら、S-13で完了した日付を入れてください`;
     } else if (t.awayPoolAt) {
       cls = 'cv-warn'; mark = '！'; word = '留守宅カードで回っています';
       const pool = poolInfo(t); if (pool) sub = `留守宅の訪ね直し ${pool.done} / ${pool.n}（${pool.pct}%・目安 ${awayRetPct()}%）`;
