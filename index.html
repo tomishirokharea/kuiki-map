@@ -218,6 +218,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .inline{display:flex;gap:8px}
 /* 予定の印刷：月と印刷ボタン。せまい画面（iPhone）でも横にはみ出さないよう、入りきらなければ2段にする */
 .tbar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.tbar .tbtn.wide{grid-column:1/-1}
 .tbar .tbtn{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;text-align:left;min-height:60px;padding:6px 12px;line-height:1.25;white-space:normal;min-width:0}
 .tbar .tbtn span{font-weight:700;font-size:16px}
 .tbar .tbtn small{font-size:12.5px;font-weight:400;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -239,7 +240,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}
 .chip{min-height:48px;border-radius:99px;border:2px solid var(--ink);background:#fff;padding:0 16px;font-weight:700;font-size:16px}
 .chip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand-ink);color:var(--on-brand)}
-.chip.chip0{opacity:.5;border-style:dashed}
+.chip.chip0{border-style:dashed;color:var(--ink2);background:#F3F5F4;border-color:var(--ink2)}
 .ritem{background:#fff;border:2px solid var(--line);border-left:10px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center}
 .ritem .rt{font-weight:700;font-size:19px}
 .ritem.evrow{grid-template-columns:1fr} /* 自分の予定：ボタンは予定の下に（予定の文字が縦に細くならない） */
@@ -1780,7 +1781,7 @@ body.renshu #btnUpd{display:none!important}
              「区域の線・取り込み」は下から出る画面（torikomi.js）、「区域の決まり」は設定タブの「区域の決まり」を開く。
              並びは「区域の線・取り込み」（1行）→ S-13・S-12（KS-7）。「区域の決まり」は設定タブ（⚙）から -->
         <div class="tbar" id="adTerrTools">
-          <button type="button" class="btn tbtn" id="adMake" style="grid-column:1/-1"><span>区域の線・取り込み</span><small>線を引く・直す・ファイル・特別区域</small></button>
+          <button type="button" class="btn tbtn wide" id="adMake"><span>区域の線・取り込み</span><small>線を引く・直す・ファイル・特別区域</small></button>
           <button type="button" class="btn tbtn" id="adS13"><span>区域割り当ての記録（S-13）</span><small>見る・印刷する</small></button>
           <button type="button" class="btn tbtn" id="adS12"><span>区域カード（S-12）</span><small>印刷する</small></button>
         </div>

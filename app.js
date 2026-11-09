@@ -9848,6 +9848,9 @@ const dueExempt = t => isAllUse(t) || paperHandOf(t);
 const dueOf = t => (t && t.lentAt && !dueExempt(t) ? new Date(Date.parse(t.lentAt) + lendDays() * DAY).toISOString() : '');
 const dueTxt = t => (dueOf(t) ? fmtDay(dueOf(t)) : 'なし'); // 区域カードなどに出す「返却の目安」
 /* 返却の目安を過ぎた貸出か。係の画面の「状況」・内訳・「今日」・申し込みの一覧で、同じ数え方にそろえる（区域カードの「返却の目安」の日付と同じ） */
+/* 紙の記録（S-13）で貸出中の区域が、返却の目安（日数）を過ぎたか。カルテの帯と同じ */
+const paperOver = t => { const ph = paperHoldOf(t); return !!ph && Math.floor((Date.now() - new Date(String(ph.a).slice(0, 10) + 'T00:00:00').getTime()) / 864e5) > lendDays(); };
+const overDue = t => pastDue(t) || paperOver(t);
 const pastDue = t => !!(t && t.holder && t.lentAt && dueOf(t) && Date.parse(dueOf(t)) < Date.now());
 /* 留守宅を回る段階：1回目に留守だった時間帯と、まだ訪ねていない時間帯（違う曜日・時間に訪ねると会えやすい） */
 function awayAdvice(r) {
@@ -12118,7 +12121,7 @@ function renderTerrList(ts) {
     const lateTag = late ? `<span class="tag-warn">${di.st === 'over' ? '年1回の期限を過ぎています' : `年1回の期限まで${di.left}日`}</span>` : '';
     // スマホの2行目：持っている人、または前回の返却
     const sub = t.holder ? `${esc(uname(t.holder))}さん${t.lentAt ? `・${daysSince(t.lentAt)}日目` : ''}${over ? '　<span class="tag-warn">返却の目安を過ぎています</span>' : ''}`
-      : pp ? `紙の記録：${esc(pp.name || '名前なし')}`
+      : pp ? `紙の記録：${esc(pp.name || '名前なし')}${paperOver(t) ? '　<span class="tag-warn">返却の目安を過ぎています</span>' : ''}`
       : pool ? '留守宅カードで回っています'
       : retAt ? `返却 ${fmtDay(retAt)}${lowWaitNote(t)}` : `前回回り終えた日 ${lastDoneTxt(t)}`;
     const who = t.holder ? `${esc(uname(t.holder))}さん` : pp ? `紙の記録：${esc(pp.name || '名前なし')}` : pool ? '留守宅カード' : '—';

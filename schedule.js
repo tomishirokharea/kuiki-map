@@ -1611,13 +1611,13 @@ button.ktag{cursor:pointer}
     // 1 今の状態
     let cls = 'cv-none', mark = '○', word = '空いています', sub = '';
     if (t.holder) {
-      const over = t.lentAt && dueOf(t) && Date.parse(dueOf(t)) < Date.now();
+      const over = pastDue(t);
       let prog = '';
       try { const r = roundInfo(t.id, true); if (r) prog = r.phase === 'away' ? `　留守宅を訪ね直す段階：${r.aw.pct}%（目安 ${awayRetPct()}%）` : `　1回目：${r.pct1}%`; } catch (e) { /* 進み具合なしで出す */ }
       cls = over ? 'cv-bad' : 'cv-ok'; mark = over ? '▲' : '✓'; word = over ? '貸出中（返却の目安を過ぎています）' : '貸出中';
       sub = `${esc(uname(t.holder))}さん・${t.lentAt ? fmtDay(t.lentAt) + 'に受け取り（' + daysSince(t.lentAt) + '日目）' : ''}　返却の目安 ${t.lentAt ? dueTxt(t) : '—'}${prog}`;
     } else if (paperLent(t)) {
-      const ph = paperHoldOf(t), over = daysFrom(ph.a) > lendDays();
+      const ph = paperHoldOf(t), over = paperOver(t);
       cls = over ? 'cv-bad' : 'cv-ok'; mark = over ? '▲' : '✓'; word = over ? '紙の記録で貸出中（返却の目安を過ぎています）' : '紙の記録で貸出中';
       sub = `${ph.name ? esc(ph.name) + '・' : ''}${showDay(ph.a)}に割り当て（${daysFrom(ph.a)}日目）　返却したら、S-13で完了した日付を入れてください`;
     } else if (t.awayPoolAt) {
@@ -2458,7 +2458,7 @@ body.duemode .terr-label:not(.duelab){display:none}
   const TCHIPS = [
     ['all', 'すべて', () => true],
     ['lent', '貸出中', t => isLent(t)],
-    ['over', '返却の目安を過ぎた', t => pastDue(t)], // 一覧の行の「返却の目安を過ぎています」と同じ判定（app.js の pastDue）
+    ['over', '返却の目安を過ぎた', t => overDue(t)], // 一覧の行・カルテの帯の「返却の目安を過ぎています」と同じ判定（app.js の overDue）
     ['free', '空いている', t => !isLent(t) && !t.awayPoolAt && lendMode(t) !== 'stop'], // 「状況」の区域の内訳と同じ数え方
     ['due', '年1回の期限が近い・過ぎた', t => { const d = dueInfo(t); return d.st === 'over' || d.st === 'warn'; }], // 年1回の期限（60日以内・過ぎた）
     ['sp', '特別区域', t => isSpecial(t)]
@@ -2540,7 +2540,6 @@ body.duemode .terr-label:not(.duelab){display:none}
   }
   /* 「区域」タブの上にある、区域の決まり：ボタンは設定（⚙）へ移した（KS-7）。
      以前はここで details に包んでいたが、描き直しの順番によって包まれず、たためなくなることがあった */
-  function foldTakeSet() { /* 「区域の決まり」のボタンは設定（⚙）へ移した（KS-7） */ }
 
   /* ---------- （2）カルテ：区域の操作を集める ---------- */
   /* 状態の帯のすぐ下に出す、いちばんよく使う操作（KS-8）：貸出中→返却する・担当を変える。空き→貸し出す（karteHtml 側） */
@@ -3042,7 +3041,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       wideOn();
       paintTopBar();
       if (!isAdmin() || lkLocked()) return;
-      if (adPane === 'terr') { foldTakeSet(); paintTerrChips(); paintTerrFind(); }
+      if (adPane === 'terr') { paintTerrChips(); paintTerrFind(); }
       if (adPane === 'status') paintAchieve();
     } catch (e) { console.error(e); }
   };
