@@ -1742,7 +1742,7 @@ body.renshu #btnUpd{display:none!important}
           <button type="button" data-ap="people" aria-pressed="false" aria-label="人とグループ">人</button>
           <button type="button" data-ap="set" aria-pressed="false" aria-label="設定">設定</button>
         </div>
-        <!-- 「区域」タブの中の切りかえ（一覧／家の印）。状況は上のタブ。予定のタブは監督だけに出す（区域係には出さない） -->
+        <!-- 「区域」タブの中の切りかえ（一覧／家の印）。状況は上のタブ。上のタブは今日・区域・状況・人・設定の5つ（係の画面は区域係だけ。予定の入口はホーム） -->
         <div class="seg adsub" id="adTerrSub" role="group" aria-label="区域の見かた" hidden>
           <button type="button" data-ap="terr" aria-pressed="true">一覧</button>
           <button type="button" data-ap="dnc" aria-pressed="false">家の印</button>
@@ -1894,6 +1894,6 @@ body.renshu #btnUpd{display:none!important}
 <script src="meibo.js"></script><!-- 名簿（グループ表のPDF）から、人とグループをまとめて直す（区域係だけ・2026-10-24） -->
 <script src="guruchu.js"></script><!-- グループの中心：区域係が地図に置き、グループ奉仕の区域の近さに使う（2026-10-23） -->
 <script src="joukyou-graph.js"></script><!-- 状況の「区域カードと留守宅カード」のグラフ（schedule.js のあと・kimari.js の前に読む。2026-10-31） -->
-<script src="kimari.js"></script><!-- 区域係の「状況」と設定「区域の決まり」を左右に。状況の札から設定に飛ぶ（2026-10-25・いちばん最後に読む） -->
+<script src="kimari.js"></script><!-- 区域係の設定タブ「区域の決まり」の整理。状況の見出しの［⚙ 決まり］から設定へ飛ぶ（2026-10-25／2026-11-09 見直し・いちばん最後に読む） -->
 </body>
 </html>

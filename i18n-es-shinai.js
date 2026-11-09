@@ -185,6 +185,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "区域の見かた": "Cómo ver los territorios",
 "人をさがす（名前・よみ）": "Buscar persona (nombre, lectura)",
 "名前・よみでさがす": "Buscar por nombre o lectura",
+"担当を変える": "Cambiar responsable",
 "期限の見張りの決まりを開く": "Abrir las reglas de Vigilancia de plazos",
 "全体の状況の決まりを開く": "Abrir las reglas de Situación general",
 "会えた成果の決まりを開く": "Abrir las reglas de Resultados de encuentros",

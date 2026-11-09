@@ -320,6 +320,7 @@ const CARRY_KEY = 'kuiki_carry', CARRY_K = 'kuiki_carry_k'; // CARRY_K：預け�
 const HOME_KEY = 'kuiki_home_code', HOME_SEEN = 'kuiki_home_seen', HOME_OFF = 'kuiki_home_banner_off', FIRST_OK = 'kuiki_first_ok', HOME_WELCOME = 'kuiki_home_welcome';
 const TOKEN_KEY = 'kuiki_token', QUEUE_KEY = 'kuiki_queue', OLD_CACHE_KEY = 'kuiki_cache', SYNC_KEY = 'kuiki_sync_at', LOCK_KEY = 'kuiki_lock_ok';
 let onMemoVer = null; // 再訪問メモの合図を受け取る（MemoSync が入れる）
+let badgeCache = null, badgeRev = 0; // 下のタブの数字の覚え書き（updateAdminBadge）
 const DATA_VER = 2; // データの種類が増えたら上げる（端末が一度だけ全部を読み直す）
 const CACHE_KEYS = ['c2_meta', 'c2_houses', 'c2_visits']; // 端末の保存：3つに分けて、変わった分だけ書く
 const BIG_SAVE_GAP_MS = 10 * 60000; // 家・記録（大きい部分）を端末に書く間隔の最短（閉じるときは、いつでも書く）
@@ -648,6 +649,7 @@ const Store = {
     return out;
   },
   save(skipVisits, only) {
+    badgeRev++; // 下のタブの数字（updateAdminBadge）を数え直す合図
     if (!LIVE) {
       if (!lsSet(this.key, JSON.stringify(this.data))) toast('この端末に保存できませんでした');
       return;
@@ -8810,26 +8812,6 @@ function renderInbox() {
   if (takeBox) takeBox.innerHTML = ['selfTakeMax', 'holdMaxPersonal', 'holdMaxGroup', 'reqMaxPersonal', 'reqMaxGroup'].map(k => R[k]).join('');
   if (etcBox) etcBox.innerHTML = ['groupOn', 'groupMax', 'lockOthers', 'memoSync'].map(k => R[k]).join('');
 }
-function approveReq(id) {
-  const r = D().requests.find(x => x.id === id); if (!r) return;
-  const sel = $(`[data-reqterr="${CSS.escape(String(id))}"]`), t = sel ? terrById(sel.value) : null;
-  if (!t || t.holder) { toast('その区域は貸し出せません'); return; }
-  commit(`区域${t.no}を${uname(r.by)}さんに貸し出しました`, () => {
-    const now = new Date().toISOString();
-    t.holder = r.by; t.lentAt = now; t.helpers = []; t.firstDoneAt = null; t.firstDonePct = null; delete t.firstLow; delete t.recLess; t.awayPoolAt = null; t.poolRetId = null;
-    t.group = r.forGroup || null; // グループ用の申し込みなら、グループの区域にする
-    if (t.group && r.use === 'all') t.use = 'all'; else delete t.use;
-    Object.assign(r, { status: 'approved', terrId: t.id, decidedAt: now, seen: false });
-  });
-}
-async function declineReq(id) {
-  const r = D().requests.find(x => x.id === id); if (!r) return;
-  if (!await ask(`${uname(r.by)}さんの申し込みを見送ります。よろしいですか？`)) return;
-  commit('申し込みを見送りました', () => {
-    Object.assign(r, { status: 'declined', decidedAt: new Date().toISOString(), seen: false });
-  });
-}
-
 /* ---------- 区域の返却（回り終えた日の記録） ----------
    「返す」を押したら、区域係が決めた目安で、自動で決める（returnPlan）。奉仕者はえらばなくてよい
    ・1回目が目安に届いていない → 途中の返却（自動受け取りを使っていれば、すぐほかの人が受け取れる。続きから回れる）
@@ -13313,7 +13295,7 @@ function openSchedActions(s, back) {
     <button class="btn block" id="scBack">${back ? '← もどる' : '閉じる'}</button>`);
   const done = () => { if (back) back(); else closeSheet(); };
   $('#scBack').onclick = done;
-  if ($('#scFit')) $('#scFit').onclick = () => { if (window.openMeetFit) window.openMeetFit(s.id); };
+  if ($('#scFit')) $('#scFit').onclick = () => { if (window.openMeetFit) window.openMeetFit(s.id, () => openSchedActions(s, back)); };
   if (!can) return;
   $('#scEdit').onclick = () => openSchedForm(s, null, back);
   $('#scDel').onclick = async () => {
@@ -15621,7 +15603,7 @@ function retapView(name) {
   const calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   try { v.scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' }); } catch (e) { v.scrollTop = 0; }
 }
-/* 係の画面の中のタブ（監督は「予定」と「人・グループ」だけ） */
+/* 係の画面の中のタブ（区域係は今日・区域・状況・人・設定。監督は「人」だけ） */
 let adPane = 'inbox';
 function setAdPane(v) {
   const allowed = isAdmin() ? ['inbox', 'terr', 'status', 'dnc', 'people', 'set'] : ['people'];
@@ -15693,9 +15675,16 @@ function waitCount() {
 function updateAdminBadge() {
   const b = $('#tabBadge');
   if (!isAdmin()) { b.hidden = true; return; }
-  let n; try { n = typeof window.todayCount === 'function' ? window.todayCount() : waitCount(); } catch (e) { n = waitCount(); } // 「今日」の対応の行の数（中の「今日」の数字と同じ）
-  b.textContent = n; b.hidden = !n;
+  /* 数え直しは重いので（返却の目安・点検などを全区域で調べる）、「係の画面」の「今日」を描いたときの数（paintToday）か直前の数を使う。
+     記録を保存したとき（Store.save）か2秒たったときに、数え直す。「今日」を描くとき（paintToday）は、その数をここに入れる */
+  const now = Date.now();
+  if (!badgeCache || badgeCache.rev !== badgeRev || now - badgeCache.at > 2000) {
+    let n; try { n = typeof window.todayCount === 'function' ? window.todayCount() : waitCount(); } catch (e) { n = waitCount(); } // 「今日」の対応の行の数（中の「今日」の数字と同じ）
+    badgeCache = { n, at: now, rev: badgeRev };
+  }
+  b.textContent = badgeCache.n; b.hidden = !badgeCache.n;
 }
+window.setBadgeCount = n => { badgeCache = { n, at: Date.now(), rev: badgeRev }; };
 function openTerr(id) {
   firstMapShow = false;
   zoomHintShown = false; // 区域カードから入ったときは、案内をもう一度出す
@@ -15952,11 +15941,8 @@ function bindStatic() {
       Store.save(); renderAll(); toast('設定を変えました');
     }
     else if ((x = q('[data-extstop]'))) toggleExtStop(x.dataset.extstop);
-    else if ((x = q('[data-reqok]'))) approveReq(x.dataset.reqok);
     else if ((x = q('[data-delok]'))) approveDel(x.dataset.delok);
     else if ((x = q('[data-delno]'))) { const r = D().requests.find(y => y.id === x.dataset.delno); if (r && !houseById(r.houseId)) approveDel(r.id); else declineDel(x.dataset.delno); }
-    else if ((x = q('[data-reqno]'))) declineReq(x.dataset.reqno);
-    else if ((x = q('[data-takenseen]'))) { const t = terrById(x.dataset.takenseen); if (t) commit(`区域${t.no}の受け取りを確認しました`, () => { t.selfSeen = true; t.selfSeenBy = me().id; t.selfSeenAt = new Date().toISOString(); }); }
     else if ((x = q('[data-takemax]'))) {
       const st = D().settings;
       st.selfTakeMax = Math.min(5, Math.max(1, st.selfTakeMax + Number(x.dataset.takemax)));

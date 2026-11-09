@@ -367,7 +367,6 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 /* ---- 予定の印刷 ---- */
 "この月の予定を印刷": "Imprimir el programa del mes",
 "{0}月の予定を印刷": "Imprimir el programa del mes {0}",
-"名前・よみでさがす": "Buscar por nombre",
 "人をさがす（名前・よみ）": "Buscar persona (nombre)",
 "グループの絞り込み": "Filtrar por grupo",
 "人の行を押すと、グループ・役割を直せます。": "Toque a una persona para cambiar su grupo y su función.",

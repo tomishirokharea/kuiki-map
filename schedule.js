@@ -530,10 +530,10 @@
 
   const _renderAdmin = window.renderAdmin;
   window.renderAdmin = function () {
-    _renderAdmin.apply(this, arguments);
+    const ret = _renderAdmin.apply(this, arguments);
     try {
       if (isAdmin()) fixTabLabel();
-      if (lkLocked() && currentView === 'admin') { const ls = document.getElementById('alockScr'); if (!ls || ls.hidden) showLockScreen(); return; }
+      if (lkLocked() && currentView === 'admin') { const ls = document.getElementById('alockScr'); if (!ls || ls.hidden) showLockScreen(); return ret; }
       if (isAdmin() && adPane === 'set') { paintTips(); paintLockBox(); }
       if (isAdmin() && adPane === 'status') {
         paintCand(); paintOps(); loadOps(false);
@@ -541,6 +541,7 @@
         paintSlotBox();
       }
     } catch (e) { console.error(e); }
+    return ret;
   };
 
   /* ---------- 途中で返却された区域・まったく回らずに返却された区域：自動受け取りの対象にする ----------
@@ -1409,9 +1410,10 @@ button.ktag{cursor:pointer}
     if (m.over.length) row('#B71C1C', `年1回の期限を過ぎた区域　${m.over.length}区域`, `区域${listNos(m.over.map(d => d.t))}`, go('status', 'adDue') + karteBtns(m.over.map(d => d.t), 2));
     if (m.warn.length) row('#C2410C', `年1回の期限まで${PIN_DAYS}日以内の区域　${m.warn.length}区域`, `区域${listNos(m.warn.map(d => d.t))}`, go('status', 'adDue'));
     // 7 返却の目安を過ぎた貸出
-    const late = ts.filter(t => t.holder && t.lentAt && dueOf(t) && Date.parse(dueOf(t)) < now); // 全体の集まり・紙で渡した区域は目安なし（M7）
+    const late = ts.filter(t => overDue(t)); // 状況の数・区域の「返却の目安を過ぎた」・一覧のバッジと同じ判定（紙で貸し出した区域も含む）
+    const lateTxt = t => { if (t.holder) return `区域${esc(t.no)}（${esc(uname(t.holder))}さん・${daysSince(dueOf(t) || t.lentAt)}日超過）`; const ph = paperHoldOf(t); return `区域${esc(t.no)}（紙の記録：${esc((ph && ph.name) || '名前なし')}さん・${ph ? paperDaysFrom(ph.a) : 0}日目）`; };
     if (late.length) row('#C2410C', `返却の目安を過ぎた貸出　${late.length}件`,
-      late.slice(0, 4).map(t => `区域${esc(t.no)}（${esc(uname(t.holder))}さん・${daysSince(dueOf(t))}日超過）`).join('、') + (late.length > 4 ? `　ほか${late.length - 4}件` : '') + '。声をかけるかどうかは、係が決めてください。',
+      late.slice(0, 4).map(lateTxt).join('、') + (late.length > 4 ? `　ほか${late.length - 4}件` : '') + '。声をかけるかどうかは、係が決めてください。',
       karteBtns(late, 3));
     // 7b 留守宅カードで回っている区域のうち、2週間進んでいないもの（M3・2026.13.105）。必要なら「正式に返却したことにする」
     const slow = ts.filter(t => !t.holder && t.awayPoolAt && Date.now() - Date.parse(t.awayPoolAt) >= 14 * DAY && (() => { const p = poolInfo(t); if (!p) return false; const last = housesOf(t.id).some(h => targets(h).some(u => visitsOf(K(h.id, u)).some(v => Date.now() - Date.parse(v.at) < 14 * DAY))); return !last; })());
@@ -1514,7 +1516,7 @@ button.ktag{cursor:pointer}
     // 「今日」の数字は、「今日の対応」の行の数（KS-5）。年1回のカバーの1行は数えない
     if (cnt) { cnt.textContent = items.length; cnt.hidden = !items.length; cnt.title = '今日の対応の件数'; }
     fixTabLabel();
-    try { if (typeof updateAdminBadge === 'function') updateAdminBadge(); } catch (e) { /* 下のタブの数字は次の描き直しで直る */ }
+    try { if (typeof setBadgeCount === 'function') setBadgeCount(items.length); if (typeof updateAdminBadge === 'function') updateAdminBadge(); } catch (e) { /* 下のタブの数字は次の描き直しで直る */ }
     loadOps(false);
   }
   window.paintToday = paintToday;
@@ -2855,7 +2857,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       return { t, sc, why, dist };
     }).sort((a, b) => b.sc - a.sc || cmpNo(a.t.no, b.t.no)).slice(0, 3);
   }
-  function openMeetFit(sid) {
+  function openMeetFit(sid, back) { // back：ホームの集まりの画面から開いたとき、その画面にもどる関数
     const s = D().schedules.find(x => x.id === sid);
     if (!s) return;
     const mc = meetCell(s), list = meetFit(s), admin = isAdmin();
@@ -2873,8 +2875,10 @@ body.duemode .terr-label:not(.duelab){display:none}
           ${s.group ? '' : '<p class="hint">監督・司会者でない人をえらんだときは、個人の区域として貸し出します。</p>'}` : ''}</div>`).join('')
         : '<div class="tdnone"><b>今、空いている区域がありません</b></div>'}
       ${admin ? '' : '<p class="hint">区域が必要なときは、「区域カード」画面の「区域をもらう」から申し込んでください。</p>'}
+      ${back ? '<button type="button" class="btn block" id="mfBack">← 予定にもどる</button>' : ''}
       <button type="button" class="btn block" data-close>閉じる</button>`);
     const S = $('#sheet');
+    if (back && $('#mfBack', S)) $('#mfBack', S).onclick = back;
     $$('[data-mfmap]', S).forEach(b => b.onclick = () => { closeSheet(); openTerr(b.dataset.mfmap); });
     $$('[data-mfkarte]', S).forEach(b => b.onclick = () => openKarte(b.dataset.mfkarte));
     $$('[data-mflend]', S).forEach(b => b.onclick = () => {
@@ -2891,7 +2895,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       });
     });
   }
-  window.openMeetFit = openMeetFit; // ホームの集まりの画面（app.js）の［この集まりに合う区域］から開く
+  window.openMeetFit = openMeetFit; // ホームの集まりの画面（app.js）の［この集まりに合う区域］から開く（第2引数：［← 予定にもどる］で開く関数）
 
   /* ---------- （11）会えた成果（会衆全体の数だけ） ----------
      ・はじめて会えた家・部屋：その家の記録のうち、いちばん古い「会えた」が、その月にあるもの
