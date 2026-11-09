@@ -224,6 +224,10 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .tbar .tbtn small{font-size:12.5px;font-weight:400;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .tbar .tbtn[aria-expanded=true]{background:#DCE8F7;border-color:var(--brand-ink)}
 .tbar .tbtn[aria-expanded=true] .tgl{display:inline-block;transform:rotate(180deg)}
+.calhead .calnav{min-width:48px;min-height:48px;font-size:22px;padding:0}
+.pfind .tfind{position:static;padding:6px 0}
+.uplist [hidden]{display:none!important}
+.gcbox>details>summary{min-height:48px;display:flex;align-items:center;font-weight:700;font-size:17px;cursor:pointer}
 .printpick{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;align-items:stretch}
 .printpick input[type=month]{flex:1 1 9em;min-width:0;max-width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:17px;background:#fff;color:var(--ink);-webkit-appearance:none;appearance:none}
 .printpick .btn{flex:1 1 11em;min-width:0;white-space:normal;line-height:1.25;flex-direction:column}
@@ -1734,7 +1738,6 @@ body.renshu #btnUpd{display:none!important}
         <div class="seg subtabs atabs" id="adTabs" role="group" aria-label="係の画面の切りかえ">
           <button type="button" data-ap="inbox" aria-pressed="true">今日<b class="cnt" id="apCnt" hidden title="申し込み・承認・確認を待っているもの">0</b></button>
           <button type="button" data-ap="terr" aria-pressed="false">区域</button>
-          <button type="button" data-ap="sched" aria-pressed="false" hidden>予定</button>
           <button type="button" data-ap="status" aria-pressed="false">状況</button>
           <button type="button" data-ap="people" aria-pressed="false" aria-label="人とグループ">人</button>
           <button type="button" data-ap="set" aria-pressed="false" aria-label="設定">設定</button>
@@ -1750,7 +1753,6 @@ body.renshu #btnUpd{display:none!important}
           <div id="adInbox"></div>
           <div id="adInboxEmpty"></div>
         </div>
-        <div class="apane" data-apane="sched" hidden><div id="adSched"></div></div>
         <div class="apane" data-apane="people" hidden><div id="adPeople"></div></div>
         <!-- 状況は幅いっぱい。設定の行（区域の決まり）は設定タブ（kimari.js）。見出しの右の［⚙ 決まり］で飛ぶ。いちばん下は毎月の点検（schedule.js） -->
         <div class="apane" data-apane="status" hidden>

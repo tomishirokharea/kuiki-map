@@ -12067,7 +12067,6 @@ function renderAdmin() {
   adminSweepSoon();
   renderInbox(); // 承認待ちの数（タブの数字）は、いつも数える
   if (adPane === 'inbox') renderDevices();
-  if (adPane === 'sched') renderSchedAdmin();
   if (adPane === 'people') renderPeople();
   if (adPane === 'set') { renderDataSet(); renderAwayRules(); } // 区域の決まりは設定タブだけに出す（kimari.js）
   if (adPane === 'status') { renderAwayAdmin(); renderMeetAdmin(); }
@@ -13300,11 +13299,13 @@ function openSchedActions(s, back) {
       <p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
     <a class="btn primary block" id="scCal" href="${gcalUrl('奉仕の集まり', s.date, s.time, s.end, s.place, s.note)}" target="_blank" rel="noopener">Googleカレンダーに入れる</a>
     ${placeHref(s) ? `<a class="btn block" href="${esc(placeHref(s))}" target="_blank" rel="noopener">場所をGoogleマップで見る</a>` : ''}
+    ${isAdmin() || isOverseer() ? '<button class="btn block" id="scFit">この集まりに合う区域</button>' : ''}
     ${can ? `<button class="btn block" id="scEdit">この予定を直す</button>
       <button class="btn block danger scdel" id="scDel">この予定を消す</button>` : ''}
     <button class="btn block" id="scBack">${back ? '← もどる' : '閉じる'}</button>`);
   const done = () => { if (back) back(); else closeSheet(); };
   $('#scBack').onclick = done;
+  if ($('#scFit')) $('#scFit').onclick = () => { if (window.openMeetFit) window.openMeetFit(s.id); };
   if (!can) return;
   $('#scEdit').onclick = () => openSchedForm(s, null, back);
   $('#scDel').onclick = async () => {
@@ -13330,8 +13331,8 @@ function calHtml(o) {
     cells += `<button type="button" class="cd${key === today ? ' today' : ''}${wd === 0 ? ' sun' : wd === 6 ? ' sat' : ''}${hn ? ' hol' : ''}${sc ? ' hassc' : ''}" data-day="${key}" aria-label="${m + 1}月${d}日${hn ? '　' + hn : ''}${sc ? `　集まり ${list.map(x => (x.time || '') + (x.place ? ' ' + x.place : '')).join('、')}` : ''}${pl ? '　計画 ' + fmtMin(pl) : ''}">
       <span class="dn">${d}</span><span class="cdmid">${tag}${ev ? '<i class="dp"></i>' : ''}</span>${mn ? `<small>${(mn / 60).toFixed(mn % 60 ? 1 : 0)}h</small>` : pl ? `<small class="pl">${fmtH(pl)}</small>` : ''}</button>`;
   }
-  return `<div class="calhead"><button type="button" class="btn small" data-cm="-1" aria-label="前の月">‹</button><b>${y}年${m + 1}月</b>
-      <button type="button" class="btn small" data-cm="1" aria-label="次の月">›</button></div>
+  return `<div class="calhead"><button type="button" class="btn small calnav" data-cm="-1" aria-label="前の月">‹</button><b>${y}年${m + 1}月</b>
+      <button type="button" class="btn small calnav" data-cm="1" aria-label="次の月">›</button></div>
     <div class="calgrid">${WD.map((w, i) => `<span class="cw${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</span>`).join('')}${cells}</div>
     <p class="calkeys"><span><b class="cdsc">9:30</b>奉仕の集まり</span><span><i class="dp"></i>自分の予定</span>${featTime() ? '<span><small>1.5h</small> 奉仕した時間</span><span><small class="pl">2h</small> 計画</span>' : ''}<span><b style="color:#C62828">赤い字</b> 祝日</span></p>
     ${monthListHtml(y, m, o)}`;
@@ -13746,7 +13747,7 @@ function renderHome() {
   $('#homeCal').innerHTML = calHtml(o);
   // ②の対応：グループ監督の「グループ」タブをなくしたので、そこにあった月の予定印刷（掲示板用）をホームに置く
   $('#homeSchedTools').innerHTML = (isAdmin() || isOverseer())
-    ? printMonthPicker('homeScPrint') : '';
+    ? `<button type="button" class="btn primary block" id="homeScNew">＋ 集まりの予定を入れる</button>${printMonthPicker('homeScPrint')}` : '';
   if (window.IkenR) IkenR.home(); // こまったこと・提案を送る（iken.js）
   if (window.dougaHomeCard) dougaHomeCard(); // はじめての方へ（使い方の動画のカード）
 }
@@ -13841,6 +13842,7 @@ function bindHome() {
     else if ((x = q('[data-cm]'))) { const b = calMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1); calMonth = new Date(b.getFullYear(), b.getMonth() + Number(x.dataset.cm), 1); renderHome(); }
     else if ((x = q('[data-day]'))) openDay(x.dataset.day);
     else if ((x = q('[data-calmode]'))) { calMode = x.dataset.calmode; renderHome(); }
+    else if (q('#homeScNew')) openSchedForm(null, null, null);
     else if (q('#homeScPrint')) printPickedMonth('homeScPrint');
   });
 }
@@ -13915,42 +13917,6 @@ function openSchedForm(s, date, back, draft) {
     done();
   };
 }
-let adSchedMode = 'cal'; // 係の予定：カレンダーか一覧か
-function renderSchedAdmin() {
-  const box = $('#adSched'); if (!box) return;
-  const admin = isAdmin(), today = ymd(new Date());
-  const list = D().schedules.filter(s => s.date >= today && (admin || s.group === myGroup()))
-    .sort((a, b) => (a.date + (a.time || '')) < (b.date + (b.time || '')) ? -1 : 1);
-  box.innerHTML = `<h2 class="sec">奉仕の集まりの予定</h2>
-    <p class="hint">${admin ? 'どのグループの予定も入れられます。「全体」は会衆の全員に表示されます。' : `${esc(myGroup())}グループの予定を入れられます。グループの人のホーム画面に表示されます。`}</p>
-    <button class="btn primary block" id="scNew">＋ 集まりの予定を入れる</button>
-    ${printMonthPicker('scPrint')}
-    <div class="seg" role="group" aria-label="表示の切りかえ">
-      <button type="button" data-asm="cal" aria-pressed="${adSchedMode === 'cal'}">カレンダー</button>
-      <button type="button" data-asm="list" aria-pressed="${adSchedMode === 'list'}">一覧</button></div>
-    ${adSchedMode === 'cal'
-      ? calHtml({ events: [], log: {}, admin: true }) + '<p class="hint">日付を押すと、その日の予定を見たり、すぐ入れたりできます。</p>'
-      : (list.length ? swipeHint(list) + list.map(s => schedRow(s, true)).join('') : '<div class="empty">これからの予定はありません。</div>')}`;
-  $('#scNew').onclick = () => openSchedForm(null, null, null);
-  $('#scPrint').onclick = () => printPickedMonth('scPrint');
-  $$('[data-asm]', box).forEach(b => b.onclick = () => { adSchedMode = b.dataset.asm; renderSchedAdmin(); });
-  $$('[data-cm]', box).forEach(b => b.onclick = () => {
-    const base = calMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    calMonth = new Date(base.getFullYear(), base.getMonth() + Number(b.dataset.cm), 1);
-    renderSchedAdmin();
-  });
-  $$('[data-day]', box).forEach(b => b.onclick = () => openSchedDay(b.dataset.day));
-}
-/* 係・監督：その日の集まりを見る／すぐ入れる */
-function openSchedDay(date) {
-  const sc = schedsOn(date);
-  setSheet(headHtml(null, fmtYmd(date), '奉仕の集まり') + `
-    ${sc.length ? sc.map(s => schedRow(s, false)).join('') : '<p class="muted">この日の集まりはありません。</p>'}
-    <button class="btn primary block" id="sdAdd">＋ この日に集まりを入れる</button>
-    <button class="btn block" data-close>閉じる</button>`);
-  $('#sdAdd').onclick = () => openSchedForm(null, date, () => openSchedDay(date));
-}
-
 /* ---- 人とグループ（区域係は変更できる。監督は自分のグループの人を見るだけ） ---- */
 /* 保存中の変更（id → 変えた値）。返事を待つあいだに同期で名簿が届いても、画面が元にもどって見えないように上から重ねる */
 var USER_PENDING = new Map(); // var：同期の受け取り（上のほうで定義）から、読み込みの順に関係なく見られるように
@@ -14235,6 +14201,15 @@ async function approveDevice(d, extra, name, back) {
   if (extra.newUser) refresh(true).catch(() => {}); // 新しい人を名簿に入れる
   if (back) back(); else closeSheet();
 }
+/* 人のさがす欄と、グループの絞り込み（その場で絞る。描き直しても残す）。名前・よみの比べ方は nameHit（ひらがな・カタカナどちらでも） */
+let peopleQ = '', peopleGrp = '';
+function applyPeopleFilter() {
+  const box = $('#adPeople'); if (!box) return;
+  const rows = $$('.uplist [data-name]', box);
+  rows.forEach(r => { r.hidden = !(nameHit(r.dataset.name, r.dataset.yomi, peopleQ) && (!peopleGrp || r.dataset.grp === peopleGrp)); });
+  const none = $('#adPeopleNone', box); if (none) none.hidden = !rows.length || rows.some(r => !r.hidden);
+  $$('#adPeopleChips [data-pgrp]', box).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.pgrp === peopleGrp)));
+}
 function renderPeople() {
   const box = $('#adPeople'); if (!box) return;
   const admin = isAdmin();
@@ -14242,20 +14217,32 @@ function renderPeople() {
     .sort((a, b) => (a.group || '～').localeCompare(b.group || '～', 'ja') || byKana(a, b));
   const noGroup = admin ? D().users.filter(u => !u.inactive && !u.group).length : 0;
   const noYomi = admin && yomiOn() ? D().users.filter(u => !u.inactive && !u.yomi).length : 0;
+  const groups = admin ? groupsAll() : [];
+  if (peopleGrp && !groups.includes(peopleGrp)) peopleGrp = '';
+  const keepFocus = document.activeElement && document.activeElement.id === 'adPeopleQ' ? document.activeElement.selectionStart : null;
   box.innerHTML = `<h2 class="sec">${admin ? '人とグループ' : `${esc(myGroup())}グループの人`}</h2>
     ${admin ? `<div class="row"><button class="btn primary" id="adUserAdd">＋ 人を追加</button>
       <button class="btn" id="adJoinQr">共通リンクのQRを見せる</button>
-      ${window.MEIBO ? '<button class="btn" id="adMeibo">名簿（PDF）から更新</button>' : ''}</div>
-      <p class="hint">集まりのときは「共通リンクのQR」を見せると、みんながその場で申し込めます。申し込みは、係の画面の「今日」で承認します。</p>` : ''}
+      ${window.MEIBO ? '<button class="btn" id="adMeibo">名簿（PDF）から更新</button>' : ''}</div>` : ''}
     ${noGroup ? `<div class="notice warn"><b>グループが決まっていない人が ${noGroup}人 います。</b>この人たちには、グループの集まりの予定は届きません（「全体」の予定だけが届きます）。</div>` : ''}
     ${noYomi ? `<div class="notice info"><b>よみが入っていない人が ${noYomi}人 います。</b>よみを入れると、名前があいうえお順に並び、ひらがなでもさがせます。<div class="row"><button class="btn small" id="adYomi">まとめて入れる</button></div></div>` : ''}
-    ${admin ? '<p class="hint">人の行を押すと、グループ・監督・司会者・役割を直せます（直して「保存する」を押したときだけ変わります）。<br>監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>' : ''}
+    <div class="pfind"><div class="tfind"><input type="search" id="adPeopleQ" enterkeyhint="search" autocomplete="off" placeholder="名前・よみでさがす" aria-label="人をさがす（名前・よみ）" value="${esc(peopleQ)}"></div>
+      ${groups.length ? `<div class="chips" id="adPeopleChips" role="group" aria-label="グループの絞り込み"><button type="button" class="chip" data-pgrp="" aria-pressed="${!peopleGrp}">すべて</button>${groups.map(g => `<button type="button" class="chip" data-pgrp="${esc(g)}" aria-pressed="${peopleGrp === g}">${esc(g)}</button>`).join('')}</div>` : ''}
+      ${admin ? '<p class="hint">人の行を押すと、グループ・役割を直せます。</p>' : ''}</div>
     <div class="uplist">${users.map(u => {
       const who = `<span class="stamp sm" style="font-size:16px">${esc(u.group || '—')}</span>
         <span class="tl-n"><b>${esc(u.name)}${u.role === 'admin' ? '（区域係）' : ''}${u.overseer ? ' <span class="gbadge">監督</span>' : ''}${u.leader ? ' <span class="gbadge">司会者</span>' : ''}${admin && u.mgr && u.role !== 'admin' ? ' <span class="gbadge">家の管理</span>' : ''}</b></span>`;
+      const at = `data-name="${esc(u.name)}"${yomiAttr(u)} data-grp="${esc(u.group || '')}"`;
       // 区域係：1人1行。押すと下から出る画面で直す（改善案A5。押しまちがいでグループや役割が変わらないように）
-      return admin ? `<button type="button" class="trow1" data-uedit="${esc(u.id)}">${who}<span class="tl-go" aria-hidden="true">›</span></button>` : `<div class="trow1 prow-ro">${who}</div>`;
-    }).join('')}</div>`;
+      return admin ? `<button type="button" class="trow1" ${at} data-uedit="${esc(u.id)}">${who}<span class="tl-go" aria-hidden="true">›</span></button>` : `<div class="trow1 prow-ro" ${at}>${who}</div>`;
+    }).join('')}</div>
+    <p class="muted" id="adPeopleNone" hidden>当てはまる人がいません。</p>`;
+  const q = $('#adPeopleQ', box);
+  q.addEventListener('input', () => { peopleQ = q.value; applyPeopleFilter(); });
+  const chips = $('#adPeopleChips', box);
+  if (chips) chips.addEventListener('click', e => { const b = e.target.closest('[data-pgrp]'); if (!b) return; peopleGrp = b.dataset.pgrp; applyPeopleFilter(); });
+  applyPeopleFilter();
+  if (keepFocus != null) { q.focus(); try { q.setSelectionRange(keepFocus, keepFocus); } catch (e) { /* 種類による */ } }
   if (admin) {
     $('#adUserAdd').onclick = openAddUser;
     $('#adJoinQr').onclick = openJoinQr;
@@ -15541,8 +15528,15 @@ function openS12() {
 function printMonthPicker(id) {
   const n = new Date(), d = new Date(n.getFullYear(), n.getMonth() + 1, 1), val = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
   return `<div class="printpick"><input type="month" id="${id}M" value="${val}" aria-label="印刷する月">
-    <button class="btn" id="${id}">この月の予定を印刷<small>掲示板用</small></button></div>`;
+    <button class="btn" id="${id}"><span id="${id}L">${d.getMonth() + 1}月の予定を印刷</span><small>掲示板用</small></button></div>`;
 }
+/* 月の欄を変えたら、ボタンの文字（「○月の予定を印刷」）も合わせる */
+document.addEventListener('input', e => {
+  const t = e.target, m = t && t.type === 'month' && /^(.+)M$/.exec(t.id || '');
+  if (!m) return;
+  const l = document.getElementById(m[1] + 'L'), v = /^\d{4}-(\d{2})$/.exec(t.value || '');
+  if (l) l.textContent = v ? `${Number(v[1])}月の予定を印刷` : 'この月の予定を印刷';
+});
 function printPickedMonth(id) {
   const m = /^(\d{4})-(\d{2})$/.exec(($(`#${id}M`) || {}).value || '');
   if (!m) { toast('印刷する月をえらんでください'); return; }
@@ -15621,9 +15615,9 @@ function retapView(name) {
 /* 係の画面の中のタブ（監督は「予定」と「人・グループ」だけ） */
 let adPane = 'inbox';
 function setAdPane(v) {
-  const allowed = isAdmin() ? ['inbox', 'terr', 'status', 'dnc', 'people', 'set'] : ['sched', 'people'];
+  const allowed = isAdmin() ? ['inbox', 'terr', 'status', 'dnc', 'people', 'set'] : ['people'];
   adPane = allowed.includes(v) ? v : allowed[0];
-  // 上のタブは5つ（今日・区域・状況・人・設定）。「家の印」は「区域」タブの中の切りかえ。予定（sched）は区域係には出さない（監督だけ）
+  // 上のタブは5つ（今日・区域・状況・人・設定）。「家の印」は「区域」タブの中の切りかえ。予定の入口はホーム（集まりの予定を入れる・月の予定を印刷）
   const tabOf = p => (p === 'dnc' ? 'terr' : p);
   $$('#adTabs [data-ap]').forEach(b => { b.hidden = !allowed.includes(b.dataset.ap); b.setAttribute('aria-pressed', String(b.dataset.ap === tabOf(adPane))); });
   const sub = $('#adTerrSub');
@@ -15632,7 +15626,7 @@ function setAdPane(v) {
   $$('#view-admin .apane').forEach(p => { const k = p.dataset.apane; p.hidden = !(k === adPane || (adPane === 'status' && k === 'status2')); });
 }
 function renderOverseer() {
-  renderSchedAdmin(); renderPeople(); setAdPane(adPane);
+  renderPeople(); setAdPane(adPane);
 }
 function updateTabs() {
   // ②の対応：グループ監督・司会者用の「グループ」タブは廃止。タブは区域係だけに表示する

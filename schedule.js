@@ -2416,13 +2416,12 @@ body.duemode .terr-label:not(.duelab){display:none}
         '「地図で順に確かめる」を押すと、要確認を1件ずつ地図で片づけられます（合っている／正しい家をタップ／とばす）。',
         '1件を押すと、地図で見る・住所を直す・拒否を外すができます。'],
       ['取り込んだあと：「要確認」が0件になるまで、地図で確かめる', '拒否の申し出を受けたとき：「＋ 地図でえらぶ」か「＋ 住所で追加」で入れる']],
-    sched: ['「予定」でやること',
-      ['集まりの予定を入れると、その人たちのホーム画面に出ます。',
-        '「集まりに合う区域」で、集まりの曜日・時間帯に会えている区域や、まだ試していない区域を、近い順に3つまで出します。そのまま貸し出せます。'],
-      ['毎月の終わり：翌月の予定を印刷して、掲示板に張る']],
     people: ['「人」でやること',
-      ['人の追加・グループ・役割（監督・司会者・区域係）を変えます。',
-        'スマホの登録の申し込みは「今日」タブに出ます。'],
+      ['人の追加・グループ・役割（監督・司会者・区域係）を変えます。人の行を押すと、グループ・監督・司会者・役割を直せます（直して「保存する」を押したときだけ変わります）。',
+        '上のさがす欄に、名前やよみ（ひらがな・カタカナどちらでも）を入れると、その場で絞れます。グループの札を押すと、そのグループの人だけになります。',
+        '集まりのときは「共通リンクのQRを見せる」と、みんながその場で申し込めます。スマホの登録の申し込みは「今日」タブに出ます。',
+        '監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。',
+        '集まりの予定は、ホーム画面の「＋ 集まりの予定を入れる」で入れます。予定を押すと「この集まりに合う区域」も出せます。'],
       ['毎月：名簿を見直して、「設定」タブの毎月の点検で「確認した」を押す']],
     set: ['「設定」でやること',
       ['いちばん上の「毎月の点検」で、要確認がないか確かめます。',
@@ -2887,30 +2886,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       });
     });
   }
-  function paintMeetFit() {
-    const host = document.getElementById('adSched');
-    if (!host || !(isAdmin() || isOverseer())) return;
-    const td = today6(), lim = addDays(td, 14);
-    const list = D().schedules.filter(s => s.date >= td && s.date <= lim && (isAdmin() || s.group === myGroup()))
-      .sort((a, b) => ((a.date + (a.time || '')) < (b.date + (b.time || '')) ? -1 : 1)).slice(0, 8);
-    const box = document.createElement('div');
-    box.id = 'adMeetFit';
-    box.innerHTML = `<h2 class="sec">集まりに合う区域（これからの2週間）</h2>
-      ${list.length ? `<p class="hint">集まりの曜日・時間帯に会えている区域や、まだ試していない区域を出します。</p>${list.map(s => `<div class="duerow" style="border-left-color:#1565C0"><div>
-          <p><b>${fmtYmd(s.date)} ${esc(s.time || '')}</b>　${esc(s.place || '')}</p><p class="muted">${esc(schedGroupName(s.group))}</p></div>
-          <div class="duebtns"><button type="button" class="btn small primary" data-mfit="${esc(s.id)}">合う区域を見る</button></div></div>`).join('')}`
-        : '<p class="muted">これからの2週間に、集まりの予定はありません。</p>'}`;
-    box.addEventListener('click', e => { const b = e.target.closest('[data-mfit]'); if (b) openMeetFit(b.dataset.mfit); });
-    const old = document.getElementById('adMeetFit');
-    if (old) old.replaceWith(box); else host.appendChild(box);
-  }
-  if (typeof renderSchedAdmin === 'function') {
-    const _renderSchedAdmin = window.renderSchedAdmin;
-    window.renderSchedAdmin = function () {
-      _renderSchedAdmin.apply(this, arguments);
-      try { paintMeetFit(); } catch (e) { console.error(e); }
-    };
-  }
+  window.openMeetFit = openMeetFit; // ホームの集まりの画面（app.js）の［この集まりに合う区域］から開く
 
   /* ---------- （11）会えた成果（会衆全体の数だけ） ----------
      ・はじめて会えた家・部屋：その家の記録のうち、いちばん古い「会えた」が、その月にあるもの

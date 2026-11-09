@@ -366,6 +366,18 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "新しい版にしたとき、一部の画面だけ古いままになることがあったのを直しました": "Se corrigió que, al actualizar, parte de la app pudiera quedar en la versión anterior",
 /* ---- 予定の印刷 ---- */
 "この月の予定を印刷": "Imprimir el programa del mes",
+"{0}月の予定を印刷": "Imprimir el programa del mes {0}",
+"名前・よみでさがす": "Buscar por nombre",
+"人をさがす（名前・よみ）": "Buscar persona (nombre)",
+"グループの絞り込み": "Filtrar por grupo",
+"人の行を押すと、グループ・役割を直せます。": "Toque a una persona para cambiar su grupo y su función.",
+"当てはまる人がいません。": "No hay nadie que coincida.",
+"この集まりに合う区域": "Territorios para esta reunión",
+"人の追加・グループ・役割（監督・司会者・区域係）を変えます。人の行を押すと、グループ・監督・司会者・役割を直せます（直して「保存する」を押したときだけ変わります）。": "Agregue personas y cambie grupo y funciones (superintendente, conductor, encargado de territorios). Al tocar a una persona se cambian; solo se guarda al tocar «Guardar».",
+"上のさがす欄に、名前やよみ（ひらがな・カタカナどちらでも）を入れると、その場で絞れます。グループの札を押すと、そのグループの人だけになります。": "Escriba un nombre en la casilla de arriba para filtrar al instante. Toque un grupo para ver solo a sus miembros.",
+"集まりのときは「共通リンクのQRを見せる」と、みんながその場で申し込めます。スマホの登録の申し込みは「今日」タブに出ます。": "En las reuniones, muestre el QR del enlace común para que todos se registren en el momento. Las solicitudes de registro aparecen en «Hoy».",
+"監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。": "Los superintendentes y conductores reciben territorios del grupo y eligen quién sale ese día. Solo el superintendente puede agregar reuniones.",
+"集まりの予定は、ホーム画面の「＋ 集まりの予定を入れる」で入れます。予定を押すと「この集まりに合う区域」も出せます。": "Las reuniones se agregan en Inicio con «＋ Agregar reunión para la predicación». Al tocar una reunión puede ver los territorios que le convienen.",
 "掲示板用": "para el tablero",
 /* ---- マイマップ取り込みの道のすき間・名前のまちがい（2026.13.46） ---- */
 "マイマップの取り込みで、枝番の線のずれや道のすき間がほかの枝番にまとわりつかないようにしました": "Al importar desde Mis mapas, el desfase de las líneas de las subdivisiones y los espacios de las calles ya no se pegan a otras subdivisiones",
