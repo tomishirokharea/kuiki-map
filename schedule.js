@@ -1362,7 +1362,7 @@ button.ktag{cursor:pointer}
     const go = (pane, anchor, label) => `<button type="button" class="btn small primary" data-tgo="${pane}" data-anchor="${anchor || ''}">${label || '見る'}</button>`;
     const row = (tone, title, sub, btns, more) => out.push({ tone, title, sub, btns, more });
     // 「確かめる ▼」：行の下に、今までの中身（番号の確認と登録・削除する／見送る）をひらく。別の場所へは飛ばない
-    const check = key => `<button type="button" class="btn small primary" data-tmore="${key}" aria-expanded="${tdOpen.has(key)}">${tdOpen.has(key) ? '閉じる ▲' : '確かめる ▼'}</button>`;
+    const check = key => `<button type="button" class="btn small primary" data-tmore="${key}" aria-controls="tdmore-${key}" aria-expanded="${tdOpen.has(key)}">${tdOpen.has(key) ? '閉じる ▲' : '確かめる ▼'}</button>`;
     // 1 スマホの登録の申し込み（本人の番号を確かめる必要があるので、ここでは決めない）
     if (typeof devPending === 'function' && typeof devPendHtml === 'function') {
       const n = devPending().length;
@@ -1424,10 +1424,11 @@ button.ktag{cursor:pointer}
       if (bad.length) row('#546E7A', `字を調べられなかった区域　${bad.length}区域`, `区域${listNos(bad)}。「字を直す」で手で決められます`, go('terr', 'adTerrs', '区域の一覧へ'));
     }
     // 10 毎月の点検で要確認のもの
-    const warns = opsItems().filter(i => i.state === 'warn');
+    const warns = opsItems().filter(i => i.state === 'warn' && i.id !== 's13'); // S-13の「記録なし」は、上の年1回のカバーの1行に出す（1回だけ）
     if (warns.length) row('#8A6D00', `点検で要確認　${warns.length}件`, warns.map(i => esc(i.title) + (i.detail ? `（${i.detail}）` : '')).join('、'), go('set', 'adOps', '点検を見る'));
     return out;
   }
+  window.todayCount = () => todayItems().length; // 下のタブ（係の画面）の数字も、「今日」の数字と同じこの数にする
   function coverHtml() {
     const c = coverInfo();
     return `<div class="cover ${c.cls}" role="status"><i aria-hidden="true">${c.mark}</i>
@@ -1498,7 +1499,7 @@ button.ktag{cursor:pointer}
     }
     const items = todayItems();
     box.innerHTML = coverHtml() + `<h2 class="sec">今日の対応</h2>` + (items.length
-      ? items.map(i => `<div class="duerow tdrow" style="border-left-color:${i.tone}"><div><p><b>${i.title}</b></p><p class="muted">${i.sub}</p></div><div class="duebtns">${i.btns}</div>${i.more ? `<details class="tdmore" data-tmorebox="${i.more.key}"${tdOpen.has(i.more.key) ? ' open' : ''}><summary hidden>${i.title}</summary>${i.more.html}</details>` : ''}</div>`).join('')
+      ? items.map(i => `<div class="duerow tdrow" style="border-left-color:${i.tone}"><div><p><b>${i.title}</b></p><p class="muted">${i.sub}</p></div><div class="duebtns">${i.btns}</div>${i.more ? `<details class="tdmore" id="tdmore-${i.more.key}" data-tmorebox="${i.more.key}"${tdOpen.has(i.more.key) ? ' open' : ''}><summary hidden>${i.title}</summary>${i.more.html}</details>` : ''}</div>`).join('')
       : '<div class="tdnone"><b>今日対応することはありません</b><small>新しい申し込みや、急ぎの区域はありません</small></div>') + othersDoneHtml() + lowNoticeHtml();
     // 以前の「待っているものはありません」の表示は、ここに一本化する
     const em = document.getElementById('adInboxEmpty');

@@ -15687,7 +15687,7 @@ function waitCount() {
 function updateAdminBadge() {
   const b = $('#tabBadge');
   if (!isAdmin()) { b.hidden = true; return; }
-  const n = waitCount();
+  let n; try { n = typeof window.todayCount === 'function' ? window.todayCount() : waitCount(); } catch (e) { n = waitCount(); } // 「今日」の対応の行の数（中の「今日」の数字と同じ）
   b.textContent = n; b.hidden = !n;
 }
 function openTerr(id) {
