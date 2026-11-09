@@ -8704,7 +8704,7 @@ function renderInbox() {
 
   const st = D().settings;
   paintTakeTgl();
-  // 区域の決まりの設定の行は、状況の右の「区域の決まり」に出す（kimari.js・状況と設定を左右に）。
+  // 区域の決まりの設定の行は、設定タブの「区域の決まり」に出す（kimari.js が置き場所をそろえる）。
   // 状況に効くもの（返却の目安・完了の目安など）は「貸し出しと返却」に、ほかは「受け取れる枚数・一緒に回る など」に分ける
   const R = {
     lendDays: `<div class="setrow">
@@ -8797,9 +8797,11 @@ function renderInbox() {
         <button type="button" data-sset="memoSync" data-v="1" aria-pressed="${st.memoSync !== 0}">使う</button>
         <button type="button" data-sset="memoSync" data-v="0" aria-pressed="${st.memoSync === 0}">使わない</button></div></div>`,
   };
-  const lendBox = $('#krLend'), etcBox = $('#krEtc');
+  // 区域の決まり（設定タブ）の箱。よく調整する行（返却の目安など）は、kimari.js が「よく調整する」に移す
+  const lendBox = $('#krLend'), takeBox = $('#krTake'), etcBox = $('#krTipsEtc');
   if (lendBox) lendBox.innerHTML = ['lendDays', 'donePct', 'awayRetPct', 'awayAgainSlot', 'lowOn', 'lowWait', 'autoFree', 'freeAfterDays', 'skipDays', 'followSkipDays', 'skipDone'].map(k => R[k]).join('');
-  if (etcBox) etcBox.innerHTML = ['selfTakeMax', 'holdMaxPersonal', 'holdMaxGroup', 'reqMaxPersonal', 'reqMaxGroup', 'groupOn', 'groupMax', 'lockOthers', 'memoSync'].map(k => R[k]).join('');
+  if (takeBox) takeBox.innerHTML = ['selfTakeMax', 'holdMaxPersonal', 'holdMaxGroup', 'reqMaxPersonal', 'reqMaxGroup'].map(k => R[k]).join('');
+  if (etcBox) etcBox.innerHTML = ['groupOn', 'groupMax', 'lockOthers', 'memoSync'].map(k => R[k]).join('');
 }
 function approveReq(id) {
   const r = D().requests.find(x => x.id === id); if (!r) return;
@@ -10209,9 +10211,9 @@ function openSlotSheet() {
 
 /* 係：完了のあとの留守宅（おすすめ）（2026-10-26。前は「返却後の留守宅カード」）
    完了した区域（S-13 に完了として記録したあと、次に区域カードとして受け取られるまで）の残りの留守宅は、留守宅カードにせず、
-   おすすめタブだけに出す。set＝設定の行（状況の右の「区域の決まり」に出す）・table＝完了した区域の表（左の状況に出す）。
+   おすすめタブだけに出す。extSetHtml＝設定の行（設定タブの「区域の決まり」に出す）・extAdminHtml＝完了した区域の表（状況に出す）。
    表は renderAwayAdmin で作った idx（unmetIndex の結果）を使い回す（区域ごとに unmetIndex を呼ばない） */
-function extAdminHtml(idx, rrow, stpd) {
+function extSetHtml(rrow, stpd) {
   const x = extSet(), st = D().settings, fd = Number(st.freeAfterDays) || 0, auto = Number(st.autoFree) === 1 && fd > 0;
   const om = Math.max(1, Math.min(5, Number(st.osaeMax) || 2)), od = Math.max(1, Math.min(14, Number(st.osaeDays) || 7)), rc = Math.max(1, Math.min(5, Number(st.recoCount) || 3));
   const lockOn = Number(st.recoLock) === 1, leftOn = Number(st.recoLeft) !== 0;
@@ -10232,6 +10234,10 @@ function extAdminHtml(idx, rrow, stpd) {
         <button type="button" data-sset="recoLock" data-v="0" aria-pressed="${!lockOn}">出さない</button></div>`) +
     rrow('1人が押さえられる予定の数', '「予定に入れる」をすると、その日の終わりまで、その家をほかの人のおすすめに出しません。同時にいくつまで押さえられるかです', stpd('osaeMax', om, 'つまで', '押さえられる予定の数', 1)) +
     rrow('何日先まで予定に入れられるか', '先の予定ほど、家を長く押さえることになります。使わなかった家は、予定の日が終わると、またおすすめに出ます', stpd('osaeDays', od, '日先まで', '予定に入れられる日数', 1));
+  return set;
+}
+function extAdminHtml(idx) {
+  const leftOn = Number(D().settings.recoLeft) !== 0;
   const live = liveHolds(), heldBy = new Map();
   live.forEach(h => { heldBy.set(h.terrId, (heldBy.get(h.terrId) || 0) + (h.keys || []).length); });
   const rows = D().territories.slice().sort(byNo).map(t => {
@@ -10243,7 +10249,7 @@ function extAdminHtml(idx, rrow, stpd) {
     return `<tr><th>区域${esc(t.no)}</th><td>${items.length}軒</td><td>${leftOn ? `${ln}軒` : '—'}</td><td>${state}</td><td>${hn ? `${hn}軒` : '—'}</td>
       <td>${lendMode(t) === 'stop' ? '<span class="muted">貸出中止</span>' : `<button type="button" class="btn small" data-extstop="${esc(t.id)}">${t.extStop ? '出す' : '止める'}</button>`}</td></tr>`;
   }).join('');
-  return { set, table: `<p class="q" data-hqk="extList">完了した区域（残りの留守宅は、おすすめに出します）</p>` + (rows
+  return { table: `<p class="q" data-hqk="extList">完了した区域（残りの留守宅は、おすすめに出します）</p>` + (rows
     ? `<div class="scroll"><table class="slots narrow"><tr><th>区域</th><th>残りの留守宅</th><th>回り残し</th><th>おすすめ</th><th>予定で押さえ中</th><th></th></tr>${rows}</table></div>`
     : '<p class="muted">今、完了した区域はありません。</p>') };
 }
@@ -10253,9 +10259,10 @@ function toggleExtStop(tid) {
   commit(t.extStop ? `区域${t.no}の残りの留守宅を、おすすめに出すようにしました` : `区域${t.no}の残りの留守宅を、おすすめに出さないようにしました`, () => { if (t.extStop) delete t.extStop; else t.extStop = true; });
 }
 
-/* 係：留守宅の状況 */
-function renderAwayAdmin() {
-  const st = D().settings, idx = unmetIndex(), act = activeCards();
+/* 係：区域の決まり（設定タブ）の「留守宅カード」「おすすめ（完了のあと）」の行。設定タブを開いているときだけ描く（kimari.js が置き場所をそろえる） */
+function renderAwayRules() {
+  const awayBox = $('#krAway'), extBox = $('#krExt'); if (!awayBox && !extBox) return;
+  const st = D().settings;
   const step = (key, label, unit, d) => `<div class="setrow"><span>${label}</span><div class="stepper">
     <button type="button" data-aset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${st[key]}${unit}</output>
     <button type="button" data-aset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div></div>`;
@@ -10268,10 +10275,7 @@ function renderAwayAdmin() {
   const stpd = (key, val, unit, label, d) => `<div class="stepper"><button type="button" data-aset="${key}" data-d="-${d}" aria-label="${label}を減らす">−</button><output class="wide">${val}${unit}</output>
     <button type="button" data-aset="${key}" data-d="${d}" aria-label="${label}を増やす">＋</button></div>`;
   const dayOnly = Number(st.awayDayOnly) || 0;
-  // 留守宅の設定の行は、状況の右の「区域の決まり」（kimari.js）に出す。左の「留守宅の状況」には、完了した区域の表だけを出す
-  const awayBox = $('#krAway'), extBox = $('#krExt'), ex = extAdminHtml(idx, rrow, stpd);
-  if (extBox) extBox.innerHTML = ex.set;
-  $('#adAwaySet').innerHTML = ex.table;
+  if (extBox) extBox.innerHTML = extSetHtml(rrow, stpd);
   if (awayBox) awayBox.innerHTML = `<p class="q"><b>留守宅訪問のルール</b></p>` +
     rrow('留守宅として訪ねる上限回数', '今回の巡回で留守だった日の数です（同じ日は1回）。届いた家は、次の巡回が始まるまで留守宅カードに入りません', stp('awayCap', rl.cap, '回', '上限回数')) +
     rrow('この日数以内に訪ねた家は、カードに入れない', '同じ家を次に訪ねるまでの最短の間隔です。0にすると、間隔をあけません', stp('awayRecentDays', rl.gap, '日', '最短間隔')) +
@@ -10279,7 +10283,7 @@ function renderAwayAdmin() {
     rrow('試した時間帯の数え方', 'どの時間帯を「試した」とみなすかだけが変わります。留守宅になる家の範囲は変わりません（今回の巡回で会えていない家です）', two('awayScope', rl.sc, [0, '今回の巡回だけ'], [1, '前回の巡回も含める'])) +
     `<p class="hint">設定を変えても、今出ているカードには反映されません。次に受け取るカードから変わります。</p>
     <p class="hint">巡回：正式返却のあと、次に区域カードとして受け取った日から、次の正式返却まで。完了のあと（おすすめに出す期間）は、前の巡回の続きです。</p>
-    <p class="hint">留守宅カードは、区域が完了する（S-13 に記録する）までです。完了のあとの残りの留守宅は、「完了のあとの留守宅（おすすめ）」の決めで、おすすめタブに出します。</p>
+    <p class="hint">留守宅カードは、区域が完了する（S-13 に記録する）までです。完了のあとの残りの留守宅は、「おすすめ（完了のあと）」の決めで、おすすめタブに出します。</p>
     <p class="q"><b>留守宅カードの出し方</b></p>` +
     `<div class="setrow"><span>留守宅カードが自動で終わるとき<br><small class="hint">「区域の返却の目安まで」は、区域を受け取った日から返却の目安（${lendDays()}日）までです。目安がない区域は、下の日数で終わります</small></span>
       <div class="seg" role="group"><button type="button" data-sset="awayExp" data-v="0" aria-pressed="${Number(st.awayExp) !== 1}">日数で</button>
@@ -10292,6 +10296,11 @@ function renderAwayAdmin() {
       <div class="seg" role="group"><button type="button" data-sset="awayAllTerr" data-v="1" aria-pressed="${st.awayAllTerr === 1}">使う</button>
       <button type="button" data-sset="awayAllTerr" data-v="0" aria-pressed="${st.awayAllTerr !== 1}">使わない</button></div></div>` +
     rrow('その日限りにする軒数', 'この軒数以下のカードは、受け取った日の終わりに自動で終わります（用事のついでに寄る人向け）。0にすると使いません', stpd('awayDayOnly', dayOnly, dayOnly ? '軒まで' : '（使わない）', 'その日限りにする軒数', 1));
+}
+/* 係：留守宅の状況（状況タブ）。設定の行は renderAwayRules（設定タブ）。ここには完了した区域の表だけを出す */
+function renderAwayAdmin() {
+  const idx = unmetIndex(), act = activeCards();
+  $('#adAwaySet').innerHTML = extAdminHtml(idx).table;
 
   const all = [...idx.values()].flat();
   const cnt = {};
@@ -12066,7 +12075,7 @@ function renderAdmin() {
   if (adPane === 'inbox') renderDevices();
   if (adPane === 'sched') renderSchedAdmin();
   if (adPane === 'people') renderPeople();
-  if (adPane === 'set') renderDataSet();
+  if (adPane === 'set') { renderDataSet(); renderAwayRules(); } // 区域の決まりは設定タブだけに出す（kimari.js）
   if (adPane === 'status') { renderAwayAdmin(); renderMeetAdmin(); }
   if (adPane === 'dnc') { if (window.renderDncAdmin) window.renderDncAdmin(); return; } // 拒否の一覧（kyohi.js）
   if (adPane !== 'status' && adPane !== 'terr') return;
@@ -13614,8 +13623,10 @@ function maybeAutoLocate() {
   } catch (e) { /* 何もしない */ }
 }
 /* 係の画面：おすすめの設定と、種類ごとの会えた割合 */
+/* 「おすすめを出す」「雨の日は、集合住宅を先に出す」の行は、設定タブの「区域の決まり」の「おすすめ（完了のあと）」（#krReco）に出す。
+   おすすめから訪ねた記録の表は、同じまとまりの下（#adReco） */
 function renderRecoAdmin() {
-  const box = $('#adReco'); if (!box) return;
+  const box = $('#adReco'), rbox = $('#krReco'); if (!box || !rbox) return;
   const st = D().settings, on = Number(st.recoOn) !== 0;
   const flag = (key, label, hint, a, b) => `<div class="setrow"><span>${label}<br><small class="hint">${hint}</small></span>
     <div class="seg" role="group" aria-label="${label}"><button type="button" data-sset="${key}" data-v="1" aria-pressed="${Number(st[key]) !== 0}">${a}</button><button type="button" data-sset="${key}" data-v="0" aria-pressed="${Number(st[key]) === 0}">${b}</button></div></div>`;
@@ -13630,13 +13641,11 @@ function renderRecoAdmin() {
     const s = stat[r[0]];
     return `<tr><th>${r[1]}</th><td>${s.n}件</td><td>${s.m}件</td><td><b>${Math.round(s.m / s.n * 100)}%</b></td></tr>`;
   }).join('');
-  box.innerHTML = `<h2 class="sec">おすすめ</h2>
-    <p class="hint">完了した区域（S-13 に完了として記録した区域）の残りの留守宅を、全員の画面の下のタブ「おすすめ」に、近くの数軒ずつ出します。カードを受け取らなくても、空いた時間に回れます。</p>
+  rbox.innerHTML = `<p class="hint">完了した区域（S-13 に完了として記録した区域）の残りの留守宅を、全員の画面の下のタブ「おすすめ」に、近くの数軒ずつ出します。カードを受け取らなくても、空いた時間に回れます。</p>
     ${flag('recoOn', 'おすすめを出す', '出さないにすると、全員の画面から「おすすめ」のタブが消えます', '出す', '出さない')}
-    ${on ? '<p class="hint">出す家・期間・予定で押さえる数などは、区域タブの「状況」の「区域の決まり（設定）」の「完了のあとの留守宅（おすすめ）」で決めます。</p>' : ''}
     ${flag('wxOn', '雨の日は、集合住宅を先に出す', '雨のとき、全員の「区域をもらう」（おすすめ順）では集合住宅の多い区域を、「おすすめ」タブでは集合住宅の部屋（エレベーターありが先）を、自動で先に出します。奉仕者の操作はいりません', '出す', '出さない')}
-    ${on || Number(st.wxOn) !== 0 ? `<p class="hint">今の天気の判定：${!LIVE ? '試作モードでは調べません' : !WX ? 'まだ届いていません（数分後にもう一度開いてください）' : WX.off ? '夜は調べません' : WX.err ? '調べられませんでした（ふだんの並びで動いています）' : (WX.r === 1 ? '<b>雨</b>' : '雨ではない') + `（${fmtTime(new Date(WX.at))}に確認${WX.p != null ? `・2時間の降水確率 ${WX.p}%` : ''}）`}</p>` : ''}
-    <h3 class="sub">おすすめから訪ねた記録（直近90日）</h3>
+    ${on || Number(st.wxOn) !== 0 ? `<p class="hint">今の天気の判定：${!LIVE ? '試作モードでは調べません' : !WX ? 'まだ届いていません（数分後にもう一度開いてください）' : WX.off ? '夜は調べません' : WX.err ? '調べられませんでした（ふだんの並びで動いています）' : (WX.r === 1 ? '<b>雨</b>' : '雨ではない') + `（${fmtTime(new Date(WX.at))}に確認${WX.p != null ? `・2時間の降水確率 ${WX.p}%` : ''}）`}</p>` : ''}`;
+  box.innerHTML = `<h3 class="sub">おすすめから訪ねた記録（直近90日）</h3>
     ${rows ? `<div class="scroll"><table class="slots narrow"><tr><th>種類</th><th>訪ねた</th><th>会えた</th><th>会えた割合</th></tr>${rows}</table></div>` : '<p class="muted">まだ記録はありません。</p>'}`;
 }
 

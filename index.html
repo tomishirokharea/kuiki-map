@@ -1752,10 +1752,7 @@ body.renshu #btnUpd{display:none!important}
         </div>
         <div class="apane" data-apane="sched" hidden><div id="adSched"></div></div>
         <div class="apane" data-apane="people" hidden><div id="adPeople"></div></div>
-        <!-- 区域係の「状況」と設定「区域の決まり」を左右に（kimari.js）。パソコン（幅1,180px以上）は右の欄、スマホは下から出る画面に出す。
-             設定の行は app.js（貸し出しと返却・そのほか・留守宅カード・完了のあとの留守宅（おすすめ））と schedule.js（手紙・提案）が、下の箱に描く -->
-        <div class="krwrap" id="krWrap">
-        <div class="krmain">
+        <!-- 状況は幅いっぱい。設定の行（区域の決まり）は設定タブ（kimari.js） -->
         <div class="apane" data-apane="status" hidden>
         <button class="btn primary block" id="adS13">区域割り当ての記録（S-13）を見る・印刷する</button>
         <button class="btn block" id="adS12">区域カード（S-12）を印刷する</button>
@@ -1780,23 +1777,10 @@ body.renshu #btnUpd{display:none!important}
         <p class="hint">手紙など、別の方法を検討してください。</p>
         <div id="adHard"></div>
         </div>
-        </div>
-        <aside class="krside" id="krSide" aria-label="区域の決まり（設定）">
-        <div id="adRules" class="krules">
-          <div class="krhead"><h2 class="sec">区域の決まり（設定）</h2><button type="button" class="icon-btn" data-krclose aria-label="区域の決まりを閉じる">×</button></div>
-          <p class="hint">変えると、すぐ全員に効きます。左の状況もすぐ変わります。状況の「かかわる設定」を押すと、ここに飛びます。</p>
-          <details class="krg" data-krg="lend" open><summary>貸し出しと返却</summary><div id="krLend" class="krbox"></div></details>
-          <details class="krg" data-krg="away" open><summary>留守宅カード</summary><div id="krAway" class="krbox"></div></details>
-          <details class="krg" data-krg="ext" open><summary>完了のあとの留守宅（おすすめ）</summary><div id="krExt" class="krbox"></div></details>
-          <details class="krg" data-krg="tips"><summary>手紙・提案・おすすめの順</summary><div id="krTips" class="krbox"></div></details>
-          <details class="krg" data-krg="etc"><summary>受け取れる枚数・一緒に回る など（状況には効かない設定）</summary><div id="krEtc" class="krbox"></div></details>
-        </div>
-        </aside>
-        </div>
         <div class="apane" data-apane="terr" hidden>
         <h2 class="sec" data-hqk="terrList">区域の一覧</h2>
         <!-- 一覧の上は2つのボタンだけにして、一覧まですぐ届くようにする（2026-10-21）。
-             「区域の線・取り込み」は下から出る画面（torikomi.js）、「区域の決まり」は状況の「区域の決まり」を開く -->
+             「区域の線・取り込み」は下から出る画面（torikomi.js）、「区域の決まり」は設定タブの「区域の決まり」を開く -->
         <div class="tbar" id="adTerrTools">
           <button type="button" class="btn tbtn" id="adMake"><span>区域の線・取り込み</span><small>線を引く・直す・ファイル・特別区域</small></button>
           <button type="button" class="btn tbtn" id="adTakeTgl"><span>区域の決まり <i class="tgl" aria-hidden="true">›</i></span><small id="adTakeSum"></small></button>
@@ -1814,11 +1798,34 @@ body.renshu #btnUpd{display:none!important}
         </div>
         <div class="apane" data-apane="dnc" hidden><div id="adDnc"></div></div>
         <div class="apane" data-apane="set" hidden>
-        <div id="adReco"></div>
-        <div id="adAge"></div>
-        <div id="adS21"></div>
-        <div id="adIken"></div>
-        <h2 class="sec">データ</h2>
+        <!-- 設定タブ：①区域の決まり ②地図（全員に効く） ③この端末だけ ④データの取り込み ⑤保守（たたむ）。
+             区域の決まりの行は app.js・schedule.js・tsuzuki.js が下の箱に描き、kimari.js が置き場所（PLACE）をそろえる -->
+        <section class="setsec" id="setRules" aria-labelledby="setRulesH">
+          <h2 class="sec" id="setRulesH">区域の決まり</h2>
+          <p class="hint">変えるとすぐ全員に効きます。まちがえたら「取り消す」で戻せます。</p>
+          <div id="adRules" class="krules">
+            <details class="krg" data-krg="top" id="krgTop" open><summary>よく調整する</summary><div id="krTop" class="krbox"></div></details>
+            <details class="krg" data-krg="lend" id="krgLend"><summary>区域カードの貸し出しと返却</summary><div id="krLend" class="krbox"></div></details>
+            <details class="krg" data-krg="away" id="krgAway"><summary>留守宅カード</summary><div id="krAway" class="krbox"></div></details>
+            <details class="krg" data-krg="ext" id="krgExt"><summary>おすすめ（完了のあと）</summary><div id="krReco" class="krbox"></div><div id="krExt" class="krbox"></div><div id="adReco"></div></details>
+            <details class="krg" data-krg="take" id="krgTake"><summary>受け取れる枚数・申し込み</summary><div id="krTake" class="krbox"></div></details>
+            <details class="krg" data-krg="tips" id="krgTips"><summary>手紙・一緒に回る・そのほか</summary><div id="krTips" class="krbox"></div><div id="krTipsEtc" class="krbox"></div></details>
+          </div>
+        </section>
+        <section class="setsec" id="setMap" aria-labelledby="setMapH">
+          <h2 class="sec" id="setMapH">地図（全員に効く）</h2>
+          <h3 class="sub" id="setMapEtcH">そのほか（全員に効く）</h3>
+          <div id="adS21"></div>
+          <div id="adIken"></div>
+        </section>
+        <section class="setsec" id="setDev" aria-labelledby="setDevH">
+          <h2 class="sec" id="setDevH">この端末だけ</h2>
+        </section>
+        <section class="setsec" id="setImp" aria-labelledby="setImpH">
+          <h2 class="sec" id="setImpH">データの取り込み</h2>
+          <div id="adAge"></div>
+        </section>
+        <details class="setsec" id="setMaint"><summary>保守</summary>
         <div id="adDataSet"></div>
         <div id="adDummy"></div>
         <div class="setrow"><span>このスマホでの動作の速さ<br><small class="hint">今のデータのまま、よく使う処理の時間を測ります（データは変わりません）。数秒かかります</small></span>
@@ -1828,6 +1835,7 @@ body.renshu #btnUpd{display:none!important}
           <button class="btn" id="adCsv">訪問記録をCSVで書き出す</button>
           <button class="btn danger" id="adReset">試作データに戻す</button>
         </div>
+        </details>
         </div>
       </div>
     </section>

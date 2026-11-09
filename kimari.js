@@ -1,29 +1,31 @@
 /* =========================================================
-   区域マップ：区域係の「状況」と設定「区域の決まり」を左右に（kimari.js・2026-10-25）
+   区域マップ：区域係の「区域の決まり」を設定タブに集める（kimari.js・2026-10-25／2026-11-09 見直し）
 
-   ねらい：左で問題を見つけて、右でその場で直す
+   ねらい：状況で問題を見つけて、設定タブの「区域の決まり」で直す
    ・状況の各見出しの下に「かかわる設定」の札（短い名前と今の値）を出す
-   ・札を押すと、その設定に飛んで光り、「変えると：…」「効く状況：…」を出す
-     パソコン（幅1,180px以上）：右の欄「区域の決まり」／スマホ：下から出る画面（その設定だけ。「…をすべて見る」で同じグループ）
-   ・設定は「区域の決まり」1か所にまとめる（区域の決まり・期限の見張りの中の区域係の決め・留守宅の設定）
-     設定の行と、押したときの処理は今までと同じ（app.js・schedule.js・tsuzuki.js が #krLend などの箱に描く）
-   ・右の欄は閉じられる（この端末に覚える）。閉じたときは、状況の上の「区域の決まり（設定）を右に出す」で出す
+   ・札を押すと、設定タブに切りかわり、その設定のまとまりを開いて光らせ、「変えると：…」「効く状況：…」を出す
+   ・設定は設定タブのいちばん上「区域の決まり」1か所にまとめる（よく調整する6項目は開いて置き、ほかの5つのまとまりはたたむ）
+     設定の行と、押したときの処理は今までと同じ（app.js・schedule.js・tsuzuki.js が #krLend などの箱に描く）。
+     描いたあとで、置き場所の表（PLACE）にしたがって行を移す（placeRows）。行はいつも1つだけ
+   ・まとまりの開け閉めは、この端末に覚える
+   ・前の「状況と区域の決まりを左右に並べる」（パソコンの右の欄・スマホの下から出る画面）は、やめた（KS-12）
    ========================================================= */
 (function () {
   'use strict';
   const $id = id => document.getElementById(id);
-  const RULES = $id('adRules'), SIDE = $id('krSide'), VA = $id('view-admin');
-  if (!RULES || !SIDE || !VA || typeof D !== 'function') return;
+  const RULES = $id('adRules'), VA = $id('view-admin');
+  if (!RULES || !VA || typeof D !== 'function') return;
 
   /* ---------- 見た目 ---------- */
   const css = document.createElement('style');
   css.textContent = `
-#krSide{display:none}
-.krules .krhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.krules .krhead h2{margin:4px 0}
 .krules details.krg{border-top:1px solid var(--line);padding:2px 0}
-.krules details.krg>summary{font-weight:700;font-size:16px;padding:12px 2px;cursor:pointer;min-height:44px;box-sizing:border-box}
+.krules details.krg>summary,#setMaint>summary{font-weight:700;font-size:16px;padding:12px 2px;cursor:pointer;min-height:44px;box-sizing:border-box}
 .krules .krbox>.setrow{border-radius:10px}
+#view-admin .setsec{margin:0 0 18px}
+#view-admin .setsec>h2.sec,#view-admin #setMaint>summary{font-size:22px;margin:28px 0 10px;padding:8px 12px;border-left:6px solid var(--terr);background:var(--terr-soft);border-radius:0 8px 8px 0}
+#view-admin #setMaint{padding:0}
+#setMap:has(#adS21:empty):has(#adIken:empty) #setMapEtcH{display:none}
 #view-admin .krchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 12px;color:var(--ink2);font-size:.8rem}
 #view-admin .krchips>span{font-size:inherit}
 #view-admin button.krchip{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:4px;width:auto!important;min-width:0!important;min-height:40px!important;height:auto!important;margin:0!important;padding:4px 12px!important;border-radius:999px!important;font-size:.875rem!important;font-weight:400!important;line-height:1.2!important;background:#F3F5F7!important;border:1px solid #C9D2DA!important;color:var(--ink)!important;white-space:nowrap!important;box-shadow:none!important;text-align:left!important}
@@ -32,11 +34,6 @@
 #adRules .setrow.kr-hit{background:#FFF8D6;box-shadow:0 0 0 2px #B98F00 inset;padding-left:8px;padding-right:8px}
 #adRules .kr-eff{display:block;margin:6px 0 0;padding:6px 8px;border-left:4px solid #B98F00;background:#FFFBE6;color:#3D3000;font-size:.875rem;line-height:1.55;font-weight:400;border-radius:4px}
 #adRules .kr-where{display:block;margin:4px 0 0;color:var(--ink2);font-size:.8rem;font-weight:400;line-height:1.5}
-#adRules .kr-hide{display:none!important}
-#sheet #adRules .krhead,#sheet #adRules>.hint{display:none}
-#sheet .krnow{margin:0 0 10px;padding:8px 12px;border:2px solid var(--line);border-radius:12px;background:#fff;font-size:.95rem;line-height:1.6}
-#sheet .krnow .krn{font-weight:700}
-#view-admin .krtopbtn{margin-top:8px}
 #view-admin .tile{position:relative}
 #view-admin .krdelta{position:absolute;top:8px;right:8px;padding:2px 8px;border-radius:999px;background:#fff;border:2px solid #B98F00;font-size:.8rem;font-weight:700;color:#3D3000;line-height:1.3;pointer-events:none}
 #view-admin .krfold-h{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;-webkit-tap-highlight-color:transparent}
@@ -44,16 +41,7 @@
 #view-admin .krfold-h:focus-visible{outline:3px solid var(--brand-ink);outline-offset:2px}
 #view-admin .kr-folded{display:none!important}
 #view-admin .krfold-sum{margin:0 0 10px;font-size:.95rem;line-height:1.6;color:var(--ink)}
-#view-admin .krfold-sum .krn{white-space:nowrap;font-weight:700}
-@media (min-width:1180px){
-  #view-admin.kr-on .wrap{max-width:1560px}
-  #view-admin.kr-on .krwrap{display:grid;grid-template-columns:minmax(0,1fr) clamp(320px,36%,480px);gap:20px;align-items:start}
-  #view-admin.kr-on #krSide{display:block;position:sticky;top:12px;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain;
-    background:var(--paper,#fff);border:2px solid var(--line);border-radius:14px;padding:6px 14px 16px;box-sizing:border-box}
-  #view-admin.kr-on #krOpenAll{display:none}
-  body.sheet-open #view-admin.kr-on .krwrap{display:block}
-  body.sheet-open #view-admin.kr-on #krSide{display:none}
-}`;
+#view-admin .krfold-sum .krn{white-space:nowrap;font-weight:700}`;
   document.head.appendChild(css);
 
   /* ---------- 設定ごとの短い名前・今の値・効く状況 ---------- */
@@ -86,21 +74,11 @@
     { h: () => $id('adHardH'), keys: ['awayTries'] }
   ];
   function prevHOf(el, tag) { let p = el && el.previousElementSibling; while (p && p.tagName !== tag) p = p.previousElementSibling; return p; }
-  // 下から出る画面に出す「いまの状況」の数（左の状況の数字を読む）
+  // 状況の数字を読む（たたんだときの要点）
   const num = sel => { const b = document.querySelector(sel); return b ? b.textContent.trim() : null; };
   // 手紙の候補の数（一覧と同じ数え方。一覧は30件まで出して「ほか○件」なので、数は留守宅の索引から数える）
   const hardN = () => { try { return typeof unmetIndex === 'function' ? String([...unmetIndex().values()].flat().filter(x => x.hard).length) : null; } catch (e) { return null; } };
   const extN = () => { const t = document.querySelector('#adAwaySet table'); return t ? String(Math.max(0, t.querySelectorAll('tr').length - 1)) : '0'; }; // 完了した区域の数
-  const NOW = {
-    lendDays: () => [['声かけ候補', num('#adDue [data-duetl="pace"] b'), '件'], ['今月中に出したい区域', num('#adDue [data-duetl="need"] b'), '件'], ['返却の目安を過ぎた貸出', num('#adTiles [data-tl="over"] b'), '件']],
-    awayRetPct: () => [['年1回の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
-    awayAgainSlot: () => [['年1回の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
-    donePct: () => [['年1回の期限を過ぎた区域', num('#adDue [data-duetl="over"] b'), '件'], ['期限まで60日以内', num('#adDue [data-duetl="warn"] b'), '件']],
-    awayTries: () => [['手紙の候補', hardN(), '件']],
-    extRest: () => [['完了した区域', extN(), '区域']],
-    extDays: () => [['完了した区域', extN(), '区域']],
-    freeAfterDays: () => [['完了した区域', extN(), '区域']]
-  };
 
   /* ---------- 設定の行に、どの設定かの印（data-krk）を付ける（「？」の説明と同じ見つけ方） ---------- */
   const SRC = [['data-sset', null], ['data-kset', null], ['data-aset', null], ['data-set', null], ['data-dueset', null], ['data-range', null],
@@ -114,33 +92,71 @@
   const rowOf = k => RULES.querySelector(`.setrow[data-krk="${k}"]`);
   const groupOf = row => (row ? row.closest('details.krg') : null);
 
+  /* ---------- 置き場所の表：設定 → 入れる箱（KS-15）。ここに無い設定は、描いた箱のまま ----------
+     krTop＝よく調整する（開いて置く）。6項目は下のまとまりには重ねて出さない */
+  const PLACE = {
+    krTop: ['lendDays', 'donePct', 'awayRetPct', 'autoFree', 'holdMaxPersonal', 'awayCap'],
+    krLend: ['awayAgainSlot', 'lowOn', 'lowWait', 'freeAfterDays', 'skipDays', 'followSkipDays', 'skipDone', 'contDays'],
+    krExt: ['recoOn', 'wxOn'],
+    krTake: ['selfTakeMax', 'holdMaxGroup', 'reqMaxPersonal', 'reqMaxGroup'],
+    krTips: ['youngW', 'awayTries', 'nightOn', 'offDays', 'groupOn', 'groupMax', 'lockOthers', 'memoSync']
+  };
+  const BOX_OF = {};
+  Object.keys(PLACE).forEach(b => PLACE[b].forEach(k => { BOX_OF[k] = b; }));
+  // 行を置き場所の箱に移す（もう置き場所のまとまりにあれば何もしない）。
+  // 箱は描くたびに中身を描き直すので、元の箱に新しい行が出る。そのときは、置き場所に残っている古い行を消して、新しい行を移す（行はいつも1つ）
+  function placeRows() {
+    Object.keys(PLACE).forEach(bid => {
+      const box = $id(bid), grp = box && box.closest('details.krg');
+      if (!box || !grp) return;
+      PLACE[bid].forEach(k => {
+        const rows = [...RULES.querySelectorAll(`.setrow[data-krk="${k}"]`)];
+        if (!rows.length) return;
+        const fresh = rows.filter(r => r.closest('details.krg') !== grp);
+        if (!fresh.length) { rows.slice(1).forEach(r => r.remove()); return; } // もう置き場所にある（念のため、重なりは1つにする）
+        rows.filter(r => r.closest('details.krg') === grp).forEach(r => r.remove()); // 置き場所の古い行
+        fresh.slice(0, -1).forEach(r => r.remove());
+        box.appendChild(fresh[fresh.length - 1]);
+      });
+      // よく調整する：表の順にそろえる（並びが違うときだけ動かす）
+      if (bid === 'krTop') {
+        const want = PLACE.krTop.map(k => box.querySelector(`:scope > .setrow[data-krk="${k}"]`)).filter(Boolean);
+        const now = [...box.children].filter(x => want.includes(x));
+        if (want.some((r, i) => now[i] !== r)) want.forEach(r => box.appendChild(r));
+      }
+    });
+  }
+  // 描き直し（app.js・schedule.js などが、それぞれの時に箱を描く）を見張って、すぐ置き場所をそろえる（画面に出る前・同じ処理の続きで動く）
+  let placing = false;
+  const mo = window.MutationObserver ? new MutationObserver(() => {
+    if (placing) return;
+    placing = true;
+    try { tagRows(); placeRows(); } catch (e) { console.error(e); } finally { mo.takeRecords(); placing = false; }
+  }) : null;
+  if (mo) mo.observe(RULES, { childList: true, subtree: true });
+
+  /* ---------- まとまりの開け閉め：はじめは「よく調整する」だけ開く。開け閉めはこの端末に覚える ---------- */
+  const OPEN_KEY = 'kuiki_kr_open';
+  let openState = null;
+  const opens = () => { if (!openState) { try { openState = JSON.parse(lsGet(OPEN_KEY) || '{}') || {}; } catch (e) { openState = {}; } } return openState; };
+  RULES.querySelectorAll('details.krg[data-krg]').forEach(d => {
+    const v = opens()[d.dataset.krg];
+    if (v != null) d.open = !!v;
+  });
+  RULES.addEventListener('toggle', e => {
+    const d = e.target;
+    if (!d || !d.matches || !d.matches('details.krg[data-krg]')) return;
+    opens()[d.dataset.krg] = d.open ? 1 : 0;
+    try { lsSet(OPEN_KEY, JSON.stringify(openState)); } catch (err) { /* 何もしない */ }
+  }, true);
+  // 前の右の欄を閉じた印は、もう使わない（1回だけ消す）
+  try { if (lsGet('kuiki_kr_side_off') != null) lsDel('kuiki_kr_side_off'); } catch (e) { /* 何もしない */ }
+
   /* ---------- 状態 ---------- */
-  const SIDE_OFF = 'kuiki_kr_side_off';
-  const sideOff = () => { try { return lsGet(SIDE_OFF) === '1'; } catch (e) { return false; } };
-  const setSideOff = v => { try { if (v) lsSet(SIDE_OFF, '1'); else lsDel(SIDE_OFF); } catch (e) { /* 何もしない */ } };
+  // 状況の見出しをたたむのは、スマホ（幅1,180px未満）だけ
   const wideMq = window.matchMedia ? window.matchMedia('(min-width:1180px)') : null;
   const wide = () => !!(wideMq && wideMq.matches);
-  const inSheet = () => !!RULES.closest('#sheet');
-  let hit = '', hitAt = 0, focusKey = '';
-
-  function sync() {
-    const on = typeof isAdmin === 'function' && isAdmin() && adPane === 'status';
-    VA.classList.toggle('kr-on', on && !sideOff());
-    requestAnimationFrame(fitSide); // 高さを測るのは描いたあと（描き直しの途中で画面全体の並べ直しをさせないため）
-    const b = $id('krOpenAll');
-    if (b) b.textContent = wide() && sideOff() ? '区域の決まり（設定）を右に出す' : '区域の決まり（設定）を開く';
-    if (inSheet() && $id('sheet').hidden) home();
-  }
-
-  // 右の欄の高さ：係の画面（上の帯の下からいちばん下まで）に収める（文字の大きさで上の帯の高さが変わるため、その場で測る）
-  function fitSide() {
-    if (!wide() || !VA.classList.contains('kr-on')) { SIDE.style.maxHeight = ''; return; }
-    const h = VA.clientHeight || window.innerHeight;
-    // 文字の大きさ（係の画面は zoom で大きくする）のぶんだけ割る
-    const z = Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1;
-    SIDE.style.maxHeight = Math.max(240, (h - 24) / z) + 'px';
-  }
-  window.addEventListener('resize', () => { try { fitSide(); } catch (e) { /* 何もしない */ } });
+  let hit = '', hitAt = 0;
 
   /* ---------- 札 ---------- */
   function chipsHtml(keys) {
@@ -149,7 +165,7 @@
     return `<span>かかわる設定：</span>` + ks.map(k => `<button type="button" class="krchip" data-krgo="${k}" aria-pressed="${k === hit}">${F[k].s}<b>${F[k].v()}</b></button>`).join('');
   }
   function paintChips() {
-    document.querySelectorAll('#krWrap .krchips').forEach(x => x.remove());
+    document.querySelectorAll('#view-admin .krchips').forEach(x => x.remove());
     if (adPane !== 'status') return;
     BLOCKS.forEach(b => {
       let h = null;
@@ -183,105 +199,55 @@
     const ch = helpChange(hit);
     lab.insertAdjacentHTML('beforeend', (ch ? `<span class="kr-eff"><b>変えると：</b>${esc(ch)}</span>` : '') + `<span class="kr-where"><b>効く状況：</b>${esc(f.w)}</span>`);
   }
-  function scrollInto(box, el) {
-    if (!box || !el) return;
-    const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 12;
-    try { box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); } catch (e) { box.scrollTop = Math.max(0, top); }
-  }
   function focusCtl(row) {
     const c = row && row.querySelector('input,button:not(.qhelp)');
     if (c) try { c.focus({ preventScroll: true }); } catch (e) { /* 何もしない */ }
   }
 
-  /* ---------- 下から出る画面（スマホ・右の欄を閉じているとき） ---------- */
-  function home() {
-    if (RULES.parentNode !== SIDE) SIDE.appendChild(RULES);
-    RULES.classList.remove('kr-focus');
-    RULES.querySelectorAll('.kr-hide').forEach(x => x.classList.remove('kr-hide'));
-    focusKey = '';
+  /* ---------- 札を押したとき・入り口から開くとき：設定タブに切りかえて、その行（まとまり）を開いて見せる ---------- */
+  // （Task 6 で、状況にもどるボタンを足す予定。それまでは、設定タブに切りかえるだけ）
+  function toSet() {
+    if (adPane !== 'set') { adPane = 'set'; renderAdmin(); }
   }
-  function applyFocus() {
-    RULES.querySelectorAll('.kr-hide').forEach(x => x.classList.remove('kr-hide'));
-    if (!inSheet() || !focusKey) { RULES.classList.remove('kr-focus'); return; }
-    const row = rowOf(focusKey), g = groupOf(row);
-    if (!row || !g) { RULES.classList.remove('kr-focus'); return; }
-    RULES.classList.add('kr-focus');
-    g.open = true;
-    RULES.querySelectorAll('details.krg').forEach(x => { if (x !== g) x.classList.add('kr-hide'); });
-    const sum = g.querySelector('summary'); if (sum) sum.classList.add('kr-hide');
-    const box = row.parentNode;
-    [...box.children].forEach(x => { if (x !== row) x.classList.add('kr-hide'); });
-  }
-  function paintNow() {
-    const el = $id('krNow'); if (!el) return;
-    const f = NOW[focusKey || hit];
-    const items = f ? f().filter(x => x[1] != null) : [];
-    el.hidden = !items.length;
-    el.innerHTML = items.length ? `<b>いまの状況</b><br>${items.map(x => `<span class="krn">${esc(x[0])} ${esc(x[1])}${esc(x[2])}</span>`).join('<br>')}` : '';
-  }
-  function openSheet(key, g) {
-    const f = key ? F[key] : null, row = key ? rowOf(key) : null, grp = groupOf(row) || (g ? RULES.querySelector(`details.krg[data-krg="${g}"]`) : null);
-    const gl = grp ? (grp.querySelector('summary') || {}).textContent || '' : '';
-    setSheet(headHtml(null, f ? esc(f.t) : '区域の決まり（設定）', f ? '区域の決まり（設定）' : '変えると、すぐ全員に効きます') +
-      (f ? '<p class="krnow" id="krNow" aria-live="polite" hidden></p>' : '') +
-      '<div id="krSlot"></div>' +
-      (f && gl ? `<button type="button" class="btn block wrap" data-krall>「${esc(gl)}」の設定をすべて見る</button>` : '') +
-      '<button type="button" class="btn block" data-close>閉じる</button>');
-    const slot = $id('krSlot'); if (!slot) return;
-    slot.appendChild(RULES);
-    focusKey = key || '';
-    if (grp) grp.open = true;
-    applyHit(); applyFocus(); paintNow();
-    if (!key && grp) scrollInto($id('sheet'), grp);
-    if (row) focusCtl(row);
-  }
-
-  /* ---------- 札を押したとき・入り口から開くとき ---------- */
   function goTab(pane, key) {
     adPane = pane; renderAdmin();
     window.scrollTo(0, 0);
     setTimeout(() => {
       const c = document.querySelector(`#view-admin [data-kset="${key}"]`), row = c && c.closest('.setrow');
       if (!row) return;
+      const d = row.closest('details'); if (d) d.open = true;
       row.scrollIntoView({ block: 'center' });
       row.style.boxShadow = '0 0 0 3px #E0B400 inset'; setTimeout(() => { row.style.boxShadow = ''; }, 4000);
     }, 60);
   }
+  function showRow(row) {
+    const g = groupOf(row);
+    if (g) g.open = true;
+    try { row.scrollIntoView({ block: 'center' }); } catch (e) { row.scrollIntoView(); }
+    focusCtl(row);
+  }
   function go(key) {
-    const f = F[key]; if (!f) return;
-    if (f.tab) { goTab(f.tab, key); return; }
+    const f = F[key];
+    if (f && f.tab) { goTab(f.tab, key); return; }
     hit = key; hitAt = Date.now();
     document.querySelectorAll('#view-admin .krchip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.krgo === key)));
-    if (wide() && !sideOff() && !inSheet()) {
-      if (!$id('sheet').hidden) closeSheet();
-      const row = rowOf(key), g = groupOf(row);
-      if (g) g.open = true;
-      applyHit();
-      if (row) { scrollInto(SIDE, row); focusCtl(row); }
-    } else openSheet(key);
+    toSet();
+    applyHit();
+    const row = rowOf(key);
+    if (row) showRow(row);
   }
+  // open(設定の名前 か まとまりの名前（lend・away・ext・take・tips・top）)
   function open(g) {
-    if (adPane !== 'status') { adPane = 'status'; renderAdmin(); window.scrollTo(0, 0); }
-    if (wide()) {
-      if (sideOff()) { setSideOff(false); sync(); }
-      if (!$id('sheet').hidden) closeSheet();
-      const grp = g ? RULES.querySelector(`details.krg[data-krg="${g}"]`) : null;
-      if (grp) { grp.open = true; scrollInto(SIDE, grp); }
-    } else openSheet('', g);
+    if (g && rowOf(g)) { go(g); return; }
+    toSet();
+    const grp = g ? RULES.querySelector(`details.krg[data-krg="${g}"]`) : null;
+    if (grp) { grp.open = true; try { grp.scrollIntoView({ block: 'start' }); } catch (e) { grp.scrollIntoView(); } }
+    else { const s = $id('setRules'); if (s) s.scrollIntoView(); }
   }
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest ? e.target : null; if (!t) return;
-    let x;
-    if ((x = t.closest('[data-krgo]'))) { e.preventDefault(); go(x.dataset.krgo); }
-    else if (t.closest('#krOpenAll')) { e.preventDefault(); if (wide()) { setSideOff(false); sync(); } else openSheet('', 'lend'); }
-    else if (t.closest('[data-krclose]')) { e.preventDefault(); if (inSheet()) closeSheet(); else { setSideOff(true); sync(); } }
-    else if (t.closest('[data-krall]')) {
-      e.preventDefault();
-      const k = focusKey; focusKey = '';
-      applyFocus();
-      const b = t.closest('[data-krall]'); if (b) b.hidden = true;
-      const row = k ? rowOf(k) : null; if (row) scrollInto($id('sheet'), row);
-    }
+    const x = t.closest('[data-krgo]');
+    if (x) { e.preventDefault(); go(x.dataset.krgo); }
   });
 
   /* ---------- 描き直したあと：印・札・光・しぼり込みを付け直す ---------- */
@@ -409,12 +375,11 @@
   });
 
   function after() {
-    sync();
     tagRows();
+    placeRows();
     if (adPane === 'status') paintChips();
     if (hit && Date.now() - hitAt > 10 * 60000) hit = '';
     applyHit();
-    if (inSheet()) { applyFocus(); paintNow(); }
     checkChange();
     paintDelta();
     paintFolds();
@@ -427,15 +392,7 @@
       return r;
     };
   }
-  // 下から出る画面を閉じたり、別の画面に変えたりしたときは、区域の決まりを元の場所（右の欄）に戻す
-  const _setSheet = window.setSheet, _closeSheet = window.closeSheet;
-  window.setSheet = function () { if (inSheet()) home(); return _setSheet.apply(this, arguments); };
-  window.closeSheet = function () { const r = _closeSheet.apply(this, arguments); if (inSheet()) home(); return r; };
-  if (wideMq && wideMq.addEventListener) wideMq.addEventListener('change', () => { try { sync(); paintFolds(); } catch (e) { /* 何もしない */ } });
+  if (wideMq && wideMq.addEventListener) wideMq.addEventListener('change', () => { try { paintFolds(); } catch (e) { /* 何もしない */ } });
 
-  // 状況の上（S-12 の下）に、区域の決まりを開くボタン（パソコンで右の欄が出ているときは隠す）
-  const s12 = $id('adS12');
-  if (s12 && !$id('krOpenAll')) s12.insertAdjacentHTML('afterend', '<button type="button" class="btn block krtopbtn" id="krOpenAll">区域の決まり（設定）を開く</button>');
-
-  window.KR = { open, go, F };
+  window.KR = { open, go, F, PLACE };
 })();

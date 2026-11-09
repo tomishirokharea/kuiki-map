@@ -223,7 +223,7 @@
     };
   }
 
-  /* 係の設定：続きから回る期間（状況の右の「区域の決まり」の「貸し出しと返却」の最後に足す・kimari.js） */
+  /* 係の設定：続きから回る期間（設定タブの「区域の決まり」の「区域カードの貸し出しと返却」の最後に足す・kimari.js） */
   const _renderInbox = window.renderInbox;
   if (typeof _renderInbox === 'function') {
     window.renderInbox = function () {

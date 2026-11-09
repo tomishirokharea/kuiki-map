@@ -279,7 +279,7 @@
     const tr = x => (x.triedAll != null ? x.triedAll : x.tried);
     const hard = [...unmetIndex().values()].flat().filter(x => x.hard)
       .sort((a, b) => slotCount(tr(b)) - slotCount(tr(a)) || (a.first < b.first ? -1 : 1));
-    box.innerHTML = `<p class="hint">違う時間帯で${triesAll()}回（区域ごとに変えたときは、その回数）留守だった家の一覧です。留守宅カードに入れるかどうかは、「区域」＞「状況」の「留守宅訪問のルール」で決めます。ふだんの区域カードでは、これまでどおり訪ねます。</p>` +
+    box.innerHTML = `<p class="hint">違う時間帯で${triesAll()}回（区域ごとに変えたときは、その回数）留守だった家の一覧です。留守宅カードに入れるかどうかは、「設定」の「区域の決まり」の「留守宅カード」で決めます。ふだんの区域カードでは、これまでどおり訪ねます。</p>` +
       (hard.length ? hard.slice(0, 30).map(x => {
         const t = TID.get(x.h.terrId);
         return `<article class="ritem k-new"><div>
@@ -356,10 +356,6 @@
       box.addEventListener('click', dueClick);
     }
     const m = monthStats(), ld = lendDays();
-    // 区域係の決め（おすすめ順・留守宅を終える回数・夜・訪問を控える日）は、状況の右の「区域の決まり」（kimari.js）の「手紙・提案・おすすめの順」に出す
-    const tips = document.getElementById('krTips'), rules = document.getElementById('adRules');
-    if (tips) tips.innerHTML = setHtml();
-    if (rules && !rules.dataset.dueBound) { rules.dataset.dueBound = '1'; rules.addEventListener('click', dueClick); }
     const paces = m.ts.filter(t => t.holder).map(paceOf).filter(p => p && p.msg).sort((a, b) => b.el - a.el);
     const maxN = Math.max(1, ...m.months.map(x => x.list.length));
     const peak = m.months.filter(x => x.list.length >= Math.max(3, Math.ceil(m.avg * 1.5)));
@@ -444,7 +440,13 @@
     $$('[data-tlkarte]', S).forEach(b => b.onclick = () => openKarte(b.dataset.tlkarte, back));
     const s13 = $('[data-tls13]', S); if (s13) s13.onclick = () => { closeSheet(); openS13(); };
   }
-  /* 区域係の決め（おすすめ順・留守宅・訪問を控える日）。状況の右の「区域の決まり」（kimari.js）に出す設定の行 */
+  /* 区域係の決め（おすすめ順・留守宅を終える回数・夜・訪問を控える日）は、設定タブの「区域の決まり」（kimari.js）の「手紙・一緒に回る・そのほか」に出す。
+     押したときの処理（dueClick）は #adRules に1回だけ付ける（設定タブを先に開いても効くように） */
+  function paintTips() {
+    const tips = document.getElementById('krTips'), rules = document.getElementById('adRules');
+    if (tips) tips.innerHTML = setHtml();
+    if (rules && !rules.dataset.dueBound) { rules.dataset.dueBound = '1'; rules.addEventListener('click', dueClick); }
+  }
   function setHtml() {
     const yw = wYoung(), offs = offDays().filter(x => x >= ymd(new Date()));
     const seg = (key, opts, cur) => `<div class="seg" role="group">${opts.map(([v, l]) =>
@@ -530,7 +532,7 @@
     try {
       if (isAdmin()) fixTabLabel();
       if (lkLocked() && currentView === 'admin') { const ls = document.getElementById('alockScr'); if (!ls || ls.hidden) showLockScreen(); return; }
-      if (isAdmin() && adPane === 'set') { paintOps(); paintLockBox(); loadOps(false); }
+      if (isAdmin() && adPane === 'set') { paintTips(); paintOps(); paintLockBox(); loadOps(false); }
       if (isAdmin() && adPane === 'status') {
         paintCand(); loadOps(false);
         paintDue();
@@ -1774,7 +1776,8 @@ button.ktag{cursor:pointer}
     if (!box) {
       box = document.createElement('div');
       box.id = 'adOpsBox';
-      pane.insertBefore(box, pane.firstChild);
+      // 設定タブは区域の決まりがいちばん上（KS-14）。点検は、それまでのあいだ設定タブのいちばん下に置く（Task 6 で状況のいちばん下へ移す）
+      if (document.getElementById('setRules')) pane.appendChild(box); else pane.insertBefore(box, pane.firstChild);
       box.addEventListener('click', async e => {
         const c = e.target.closest('[data-opschk]'), r = e.target.closest('[data-opsre]');
         if (c) {
@@ -2254,8 +2257,8 @@ body.duemode .terr-label:not(.duelab){display:none}
     let box = document.getElementById('adLockBox');
     if (!box) {
       box = document.createElement('div'); box.id = 'adLockBox'; box.className = 'lkset';
-      const ref = document.getElementById('adOpsBox');
-      pane.insertBefore(box, ref ? ref.nextSibling : pane.firstChild);
+      const host = document.getElementById('setDev'), ref = document.getElementById('adOpsBox'); // 設定タブの「この端末だけ」
+      if (host) host.appendChild(box); else pane.insertBefore(box, ref ? ref.nextSibling : pane.firstChild);
       box.addEventListener('click', async e => {
         const q = s => e.target.closest(s), c = lkCfg();
         try {
@@ -2395,13 +2398,13 @@ body.duemode .terr-label:not(.duelab){display:none}
       ['上の欄に、番号（例：53）・名前・字・持っている人の名前を入れると、すぐ見つかります。その下のボタンで、貸出中・空いている・期限が近い区域などに絞れます。',
         '区域の行を押すと、その区域の「カルテ」が開きます。区域の操作はカルテにまとめています（貸し出し・担当を変える・返却・貸出中止・線を直す・S-12の印刷など）。',
         '「状況」で、期限・時間帯の表・留守宅のようすが見られます。「期限の地図」で、期限ごとに色分けした地図が見られます。',
-        '自動受け取り・枚数・返却の目安などの決まりは、「区域の決まり」の「貸し出しと返却」で変えられます（区域の一覧の上の「区域の決まり」からも開けます）。'],
+        '自動受け取り・枚数・返却の目安などの決まりは、「設定」の「区域の決まり」で変えられます（区域の一覧の上の「区域の決まり」からも開けます）。'],
       ['毎月：「状況」で、期限の近い区域と「何度訪ねても会えない家」を確かめる']],
     status: ['「状況」でやること',
       ['期限の見張り：全区域を1年で回るために、今月出したい区域が分かります。',
         '時間帯の表：「区域ごと」にすると、まだ試していない枠などに「出す」ボタンが出ます。押すと、その時間帯の留守宅カードが、全員の一覧の上に「区域係のおすすめ」として出ます。',
         '会えた成果：はじめて会えた家と、時間帯を変えて会えた家の数です（会衆全体の数だけで、人ごとの数は出しません）。',
-        '区域の決まり（設定）：パソコンでは右に出ます。スマホでは「区域の決まり（設定）を開く」で出ます。各見出しの下の「かかわる設定」を押すと、その設定に飛び、その場で変えられます。変えると、すぐ全員に効きます。'],
+        '区域の決まり：「設定」タブのいちばん上にあります。各見出しの下の「かかわる設定」を押すと、その設定に飛び、その場で変えられます。変えると、すぐ全員に効きます。'],
       ['毎月：期限の見張りと、何度訪ねても会えない家を確かめる']],
     dnc: ['「拒否」でやること',
       ['奉仕者が「拒否」と記録した家と、区域係が取り込んだ・追加した拒否が、区域ごとに並びます。区域の行を押すと開きます。',
