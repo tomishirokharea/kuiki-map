@@ -1650,6 +1650,9 @@ button.ktag{cursor:pointer}
     const users = free ? D().users.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja')) : [];
     return headHtml(t, `区域${esc(t.no)}のカルテ`, esc(t.name || '')) + `
       <div class="cover ${cls}" role="status"><i aria-hidden="true">${mark}</i><div><b>${word}</b>${sub ? `<small>${sub}</small>` : ''}</div></div>
+      ${karteMainHtml(t)}
+      ${free ? `${paperLent(t) ? '<p class="hint">紙の記録（S-13）で貸出中です。アプリで回る人を担当にするときだけ使います。</p>' : ''}<div class="klend"><select id="kLendSel" aria-label="貸し出す人をえらぶ"><option value="">人をえらんでください</option>${users.map(u => `<option value="${esc(u.id)}">${esc(u.name)}（今 ${heldCount(u.id)}枚）</option>`).join('')}</select>
+          <button type="button" class="btn primary" id="kLend">貸し出す</button></div>` : ''}
       <p class="kq">期限</p>
       <p>前回回り終えた日：<b>${di.last ? showDay(di.last) : '記録なし'}</b>　／　<b>${yearTxt}</b></p>
       <p class="kq">次の一手</p>
@@ -1667,8 +1670,6 @@ button.ktag{cursor:pointer}
       ${profLine(t, 'karte:' + t.id) || '<p class="muted">年齢データがないため、出せません。</p>'}
       <p class="kq">S-13の履歴（新しい順）</p>
       ${hist.length ? `<ul class="khist">${hist.map(h => `<li>${showDay(h.a)} 〜 ${h.c ? showDay(h.c) : h.cur ? '貸出中' : h.ret ? '返却 ' + showDay(h.ret) : ''}　${esc(h.name)}さん</li>`).join('')}</ul>` : '<p class="muted">記録がありません。</p>'}
-      ${free ? `<p class="kq">貸し出す</p>${paperLent(t) ? '<p class="hint">紙の記録（S-13）で貸出中です。アプリで回る人を担当にするときだけ使います。</p>' : ''}<div class="klend"><select id="kLendSel" aria-label="貸し出す人をえらぶ"><option value="">人をえらんでください</option>${users.map(u => `<option value="${esc(u.id)}">${esc(u.name)}（今 ${heldCount(u.id)}枚）</option>`).join('')}</select>
-        <button type="button" class="btn primary" id="kLend">貸し出す</button></div>` : ''}
       <div class="kact"><button type="button" class="btn" data-kmap="${esc(t.id)}">地図で見る</button><button type="button" class="btn" data-ks12="${esc(t.id)}">S-12を印刷</button><button type="button" class="btn" data-kadj="${esc(t.id)}">この区域だけの調整</button></div>
       ${karteOpsHtml(t)}
       <button class="btn block" data-close>閉じる</button>`;
@@ -2457,6 +2458,7 @@ body.duemode .terr-label:not(.duelab){display:none}
   const TCHIPS = [
     ['all', 'すべて', () => true],
     ['lent', '貸出中', t => isLent(t)],
+    ['over', '返却の目安を過ぎた', t => pastDue(t)], // 一覧の行の「返却の目安を過ぎています」と同じ判定（app.js の pastDue）
     ['free', '空いている', t => !isLent(t) && !t.awayPoolAt && lendMode(t) !== 'stop'], // 「状況」の区域の内訳と同じ数え方
     ['due', '年1回の期限が近い・過ぎた', t => { const d = dueInfo(t); return d.st === 'over' || d.st === 'warn'; }], // 年1回の期限（60日以内・過ぎた）
     ['sp', '特別区域', t => isSpecial(t)]
@@ -2500,7 +2502,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     if (out) out.textContent = q || findChip !== 'all' ? (hits.length ? `${hits.length}区域` : '見つかりません') : '';
     return hits;
   }
-  /* 絞り込み：すべて／貸出中／空いている／年1回の期限が近い・過ぎた／特別区域（0件の絞り込みは出さない） */
+  /* 絞り込み：すべて／貸出中／返却の目安を過ぎた／空いている／年1回の期限が近い・過ぎた／特別区域（0件でも位置は変えず、薄く出す。押すと「0件です」） */
   function paintTerrChips() {
     const list = document.getElementById('adTerrs');
     if (!list) return;
@@ -2510,11 +2512,11 @@ body.duemode .terr-label:not(.duelab){display:none}
       box.id = 'adTerrChips'; box.className = 'chips tchips';
       box.setAttribute('role', 'group'); box.setAttribute('aria-label', '区域の絞り込み');
       list.before(box);
-      box.addEventListener('click', e => { const b = e.target.closest('[data-tchip]'); if (!b) return; findChip = b.dataset.tchip; paintTerrChips(); applyFind(); });
+      box.addEventListener('click', e => { const b = e.target.closest('[data-tchip]'); if (!b) return; if (b.getAttribute('aria-disabled') === 'true') { toast('0件です'); return; } findChip = b.dataset.tchip; paintTerrChips(); applyFind(); });
     }
     const ts = D().territories, cnt = TCHIPS.map(c => ts.filter(c[2]).length);
     if (findChip !== 'all' && !cnt[TCHIPS.findIndex(c => c[0] === findChip)]) findChip = 'all';
-    box.innerHTML = TCHIPS.map((c, i) => (c[0] === 'all' || cnt[i] ? `<button type="button" class="chip" data-tchip="${c[0]}" aria-pressed="${findChip === c[0]}">${c[1]} ${cnt[i]}</button>` : '')).join('');
+    box.innerHTML = TCHIPS.map((c, i) => `<button type="button" class="chip${cnt[i] ? '' : ' chip0'}" data-tchip="${c[0]}" aria-pressed="${findChip === c[0]}"${cnt[i] ? '' : ' aria-disabled="true"'}>${c[1]} ${cnt[i]}</button>`).join('');
   }
   function paintTerrFind() {
     const list = document.getElementById('adTerrs');
@@ -2536,19 +2538,23 @@ body.duemode .terr-label:not(.duelab){display:none}
     }
     queueMicrotask(applyFind); // 特別区域の組の見出し（tokubetsu.js）が入ったあとで、さがす・絞り込みを当てる
   }
-  /* 「区域」タブの上にある、区域の決まり：開け閉めは index.html の「区域の決まり」ボタン（paintTakeTgl）で行う（2026-10-21）。
+  /* 「区域」タブの上にある、区域の決まり：ボタンは設定（⚙）へ移した（KS-7）。
      以前はここで details に包んでいたが、描き直しの順番によって包まれず、たためなくなることがあった */
-  function foldTakeSet() { if (typeof paintTakeTgl === 'function') paintTakeTgl(); }
+  function foldTakeSet() { /* 「区域の決まり」のボタンは設定（⚙）へ移した（KS-7） */ }
 
   /* ---------- （2）カルテ：区域の操作を集める ---------- */
-  function karteOpsHtml(t) {
+  /* 状態の帯のすぐ下に出す、いちばんよく使う操作（KS-8）：貸出中→返却する・担当を変える。空き→貸し出す（karteHtml 側） */
+  function karteMainHtml(t) {
+    if (!t.holder) return '';
     const users = D().users.filter(u => !u.inactive).slice().sort(byKana); // よみがあればあいうえお順（app.js）
+    return `<div class="kops kmain"><div class="krow"><button type="button" class="btn primary" data-kret>返却する（回り終えたかを確かめる）</button></div>
+      <label>担当を変える <select data-khold aria-label="担当を変える"><option value="">えらんでください</option>${users.filter(u => u.id !== t.holder).map(u => `<option value="${esc(u.id)}">${esc(u.name)}（今 ${heldCount(u.id)}枚）</option>`).join('')}</select></label></div>`;
+  }
+  function karteOpsHtml(t) {
     const pool = poolInfo(t), hg = t.holder ? (userById(t.holder) || {}).group : '';
     const lm = lendMode(t);
     return `<p class="kq">区域の操作</p><div class="kops">
-      ${t.holder ? `<div class="krow"><button type="button" class="btn primary" data-kret>返却する（回り終えたかを確かめる）</button></div>
-        <label>担当を変える <select data-khold aria-label="担当を変える"><option value="">えらんでください</option>${users.filter(u => u.id !== t.holder).map(u => `<option value="${esc(u.id)}">${esc(u.name)}（今 ${heldCount(u.id)}枚）</option>`).join('')}</select></label>
-        ${useSelectHtml(t, 'data-kgrp')}` : ''}
+      ${t.holder ? useSelectHtml(t, 'data-kgrp') : ''}
       ${pool ? `<div class="krow"><button type="button" class="btn" data-kpoolfin>正式に返却したことにする（留守宅の訪ね直し ${pool.pct}%）</button></div>` : ''}
       <label>この区域の貸し出し <select data-klend aria-label="この区域の貸し出し">
         <option value="auto"${lm === 'auto' ? ' selected' : ''}>きまりのとおり</option>

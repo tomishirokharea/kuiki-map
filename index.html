@@ -239,6 +239,7 @@ details.all>summary,details.more>summary{min-height:52px;display:flex;align-item
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}
 .chip{min-height:48px;border-radius:99px;border:2px solid var(--ink);background:#fff;padding:0 16px;font-weight:700;font-size:16px}
 .chip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand-ink);color:var(--on-brand)}
+.chip.chip0{opacity:.5;border-style:dashed}
 .ritem{background:#fff;border:2px solid var(--line);border-left:10px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center}
 .ritem .rt{font-weight:700;font-size:19px}
 .ritem.evrow{grid-template-columns:1fr} /* 自分の予定：ボタンは予定の下に（予定の文字が縦に細くならない） */
@@ -1777,12 +1778,11 @@ body.renshu #btnUpd{display:none!important}
         <h2 class="sec" data-hqk="terrList">区域の一覧</h2>
         <!-- 一覧の上はボタンだけにして、一覧まですぐ届くようにする（2026-10-21）。
              「区域の線・取り込み」は下から出る画面（torikomi.js）、「区域の決まり」は設定タブの「区域の決まり」を開く。
-             S-13・S-12 は状況の上から移した（KS-11。並べ方は Task 7 で見直す） -->
+             並びは「区域の線・取り込み」（1行）→ S-13・S-12（KS-7）。「区域の決まり」は設定タブ（⚙）から -->
         <div class="tbar" id="adTerrTools">
-          <button type="button" class="btn tbtn" id="adMake"><span>区域の線・取り込み</span><small>線を引く・直す・ファイル・特別区域</small></button>
-          <button type="button" class="btn tbtn" id="adTakeTgl"><span>区域の決まり <i class="tgl" aria-hidden="true">›</i></span><small id="adTakeSum"></small></button>
-          <button type="button" class="btn" id="adS13">区域割り当ての記録（S-13）を見る・印刷する</button>
-          <button type="button" class="btn" id="adS12">区域カード（S-12）を印刷する</button>
+          <button type="button" class="btn tbtn" id="adMake" style="grid-column:1/-1"><span>区域の線・取り込み</span><small>線を引く・直す・ファイル・特別区域</small></button>
+          <button type="button" class="btn tbtn" id="adS13"><span>区域割り当ての記録（S-13）</span><small>見る・印刷する</small></button>
+          <button type="button" class="btn tbtn" id="adS12"><span>区域カード（S-12）</span><small>印刷する</small></button>
         </div>
         <!-- 下から出る画面のボタンが使う、元のボタンとファイルの入り口（画面には出さない） -->
         <div id="adMakeSrc" hidden>

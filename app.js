@@ -8703,7 +8703,6 @@ function renderInbox() {
   updateAdminBadge();
 
   const st = D().settings;
-  paintTakeTgl();
   // 区域の決まりの設定の行は、設定タブの「区域の決まり」に出す（kimari.js が置き場所をそろえる）。
   // 状況に効くもの（返却の目安・完了の目安など）は「貸し出しと返却」に、ほかは「受け取れる枚数・一緒に回る など」に分ける
   const R = {
@@ -12047,16 +12046,6 @@ function renderDataSet() {
     row('cacheDays', '通信がない端末にデータを残す期間', '日', 5, 'この日数のあいだ通信できなかった端末は、保存した区域の情報を自動で消します') +
     row('syncGroupSec', '一緒に回っているとき、ほかの人の記録を取りに行く間隔', '秒', 1, '短いほど早く反映されますが、サーバーが混みます。80人が同時に使っても、7秒なら余裕があります') +
     row('syncNormalSec', '区域カード・地図を見ているとき、取りに行く間隔', '秒', 5, 'ふだんの間隔です。混むときは長くしてください');
-}
-/* 「区域」タブの「区域の決まり」：状況の「区域の決まり」（kimari.js）の「貸し出しと返却」を開く入り口。ボタンの下に今の決めを短く出す */
-function paintTakeTgl() {
-  const b = $('#adTakeTgl'); if (!b) return;
-  const st = D().settings;
-  $('#adTakeSum').textContent = `自動受け取り ${Number(st.autoFree) === 1 ? '使う' : '使わない'}・目安 ${lendDays()}日・1人 ${st.holdMaxPersonal || 2}枚`;
-  if (!b.dataset.bound) {
-    b.dataset.bound = '1';
-    b.onclick = () => { if (window.KR) KR.open('lend'); };
-  }
 }
 /* 係の画面：開いているタブの中身だけを作る（3万件のとき、全部のタブを毎回作ると重いため） */
 let poolSweepAt = 0;
