@@ -1508,8 +1508,10 @@ button.ktag{cursor:pointer}
     // 「今日」の数字は、「今日の対応」の行の数（KS-5）。年1回のカバーの1行は数えない
     if (cnt) { cnt.textContent = items.length; cnt.hidden = !items.length; cnt.title = '今日の対応の件数'; }
     fixTabLabel();
+    try { if (typeof updateAdminBadge === 'function') updateAdminBadge(); } catch (e) { /* 下のタブの数字は次の描き直しで直る */ }
     loadOps(false);
   }
+  window.paintToday = paintToday;
   const _renderInbox = window.renderInbox;
   window.renderInbox = function () {
     _renderInbox.apply(this, arguments);
