@@ -65,7 +65,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "もう一度使えるようにした人：{0}人": "Personas habilitadas otra vez: {0}",
 "使うのをやめた人：{0}人": "Personas dadas de baja: {0}",
 "次の{0}件は、そのままにしました。": "Los siguientes {0} se dejaron como estaban.",
-"新しく登録した人は、共通リンクのQRから申し込んでもらい、「申請・承認」で、その人の名前をえらんで承認してください。更新の前の名簿は、スプレッドシートの「users_控え」に残っています。": "Pida a las personas nuevas que soliciten con el QR del enlace común, y apruébelas en «Solicitudes» eligiendo su nombre. La lista de antes de la actualización queda guardada en la hoja de cálculo («users_控え»).",
+"新しく登録した人は、共通リンクのQRから申し込んでもらい、係の画面の「今日」で、その人の名前をえらんで承認してください。更新の前の名簿は、スプレッドシートの「users_控え」に残っています。": "Pida a las personas nuevas que soliciten con el QR del enlace común, y apruébelas en «Hoy», en la pantalla del encargado, eligiendo su nombre. La lista de antes de la actualización queda guardada en la hoja de cálculo («users_控え»).",
 "この人のスマホでは、次に開いたときに区域の情報が消えます。 再訪問のメモ（次の約束・📌）も消え、あとで使えるようにしても元にもどりません（本人がバックアップを保存していれば、もどせます）。 受け持ちの家のリストと、会えた記録は残ります。": "La información se borrará de su teléfono la próxima vez que lo abra. También se borrarán sus notas de revisitas (próxima cita y 📌), y no volverán aunque se le habilite otra vez (salvo que haya guardado una copia de seguridad). Se conservan su lista de casas de revisita y los registros de «Lo encontré».",
 "{0}さんが区域マップを使うのをやめますか？": "¿Dar de baja a {0} del Mapa de Territorios?",
 "このまま使う": "Seguir usando"

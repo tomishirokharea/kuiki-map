@@ -390,8 +390,9 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     let box = document.getElementById('adMapKind');
     if (!box) {
       box = document.createElement('div'); box.id = 'adMapKind';
-      const ref = document.getElementById('adLockBox') || document.getElementById('adOpsBox');
-      pane.insertBefore(box, ref ? ref.nextSibling : pane.firstChild);
+      const host = document.getElementById('setMap'), ref = document.getElementById('adLockBox');
+      if (host) host.insertBefore(box, host.firstElementChild ? host.firstElementChild.nextSibling : null); // 設定タブの「地図（全員に効く）」の見出しのすぐ下
+      else pane.insertBefore(box, ref ? ref.nextSibling : pane.firstChild);
       box.addEventListener('click', e => {
         const b = e.target.closest('[data-mapstd]'); if (!b) return;
         D().settings.mapStd = Number(b.dataset.mapstd);
@@ -671,7 +672,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     const dLa = 2000 / 110540, dLn = 2000 / (111320 * Math.cos(((s + n) / 2) * Math.PI / 180));
     return [s - dLa, w - dLn, n + dLa, e + dLn];
   }
-  /* ---- 係の画面「設定・データ」：地図の目印 ---- */
+  /* ---- 係の画面「設定」：地図の目印 ---- */
   function lmListHtml() {
     let list = LM.items.slice().sort((a, b) => lmPri(a.kind) - lmPri(b.kind) || a.name.localeCompare(b.name, 'ja'));
     if (LMUI.kind) list = list.filter(x => x.kind === LMUI.kind);
@@ -692,8 +693,10 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     let box = document.getElementById('adLmBox');
     if (box) { paintLmList(); return; }
     box = document.createElement('div'); box.id = 'adLmBox';
-    const ref = document.getElementById('adMapKind') || document.getElementById('adLockBox') || document.getElementById('adOpsBox');
-    pane.insertBefore(box, ref ? ref.nextSibling : pane.firstChild);
+    const host = document.getElementById('setMap'), kind = document.getElementById('adMapKind');
+    if (host && kind && kind.parentNode === host) host.insertBefore(box, kind.nextSibling); // 設定タブの「地図（全員に効く）」：地図の種類の下
+    else if (host) host.insertBefore(box, document.getElementById('setMapEtcH'));
+    else { const ref = kind || document.getElementById('adLockBox'); pane.insertBefore(box, ref ? ref.nextSibling : pane.firstChild); }
     box.innerHTML = `<h2 class="sec">地図の目印（<span id="lmCount">${LM.items.length}件</span>）</h2>
       <p class="hint">会館・学校・店など、だれでも分かる公の場所だけです。登録は、地図を長押しして「ここに目印を登録」を押します。<br>${PRIV}。</p>
       <div class="chips" id="lmChips" role="group" aria-label="種類で絞りこむ">

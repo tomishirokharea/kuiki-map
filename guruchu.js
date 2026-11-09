@@ -202,10 +202,11 @@
     const farTxt = farList.length ? `<p class="muted" style="margin-top:8px">どのグループの中心からも${fmtDist(FAR_M)}以上はなれた区域：${farList.length}枚（区域番号 ${farList.slice(0, 10).map(t => esc(t.no)).join(', ')}${farList.length > 10 ? ' …' : ''}）。全体の集まりの「集まりに合う区域」で、少し先に出します。</p>` : '';
     const oldTxt = old.map(k => `<div class="gcrow"><div><b>${esc(k)}</b><p class="muted">今はこのグループの人がいません（名前を変えたときなど）</p></div>
         <button type="button" class="btn small danger" data-gcold="${esc(k)}">消す</button></div>`).join('');
-    return `<h3 class="sub">グループの中心${helpBtn('groupPts')}</h3>
+    return `<details${gcOpen ? ' open' : ''}><summary>グループの中心</summary><h3 class="sub">${helpBtn('groupPts')}</h3>
       <p class="hint">グループの人がだいたい住んでいるあたりを地図に置くと、グループ奉仕の区域を、そのグループに近い順に出せます。名前や住所は使いません。</p>
-      ${groups.length ? rows : '<p class="muted">グループがまだありません。下の一覧で、人にグループを決めてください。</p>'}${oldTxt}${farTxt}`;
+      ${groups.length ? rows : '<p class="muted">グループがまだありません。下の一覧で、人にグループを決めてください。</p>'}${oldTxt}${farTxt}</details>`;
   }
+  let gcOpen = false; // 「グループの中心」は、はじめはたたむ（描き直しても、ひらいていればそのまま）
   function paintBox() {
     const box = document.getElementById('adPeople');
     if (!box || !isAdmin()) return;
@@ -217,10 +218,12 @@
         const d = e.target.closest('[data-gcold]'); if (d) dropOld(d.dataset.gcold);
       });
     }
+    { const d = el.querySelector('details'); if (d) gcOpen = d.open; }
     el.innerHTML = boxHtml();
+    { const d = el.querySelector('details'); if (d) d.addEventListener('toggle', () => { gcOpen = d.open; }); }
     // 「人とグループ」の見出し・ボタン・説明のすぐあと（人の一覧の前）に置く。描き直しを飛ばしたとき（入力中）は、置いた場所のまま
     if (el.parentNode !== box) {
-      const first = box.querySelector('.uplist') || box.querySelector('article.trow'); // 人の一覧（1人1行・改善案A5）の前
+      const first = box.querySelector('.pfind') || box.querySelector('.uplist') || box.querySelector('article.trow'); // 人の一覧（1人1行・改善案A5）の前
       if (first) box.insertBefore(el, first); else box.appendChild(el);
     }
   }

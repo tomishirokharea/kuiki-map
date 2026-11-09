@@ -1057,7 +1057,7 @@
     // 4) 終わりの画面
     const gaps = st.fit ? [...st.fit.gaps.entries()].sort((a, b) => cmpNo(a[0], b[0])) : [];
     const terrLine = `<li>区域：新しく ${res.nNew}・線を新しくした ${res.nKeep}・消した ${res.nGone}${st.tp.made.length ? `（自動で作った枝番：${st.tp.made.map(esc).join('、')}）` : ''}</li>`;
-    const pinLine = `<li>拒否 ${res.dnc}件・注意（！）${res.cau}件${res.skip ? `・同じものがあったので入れなかった ${res.skip}件` : ''}${res.delD || res.delC ? `（入れる前に消した拒否 ${res.delD}・注意 ${res.delC}）` : ''}${res.pinOnly ? `（うち家の印とつながっていないもの ${res.pinOnly}件は「拒否・！」の一覧の「要確認」から地図で家とつなげます）` : ''}</li>`;
+    const pinLine = `<li>拒否 ${res.dnc}件・注意（！）${res.cau}件${res.skip ? `・同じものがあったので入れなかった ${res.skip}件` : ''}${res.delD || res.delC ? `（入れる前に消した拒否 ${res.delD}・注意 ${res.delC}）` : ''}${res.pinOnly ? `（うち家の印とつながっていないもの ${res.pinOnly}件は「家の印」の一覧の「要確認」から地図で家とつなげます）` : ''}</li>`;
     infoSheet(msg, `
       <ul class="kk-ul">${mode !== 'pins' ? terrLine : ''}${mode !== 'lines' ? pinLine : ''}</ul>
       ${gaps.length ? `<div class="notice warn"><b>枝番の線の外に残った家：</b>${gaps.map(([p, n]) => `区域${esc(p)} ${n}軒`).join('、')}<br>「区域の線・取り込み」の「区域の線を直す」で、枝番の線を引き直してください。</div>` : ''}
