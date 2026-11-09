@@ -1717,6 +1717,7 @@ function applyInbox() {
   Store.pulled = true;
   if (currentView === 'admin') adminSweepSoon();
   if (!any) return;
+  badgeRev++; // 届いた変更で「今日」の数が変わるので、下のタブの数字を数え直す（Store.save を通らないため）
   updateTabs();
   // 家・区域だけが変わったときは、家・区域の索引だけを作り直す（記録の分け直しはしない・改善案B1）
   renderAll(full ? false : idxOk ? true : visOk ? 'houses' : false);
@@ -11383,6 +11384,7 @@ async function fetchDevices(force) {
   } catch (e) { /* 次の機会に */ }
   finally { devState.busy = false; }
   if (!changed && !force) return;
+  badgeRev++; // スマホの登録の申し込みが変わった
   if (currentView === 'admin') { renderDevices(); renderInbox(); }
   renderQrPending();
   updateAdminBadge();
@@ -11404,6 +11406,7 @@ async function deviceAction(action, extra, okMsg) {
       break;
     }
   }
+  badgeRev++;
   renderDevices(); renderInbox(); renderQrPending(); updateAdminBadge();
 }
 /* スマホの登録の申し込み（番号を確かめて登録・見送る）。「今日」の行の［確かめる ▼］の下に出す（見出しなし） */
