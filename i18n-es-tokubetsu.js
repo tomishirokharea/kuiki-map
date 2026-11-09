@@ -10,6 +10,11 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "区域の線・取り込み": "Límites e importación",
 "線を引く・直す・ファイル・特別区域": "Dibujar · corregir · archivos · especiales",
 "区域の決まり": "Reglas de los territorios",
+/* ---- 係の画面「状況」の見出しの［⚙ 決まり］と、設定タブの［← 状況にもどる］（kimari.js・2026-11-09） ---- */
+"⚙ 決まり": "⚙ Reglas",
+"この見出しにかかわる区域の決まりを開く": "Abrir las reglas de los territorios relacionadas con esta sección",
+"← 状況にもどる": "← Volver a Situación",
+"期限ごとに色分けした地図が開きます": "Se abre el mapa coloreado según el plazo",
 "この区域の貸し出し": "Asignación de este territorio",
 "この区域だけの調整": "Ajustes solo de este territorio",
 "自動受け取り {0}・目安 {1}日・1人 {2}枚": "Recepción automática: {0} · plazo {1} días · {2} por persona",

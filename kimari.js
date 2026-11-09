@@ -2,8 +2,9 @@
    区域マップ：区域係の「区域の決まり」を設定タブに集める（kimari.js・2026-10-25／2026-11-09 見直し）
 
    ねらい：状況で問題を見つけて、設定タブの「区域の決まり」で直す
-   ・状況の各見出しの下に「かかわる設定」の札（短い名前と今の値）を出す
-   ・札を押すと、設定タブに切りかわり、その設定のまとまりを開いて光らせ、「変えると：…」「効く状況：…」を出す
+   ・状況の各見出しの右に［⚙ 決まり］を1つ出す（KS-11。前の「かかわる設定」の札はやめた）
+   ・押すと（KR.open(keys, from)）、設定タブに切りかわり、かかわる設定の行を全部光らせ、そのまとまりを開いて、「変えると：…」「効く状況：…」を出す。
+     上に［← 状況にもどる］を出し、押すと状況のもとの見出しにもどる。タブで移ったときも消す
    ・設定は設定タブのいちばん上「区域の決まり」1か所にまとめる（よく調整する6項目は開いて置き、ほかの5つのまとまりはたたむ）
      設定の行と、押したときの処理は今までと同じ（app.js・schedule.js・tsuzuki.js が #krLend などの箱に描く）。
      描いたあとで、置き場所の表（PLACE）にしたがって行を移す（placeRows）。行はいつも1つだけ
@@ -26,19 +27,18 @@
 #view-admin .setsec>h2.sec,#view-admin #setMaint>summary{font-size:22px;margin:28px 0 10px;padding:8px 12px;border-left:6px solid var(--terr);background:var(--terr-soft);border-radius:0 8px 8px 0}
 #view-admin #setMaint{padding:0}
 #setMap:has(#adS21:empty):has(#adIken:empty) #setMapEtcH{display:none}
-#view-admin .krchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 12px;color:var(--ink2);font-size:.8rem}
-#view-admin .krchips>span{font-size:inherit}
-#view-admin button.krchip{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:4px;width:auto!important;min-width:0!important;min-height:40px!important;height:auto!important;margin:0!important;padding:4px 12px!important;border-radius:999px!important;font-size:.875rem!important;font-weight:400!important;line-height:1.2!important;background:#F3F5F7!important;border:1px solid #C9D2DA!important;color:var(--ink)!important;white-space:nowrap!important;box-shadow:none!important;text-align:left!important}
-#view-admin button.krchip b{display:inline!important;font-weight:700;margin:0!important;font-size:inherit!important}
-#view-admin button.krchip[aria-pressed=true]{background:#FFF4C2!important;border-color:#B98F00!important;box-shadow:0 0 0 2px #FFE58A!important}
-#adRules .setrow.kr-hit{background:#FFF8D6;box-shadow:0 0 0 2px #B98F00 inset;padding-left:8px;padding-right:8px}
-#adRules .kr-eff{display:block;margin:6px 0 0;padding:6px 8px;border-left:4px solid #B98F00;background:#FFFBE6;color:#3D3000;font-size:.875rem;line-height:1.55;font-weight:400;border-radius:4px}
-#adRules .kr-where{display:block;margin:4px 0 0;color:var(--ink2);font-size:.8rem;font-weight:400;line-height:1.5}
+#view-admin .krsh{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px}
+#view-admin .krsh>.krset{margin:0 0 0 auto;flex:none;min-width:44px;min-height:46px;font-size:15px;padding:0 10px;border-width:2px}
+#view-admin .krback{position:sticky;top:0;z-index:6;background:var(--bg,#F4F1EA);padding:8px 0;margin:0 0 4px;box-shadow:0 6px 8px -6px #0000002e}
+#view-admin .krback .btn{min-height:48px}
+[data-apane="set"] .setrow.kr-hit{background:#FFF8D6;box-shadow:0 0 0 2px #B98F00 inset;padding-left:8px;padding-right:8px}
+[data-apane="set"] .kr-eff{display:block;margin:6px 0 0;padding:6px 8px;border-left:4px solid #B98F00;background:#FFFBE6;color:#3D3000;font-size:.875rem;line-height:1.55;font-weight:400;border-radius:4px}
+[data-apane="set"] .kr-where{display:block;margin:4px 0 0;color:var(--ink2);font-size:.8rem;font-weight:400;line-height:1.5}
 #view-admin .tile{position:relative}
 #view-admin .krdelta{position:absolute;top:8px;right:8px;padding:2px 8px;border-radius:999px;background:#fff;border:2px solid #B98F00;font-size:.8rem;font-weight:700;color:#3D3000;line-height:1.3;pointer-events:none}
 #view-admin .krfold-h{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;-webkit-tap-highlight-color:transparent}
-#view-admin .krfold-h .krfold-i{flex:none;font-size:.8rem;font-weight:700;color:var(--brand-ink);border:2px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap;background:#fff}
-#view-admin .krfold-h:focus-visible{outline:3px solid var(--brand-ink);outline-offset:2px}
+#view-admin .krfold-h .krfold-i{flex:none;font:inherit;font-size:.8rem;font-weight:700;color:var(--brand-ink);border:2px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap;background:#fff;min-height:44px;min-width:44px;cursor:pointer}
+#view-admin .krfold-h .krfold-i:focus-visible{outline:3px solid var(--brand-ink);outline-offset:2px}
 #view-admin .kr-folded{display:none!important}
 #view-admin .krfold-sum{margin:0 0 10px;font-size:.95rem;line-height:1.6;color:var(--ink)}
 #view-admin .krfold-sum .krn{white-space:nowrap;font-weight:700}`;
@@ -61,17 +61,17 @@
     awayScope: { s: '試した時間帯の数え方：', t: '試した時間帯の数え方', v: () => (typeof awayRule === 'function' && awayRule().sc ? '前回の巡回も含める' : '今回の巡回だけ'), w: 'まだ試していない家の数・区域ごと' },
     keepMonths: { s: '記録を残す期間：', t: '訪問記録を残す期間', v: () => `${Number(st().keepMonths) || 24}か月`, w: '会えた成果（設定タブにあります）', tab: 'set' }
   };
-  // 状況の見出し → 札に出す設定
+  // 状況の見出し（id） → ［⚙ 決まり］で開く設定。見出しの id は index.html・schedule.js で付けている（もどる先にも使う）
   const prevH = (id, tag) => { const el = $id(id); let p = el && el.previousElementSibling; while (p && p.tagName !== tag) p = p.previousElementSibling; return p; };
   const BLOCKS = [
-    { h: () => document.querySelector('#adDue > h2'), keys: ['lendDays', 'awayRetPct', 'awayAgainSlot', 'donePct', 'awayTries'] },
-    { h: () => prevH('adTiles', 'H2'), keys: ['lendDays', 'awayRetPct'] },
-    { h: () => document.querySelector('#adAch > h2'), keys: ['keepMonths'] },
-    { h: () => $id('adCandH'), keys: ['awayTries'] },
-    { h: () => prevH('adAwaySet', 'H2'), keys: ['extRest', 'extDays', 'freeAfterDays'] },
-    { h: () => { const s = $id('adAwaySlots'); return s ? prevHOf(s.closest('.scroll') || s, 'H3') : null; }, keys: ['awayScope', 'awayTries'] },
-    { h: () => prevH('adAwayTerrs', 'H3'), keys: ['awayScope', 'awayTries'] },
-    { h: () => $id('adHardH'), keys: ['awayTries'] }
+    { id: 'adDueH', keys: ['lendDays', 'awayRetPct', 'awayAgainSlot', 'donePct', 'awayTries'] }, // 期限の見張り
+    { id: 'adTilesH', keys: ['lendDays', 'awayRetPct'] }, // 全体の状況
+    { id: 'adAchH', keys: ['keepMonths'] }, // 会えた成果
+    { id: 'adCandH', keys: ['awayTries'] }, // 何度訪ねても会えない家
+    { id: 'adAwaySetH', keys: ['extRest', 'extDays', 'freeAfterDays'] }, // 留守宅の状況
+    { id: 'adAwaySlotsH', keys: ['awayScope', 'awayTries'] }, // まだ試していない家の数（時間帯ごと）
+    { id: 'adAwayTerrsH', keys: ['awayScope', 'awayTries'] }, // 区域ごと
+    { id: 'adHardH', keys: ['awayTries'] } // なかなか会えない家
   ];
   function prevHOf(el, tag) { let p = el && el.previousElementSibling; while (p && p.tagName !== tag) p = p.previousElementSibling; return p; }
   // 状況の数字を読む（たたんだときの要点）
@@ -89,8 +89,13 @@
     return '';
   }
   function tagRows() { RULES.querySelectorAll('.setrow').forEach(r => { const k = keyOf(r); if (k) r.setAttribute('data-krk', k); }); }
-  const rowOf = k => RULES.querySelector(`.setrow[data-krk="${k}"]`);
-  const groupOf = row => (row ? row.closest('details.krg') : null);
+  // 設定の行：区域の決まり（data-krk）か、設定タブのほかの所（訪問記録を残す期間は「保守」の中・data-kset）
+  const SETP = () => document.querySelector('.apane[data-apane="set"]');
+  const rowOf = k => {
+    const r = RULES.querySelector(`.setrow[data-krk="${k}"]`); if (r) return r;
+    const p = SETP(), c = p && p.querySelector(`[data-kset="${k}"]`);
+    return c ? c.closest('.setrow') : null;
+  };
 
   /* ---------- 置き場所の表：設定 → 入れる箱（KS-15）。ここに無い設定は、描いた箱のまま ----------
      krTop＝よく調整する（開いて置く）。6項目は下のまとまりには重ねて出さない */
@@ -143,9 +148,12 @@
     const v = opens()[d.dataset.krg];
     if (v != null) d.open = !!v;
   });
+  // ［⚙ 決まり］で開いた箱は、覚えない（その人が自分で開け閉めしたときだけ覚える）
+  const quiet = new WeakSet();
   RULES.addEventListener('toggle', e => {
     const d = e.target;
     if (!d || !d.matches || !d.matches('details.krg[data-krg]')) return;
+    if (quiet.has(d)) { quiet.delete(d); return; }
     opens()[d.dataset.krg] = d.open ? 1 : 0;
     try { lsSet(OPEN_KEY, JSON.stringify(openState)); } catch (err) { /* 何もしない */ }
   }, true);
@@ -156,31 +164,41 @@
   // 状況の見出しをたたむのは、スマホ（幅1,180px未満）だけ
   const wideMq = window.matchMedia ? window.matchMedia('(min-width:1180px)') : null;
   const wide = () => !!(wideMq && wideMq.matches);
-  let hit = '', hitAt = 0;
+  let jump = null; // ［⚙ 決まり］で開いたとき：{ keys: 光らせる設定, from: もどる見出しの id }
 
-  /* ---------- 札 ---------- */
-  function chipsHtml(keys) {
-    const ks = keys.filter(k => F[k] && (!F[k].need || F[k].need()));
-    if (!ks.length) return '';
-    return `<span>かかわる設定：</span>` + ks.map(k => `<button type="button" class="krchip" data-krgo="${k}" aria-pressed="${k === hit}">${F[k].s}<b>${F[k].v()}</b></button>`).join('');
-  }
-  function paintChips() {
-    document.querySelectorAll('#view-admin .krchips').forEach(x => x.remove());
+  /* ---------- 状況の見出しの右の［⚙ 決まり］（1つの見出しに1つ） ---------- */
+  function paintSets() {
+    document.querySelectorAll('#view-admin .krset').forEach(x => { const h = x.parentNode; x.remove(); if (h && h.classList) h.classList.remove('krsh'); });
     if (adPane !== 'status') return;
     BLOCKS.forEach(b => {
-      let h = null;
-      try { h = b.h(); } catch (e) { h = null; }
-      if (!h || !h.parentNode) return;
-      const html = chipsHtml(b.keys);
-      if (!html) return;
-      const d = document.createElement('div');
-      d.className = 'krchips'; d.setAttribute('role', 'group'); d.setAttribute('aria-label', 'かかわる設定');
-      d.innerHTML = html;
-      h.insertAdjacentElement('afterend', d);
+      const h = $id(b.id);
+      if (!h || h.querySelector(':scope > .krset')) return;
+      const ks = b.keys.filter(k => F[k]);
+      if (!ks.length) return;
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'btn small krset';
+      btn.dataset.krset = ks.join(','); btn.dataset.krfrom = b.id;
+      btn.setAttribute('aria-label', 'この見出しにかかわる区域の決まりを開く');
+      btn.textContent = '⚙ 決まり';
+      h.classList.add('krsh');
+      const fi = h.querySelector(':scope > .krfold-i');
+      h.insertBefore(btn, fi || null); // たたむ／開くの印より前（見出しの右のはし）
     });
   }
+  // 見出しの箱を描き直す処理（会えない家・点検など、あとで読みこんで描くもの）でボタンが消えたら、すぐ付け直す
+  const pane1 = document.querySelector('.apane[data-apane="status"]'), pane2 = document.querySelector('.apane[data-apane="status2"]');
+  let setsTm = 0;
+  const setsMo = window.MutationObserver ? new MutationObserver(() => {
+    if (setsTm || adPane !== 'status') return;
+    setsTm = requestAnimationFrame(() => {
+      setsTm = 0;
+      if (adPane !== 'status') return;
+      if (BLOCKS.some(b => { const h = $id(b.id); return h && !h.querySelector(':scope > .krset'); })) { try { paintSets(); paintFolds(); } catch (e) { console.error(e); } }
+    });
+  }) : null;
+  if (setsMo) [pane1, pane2].forEach(p => { if (p) setsMo.observe(p, { childList: true, subtree: true }); });
 
-  /* ---------- 押した設定を光らせ、変えたときの影響を出す ---------- */
+  /* ---------- 開いた設定を光らせ、変えたときの影響を出す ---------- */
   function helpChange(k) {
     const H = window.HELP; if (!H) return '';
     const lang = window.KI && KI.lang === 'es' ? 'es' : 'ja';
@@ -188,72 +206,95 @@
     return it && it.change ? it.change : '';
   }
   function applyHit() {
-    RULES.querySelectorAll('.kr-hit').forEach(r => r.classList.remove('kr-hit'));
-    RULES.querySelectorAll('.kr-eff, .kr-where').forEach(x => x.remove());
-    if (!hit) return;
-    const row = rowOf(hit), f = F[hit];
-    if (!row || !f) return;
-    row.classList.add('kr-hit');
-    const lab = row.firstElementChild;
-    if (!lab) return;
-    const ch = helpChange(hit);
-    lab.insertAdjacentHTML('beforeend', (ch ? `<span class="kr-eff"><b>変えると：</b>${esc(ch)}</span>` : '') + `<span class="kr-where"><b>効く状況：</b>${esc(f.w)}</span>`);
+    const p = SETP() || RULES;
+    p.querySelectorAll('.kr-hit').forEach(r => r.classList.remove('kr-hit'));
+    p.querySelectorAll('.kr-eff, .kr-where').forEach(x => x.remove());
+    if (!jump) return;
+    jump.keys.forEach(k => {
+      const row = rowOf(k), f = F[k];
+      if (!row) return;
+      row.classList.add('kr-hit');
+      const lab = row.firstElementChild;
+      if (!lab || !f) return;
+      const ch = helpChange(k);
+      lab.insertAdjacentHTML('beforeend', (ch ? `<span class="kr-eff"><b>変えると：</b>${esc(ch)}</span>` : '') + `<span class="kr-where"><b>効く状況：</b>${esc(f.w)}</span>`);
+    });
   }
   function focusCtl(row) {
     const c = row && row.querySelector('input,button:not(.qhelp)');
     if (c) try { c.focus({ preventScroll: true }); } catch (e) { /* 何もしない */ }
   }
+  // 行を囲む箱（details）を開く。ここで開いたものは、開け閉めの覚えに入れない
+  function openUp(el) {
+    for (let d = el && el.closest('details'); d; d = d.parentElement ? d.parentElement.closest('details') : null) {
+      if (!d.open) { quiet.add(d); d.open = true; }
+    }
+  }
+  const view = (el, block) => { try { el.scrollIntoView({ block }); } catch (e) { el.scrollIntoView(); } };
 
-  /* ---------- 札を押したとき・入り口から開くとき：設定タブに切りかえて、その行（まとまり）を開いて見せる ---------- */
-  // （Task 6 で、状況にもどるボタンを足す予定。それまでは、設定タブに切りかえるだけ）
-  function toSet() {
-    if (adPane !== 'set') { adPane = 'set'; renderAdmin(); }
+  /* ---------- 設定タブの上の［← 状況にもどる］ ---------- */
+  function paintBack() {
+    const p = SETP(); let bar = $id('krBackBar');
+    if (!jump || !jump.from || adPane !== 'set' || !p) { if (bar) bar.remove(); return; }
+    if (!bar) {
+      bar = document.createElement('div'); bar.id = 'krBackBar'; bar.className = 'krback';
+      bar.innerHTML = '<button type="button" class="btn" id="krBack">← 状況にもどる</button>';
+    }
+    if (p.firstElementChild !== bar) p.insertBefore(bar, p.firstChild);
   }
-  function goTab(pane, key) {
-    adPane = pane; renderAdmin();
-    window.scrollTo(0, 0);
-    setTimeout(() => {
-      const c = document.querySelector(`#view-admin [data-kset="${key}"]`), row = c && c.closest('.setrow');
-      if (!row) return;
-      const d = row.closest('details'); if (d) d.open = true;
-      row.scrollIntoView({ block: 'center' });
-      row.style.boxShadow = '0 0 0 3px #E0B400 inset'; setTimeout(() => { row.style.boxShadow = ''; }, 4000);
-    }, 60);
+  function clearJump() {
+    if (!jump) return;
+    jump = null;
+    applyHit(); paintBack();
   }
-  function showRow(row) {
-    const g = groupOf(row);
-    if (g) g.open = true;
-    try { row.scrollIntoView({ block: 'center' }); } catch (e) { row.scrollIntoView(); }
-    focusCtl(row);
+  function back() {
+    const from = jump && jump.from;
+    clearJump();
+    setAdPane('status'); renderAdmin();
+    const go = () => {
+      const h = from && $id(from); if (!h) return;
+      view(h, 'start');
+      const b = h.querySelector('.krset'); if (b) try { b.focus({ preventScroll: true }); } catch (e) { /* 何もしない */ }
+    };
+    go(); setTimeout(go, 80); // グラフなどがあとで高さを変えても、見出しに着くように
   }
-  function go(key) {
-    const f = F[key];
-    if (f && f.tab) { goTab(f.tab, key); return; }
-    hit = key; hitAt = Date.now();
-    document.querySelectorAll('#view-admin .krchip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.krgo === key)));
-    toSet();
-    applyHit();
-    const row = rowOf(key);
-    if (row) showRow(row);
-  }
-  // open(設定の名前 か まとまりの名前（lend・away・ext・take・tips・top）)
-  function open(g) {
-    if (g && rowOf(g)) { go(g); return; }
-    toSet();
-    const grp = g ? RULES.querySelector(`details.krg[data-krg="${g}"]`) : null;
-    if (grp) { grp.open = true; try { grp.scrollIntoView({ block: 'start' }); } catch (e) { grp.scrollIntoView(); } }
-    else { const s = $id('setRules'); if (s) s.scrollIntoView(); }
+
+  /* ---------- KR.open(keys, from)：設定タブに切りかえて、keys の行を全部光らせ、その箱を開き、いちばん上の行へ動く ----------
+     from（状況の見出しの id）があれば、上に［← 状況にもどる］を出す。
+     keys に、まとまりの名前（lend・away・ext・take・tips・top）を1つ渡すと、そのまとまりを開くだけ（区域タブの入り口・Task 7 まで） */
+  function open(keys, from) {
+    if (typeof keys === 'string') {
+      const grp = !rowOf(keys) && !F[keys] ? RULES.querySelector(`details.krg[data-krg="${keys}"]`) : null;
+      if (grp || !keys) {
+        clearJump();
+        if (adPane !== 'set') { setAdPane('set'); renderAdmin(); }
+        if (grp) { openUp(grp.querySelector('.krbox') || grp); view(grp, 'start'); }
+        else { const s = $id('setRules'); if (s) view(s, 'start'); }
+        return;
+      }
+      keys = [keys];
+    }
+    jump = { keys: (keys || []).filter(Boolean), from: from || '' };
+    if (adPane !== 'set') { setAdPane('set'); renderAdmin(); } // 描いたあと（after）で光と［もどる］を付ける
+    else { applyHit(); paintBack(); }
+    const rows = jump.keys.map(rowOf).filter(Boolean);
+    rows.forEach(openUp);
+    if (rows[0]) { view(rows[0], 'center'); focusCtl(rows[0]); }
   }
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest ? e.target : null; if (!t) return;
-    const x = t.closest('[data-krgo]');
-    if (x) { e.preventDefault(); go(x.dataset.krgo); }
+    const x = t.closest('.krset[data-krset]');
+    if (x) { e.preventDefault(); open(x.dataset.krset.split(','), x.dataset.krfrom); return; }
+    if (t.closest('#krBack')) { e.preventDefault(); back(); }
   });
+  // 上のタブ・区域の中の切りかえで移ったときは、［もどる］と光を消す
+  document.addEventListener('click', e => {
+    if (jump && e.target && e.target.closest && e.target.closest('#adTabs [data-ap], #adTerrSub [data-ap]')) clearJump();
+  }, true);
 
-  /* ---------- 描き直したあと：印・札・光・しぼり込みを付け直す ---------- */
   /* ---------- 変えたあと：左の変わった数字に「前 → 今」の印（10秒）・お知らせに「取り消す」 ---------- */
   const CTL = '[data-sset],[data-kset],[data-aset],[data-dueset],[data-donepct],[data-takemax],[data-range],[data-offadd],[data-offdel]';
-  let pending = null, delta = null;
+  let pending = null, delta = null, deltaBase = null; // deltaBase：設定タブで変えたときの、状況の数字（もどったときに「前 → 今」を出す）
   const snapNums = () => { const o = {}; document.querySelectorAll('#adDue [data-duetl], #adTiles [data-tl]').forEach(t => { const b = t.querySelector('b'); if (b) o[(t.dataset.duetl ? 'd:' + t.dataset.duetl : 't:' + t.dataset.tl)] = b.textContent.trim(); }); return o; };
   const snapVals = () => { const o = {}; Object.keys(F).forEach(k => { try { o[k] = F[k].v(); } catch (e) { o[k] = ''; } }); return o; };
   const grab = e => {
@@ -272,13 +313,15 @@
     const now = snapNums(), map = {};
     Object.keys(now).forEach(k => { if (p.nums[k] != null && p.nums[k] !== now[k]) map[k] = [p.nums[k], now[k]]; });
     delta = { map, until: Date.now() + 10000 };
+    // 設定タブで変えたとき、状況の数字はまだ描き直されていない。状況にもどったときに比べる（はじめに変える前の数字を使う）
+    if (adPane !== 'status' && Object.keys(p.nums).length && !deltaBase) deltaBase = { nums: p.nums, at: Date.now() };
     const vals = snapVals(), ch = Object.keys(F).filter(k => p.vals[k] !== vals[k]);
     const msg = ch.length === 1 ? `${F[ch[0]].t}を ${p.vals[ch[0]]} → ${vals[ch[0]]} にしました` : '設定を変えました';
     // 設定の処理が、このあとで「設定を変えました」を出すので、それよりあとに出す
     setTimeout(() => toast(msg, null, { label: '取り消す', fn: () => undo(p.prev) }), 0);
   }
   function undo(prev) {
-    delta = null; document.querySelectorAll('#view-admin .krdelta').forEach(x => x.remove());
+    delta = null; deltaBase = null; document.querySelectorAll('#view-admin .krdelta').forEach(x => x.remove());
     const s = D().settings;
     new Set(Object.keys(prev).concat(Object.keys(s))).forEach(k => {
       if (JSON.stringify(prev[k]) === JSON.stringify(s[k])) return;
@@ -287,6 +330,14 @@
     Store.save(); renderAll(); toast('設定をもとにもどしました');
   }
   function paintDelta() {
+    if (deltaBase && adPane === 'status') {
+      const b = deltaBase; deltaBase = null;
+      if (Date.now() - b.at < 10 * 60000) {
+        const now = snapNums(), map = {};
+        Object.keys(now).forEach(k => { if (b.nums[k] != null && b.nums[k] !== now[k]) map[k] = [b.nums[k], now[k]]; });
+        if (Object.keys(map).length) delta = { map, until: Date.now() + 10000 };
+      }
+    }
     if (!delta || Date.now() > delta.until) { delta = null; return; }
     Object.keys(delta.map).forEach(k => {
       const sel = k.startsWith('d:') ? `#adDue [data-duetl="${k.slice(2)}"]` : `#adTiles [data-tl="${k.slice(2)}"]`;
@@ -299,11 +350,11 @@
     paintDelta.tm = setTimeout(() => { document.querySelectorAll('#view-admin .krdelta').forEach(x => x.remove()); }, Math.max(0, left));
   }
 
-  /* ---------- スマホ：状況の見出しをたたむ（期限の見張りだけ開いておく・開け閉めはこの端末に覚える） ---------- */
+  /* ---------- スマホ：状況の見出しをたたむ（期限の見張りと毎月の点検だけ開いておく・開け閉めはこの端末に覚える） ---------- */
   const FOLD = 'kuiki_kr_fold';
   let foldState = null;
   const folds = () => { if (!foldState) { try { foldState = JSON.parse(lsGet(FOLD) || '{}') || {}; } catch (e) { foldState = {}; } } return foldState; };
-  const isOpen = id => { const f = folds(); return f[id] != null ? !!f[id] : id === 'due'; };
+  const isOpen = id => { const f = folds(); return f[id] != null ? !!f[id] : id === 'due' || id === 'ops'; }; // 毎月の点検（いちばん下）も、はじめは開いておく
   const setOpenF = (id, v) => { folds()[id] = v ? 1 : 0; try { lsSet(FOLD, JSON.stringify(foldState)); } catch (e) { /* 何もしない */ } };
   // 見出しごとの、たたんだときの要点
   const dueNum = k => num(`#adDue [data-duetl="${k}"] b`), tileNum = k => num(`#adTiles [data-tl="${k}"] b`);
@@ -312,13 +363,14 @@
     tiles: () => [['区域の数', tileNum('terr')], ['返却の目安を過ぎた貸出', tileNum('over')], ['この90日で会えた', tileNum('met')]],
     away: () => [['完了した区域', extN()]],
     hard: () => [['手紙の候補', hardN()]],
-    jg: () => (window.JGUI ? JGUI.sum() : []) // 区域カードと留守宅カードのグラフ（joukyou-graph.js）：直近30日の会えた割合
+    jg: () => (window.JGUI ? JGUI.sum() : []), // 区域カードと留守宅カードのグラフ（joukyou-graph.js）：直近30日の会えた割合
+    ops: () => [['要確認', String(document.querySelectorAll('#adOpsBox [data-ops="warn"]').length) + '件']] // 毎月の点検（状況のいちばん下）
   };
   const sumHtml = a => a.filter(x => x[1] != null).map(x => `<span class="krn">${esc(x[0])} ${esc(x[1])}</span>`).join('・');
   // 状況の見出し（id・見つけ方・中身の終わり）
   function foldBlocks() {
     const out = [], panes = [document.querySelector('.apane[data-apane="status"]'), document.querySelector('.apane[data-apane="status2"]')];
-    const BOX = { adDue: 'due', adSlotBox: 'slot', adAch: 'ach', adJG: 'jg', adCand: 'cand' };
+    const BOX = { adDue: 'due', adSlotBox: 'slot', adAch: 'ach', adJG: 'jg', adCand: 'cand', adOpsBox: 'ops' };
     // 見出しは、文字ではなく、すぐ下の箱で見分ける（スペイン語の画面でも同じに動くように）
     const HID = new Map();
     const put = (h, id) => { if (h) HID.set(h, id); };
@@ -330,8 +382,8 @@
       if (!pane) return;
       let cur = null;
       [...pane.children].forEach(el => {
-        if (el.hidden || el.classList.contains('krchips') || el.classList.contains('krfold-sum')) return;
-        if (BOX[el.id]) { const h = el.querySelector(':scope > h2'); cur = null; if (h) out.push({ id: BOX[el.id], h, body: [...el.children].filter(x => x !== h && !x.classList.contains('krchips') && !x.classList.contains('krfold-sum')) }); return; }
+        if (el.hidden || el.classList.contains('krfold-sum')) return;
+        if (BOX[el.id]) { const h = el.querySelector(':scope > h2'); cur = null; if (h) out.push({ id: BOX[el.id], h, body: [...el.children].filter(x => x !== h && !x.classList.contains('krfold-sum')) }); return; }
         if (/^H[23]$/.test(el.tagName)) { const id = ID(el); cur = id ? { id, h: el, body: [] } : null; if (cur) out.push(cur); return; }
         if (cur) cur.body.push(el);
       });
@@ -345,20 +397,23 @@
     if (adPane !== 'status' || wide()) return;
     foldBlocks().forEach(b => {
       const open = isOpen(b.id);
-      b.h.classList.add('krfold-h'); b.h.setAttribute('role', 'button'); b.h.setAttribute('tabindex', '0'); b.h.setAttribute('aria-expanded', String(open)); b.h.dataset.krfold = b.id;
-      b.h.insertAdjacentHTML('beforeend', `<span class="krfold-i" aria-hidden="true">${open ? 'たたむ ▴' : '開く ▾'}</span>`);
+      // 開け閉めは、見出しの右の［たたむ／開く］ボタン（見出しの文字を押しても開け閉めする）。見出しの中に［⚙ 決まり］もあるので、見出しそのものはボタンにしない
+      b.h.classList.add('krfold-h'); b.h.dataset.krfold = b.id;
+      b.h.insertAdjacentHTML('beforeend', `<button type="button" class="krfold-i" aria-expanded="${open}">${open ? 'たたむ ▴' : '開く ▾'}</button>`);
       if (open) return;
       b.body.forEach(x => x.classList.add('kr-folded'));
       const sum = SUMS[b.id] ? sumHtml(SUMS[b.id]()) : '';
-      if (sum) {
-        const chips = b.h.nextElementSibling && b.h.nextElementSibling.classList.contains('krchips') ? b.h.nextElementSibling : null;
-        (chips || b.h).insertAdjacentHTML('afterend', `<p class="krfold-sum">${sum}</p>`);
-      }
+      if (sum) b.h.insertAdjacentHTML('afterend', `<p class="krfold-sum">${sum}</p>`);
     });
   }
-  const toggleFold = h => { const id = h.dataset.krfold; if (!id) return; setOpenF(id, !isOpen(id)); paintFolds(); };
+  const toggleFold = h => {
+    const id = h.dataset.krfold; if (!id) return;
+    const had = document.activeElement && h.contains(document.activeElement);
+    setOpenF(id, !isOpen(id)); paintFolds();
+    const b = had && h.querySelector('.krfold-i'); if (b) try { b.focus({ preventScroll: true }); } catch (e) { /* 何もしない */ }
+  };
   // 「今日」タブの「見る」などで状況の中の場所に飛ぶときは、その見出しを開いておく（たたんだ中には飛べないため）
-  const ANCHOR = { adDue: 'due', adTiles: 'tiles', adSlotBox: 'slot', adAch: 'ach', adJG: 'jg', adMeet: 'meet', adCand: 'cand', adAwaySet: 'away', adAwaySlots: 'slots2', adAwayTerrs: 'terrs', adHard: 'hard' };
+  const ANCHOR = { adDue: 'due', adTiles: 'tiles', adSlotBox: 'slot', adAch: 'ach', adJG: 'jg', adMeet: 'meet', adCand: 'cand', adAwaySet: 'away', adAwaySlots: 'slots2', adAwayTerrs: 'terrs', adHard: 'hard', adOps: 'ops' };
   document.addEventListener('click', e => {
     const b = e.target && e.target.closest ? e.target.closest('[data-tgo="status"][data-anchor]') : null;
     const id = b && ANCHOR[b.dataset.anchor];
@@ -369,17 +424,14 @@
     if (!h || e.target.closest('button:not(.krfold-i), a, input, select')) return;
     toggleFold(h);
   });
-  VA.addEventListener('keydown', e => {
-    const h = e.target && e.target.classList && e.target.classList.contains('krfold-h') ? e.target : null;
-    if (h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleFold(h); }
-  });
 
   function after() {
     tagRows();
     placeRows();
-    if (adPane === 'status') paintChips();
-    if (hit && Date.now() - hitAt > 10 * 60000) hit = '';
+    if (jump && adPane !== 'set') jump = null; // ほかの所から移ったとき（今日の「見る」など）
+    paintSets();
     applyHit();
+    paintBack();
     checkChange();
     paintDelta();
     paintFolds();
@@ -394,5 +446,5 @@
   }
   if (wideMq && wideMq.addEventListener) wideMq.addEventListener('change', () => { try { paintFolds(); } catch (e) { /* 何もしない */ } });
 
-  window.KR = { open, go, F, PLACE };
+  window.KR = { open, F, PLACE };
 })();

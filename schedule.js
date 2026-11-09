@@ -71,6 +71,7 @@
 .duemeet{display:inline-block;background:var(--terr-soft);color:var(--terr);border-radius:6px;padding:0 6px;font-size:13px;font-weight:700}
 .duetbl th,.duetbl td{text-align:left;vertical-align:middle}
 .duetbl td.num{text-align:right;white-space:nowrap}
+.duemap{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:4px 0 12px}.duemap .muted{font-size:.875rem}
 .duerow{background:#fff;border:2px solid var(--line);border-left-width:10px;border-radius:12px;padding:10px 12px;margin-bottom:8px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
 .duerow p{margin:0}
 .duebtns{display:flex;flex-direction:column;gap:6px}
@@ -362,9 +363,10 @@
     const order = m.ds.slice().sort((a, b) => RANK[a.st] - RANK[b.st] ||
       (a.left == null ? 1 : b.left == null ? -1 : a.left - b.left) || cmpNo(a.t.no, b.t.no));
     const SHOW = 8, sizes = sizeCheck();
-    box.innerHTML = `<h2 class="sec">期限の見張り</h2>
+    box.innerHTML = `<h2 class="sec" id="adDueH">期限の見張り</h2>
       <p class="hint">1区域は留守宅も含めて返却の目安（${ld}日）以内、全区域は前回回り終えた日から1年以内に回る、という原則で計算しています。
         前回回り終えた日は、アプリの記録とS-13に転記した紙の記録のうち、新しいほうを使います。</p>
+      <p class="duemap"><button type="button" class="btn" data-admap>地図で見る</button><span class="muted">期限ごとに色分けした地図が開きます</span></p>
       <div class="tiles">
         ${dueTile('over', m.over.length, '年1回の期限を過ぎた区域', '', m.over.length)}
         ${dueTile('warn', m.warn.length, `期限まで${PIN_DAYS}日以内`, '', m.warn.length)}
@@ -532,9 +534,9 @@
     try {
       if (isAdmin()) fixTabLabel();
       if (lkLocked() && currentView === 'admin') { const ls = document.getElementById('alockScr'); if (!ls || ls.hidden) showLockScreen(); return; }
-      if (isAdmin() && adPane === 'set') { paintTips(); paintOps(); paintLockBox(); loadOps(false); }
+      if (isAdmin() && adPane === 'set') { paintTips(); paintLockBox(); }
       if (isAdmin() && adPane === 'status') {
-        paintCand(); loadOps(false);
+        paintCand(); paintOps(); loadOps(false);
         paintDue();
         paintSlotBox();
       }
@@ -1427,7 +1429,7 @@ button.ktag{cursor:pointer}
     }
     // 10 毎月の点検で要確認のもの
     const warns = opsItems().filter(i => i.state === 'warn' && i.id !== 's13'); // S-13の「記録なし」は、上の年1回のカバーの1行に出す（1回だけ）
-    if (warns.length) row('#8A6D00', `点検で要確認　${warns.length}件`, warns.map(i => esc(i.title) + (i.detail ? `（${i.detail}）` : '')).join('、'), go('set', 'adOps', '点検を見る'));
+    if (warns.length) row('#8A6D00', `点検で要確認　${warns.length}件`, warns.map(i => esc(i.title) + (i.detail ? `（${i.detail}）` : '')).join('、'), go('status', 'adOps', '点検を見る')); // 点検は状況のいちばん下（KS-13）
     return out;
   }
   window.todayCount = () => todayItems().length; // 下のタブ（係の画面）の数字も、「今日」の数字と同じこの数にする
@@ -1698,7 +1700,7 @@ button.ktag{cursor:pointer}
   const karteBtns = (ts, max) => ts.slice(0, max || 2).map(t => `<button type="button" class="btn small" data-tkarte="${esc(t.id)}">区域${esc(t.no)}のカルテ</button>`).join('');
 
   /* =========================================================
-     第4弾（2）毎月の点検（「設定」タブの上）／設定の変更履歴／整理とバックアップの状態
+     第4弾（2）毎月の点検（「状況」タブのいちばん下・KS-13）／設定の変更履歴／整理とバックアップの状態
      ・サーバーの ops 問い合わせで読む（区域係だけ・同期には乗せない）。5分に1回まで
      ・要確認の項目は「今日」タブにも1行出す
      ========================================================= */
@@ -1770,14 +1772,14 @@ button.ktag{cursor:pointer}
   }
   function paintOps() {
     if (!isAdmin()) return;
-    const pane = document.querySelector('[data-apane="set"]');
+    // 毎月の点検は、状況のいちばん下（KS-13。状況は status と status2 の2つの入れ物で、下が status2）
+    const pane = document.querySelector('[data-apane="status2"]') || document.querySelector('[data-apane="status"]');
     if (!pane) return;
     let box = document.getElementById('adOpsBox');
     if (!box) {
       box = document.createElement('div');
       box.id = 'adOpsBox';
-      // 設定タブは区域の決まりがいちばん上（KS-14）。点検は、それまでのあいだ設定タブのいちばん下に置く（Task 6 で状況のいちばん下へ移す）
-      if (document.getElementById('setRules')) pane.appendChild(box); else pane.insertBefore(box, pane.firstChild);
+      pane.appendChild(box);
       box.addEventListener('click', async e => {
         const c = e.target.closest('[data-opschk]'), r = e.target.closest('[data-opsre]');
         if (c) {
@@ -1794,7 +1796,7 @@ button.ktag{cursor:pointer}
     const hist = (opsState.data && opsState.data.history) || [];
     box.innerHTML = `<h2 class="sec" id="adOps">毎月の点検</h2>
       <div class="cover ${warn ? 'cv-warn' : 'cv-ok'}" role="status"><i aria-hidden="true">${warn ? '！' : '✓'}</i><div><b>${warn ? `要確認が${warn}件あります` : 'いまのところ、問題はありません'}</b><small>月が変わると、係のチェックは空に戻ります</small></div></div>
-      ${items.map(i => `<div class="duerow opsrow" style="border-left-color:${MK[i.state][0]}"><div><p><b>${MK[i.state][1]}</b>　${esc(i.title)}</p><p class="muted">${i.detail}</p></div>
+      ${items.map(i => `<div class="duerow opsrow" data-ops="${esc(i.state)}" style="border-left-color:${MK[i.state][0]}"><div><p><b>${MK[i.state][1]}</b>　${esc(i.title)}</p><p class="muted">${i.detail}</p></div>
         ${i.state === 'todo' ? `<div class="duebtns"><button type="button" class="btn small primary" data-opschk="${esc(i.id)}" data-on="1">確認した</button></div>`
           : i.state === 'done' ? `<div class="duebtns"><button type="button" class="btn small" data-opschk="${esc(i.id)}" data-on="0">取り消す</button></div>` : '<div></div>'}</div>`).join('')}
       <details class="dueset"><summary>設定の変更・書き出しの履歴（新しい順・${hist.length}件）</summary>
@@ -2946,7 +2948,7 @@ body.duemode .terr-label:not(.duelab){display:none}
       if (ref && ref.parentNode) ref.parentNode.insertBefore(box, ref.nextSibling); else pane.appendChild(box);
     }
     const ms = achieveStats().months, max = Math.max(1, ...ms.map(x => x.first));
-    box.innerHTML = `<h2 class="sec">会えた成果（会衆全体）</h2>
+    box.innerHTML = `<h2 class="sec" id="adAchH">会えた成果（会衆全体）</h2>
       <p class="hint">「はじめて会えた」は、その月に、その家・部屋ではじめて「会えた」の記録がついた数です。「時間帯を変えて」は、前に留守だった時間帯とはちがう時間帯で会えた数です。人ごとの数は出しません。</p>
       <div class="scroll"><table class="slots narrow achtbl"><tr><th>月</th><th>はじめて会えた</th><th>うち時間帯を変えて</th><th style="width:40%"></th></tr>
       ${ms.map(x => `<tr><th>${x.label}</th><td class="num"><b>${x.first}</b>軒</td><td class="num">${x.changed}軒</td><td><div class="bar"><i style="width:${Math.round(x.first / max * 100)}%"></i></div></td></tr>`).join('')}</table></div>
@@ -3045,9 +3047,9 @@ body.duemode .terr-label:not(.duelab){display:none}
       try { wideOn(); paintTopBar(); } catch (e) { console.error(e); }
     };
   }
-  /* 「区域」タブの中の「期限の地図」：地図を開いて、期限の色分けを入れる */
+  /* 状況の「期限の見張り」の［地図で見る］（前は「区域」タブの中の「期限の地図」・KS-6）：地図を開いて、期限の色分けを入れる */
   {
-    const sub = document.getElementById('adTerrSub');
+    const sub = document.getElementById('view-admin');
     if (sub) sub.addEventListener('click', e => {
       if (!e.target.closest('[data-admap]')) return;
       dmState.on = true; lsSet('kuiki_duemode', '1');

@@ -780,8 +780,6 @@ html[lang="es"] .atabs button{font-size:13px;white-space:normal;line-height:1.15
 .atabs button:not([hidden]) ~ button{border-left:2px solid var(--ink)!important}
 .adsub{display:flex;flex-wrap:nowrap;margin:-4px 0 8px}
 .adsub button{flex:1 1 auto;min-height:48px;font-size:16px;white-space:nowrap;padding:0 6px!important;min-width:0}
-.adsub [data-admap]{flex:1.3 1 auto}
-.adsub [data-admap]::after{content:' ›'} /* 押すと地図に移る（ほかの3つは同じ画面の中の切りかえ）ことが分かるように（改善案A9） */
 @media (max-width:380px){.adsub button{font-size:15px;padding:0 4px!important}}
 .atabs .cnt{position:static;display:inline-grid;margin-left:4px;vertical-align:middle}
 
@@ -1752,11 +1750,9 @@ body.renshu #btnUpd{display:none!important}
         </div>
         <div class="apane" data-apane="sched" hidden><div id="adSched"></div></div>
         <div class="apane" data-apane="people" hidden><div id="adPeople"></div></div>
-        <!-- 状況は幅いっぱい。設定の行（区域の決まり）は設定タブ（kimari.js） -->
+        <!-- 状況は幅いっぱい。設定の行（区域の決まり）は設定タブ（kimari.js）。見出しの右の［⚙ 決まり］で飛ぶ。いちばん下は毎月の点検（schedule.js） -->
         <div class="apane" data-apane="status" hidden>
-        <button class="btn primary block" id="adS13">区域割り当ての記録（S-13）を見る・印刷する</button>
-        <button class="btn block" id="adS12">区域カード（S-12）を印刷する</button>
-        <h2 class="sec">全体の状況</h2>
+        <h2 class="sec" id="adTilesH">全体の状況</h2>
         <div class="tiles" id="adTiles"></div>
         <h2 class="sec">時間帯ごとの「会えた」割合（直近180日）</h2>
         <p class="hint">枠で囲んだ欄が、いちばん会えている時間帯です（10件以上の記録がある欄のみ）。</p>
@@ -1766,12 +1762,12 @@ body.renshu #btnUpd{display:none!important}
         <div class="scroll" id="adMeet"></div>
         </div>
         <div class="apane" data-apane="status2" hidden>
-        <h2 class="sec">留守宅の状況</h2>
+        <h2 class="sec" id="adAwaySetH">留守宅の状況</h2>
         <div id="adAwaySet"></div>
-        <h3 class="sub">まだ試していない家の数（時間帯ごと）</h3>
+        <h3 class="sub" id="adAwaySlotsH">まだ試していない家の数（時間帯ごと）</h3>
         <p class="hint">枠で囲んだ時間帯がいちばん手薄です。集まりの時間を決める参考にしてください。</p>
         <div class="scroll"><table class="slots" id="adAwaySlots"></table></div>
-        <h3 class="sub">区域ごと</h3>
+        <h3 class="sub" id="adAwayTerrsH">区域ごと</h3>
         <div class="scroll" id="adAwayTerrs"></div>
         <h3 class="sub" id="adHardH">なかなか会えない家（すべての時間帯で留守）</h3>
         <p class="hint">手紙など、別の方法を検討してください。</p>
@@ -1779,11 +1775,14 @@ body.renshu #btnUpd{display:none!important}
         </div>
         <div class="apane" data-apane="terr" hidden>
         <h2 class="sec" data-hqk="terrList">区域の一覧</h2>
-        <!-- 一覧の上は2つのボタンだけにして、一覧まですぐ届くようにする（2026-10-21）。
-             「区域の線・取り込み」は下から出る画面（torikomi.js）、「区域の決まり」は設定タブの「区域の決まり」を開く -->
+        <!-- 一覧の上はボタンだけにして、一覧まですぐ届くようにする（2026-10-21）。
+             「区域の線・取り込み」は下から出る画面（torikomi.js）、「区域の決まり」は設定タブの「区域の決まり」を開く。
+             S-13・S-12 は状況の上から移した（KS-11。並べ方は Task 7 で見直す） -->
         <div class="tbar" id="adTerrTools">
           <button type="button" class="btn tbtn" id="adMake"><span>区域の線・取り込み</span><small>線を引く・直す・ファイル・特別区域</small></button>
           <button type="button" class="btn tbtn" id="adTakeTgl"><span>区域の決まり <i class="tgl" aria-hidden="true">›</i></span><small id="adTakeSum"></small></button>
+          <button type="button" class="btn" id="adS13">区域割り当ての記録（S-13）を見る・印刷する</button>
+          <button type="button" class="btn" id="adS12">区域カード（S-12）を印刷する</button>
         </div>
         <!-- 下から出る画面のボタンが使う、元のボタンとファイルの入り口（画面には出さない） -->
         <div id="adMakeSrc" hidden>
