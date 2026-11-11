@@ -56,7 +56,11 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "全体の集まりの予定に、司会者の名前が出るようになりました（予定の一覧・印刷）。監督と司会者は、全体の集まりの予定を入れられます。毎週・2週ごとのくり返しも、いつまでかを決めて入れられます。": "Las reuniones generales ahora muestran el nombre de quien dirige (en la lista y al imprimir). El superintendente y el conductor pueden poner reuniones generales. También se pueden repetir cada semana o cada 2 semanas hasta la fecha que elija.",
 "{0}件入ります（{1}）": "Se agregarán {0} ({1})",
 "{0}件入ります（{1}）。いちどに入れられるのは半年・26件までです。": "Se agregarán {0} ({1}). Se pueden agregar como máximo 26 (medio año) a la vez.",
-"いつまでの日を、日にちより後にしてください。": "Ponga la fecha «Hasta» después de la fecha de inicio.",
-"いつまでの日を、日にちより後にしてください": "Ponga la fecha «Hasta» después de la fecha de inicio",
+"・司会：": " · Dirige: ",
+"司会する人の名前です。ほかの人が司会するときは書きかえてください。": "Es el nombre de quien dirige. Si dirige otra persona, cámbielo.",
+"日にちを入れてください。": "Ponga la fecha.",
+"いつまでの日を、日にちと同じか後にしてください。": "Ponga la fecha «Hasta» igual o posterior a la fecha de inicio.",
+"いつまでの日を、日にちと同じか後にしてください": "Ponga la fecha «Hasta» igual o posterior a la fecha de inicio",
+"集まりの予定は、ホームのカレンダーの下の「＋ 集まりの予定を入れる」で入れます（グループの予定は監督、全体の予定は監督と司会者）。予定を押すと「この集まりに合う区域」も出せます。": "Las reuniones se agregan con «＋ Agregar reunión para la predicación», debajo del calendario de Inicio (las del grupo, el superintendente; las generales, el superintendente y el conductor). Al pulsar una reunión también se pueden ver los «Territorios para esta reunión».",
 "監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。グループの集まりの予定を入れられるのは監督だけです。全体の集まりの予定は、監督と司会者が入れられます。": "El superintendente y el conductor reciben territorios de grupo y eligen quién sale ese día. Solo el superintendente puede poner reuniones del grupo. Las reuniones generales las pueden poner el superintendente y el conductor."
 });

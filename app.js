@@ -13260,6 +13260,8 @@ const schedGroupName = g => (g ? `${g}グループ` : '全体');
 /* 全体の集まりの司会者（2026-11-11）：全体の予定だけ。グループ名のあとに「・司会：○○」（文字だけ返す。esc は使う側で） */
 const schedHost = s => (s && !s.group && s.host ? String(s.host) : '');
 const schedTag = s => schedGroupName(s.group) + (schedHost(s) ? `・司会：${schedHost(s)}` : '');
+/* 画面に出す形：名前は data-notr（スペイン語でも名前は訳さず、「・司会：」だけ訳す。登録されていない名前でも札が訳されるように） */
+const schedTagHtml = s => esc(schedGroupName(s.group)) + (schedHost(s) ? `<span>・司会：</span><span data-notr>${esc(schedHost(s))}</span>` : '');
 /* くり返しの日付：start から step 日ごとに until まで（step 0＝くり返さない）。まちがい防止に、半年（183日）・26件まで。
    cut＝上限で打ち切った。until が start より前なら dates は空 */
 const SCHED_REP_MAX = 26, SCHED_REP_DAYS = 183;
@@ -13304,7 +13306,7 @@ const canEditSched = s => isAdmin() || (s.group ? isOverseer() && s.group === my
 function schedRow(s, withDate) {
   const body = `<article class="ritem k-new schedrow swipe-body" data-sopen="${esc(s.id)}" role="button" tabindex="0" aria-label="${esc(fmtYmd(s.date))} ${esc(s.time || '')} ${esc(s.place || '場所未定')}の予定。押すと操作が出ます"><div>
       ${withDate ? `<p class="rt">${fmtYmd(s.date)}</p><p>${schedLine(s)}</p>` : `<p class="rt">${schedLine(s)}</p>`}
-      <p class="muted">${esc(schedTag(s))}${s.note ? '　' + esc(s.note) : ''}</p></div>
+      <p class="muted">${schedTagHtml(s)}${s.note ? '　' + esc(s.note) : ''}</p></div>
       <span class="chev" aria-hidden="true">›</span></article>`;
   if (!canEditSched(s)) return body.replace(' swipe-body', '');
   return `<div class="swipe" data-sid="${esc(s.id)}"><div class="swipe-acts" aria-label="この予定の操作">
@@ -13318,7 +13320,7 @@ function openSchedActions(s, back) {
   const can = canEditSched(s);
   setSheet(headHtml(null, esc(fmtYmd(s.date)), '奉仕の集まり') + `
     <div class="schedbox"><p class="rt">${schedLine(s)}</p>
-      <p class="muted">${esc(schedTag(s))}${s.note ? '　' + esc(s.note) : ''}</p></div>
+      <p class="muted">${schedTagHtml(s)}${s.note ? '　' + esc(s.note) : ''}</p></div>
     <a class="btn primary block" id="scCal" href="${gcalUrl('奉仕の集まり', s.date, s.time, s.end, s.place, s.note)}" target="_blank" rel="noopener">Googleカレンダーに入れる</a>
     ${placeHref(s) ? `<a class="btn block" href="${esc(placeHref(s))}" target="_blank" rel="noopener">場所をGoogleマップで見る</a>` : ''}
     ${isAdmin() || isOverseer() ? '<button class="btn block" id="scFit">この集まりに合う区域</button>' : ''}
@@ -13365,7 +13367,7 @@ function monthListHtml(y, m, o) {
   const pre = `${y}-${pad2(m + 1)}`, today = ymd(new Date()), upcoming = UI.calList !== 'all';
   const items = [];
   D().schedules.filter(s => String(s.date).startsWith(pre) && (!s.group || s.group === myGroup() || isAdmin()))
-    .forEach(s => items.push({ date: s.date, time: s.time || '', text: schedLine(s), tag: schedTag(s), mine: false }));
+    .forEach(s => items.push({ date: s.date, time: s.time || '', text: schedLine(s), tag: schedTag(s), tagHtml: schedTagHtml(s), mine: false }));
   ((o && o.events) || []).filter(e => String(e.date).startsWith(pre))
     .forEach(e => items.push({ date: e.date, time: e.time || '', text: `${e.time ? esc(e.time) + '　' : ''}${esc(e.title)}`, tag: '自分の予定', mine: true }));
   if (o && !o.admin && featFollow()) { // 再訪問の約束（このスマホの中だけ）
@@ -13383,7 +13385,7 @@ function monthListHtml(y, m, o) {
   if (!list.length) return `<p class="muted calnone">${hid ? 'この月の今日より前の予定は、設定の「予定の一覧」で表示できます。' : 'この月の予定は、まだ入っていません。'}</p>`;
   return `<ul class="calsched">${list.map(x => {
     const d = parseYmd(x.date);
-    return `<li data-day="${x.date}"${x.mine ? ' class="mine"' : ''}><b>${d.getDate()}日（${WD[d.getDay()]}）</b><span>${x.text}</span><small>${esc(x.tag)}</small></li>`;
+    return `<li data-day="${x.date}"${x.mine ? ' class="mine"' : ''}><b>${d.getDate()}日（${WD[d.getDay()]}）</b><span>${x.text}</span><small>${x.tagHtml || esc(x.tag)}</small></li>`;
   }).join('')}</ul>` + (hid ? `<p class="hint">今日より前の予定 ${hid}件は出していません（設定で変えられます）。</p>` : '');
 }
 const pad2 = n => String(n).padStart(2, '0');
@@ -13909,7 +13911,7 @@ function openSchedForm(s, date, back, draft) {
   const hostHtml = `<label class="field" id="scHostRow"${g0 ? ' hidden' : ''}><span>司会者</span>
       <input type="text" id="scHost" maxlength="30" list="scHostList" autocomplete="off" value="${esc(v('host', s ? '' : me().name))}" ${inp}>
       <datalist id="scHostList">${schedHostCands().map(n => `<option value="${esc(n)}"></option>`).join('')}</datalist></label>
-    <p class="hint" id="scHostHint"${g0 ? ' hidden' : ''}>はじめは入れた人の名前です。ほかの人が司会するときは書きかえてください。</p>`;
+    <p class="hint" id="scHostHint"${g0 ? ' hidden' : ''}>${s ? '司会する人の名前です。ほかの人が司会するときは書きかえてください。' : 'はじめは入れた人の名前です。ほかの人が司会するときは書きかえてください。'}</p>`;
   // くり返し：しない／毎週／2週ごと、いつまで（はじめはその月の終わり）。新しく入れるときだけ
   const repHtml = s ? '' : `<div class="field"><span>くり返し</span>
       <div class="seg repseg" role="group" aria-label="くり返し">${[[0, 'しない'], [7, '毎週'], [14, '2週ごと']].map(([n, l]) =>
@@ -13946,14 +13948,16 @@ function openSchedForm(s, date, back, draft) {
     if (!on) return;
     const x = schedRepeatDates($('#scDate').value, r, $('#scUntil').value);
     const md = t => { const p = parseYmd(t); return `${p.getMonth() + 1}/${p.getDate()}`; };
-    $('#scRepN').textContent = !x.dates.length ? 'いつまでの日を、日にちより後にしてください。'
+    $('#scRepN').textContent = !$('#scDate').value ? '日にちを入れてください。' : !x.dates.length ? 'いつまでの日を、日にちと同じか後にしてください。'
       : `${x.dates.length}件入ります（${x.dates.slice(0, 6).map(md).join('、')}${x.dates.length > 6 ? '、…' : ''}）` // 区切りは「、」（「・」はカタカナの範囲で、スペイン語の置きかえが効かない）
         + (x.cut ? '。いちどに入れられるのは半年・26件までです。' : '');
   };
   $$('#sheet [data-rep]').forEach(b => { b.onclick = () => { $$('#sheet [data-rep]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); paintRep(); }; });
   if (!s) {
-    $('#scDate').addEventListener('input', () => { if (!untilTouched && $('#scDate').value) $('#scUntil').value = schedMonthEnd($('#scDate').value); paintRep(); });
-    $('#scUntil').addEventListener('input', () => { untilTouched = true; paintRep(); });
+    // input と change の両方を聞く（日付の欄で change しか来ないブラウザもあるため）
+    const onDate = () => { if (!untilTouched && $('#scDate').value) $('#scUntil').value = schedMonthEnd($('#scDate').value); paintRep(); };
+    const onUntil = () => { untilTouched = true; paintRep(); };
+    ['input', 'change'].forEach(ev => { $('#scDate').addEventListener(ev, onDate); $('#scUntil').addEventListener(ev, onUntil); });
     paintRep();
   }
   if ($('#scGroup')) $('#scGroup').onchange = () => {
@@ -13974,7 +13978,7 @@ function openSchedForm(s, date, back, draft) {
     if (!d.date) { toast('日にちを入れてください'); return; }
     if (d.mapUrl && !GMAP_RE.test(d.mapUrl)) { toast('GoogleマップのURL（https://maps.app.goo.gl/… など）を貼ってください'); return; }
     const dates = s ? [d.date] : schedRepeatDates(d.date, d.rep, d.until).dates;
-    if (!dates.length) { toast('いつまでの日を、日にちより後にしてください'); return; }
+    if (!dates.length) { toast('いつまでの日を、日にちと同じか後にしてください'); return; }
     const base = { time: d.time, end: d.end, place: d.place, note: d.note, group: d.group, host: d.group ? '' : d.host,
       mapUrl: d.mapUrl, loc: d.loc || (d.mapUrl ? coordsFromUrl(d.mapUrl) : null) };
     commit(s ? '集まりの予定を直しました' : `集まりの予定を${dates.length}件入れました`, () => {
@@ -15623,7 +15627,7 @@ async function printMonthSchedule(y, m) {
   for (let d = 1; d <= last; d++) {
     const key = `${pre}-${pad2(d)}`, wd = new Date(y, m, d).getDay();
     const ev = list.filter(s => s.date === key).map(s => `<div class="pe"><b>${esc(s.time || '')}${s.end ? '〜' + esc(s.end) : ''}</b> ${esc(s.place || '')}
-      <small>${esc(schedTag(s))}${s.note ? '・' + esc(s.note) : ''}</small></div>`).join('');
+      <small>${schedTagHtml(s)}${s.note ? '・' + esc(s.note) : ''}</small></div>`).join('');
     cells.push(`<td class="${wd === 0 ? 'sun' : wd === 6 ? 'sat' : ''}"><span class="dn">${d}</span>${ev}</td>`);
   }
   while (cells.length % 7) cells.push('<td class="off"></td>');
