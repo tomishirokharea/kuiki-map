@@ -439,7 +439,7 @@
       ? `<div class="knext"><p class="klbl">次の集まり</p>
           <p class="kdate">${next.date === today ? '<span>今日</span>　' : ''}${fmtYmd(next.date)}</p>
           <p class="ktime">${schedLine(next)}</p>
-          <p class="muted">${esc(schedGroupName(next.group))}${next.note ? '　' + esc(next.note) : ''}</p>
+          <p class="muted">${esc(schedTag(next))}${next.note ? '　' + esc(next.note) : ''}</p>
           ${href ? `<a class="btn primary block" href="${esc(href)}" target="_blank" rel="noopener">道順</a>` : ''}</div>`
       : '<div class="knext"><p class="klbl">次の集まり</p><p class="ktime">予定はまだありません</p></div>';
     const mine = D().territories.filter(t => t.holder === me().id).sort(byNo);
