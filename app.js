@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.140';
+var APP_JS_VER = '2026.13.141';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2808,6 +2808,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.141', items: [
+    ['集', '全体の集まりの予定に、司会者の名前が出るようになりました（予定の一覧・印刷）。監督と司会者は、全体の集まりの予定を入れられます。毎週・2週ごとのくり返しも、いつまでかを決めて入れられます。']
+  ] },
   { v: '2026.13.139', role: 'admin', items: [
     ['係', '係の画面の並びを見直しました。場所が変わったものは次のとおりです。'],
     ['状', '状況は、上のタブに出ます。「区域」タブの中にあった「状況」は、上の「状況」タブになりました。'],
@@ -13254,6 +13257,30 @@ let calMonth = null, calMode = 'cal';
 const schedsOn = date => D().schedules.filter(s => s.date === date && (!s.group || s.group === myGroup() || isAdmin()))
   .sort((a, b) => (a.time || '') < (b.time || '') ? -1 : 1);
 const schedGroupName = g => (g ? `${g}グループ` : '全体');
+/* 全体の集まりの司会者（2026-11-11）：全体の予定だけ。グループ名のあとに「・司会：○○」（文字だけ返す。esc は使う側で） */
+const schedHost = s => (s && !s.group && s.host ? String(s.host) : '');
+const schedTag = s => schedGroupName(s.group) + (schedHost(s) ? `・司会：${schedHost(s)}` : '');
+/* 画面に出す形：名前は data-notr（スペイン語でも名前は訳さず、「・司会：」だけ訳す。登録されていない名前でも札が訳されるように） */
+const schedTagHtml = s => esc(schedGroupName(s.group)) + (schedHost(s) ? `<span>・司会：</span><span data-notr>${esc(schedHost(s))}</span>` : '');
+/* くり返しの日付：start から step 日ごとに until まで（step 0＝くり返さない）。まちがい防止に、半年（183日）・26件まで。
+   cut＝上限で打ち切った。until が start より前なら dates は空 */
+const SCHED_REP_MAX = 26, SCHED_REP_DAYS = 183;
+function schedRepeatDates(start, step, until) {
+  const ok = x => /^\d{4}-\d{2}-\d{2}$/.test(String(x || ''));
+  if (!ok(start)) return { dates: [], cut: false };
+  if (!step) return { dates: [start], cut: false };
+  if (!ok(until) || until < start) return { dates: [], cut: false };
+  const lim = parseYmd(start); lim.setDate(lim.getDate() + SCHED_REP_DAYS);
+  const end = until < ymd(lim) ? until : ymd(lim);
+  let cut = until > end;
+  const out = [], d = parseYmd(start);
+  while (ymd(d) <= end) {
+    if (out.length >= SCHED_REP_MAX) { cut = true; break; }
+    out.push(ymd(d)); d.setDate(d.getDate() + step);
+  }
+  return { dates: out, cut };
+}
+const schedMonthEnd = x => { const d = parseYmd(x); return ymd(new Date(d.getFullYear(), d.getMonth() + 1, 0)); };
 /* Googleカレンダーに追加するリンク（アプリから直接書きこむのではなく、Googleカレンダーの追加画面を開く） */
 function gcalUrl(title, date, time, end, place, note) {
   const d = date.replace(/-/g, '');
@@ -13270,13 +13297,16 @@ function gcalUrl(title, date, time, end, place, note) {
   return 'https://calendar.google.com/calendar/render?action=TEMPLATE&ctz=Asia%2FTokyo&text=' + encodeURIComponent(title) +
     '&dates=' + dates + (place ? '&location=' + encodeURIComponent(place) : '') + (note ? '&details=' + encodeURIComponent(note) : '');
 }
-const canEditSched = s => isAdmin() || (isOverseer() && s.group === myGroup());
+/* 集まりの予定（2026-11-11）：入れられるのは区域係・監督・司会者（グループのある人）。
+   直す・消すのは、グループの予定は区域係とそのグループの監督（今までどおり）、全体の予定は区域係と入れた本人（サーバーの schedCan_ と同じ） */
+const canAddSched = () => isAdmin() || isOverseer() || canGroupTerr();
+const canEditSched = s => isAdmin() || (s.group ? isOverseer() && s.group === myGroup() : canGroupTerr() && s.by === me().id);
 /* 予定の1行。直せる人には、左にスワイプすると「編集」「削除」が出る形にする */
 /* 予定の行：押すと「Googleカレンダーに入れる・直す・消す」の画面が出る（行の中にボタンを置かず、行全体を押せるように） */
 function schedRow(s, withDate) {
   const body = `<article class="ritem k-new schedrow swipe-body" data-sopen="${esc(s.id)}" role="button" tabindex="0" aria-label="${esc(fmtYmd(s.date))} ${esc(s.time || '')} ${esc(s.place || '場所未定')}の予定。押すと操作が出ます"><div>
       ${withDate ? `<p class="rt">${fmtYmd(s.date)}</p><p>${schedLine(s)}</p>` : `<p class="rt">${schedLine(s)}</p>`}
-      <p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
+      <p class="muted">${schedTagHtml(s)}${s.note ? '　' + esc(s.note) : ''}</p></div>
       <span class="chev" aria-hidden="true">›</span></article>`;
   if (!canEditSched(s)) return body.replace(' swipe-body', '');
   return `<div class="swipe" data-sid="${esc(s.id)}"><div class="swipe-acts" aria-label="この予定の操作">
@@ -13290,7 +13320,7 @@ function openSchedActions(s, back) {
   const can = canEditSched(s);
   setSheet(headHtml(null, esc(fmtYmd(s.date)), '奉仕の集まり') + `
     <div class="schedbox"><p class="rt">${schedLine(s)}</p>
-      <p class="muted">${schedGroupName(s.group)}${s.note ? '　' + esc(s.note) : ''}</p></div>
+      <p class="muted">${schedTagHtml(s)}${s.note ? '　' + esc(s.note) : ''}</p></div>
     <a class="btn primary block" id="scCal" href="${gcalUrl('奉仕の集まり', s.date, s.time, s.end, s.place, s.note)}" target="_blank" rel="noopener">Googleカレンダーに入れる</a>
     ${placeHref(s) ? `<a class="btn block" href="${esc(placeHref(s))}" target="_blank" rel="noopener">場所をGoogleマップで見る</a>` : ''}
     ${isAdmin() || isOverseer() ? '<button class="btn block" id="scFit">この集まりに合う区域</button>' : ''}
@@ -13337,7 +13367,7 @@ function monthListHtml(y, m, o) {
   const pre = `${y}-${pad2(m + 1)}`, today = ymd(new Date()), upcoming = UI.calList !== 'all';
   const items = [];
   D().schedules.filter(s => String(s.date).startsWith(pre) && (!s.group || s.group === myGroup() || isAdmin()))
-    .forEach(s => items.push({ date: s.date, time: s.time || '', text: schedLine(s), tag: schedGroupName(s.group), mine: false }));
+    .forEach(s => items.push({ date: s.date, time: s.time || '', text: schedLine(s), tag: schedTag(s), tagHtml: schedTagHtml(s), mine: false }));
   ((o && o.events) || []).filter(e => String(e.date).startsWith(pre))
     .forEach(e => items.push({ date: e.date, time: e.time || '', text: `${e.time ? esc(e.time) + '　' : ''}${esc(e.title)}`, tag: '自分の予定', mine: true }));
   if (o && !o.admin && featFollow()) { // 再訪問の約束（このスマホの中だけ）
@@ -13355,7 +13385,7 @@ function monthListHtml(y, m, o) {
   if (!list.length) return `<p class="muted calnone">${hid ? 'この月の今日より前の予定は、設定の「予定の一覧」で表示できます。' : 'この月の予定は、まだ入っていません。'}</p>`;
   return `<ul class="calsched">${list.map(x => {
     const d = parseYmd(x.date);
-    return `<li data-day="${x.date}"${x.mine ? ' class="mine"' : ''}><b>${d.getDate()}日（${WD[d.getDay()]}）</b><span>${x.text}</span><small>${esc(x.tag)}</small></li>`;
+    return `<li data-day="${x.date}"${x.mine ? ' class="mine"' : ''}><b>${d.getDate()}日（${WD[d.getDay()]}）</b><span>${x.text}</span><small>${x.tagHtml || esc(x.tag)}</small></li>`;
   }).join('')}</ul>` + (hid ? `<p class="hint">今日より前の予定 ${hid}件は出していません（設定で変えられます）。</p>` : '');
 }
 const pad2 = n => String(n).padStart(2, '0');
@@ -13386,7 +13416,7 @@ function openDay(date) {
       <h3 class="sub">奉仕の集まり</h3>
       ${sc.length ? swipeHint(sc) + sc.map(s => schedRow(s, false)).join('')
         : '<p class="muted">この日の集まりはありません。</p>'}
-      ${isOverseer() || isAdmin() ? `<button class="btn small" id="dAddSched">＋ この日に集まりを入れる</button>` : ''}
+      ${canAddSched() ? `<button class="btn small" id="dAddSched">＋ この日に集まりを入れる</button>` : ''}
       <h3 class="sub">自分の予定 <span class="muted" style="font-size:14px">（このスマホだけ）</span></h3>
       ${ev.length ? ev.map(e => `<article class="ritem k-young evrow"><div><p class="rt">${e.time ? esc(e.time) + '　' : ''}${esc(e.title)}</p></div>
         <span class="actions" style="margin:0"><a class="btn small" href="${gcalUrl(e.title, e.date, e.time, '', '', '')}" target="_blank" rel="noopener">Googleカレンダーへ</a>
@@ -13740,8 +13770,9 @@ function renderHome() {
   }
   $('#homeCal').innerHTML = calHtml(o);
   // ②の対応：グループ監督の「グループ」タブをなくしたので、そこにあった月の予定印刷（掲示板用）をホームに置く
-  $('#homeSchedTools').innerHTML = (isAdmin() || isOverseer())
-    ? `<button type="button" class="btn primary block" id="homeScNew">＋ 集まりの予定を入れる</button>${printMonthPicker('homeScPrint')}` : '';
+  // 司会者（監督でない人）は、全体の集まりの予定を入れるボタンだけ（月の予定の印刷は区域係・監督だけ。2026-11-11）
+  $('#homeSchedTools').innerHTML = canAddSched()
+    ? `<button type="button" class="btn primary block" id="homeScNew">＋ 集まりの予定を入れる</button>${isAdmin() || isOverseer() ? printMonthPicker('homeScPrint') : ''}` : '';
   if (window.IkenR) IkenR.home(); // こまったこと・提案を送る（iken.js）
   if (window.dougaHomeCard) dougaHomeCard(); // はじめての方へ（使い方の動画のカード）
 }
@@ -13855,14 +13886,40 @@ function coordsFromUrl(u) {
   return m ? [Number(m[1]), Number(m[2])] : null;
 }
 let pickPlace = null; // 区域マップの地図で場所をえらんでいるとき
+/* 全体の集まりの司会者の候補：監督・司会者（グループのある人）の名前（あいうえお順） */
+const schedHostCands = () => D().users.filter(u => !u.inactive && u.group && (u.overseer || u.leader)).sort(byKana).map(u => u.name);
 function openSchedForm(s, date, back, draft) {
-  const admin = isAdmin(), groups = groupsAll();
+  const admin = isAdmin(), ov = !admin && isOverseer(), groups = groupsAll();
   const v = (k, def) => (draft && draft[k] != null ? draft[k] : (s && s[k] != null ? s[k] : def));
-  const g0 = v('group', admin ? (groups[0] || '') : myGroup());
+  // どの予定か：区域係＝全体かどのグループでも／監督＝自分のグループか全体／司会者＝全体だけ（2026-11-11）
+  const g0 = v('group', admin ? (groups[0] || '') : ov ? myGroup() : '');
   const loc = v('loc', null);
+  const rep = Number(v('rep', 0)) || 0;
+  const d0 = v('date', date || ymd(new Date()));
+  let untilTouched = !!(draft && draft.untilTouched);
+  const until0 = v('until', schedMonthEnd(d0));
   const inp = 'style="width:100%;min-height:54px;border-radius:12px;border:2px solid var(--ink2);padding:0 12px;font-size:18px;background:#fff"';
+  const groupHtml = admin
+    ? `<label class="field"><span>どのグループの予定か</span><select id="scGroup" ${inp}>
+      <option value=""${!g0 ? ' selected' : ''}>全体（会衆の全員）</option>${groups.map(g => `<option value="${esc(g)}"${g === g0 ? ' selected' : ''}>${esc(g)}グループ</option>`).join('')}</select></label>`
+    : ov
+      // 全体にできるのは、新しく入れるときか、自分が入れた予定だけ（全体の予定を直せるのは入れた本人と区域係。サーバーの schedCan_ と同じ）
+      ? `<label class="field"><span>どのグループの予定か</span><select id="scGroup" ${inp}>
+      <option value="${esc(myGroup())}"${g0 ? ' selected' : ''}>${esc(myGroup())}グループ</option>${!s || s.by === me().id ? `<option value=""${!g0 ? ' selected' : ''}>全体（会衆の全員）</option>` : ''}</select></label>`
+      : '<p class="muted">全体の集まりの予定として入れます（全員に届きます）。</p>';
+  // 司会者：全体の予定のときだけ。はじめは入れる人の名前（直すときは今の名前）
+  const hostHtml = `<label class="field" id="scHostRow"${g0 ? ' hidden' : ''}><span>司会者</span>
+      <input type="text" id="scHost" maxlength="30" list="scHostList" autocomplete="off" value="${esc(v('host', s ? '' : me().name))}" ${inp}>
+      <datalist id="scHostList">${schedHostCands().map(n => `<option value="${esc(n)}"></option>`).join('')}</datalist></label>
+    <p class="hint" id="scHostHint"${g0 ? ' hidden' : ''}>${s ? '司会する人の名前です。ほかの人が司会するときは書きかえてください。' : 'はじめは入れた人の名前です。ほかの人が司会するときは書きかえてください。'}</p>`;
+  // くり返し：しない／毎週／2週ごと、いつまで（はじめはその月の終わり）。新しく入れるときだけ
+  const repHtml = s ? '' : `<div class="field"><span>くり返し</span>
+      <div class="seg repseg" role="group" aria-label="くり返し">${[[0, 'しない'], [7, '毎週'], [14, '2週ごと']].map(([n, l]) =>
+        `<button type="button" data-rep="${n}" aria-pressed="${rep === n}">${l}</button>`).join('')}</div></div>
+    <label class="field" id="scUntilRow"${rep ? '' : ' hidden'}><span>いつまで</span><input type="date" id="scUntil" value="${esc(until0)}" ${inp}></label>
+    <p class="muted" id="scRepN" aria-live="polite"${rep ? '' : ' hidden'}></p>`;
   setSheet(headHtml(null, s ? '集まりの予定を直す' : '集まりの予定を入れる', '') + `
-    <label class="field"><span>日にち</span><input type="date" id="scDate" value="${esc(v('date', date || ymd(new Date())))}" ${inp}></label>
+    <label class="field"><span>日にち</span><input type="date" id="scDate" value="${esc(d0)}" ${inp}></label>
     <div class="inline"><label class="field" style="flex:1"><span>はじまり</span><input type="time" id="scTime" value="${esc(v('time', '09:30'))}" ${inp}></label>
       <label class="field" style="flex:1"><span>おわり（なくてもよい）</span><input type="time" id="scEnd" value="${esc(v('end', ''))}" ${inp}></label></div>
     <label class="field"><span>場所</span><input type="text" id="scPlace" maxlength="60" value="${esc(v('place', ''))}" placeholder="例：〇〇さん宅、会館"></label>
@@ -13871,17 +13928,43 @@ function openSchedForm(s, date, back, draft) {
     <div class="inline"><button type="button" class="btn small" id="scPick">区域マップの地図でえらぶ</button>
       ${loc ? `<span class="muted">地図でえらんだ場所があります</span><button type="button" class="btn small" id="scLocClear">外す</button>` : ''}</div>
     <label class="field"><span>ひとこと（なくてもよい）</span><input type="text" id="scNote" maxlength="160" value="${esc(v('note', ''))}" placeholder="例：区域12を回ります"></label>
-    ${admin ? `<label class="field"><span>どのグループの予定か</span><select id="scGroup" ${inp}>
-      <option value=""${!g0 ? ' selected' : ''}>全体（会衆の全員）</option>${groups.map(g => `<option value="${esc(g)}"${g === g0 ? ' selected' : ''}>${esc(g)}グループ</option>`).join('')}</select></label>`
-      : `<p class="muted">${esc(myGroup())}グループの予定として入れます（${groupMembers(myGroup()).length}人に届きます）。</p>`}
-    ${s ? '' : `<label class="check"><input type="checkbox" id="scRepeat"${v('repeat', false) ? ' checked' : ''}>同じ曜日・同じ時間で、4週ぶん入れる</label>`}
+    ${groupHtml}
+    ${hostHtml}
+    ${repHtml}
     <button class="btn primary block" id="scSave">保存する</button>
     ${s ? '<button class="btn danger block" id="scDel">この予定を消す</button>' : ''}
     <button class="btn block" id="scBack">もどる</button>`);
   const done = () => (back ? back() : closeSheet());
+  const curRep = () => { const b = $('#sheet [data-rep][aria-pressed="true"]'); return b ? Number(b.dataset.rep) || 0 : 0; };
+  const curGroup = () => ($('#scGroup') ? $('#scGroup').value : '');
   const read = () => ({ date: $('#scDate').value, time: $('#scTime').value || '', end: $('#scEnd').value || '', place: $('#scPlace').value.trim(),
-    note: $('#scNote').value.trim(), group: admin ? $('#scGroup').value : myGroup(), mapUrl: $('#scMap').value.trim(), loc,
-    repeat: !!($('#scRepeat') && $('#scRepeat').checked) });
+    note: $('#scNote').value.trim(), group: curGroup(), mapUrl: $('#scMap').value.trim(), loc,
+    host: $('#scHost').value.trim().slice(0, 30), rep: s ? 0 : curRep(), until: $('#scUntil') ? $('#scUntil').value : '', untilTouched });
+  /* くり返しの件数と日付の見本（「5件入ります（1/3・1/10・…）」） */
+  const paintRep = () => {
+    if (s) return;
+    const r = curRep(), on = !!r;
+    $('#scUntilRow').hidden = !on; $('#scRepN').hidden = !on;
+    if (!on) return;
+    const x = schedRepeatDates($('#scDate').value, r, $('#scUntil').value);
+    const md = t => { const p = parseYmd(t); return `${p.getMonth() + 1}/${p.getDate()}`; };
+    $('#scRepN').textContent = !$('#scDate').value ? '日にちを入れてください。' : !x.dates.length ? 'いつまでの日を、日にちと同じか後にしてください。'
+      : `${x.dates.length}件入ります（${x.dates.slice(0, 6).map(md).join('、')}${x.dates.length > 6 ? '、…' : ''}）` // 区切りは「、」（「・」はカタカナの範囲で、スペイン語の置きかえが効かない）
+        + (x.cut ? '。いちどに入れられるのは半年・26件までです。' : '');
+  };
+  $$('#sheet [data-rep]').forEach(b => { b.onclick = () => { $$('#sheet [data-rep]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); paintRep(); }; });
+  if (!s) {
+    // input と change の両方を聞く（日付の欄で change しか来ないブラウザもあるため）
+    const onDate = () => { if (!untilTouched && $('#scDate').value) $('#scUntil').value = schedMonthEnd($('#scDate').value); paintRep(); };
+    const onUntil = () => { untilTouched = true; paintRep(); };
+    ['input', 'change'].forEach(ev => { $('#scDate').addEventListener(ev, onDate); $('#scUntil').addEventListener(ev, onUntil); });
+    paintRep();
+  }
+  if ($('#scGroup')) $('#scGroup').onchange = () => {
+    const all = !curGroup();
+    $('#scHostRow').hidden = !all; $('#scHostHint').hidden = !all;
+    if (all && !$('#scHost').value.trim() && !s) $('#scHost').value = me().name;
+  };
   $('#scBack').onclick = done;
   $('#scPick').onclick = () => {
     const d = read();
@@ -13894,14 +13977,13 @@ function openSchedForm(s, date, back, draft) {
     const d = read();
     if (!d.date) { toast('日にちを入れてください'); return; }
     if (d.mapUrl && !GMAP_RE.test(d.mapUrl)) { toast('GoogleマップのURL（https://maps.app.goo.gl/… など）を貼ってください'); return; }
-    const base = { time: d.time, end: d.end, place: d.place, note: d.note, group: d.group, mapUrl: d.mapUrl, loc: d.loc || (d.mapUrl ? coordsFromUrl(d.mapUrl) : null) };
-    const n = !s && d.repeat ? 4 : 1;
-    commit(s ? '集まりの予定を直しました' : `集まりの予定を${n}件入れました`, () => {
+    const dates = s ? [d.date] : schedRepeatDates(d.date, d.rep, d.until).dates;
+    if (!dates.length) { toast('いつまでの日を、日にちと同じか後にしてください'); return; }
+    const base = { time: d.time, end: d.end, place: d.place, note: d.note, group: d.group, host: d.group ? '' : d.host,
+      mapUrl: d.mapUrl, loc: d.loc || (d.mapUrl ? coordsFromUrl(d.mapUrl) : null) };
+    commit(s ? '集まりの予定を直しました' : `集まりの予定を${dates.length}件入れました`, () => {
       if (s) Object.assign(s, base, { date: d.date, at: new Date().toISOString() });
-      else for (let i = 0; i < n; i++) {
-        const dd = parseYmd(d.date); dd.setDate(dd.getDate() + 7 * i);
-        D().schedules.push(Object.assign({ id: 's' + uid() + i, date: ymd(dd), by: me().id, at: new Date().toISOString() }, base));
-      }
+      else dates.forEach((dt, i) => D().schedules.push(Object.assign({ id: 's' + uid() + i, date: dt, by: me().id, at: new Date().toISOString() }, base)));
     });
     done();
   };
@@ -14265,7 +14347,7 @@ function openEditUser(id) {
         <input type="text" id="euYomi" maxlength="30" value="${esc(f.yomi)}" placeholder="例：やまだ はなこ" autocomplete="off" lang="ja"></label>` : ''}
       <label class="check"><input type="checkbox" id="euOver"${f.overseer ? ' checked' : ''}>グループ監督</label>
       <label class="check"><input type="checkbox" id="euLead"${f.leader ? ' checked' : ''}>司会者</label>
-      <p class="hint">監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。</p>
+      <p class="hint">監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。グループの集まりの予定を入れられるのは監督だけです。全体の集まりの予定は、監督と司会者が入れられます。</p>
       ${f.role === 'admin' ? '' : `<label class="check"><input type="checkbox" id="euMgr"${f.mgr ? ' checked' : ''}>家と拒否の管理ができる</label>
       <p class="hint">家の削除・拒否の削除・家の編集ができます。記録のある家や拒否も消せます。信頼できる人にだけ任せてください。</p>`}
       <button class="btn primary block" id="euSave">保存する</button>
@@ -15545,7 +15627,7 @@ async function printMonthSchedule(y, m) {
   for (let d = 1; d <= last; d++) {
     const key = `${pre}-${pad2(d)}`, wd = new Date(y, m, d).getDay();
     const ev = list.filter(s => s.date === key).map(s => `<div class="pe"><b>${esc(s.time || '')}${s.end ? '〜' + esc(s.end) : ''}</b> ${esc(s.place || '')}
-      <small>${esc(schedGroupName(s.group))}${s.note ? '・' + esc(s.note) : ''}</small></div>`).join('');
+      <small>${schedTagHtml(s)}${s.note ? '・' + esc(s.note) : ''}</small></div>`).join('');
     cells.push(`<td class="${wd === 0 ? 'sun' : wd === 6 ? 'sat' : ''}"><span class="dn">${d}</span>${ev}</td>`);
   }
   while (cells.length % 7) cells.push('<td class="off"></td>');
