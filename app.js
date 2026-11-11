@@ -8453,7 +8453,7 @@ const byLongest = (a, b) => ((a.last || '') < (b.last || '') ? -1 : 1); // 長�
 
 /* 「もう1枚」のボタン（上限に届いていたら、そのことを小さく出す） */
 function addBtnHtml(g) {
-  const label = g ? '＋ 集まりで使う区域をもらう' : (canGroupTerr() ? '＋ 個人の区域をもらう' : '＋ 区域カードをもう1枚ほしい');
+  const label = g ? '＋ 集まりで使う区域をもらう' : '＋ 個人の区域をもらう';
   // 集まりで使う区域：「司会だけする」（ほかの監督・司会者のカードで、今日だけ司会する）を右半分に。枚数の上限とは関係なく出す
   const leadOn = g && canGroupTerr() && D().settings.groupOn !== 0;
   const leadBtn = full => `<button class="btn ${full ? 'block ' : ''}wideadd twoline" data-leadpick><b>司会だけする</b><small>ほかの人のカードを今日だけ使う</small></button>`;
@@ -8620,7 +8620,7 @@ function openRequestSheet(g) {
         ? `<button class="btn small primary" data-take="${esc(t.id)}">受け取る</button>`
         : `<button class="btn small" data-ask="${esc(t.id)}">係に頼む</button>`}
     </article>`).join('');
-  setSheet(headHtml(null, G ? `${esc(myGroup())}グループの区域をもらう` : (canGroupTerr() ? '個人の区域をもらう' : '区域カードをもう1枚'),
+  setSheet(headHtml(null, G ? `${esc(myGroup())}グループの区域をもらう` : '個人の区域をもらう',
       `持てるのは${holdMax(G)}枚まで（今 ${heldOf(G)}枚・申し込み中 ${pendingOf(G).length}件）`) + `
     ${G ? `<div class="seg" role="group" aria-label="もらうカード"><button type="button" aria-pressed="true">区域カード</button><button type="button" data-gaway aria-pressed="false">留守宅カード</button></div>
       <p class="hint">グループの区域は、奉仕の集まりで使います。受け取ったら「今日回る人をえらぶ」で、回る人を決められます。</p>` : ''}
