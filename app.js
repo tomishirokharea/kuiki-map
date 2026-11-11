@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.139';
+var APP_JS_VER = '2026.13.140';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -8273,8 +8273,9 @@ function renderCards() {
       (pC.length ? pC.map(t => cardHtml(t, true)).join('') : '<p class="muted emptyline">まだありません。</p>') +
       reqBoxesHtml(false) + addBtnHtml(false);
   } else {
-    $('#myCards').innerHTML = mine.length ? tap + mine.map(t => cardHtml(t, true)).join('')
-      : '<div class="empty">受け取っている区域カードはありません。<br>下のボタンから申し込めます。</div>';
+    // 監督・司会者・係と同じ「個人の区域」の見出しを付ける（申し込みのボタンは #reqArea でこの下に続く）
+    $('#myCards').innerHTML = `<h2 class="sec">個人の区域</h2>` +
+      (mine.length ? tap + mine.map(t => cardHtml(t, true)).join('') : '<p class="muted emptyline">まだありません。</p>');
   }
   const helping = ts.filter(t => t.holder !== me().id && (isHelper(t) || isLead(t)) && !(canGroupTerr() && isLead(t))); // 今日の司会は「集まりで使う区域」に出す
   const myDummy = ts.find(t => t.dummy && t.holder === me().id);
