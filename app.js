@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.139';
+var APP_JS_VER = '2026.13.140';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -8273,8 +8273,9 @@ function renderCards() {
       (pC.length ? pC.map(t => cardHtml(t, true)).join('') : '<p class="muted emptyline">まだありません。</p>') +
       reqBoxesHtml(false) + addBtnHtml(false);
   } else {
-    $('#myCards').innerHTML = mine.length ? tap + mine.map(t => cardHtml(t, true)).join('')
-      : '<div class="empty">受け取っている区域カードはありません。<br>下のボタンから申し込めます。</div>';
+    // 監督・司会者・係と同じ「個人の区域」の見出しを付ける（申し込みのボタンは #reqArea でこの下に続く）
+    $('#myCards').innerHTML = `<h2 class="sec">個人の区域</h2>` +
+      (mine.length ? tap + mine.map(t => cardHtml(t, true)).join('') : '<p class="muted emptyline">まだありません。</p>');
   }
   const helping = ts.filter(t => t.holder !== me().id && (isHelper(t) || isLead(t)) && !(canGroupTerr() && isLead(t))); // 今日の司会は「集まりで使う区域」に出す
   const myDummy = ts.find(t => t.dummy && t.holder === me().id);
@@ -8452,7 +8453,7 @@ const byLongest = (a, b) => ((a.last || '') < (b.last || '') ? -1 : 1); // 長�
 
 /* 「もう1枚」のボタン（上限に届いていたら、そのことを小さく出す） */
 function addBtnHtml(g) {
-  const label = g ? '＋ 集まりで使う区域をもらう' : (canGroupTerr() ? '＋ 個人の区域をもらう' : '＋ 区域カードをもう1枚ほしい');
+  const label = g ? '＋ 集まりで使う区域をもらう' : '＋ 個人の区域をもらう';
   // 集まりで使う区域：「司会だけする」（ほかの監督・司会者のカードで、今日だけ司会する）を右半分に。枚数の上限とは関係なく出す
   const leadOn = g && canGroupTerr() && D().settings.groupOn !== 0;
   const leadBtn = full => `<button class="btn ${full ? 'block ' : ''}wideadd twoline" data-leadpick><b>司会だけする</b><small>ほかの人のカードを今日だけ使う</small></button>`;
@@ -8619,7 +8620,7 @@ function openRequestSheet(g) {
         ? `<button class="btn small primary" data-take="${esc(t.id)}">受け取る</button>`
         : `<button class="btn small" data-ask="${esc(t.id)}">係に頼む</button>`}
     </article>`).join('');
-  setSheet(headHtml(null, G ? `${esc(myGroup())}グループの区域をもらう` : (canGroupTerr() ? '個人の区域をもらう' : '区域カードをもう1枚'),
+  setSheet(headHtml(null, G ? `${esc(myGroup())}グループの区域をもらう` : '個人の区域をもらう',
       `持てるのは${holdMax(G)}枚まで（今 ${heldOf(G)}枚・申し込み中 ${pendingOf(G).length}件）`) + `
     ${G ? `<div class="seg" role="group" aria-label="もらうカード"><button type="button" aria-pressed="true">区域カード</button><button type="button" data-gaway aria-pressed="false">留守宅カード</button></div>
       <p class="hint">グループの区域は、奉仕の集まりで使います。受け取ったら「今日回る人をえらぶ」で、回る人を決められます。</p>` : ''}

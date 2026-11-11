@@ -751,7 +751,7 @@ button.ktag{cursor:pointer}
       ? `<p class="krain">${rainHit ? '雨のため、集合住宅を先に出しています' : '雨ですが、空いている区域に集合住宅の区域はありません'}<small>天気：Open-Meteo</small></p>`
       : rainNote(rainHit);
     const ALL = G && reqUse === 'all';
-    setSheet(headHtml(null, G ? '集まりで使う区域をもらう' : (canGroupTerr() ? '個人の区域をもらう' : '区域カードをもう1枚'), headSub) + `
+    setSheet(headHtml(null, G ? '集まりで使う区域をもらう' : '個人の区域をもらう', headSub) + `
       ${G ? `<p class="q">使う集まり</p>
         <div class="seg" role="group" aria-label="使う集まり"><button type="button" data-ruse="grp" aria-pressed="${!ALL}">${esc(myGroup())}グループ奉仕</button><button type="button" data-ruse="all" aria-pressed="${ALL}">全体の集まり</button></div>
         <div class="seg" role="group" aria-label="もらうカード"><button type="button" aria-pressed="true">区域カード</button><button type="button" data-gaway aria-pressed="false">留守宅カード</button></div>
