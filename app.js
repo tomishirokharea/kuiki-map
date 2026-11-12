@@ -14421,7 +14421,7 @@ function relOrphans() {
     if (h && sum(k).met) return;
     out.push({ k, h, r: rel[k] });
   });
-  // 区域番号の順（家がない印は最後）。同じ区域の中は家の名前の順（監査 #4）
+  // 区域番号の順（家がない印は最後）。同じ区域の中は家の id の順（監査 #4）
   const no = x => { const t = x.h && terrById(x.h.terrId); return t ? t.no : null; };
   return out.sort((a, b) => {
     const na = no(a), nb = no(b);
