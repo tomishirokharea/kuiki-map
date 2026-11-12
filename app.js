@@ -14421,17 +14421,25 @@ function relOrphans() {
     if (h && sum(k).met) return;
     out.push({ k, h, r: rel[k] });
   });
-  return out;
+  // 区域番号の順（家がない印は最後）。同じ区域の中は家の名前の順（監査 #4）
+  const no = x => { const t = x.h && terrById(x.h.terrId); return t ? t.no : null; };
+  return out.sort((a, b) => {
+    const na = no(a), nb = no(b);
+    if (na === null || nb === null) return (na === null) - (nb === null);
+    return cmpNo(na, nb) || cmpNo(a.k, b.k);
+  });
 }
+/* サーバーから最新を受け取る前（起動直後の、端末に保存した古いデータ）や読み直しのあいだは、数えない・消さない（監査 #2。adminSweepSoon と同じ守り） */
+const relCleanReady = () => !LIVE || (!!Store.fp && Store.pulled && !Store.needFull && !reloading);
 function renderRelClean() {
   const el = $('#adRelClean'); if (!el) return;
-  const n = isAdmin() ? relOrphans().length : 0;
-  el.innerHTML = n ? `<div class="setrow"><span>残っている再訪問の印<br><small class="hint">会えた記録も受け持ちもないのに、再訪問の印だけが残っている家です（リセットや記録の取り消しで残りました）。消しても、家・訪問の記録・拒否・注意は変わりません。</small></span>
+  const n = isAdmin() && relCleanReady() ? relOrphans().length : 0;
+  el.innerHTML = n ? `<div class="setrow"><span>残っている再訪問の印<br><small class="hint">会えた記録も受け持ちもないのに、再訪問の印だけが残っている家です。消しても、家・訪問の記録・拒否・注意は変わりません。</small></span>
     <div class="actions"><button type="button" class="btn small" data-relclean>確かめて消す（${n}件）</button></div></div>` : '';
 }
 function openRelClean() {
   if (!isAdmin()) return;
-  if (LIVE && !Store.fp) { toast('読み込みが終わってから、もう一度押してください'); return; }
+  if (!relCleanReady()) { toast('読み込みが終わってから、もう一度押してください'); return; }
   const list = relOrphans();
   if (!list.length) { toast('残っている再訪問の印はありません'); renderAll(); return; }
   const MAX = 50;
@@ -14448,14 +14456,18 @@ function openRelClean() {
     <p class="hint">家・訪問の記録・拒否・注意は消えません。消したあとに出る「取り消す」で、もとにもどせます。</p>
     <button class="btn block danger" id="rcGo">消す（${list.length}件）</button>
     <button class="btn block" data-close>やめる</button>`);
+  const shown = list.map(x => x.k);
   $('#rcGo').onclick = () => {
     closeSheet();
-    cleanRelOrphans();
+    cleanRelOrphans(shown);
   };
 }
-function cleanRelOrphans() {
-  if (!isAdmin()) return;
-  const keys = relOrphans().map(x => x.k); // 押したときに数え直す（確認の画面を開いているあいだに記録が届いたとき）
+/* shown：確認の画面に出した印。消すのは、その中で押したときにも残っている印だけ
+   （確認の画面を開いているあいだに会えた記録・受け持ちが届いた印は消さない。あとから増えた印も、見せていないので消さない。監査 #3） */
+function cleanRelOrphans(shown) {
+  if (!isAdmin() || !relCleanReady()) return;
+  const now = new Set(relOrphans().map(x => x.k));
+  const keys = (shown || []).filter(k => now.has(k));
   if (!keys.length) { toast('残っている再訪問の印はありません'); return; }
   commitIn([], `再訪問の印を${keys.length}件消しました`, () => { keys.forEach(k => { delete D().released[k]; }); });
 }
