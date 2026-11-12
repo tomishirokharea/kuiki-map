@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.141';
+var APP_JS_VER = '2026.13.142';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2464,8 +2464,10 @@ function canSeeDetail(k, house) {
 const seeV = (v, k, house) => v.by === me().id || canSeeDetail(k, house);
 /* 再訪問のリストから「外した」家（もう訪ねない）：外したときより前の★は数えない */
 const closedAt = k => { const r = D().released[k]; return r && r.reason === 'closed' ? r.at : null; };
-/* 引き継ぎを待っている家（「外した」家はふくめない） */
-const relOf = k => { const r = D().released[k]; return r && r.reason !== 'closed' ? r : null; };
+/* 引き継ぎを待っている家（「外した」家はふくめない）
+   「会えた」記録のない家の印は、引き継ぎとして扱わない（一覧・おすすめ・留守宅カードの除外のどれにも使わない）。
+   リセットや記録の取り消しで、印だけが残ることがあったため（2026-11-12。残った印は係の「保守」で消せる：relOrphans） */
+const relOf = k => { const r = D().released[k]; return r && r.reason !== 'closed' && sum(k).met ? r : null; };
 function lastInterest(k) {
   const m = sum(k).met;
   if (!(m && seeV(m, k) && INTERESTED.has(m.interest))) return null;
@@ -2808,6 +2810,12 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.142', items: [
+    ['再', '会えた記録のない家が「引き継ぎを待っている家」に出ることがあったのを直しました。']
+  ] },
+  { v: '2026.13.142', role: 'admin', items: [
+    ['係', '記録のリセットのときに、再訪問の印（引き継ぎ待ち・リストから外した）も一緒に消すようにしました。前のリセットで残った印は、設定タブの「保守」にある「残っている再訪問の印」から、確かめて消せます（残っているときだけ出ます）。']
+  ] },
   { v: '2026.13.141', items: [
     ['集', '全体の集まりの予定に、司会者の名前が出るようになりました（予定の一覧・印刷）。監督と司会者は、全体の集まりの予定を入れられます。毎週・2週ごとのくり返しも、いつまでかを決めて入れられます。']
   ] },
@@ -12031,6 +12039,7 @@ function runPerfCheck() {
 
 function renderDataSet() {
   renderDummy();
+  renderRelClean(); // 残った再訪問の印（あるときだけ出る）
   renderRecoAdmin();
   renderAgeAdmin();
   if (window.IkenR) IkenR.renderAdmin(); // こまったこと・提案（iken.js）
@@ -14400,6 +14409,69 @@ function handoffHtml() {
     }).join('');
 }
 
+/* ---- 残った再訪問の印の掃除（区域係だけ・2026-11-12） ----
+   再訪問の印（released：引き継ぎ待ち・外した）は、受け持ちを外したときに付く。リセットや記録の取り消しで、
+   記録と受け持ちが消えても印だけが残ることがあった。残った印は、仮の家を消せなくする（houseRecCounts）ので、ここで消す。
+   対象：受け持ちがなく、「会えた」記録もない家の印／家がもうない印。家・記録・拒否・注意には手をふれない。取り消せる */
+function relOrphans() {
+  const out = [], rel = D().released || {};
+  Object.keys(rel).forEach(k => {
+    if (D().follows[k]) return;
+    const h = houseById(parseKey(k)[0]);
+    if (h && sum(k).met) return;
+    out.push({ k, h, r: rel[k] });
+  });
+  // 区域番号の順（家がない印は最後）。同じ区域の中は家の id の順（監査 #4）
+  const no = x => { const t = x.h && terrById(x.h.terrId); return t ? t.no : null; };
+  return out.sort((a, b) => {
+    const na = no(a), nb = no(b);
+    if (na === null || nb === null) return (na === null) - (nb === null);
+    return cmpNo(na, nb) || cmpNo(a.k, b.k);
+  });
+}
+/* サーバーから最新を受け取る前（起動直後の、端末に保存した古いデータ）や読み直しのあいだは、数えない・消さない（監査 #2。adminSweepSoon と同じ守り） */
+const relCleanReady = () => !LIVE || (!!Store.fp && Store.pulled && !Store.needFull && !reloading);
+function renderRelClean() {
+  const el = $('#adRelClean'); if (!el) return;
+  const n = isAdmin() && relCleanReady() ? relOrphans().length : 0;
+  el.innerHTML = n ? `<div class="setrow"><span>残っている再訪問の印<br><small class="hint">会えた記録も受け持ちもないのに、再訪問の印だけが残っている家です。消しても、家・訪問の記録・拒否・注意は変わりません。</small></span>
+    <div class="actions"><button type="button" class="btn small" data-relclean>確かめて消す（${n}件）</button></div></div>` : '';
+}
+function openRelClean() {
+  if (!isAdmin()) return;
+  if (!relCleanReady()) { toast('読み込みが終わってから、もう一度押してください'); return; }
+  const list = relOrphans();
+  if (!list.length) { toast('残っている再訪問の印はありません'); renderAll(); return; }
+  const MAX = 50;
+  const line = x => {
+    const t = x.h && terrById(x.h.terrId), unit = parseKey(x.k)[1];
+    const what = x.h ? targetName(x.h, unit) : '（家がもうありません）';
+    const kind = x.r && x.r.reason === 'closed' ? 'リストから外した印' : '引き継ぎ待ちの印';
+    return `<li><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span><span>${what}<br><small class="muted">${kind}${x.r && x.r.at ? `・${fmtDate(x.r.at)}` : ''}</small></span></li>`;
+  };
+  setSheet(headHtml(null, '残っている再訪問の印', `${list.length}件`) + `
+    <p>次の${list.length}件の印を消します。会えた記録も受け持ちもない家（または、もうない家）の印です。</p>
+    <ul class="history">${list.slice(0, MAX).map(line).join('')}</ul>
+    ${list.length > MAX ? `<p class="muted">ほか ${list.length - MAX}件</p>` : ''}
+    <p class="hint">家・訪問の記録・拒否・注意は消えません。消したあとに出る「取り消す」で、もとにもどせます。</p>
+    <button class="btn block danger" id="rcGo">消す（${list.length}件）</button>
+    <button class="btn block" data-close>やめる</button>`);
+  const shown = list.map(x => x.k);
+  $('#rcGo').onclick = () => {
+    closeSheet();
+    cleanRelOrphans(shown);
+  };
+}
+/* shown：確認の画面に出した印。消すのは、その中で押したときにも残っている印だけ
+   （確認の画面を開いているあいだに会えた記録・受け持ちが届いた印は消さない。あとから増えた印も、見せていないので消さない。監査 #3） */
+function cleanRelOrphans(shown) {
+  if (!isAdmin() || !relCleanReady()) return;
+  const now = new Set(relOrphans().map(x => x.k));
+  const keys = (shown || []).filter(k => now.has(k));
+  if (!keys.length) { toast('残っている再訪問の印はありません'); return; }
+  commitIn([], `再訪問の印を${keys.length}件消しました`, () => { keys.forEach(k => { delete D().released[k]; }); });
+}
+
 /* =========================================================
    印刷（PDFとしても保存できる）
    ========================================================= */
@@ -15989,6 +16061,7 @@ function bindStatic() {
     else if ((x = q('[data-rename]'))) { const t = terrById(x.dataset.rename); if (t) openTerrForm({ terr: t }); else toast('この区域は、もうありません'); }
     else if ((x = q('[data-delterr]'))) openDeleteTerr(x.dataset.delterr);
     else if ((x = q('[data-dummy]'))) { const a = x.dataset.dummy; if (a === 'add') addDummy(); else if (a === 'del') delDummy(); else openDummyGuide(); }
+    else if (q('[data-relclean]')) openRelClean();
     else if ((x = q('[data-go]'))) goTo(x.dataset.go, x.dataset.unit);
     else if ((x = q('[data-fact]'))) followAction(x.dataset.fact, x.dataset.key);
     else if ((x = q('[data-set]'))) changeSetting(x.dataset.set, Number(x.dataset.d));
