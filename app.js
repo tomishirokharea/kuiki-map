@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.142';
+var APP_JS_VER = '2026.13.143';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2810,6 +2810,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.143', items: [
+    ['地', '地図を拡大すると、土地の区切り（登記上の土地の線）がうすい線で出るようになりました。奥にある家や、家を追加する場所の目安になります。実際の敷地や塀とは違うことがあります。出したくないときは、印の見かた（？）で切れます。']
+  ] },
   { v: '2026.13.142', items: [
     ['再', '会えた記録のない家が「引き継ぎを待っている家」に出ることがあったのを直しました。']
   ] },
@@ -4278,6 +4281,7 @@ function renderHouses() {
   houseLayer.clearLayers();
   if (window.renderDncPins) window.renderDncPins(); // 場所だけの拒否の印（kyohi.js）
   if (window.renderChuiPins) window.renderChuiPins(); // 場所だけの注意の印（chui.js）
+  if (window.renderTochiKugiri) window.renderTochiKugiri(); // 土地の区切り（tochi-kugiri.js・2026-11-13）
   const fkeys = followMap ? new Set(myFollowKeys()) : null;
   const ff = fkeys ? (k => (fkeys.has(k) ? 'hl' : 'dim')) : focusFn();
   renderCardBar();

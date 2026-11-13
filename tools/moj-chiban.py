@@ -197,6 +197,23 @@ def parse_geojson(name, data, out, stats):
         stats['使った土地'] = stats.get('使った土地', 0) + 1
 
 
+def enc_bbox(entries):
+    """符号化した土地の一覧から、範囲 [南, 西, 北, 東]（度）を出す（地図に出す範囲をしぼるため・2026-11-13）"""
+    s = n = w = e = None
+    for p in entries:
+        cy, cx = p[1], p[2]
+        ys = [cy] + [cy + p[i] for i in range(3, len(p) - 1, 2)]
+        xs = [cx] + [cx + p[i + 1] for i in range(3, len(p) - 1, 2)]
+        lo_y, hi_y, lo_x, hi_x = min(ys), max(ys), min(xs), max(xs)
+        s = lo_y if s is None or lo_y < s else s
+        n = hi_y if n is None or hi_y > n else n
+        w = lo_x if w is None or lo_x < w else w
+        e = hi_x if e is None or hi_x > e else e
+    if s is None:
+        return None
+    return [round(s / 1e6, 6), round(w / 1e6, 6), round(n / 1e6, 6), round(e / 1e6, 6)]
+
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__)
@@ -221,6 +238,9 @@ def main():
         for acode, a in sorted(m['azas'].items()):
             a['p'].sort(key=lambda e: [int(n) for n in e[0].split('-')])
             index['azas'][a['name']] = {'f': acode, 'n': len(a['p'])}
+            bb = enc_bbox(a['p'])  # 字の範囲（画面が、見えている字だけ読むため）
+            if bb:
+                index['azas'][a['name']]['b'] = bb
             with open(os.path.join(d, acode + '.json'), 'w', encoding='utf-8') as f:
                 json.dump({'v': 1, 'name': a['name'], 'p': a['p']}, f, ensure_ascii=False, separators=(',', ':'))
         with open(os.path.join(d, 'index.json'), 'w', encoding='utf-8') as f:
@@ -232,6 +252,10 @@ def main():
     lst = json.load(open(lst_path, encoding='utf-8')) if os.path.exists(lst_path) else {'v': 1, 'munis': {}}
     for code, m in out.items():
         lst['munis'][m['muni']] = {'code': code, 'asof': asof}
+        bbs = [b for b in (enc_bbox(a['p']) for a in m['azas'].values()) if b]  # 市町村の範囲＝字の範囲を合わせたもの
+        if bbs:
+            lst['munis'][m['muni']]['b'] = [round(min(b[0] for b in bbs), 6), round(min(b[1] for b in bbs), 6),
+                                            round(max(b[2] for b in bbs), 6), round(max(b[3] for b in bbs), 6)]
     with open(lst_path, 'w', encoding='utf-8') as f:
         json.dump(lst, f, ensure_ascii=False, separators=(',', ':'))
     print(stats, file=sys.stderr)

@@ -21,7 +21,7 @@ const FORCE = String(process.env.FORCE || '') === 'true'; // すべて作り直�
 const DEMO = String(process.env.KUIKI_DEMO || '') === '1'; // 試作モードでの動作確認用（ふだんは使わない）
 const UPLOAD = String(process.env.KUIKI_UPLOAD || '').trim(); // 動作確認用：送り先を変える（ふだんは空）
 const PER_FILE = 8;            // 1ファイルに入れる区域の数（A4の表・裏が2組）
-const LAYOUT = 's12-a6-v2';    // カードの形を変えたときは、この文字を変える（全部を作り直す）
+const LAYOUT = 's12-a6-v3';    // カードの形を変えたときは、この文字を変える（全部を作り直す）。v3：土地の区切り（2026-11-13）
 const LOAD_WAIT_MS = 15 * 60000;
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
@@ -146,6 +146,7 @@ async function main() {
       const sk = v => (!v ? 0 : v && typeof v === 'object' && v.q && !v.p ? 2 : 1); // 拒否＝1・訪問しない＝2（切りかえたら作り直す・監査 HS-A4）
       const terrs = D().territories.filter(t => !t.dummy).slice().sort(byNo);
       const lines = await sha(JSON.stringify(polyTerrs().map(t => [t.id, t.no, t.polygon]))); // となりの区域の線も地図に出るため
+      const tkv = window.tochiKugiri ? await window.tochiKugiri.ver().catch(() => '') : ''; // 土地の区切りのデータの版（変わったら作り直す）
       const byT = new Map();
       D().houses.forEach(h => { if (!h.terrId) return; if (!byT.has(h.terrId)) byT.set(h.terrId, []); byT.get(h.terrId).push(h); });
       const sigs = {};
@@ -153,7 +154,7 @@ async function main() {
         const hs = (byT.get(t.id) || []).map(h => [h.id, h.lat, h.lng, h.type, h.label || '', h.units || [], h.kind || '', !!h.lock,
           h.uk || null, h.ul || null, !!h.prov, sk(dnc[K(h.id, '')]), (h.units || []).filter(u => dnc[K(h.id, u)]).map(u => u + (sk(dnc[K(h.id, u)]) === 2 ? ':q' : ''))])
           .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-        sigs[t.id] = await sha(JSON.stringify([LAYOUT, t.no, t.name || '', t.polygon || null, lines, hs]));
+        sigs[t.id] = await sha(JSON.stringify([LAYOUT, tkv, t.no, t.name || '', t.polygon || null, lines, hs]));
       }
       const files = [];
       for (let i = 0; i < terrs.length; i += PER_FILE) {
@@ -185,9 +186,12 @@ async function main() {
 
     for (const f of plan.files) {
       if (!FORCE && had[f.name] && had[f.name].h === f.sig) { skipped++; continue; }
-      const before = await page.evaluate(() => window.__tileBad);
-      await page.evaluate(async ids => { await printS12(ids, 'a6', true); }, f.ids);
-      const bad = (await page.evaluate(() => window.__tileBad)) - before;
+      const before = await page.evaluate(() => window.__tileBad + (window.tochiKugiri ? window.tochiKugiri.bad() : 0));
+      // 万一画面側が固まっても、週次ジョブ全体が止まらないように3分で打ち切る（次の回に作り直される）
+      await page.evaluate(async ids => {
+        await Promise.race([printS12(ids, 'a6', true), new Promise((_, rej) => setTimeout(() => rej(new Error('S-12 の準備が3分で終わりませんでした')), 180000))]);
+      }, f.ids);
+      const bad = (await page.evaluate(() => window.__tileBad + (window.tochiKugiri ? window.tochiKugiri.bad() : 0))) - before; // 土地の区切りの表が読めなかったときも、印を残さず次の回に作り直す
       const pdf = await render();
       // 地図の画像が欠けたときは、印を残さない（次の回にもう一度作る）
       await send(f.name, bad ? 'incomplete' : f.sig, pdf, bad ? `地図の画像${bad}枚を受け取れませんでした` : '');
