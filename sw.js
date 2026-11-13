@@ -13,7 +13,8 @@
    ・サーバー（GAS）とのやりとり・版の確認には、手を出さない
    ・招待コード（?t=）の入ったURLは保存しない（URLの ? から後ろを消して保存する）
    ========================================================= */
-const APP_CACHE = 'kuiki-app-v142'; // v142：2026.13.142（記録のない家が「引き継ぎを待っている家」に出ないように・リセットで再訪問の印も消す・残った印の掃除）
+const APP_CACHE = 'kuiki-app-v143'; // v143：2026.13.143（土地の区切り：登記所備付地図の筆の線を地図とS-12に）
+// v142：2026.13.142（記録のない家が「引き継ぎを待っている家」に出ないように・リセットで再訪問の印も消す・残った印の掃除）
 // v141：2026.13.141（全体の集まりの予定：司会者の名前・監督と司会者が入れる・くり返し）
 // v140：2026.13.140（伝道者の区域カードの画面にも「個人の区域」の見出しを付けた）
 // v139：2026.13.139（係の画面の並びを見直した：状況は上のタブ・区域の決まりは設定・集まりの予定はホーム・家の印）
@@ -33,7 +34,7 @@ const AREA_KEY = 'https://kuiki.invalid/area';
 let AREA = undefined; // [南, 西, 北, 東]。undefined＝まだ読んでいない、null＝区域がない
 const NET_WAIT_MS = 6000;
 // 圏外用に控える、アプリのファイル（新しくファイルを足したら、ここに名前を足す）
-const APP_NAMES = ['config', 'schedule', 'kantan', 'tsuzuki', 'kangaeru', 'chizu', 'apt-import', 'apt-wizard', 'apt-heya', 'naoshi', 'kyohi', 'chui', 'kml-koushin', 'help', 'douga', 'kyoukai', 'torikomi', 'tokubetsu', 'nozoku', 'i18n', 'i18n-es', 'i18n-es-chizu', 'i18n-es-kyoukai', 'i18n-es-tokubetsu', 'guruchu', 'i18n-es-guruchu', 'meibo', 'i18n-es-meibo', 'i18n-es-shikai', 'i18n-es-tenken', 'i18n-es-kaizen', 'i18n-es-osusume', 'houkoku', 'iken', 'i18n-es-houkoku', 'joukyou-graph', 'i18n-es-joukyou', 'i18n-es-shinai', 'app', 'chizu-okuru', 'heya-wake', 'app-head', 'kimari', 'gaikokugo'];
+const APP_NAMES = ['config', 'schedule', 'kantan', 'tsuzuki', 'kangaeru', 'chizu', 'apt-import', 'apt-wizard', 'apt-heya', 'naoshi', 'kyohi', 'chui', 'kml-koushin', 'help', 'douga', 'kyoukai', 'torikomi', 'tokubetsu', 'nozoku', 'i18n', 'i18n-es', 'i18n-es-chizu', 'i18n-es-kyoukai', 'i18n-es-tokubetsu', 'guruchu', 'i18n-es-guruchu', 'meibo', 'i18n-es-meibo', 'i18n-es-shikai', 'i18n-es-tenken', 'i18n-es-kaizen', 'i18n-es-osusume', 'houkoku', 'iken', 'i18n-es-houkoku', 'joukyou-graph', 'i18n-es-joukyou', 'i18n-es-shinai', 'app', 'chizu-okuru', 'heya-wake', 'app-head', 'kimari', 'gaikokugo', 'tochi-kugiri'];
 const APP_FILES = new RegExp('/(' + APP_NAMES.join('|') + ')\\.js$');
 
 /* 新しい版を入れるとき（install）：画面のファイルを先に取って、新しい控えに入れておく（M2・2026.13.102）。

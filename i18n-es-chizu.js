@@ -122,4 +122,8 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "断られた": "rechazó la visita",
 "理由は書かない": "sin motivo",
 "家の編集の「この家の印」の見出しに「？」を付け、押すと、注意・拒否をどんなときに、どう使うかが出るようにしました。印のボタンの下にも「夜勤・犬など」のような一言を出します。": "En «Marca de esta casa» (editar la casa) hay un «?» que explica cuándo y cómo usar Aviso y No visitar. Bajo cada botón aparece una pista corta, como «turno de noche, perro…».",
+"土地の区切りを出す": "Mostrar los límites de parcelas",
+"土地の区切りを入れる": "Incluir los límites de parcelas",
+"地図を拡大すると、うすい線で出ます。登記上の土地の区切りの目安です。実際の敷地や塀とは違うことがあります。": "Al acercar el mapa, aparecen como líneas tenues. Son una referencia de los límites registrales de las parcelas; pueden diferir del terreno o las cercas reales.",
+"地図を拡大すると、土地の区切り（登記上の土地の線）がうすい線で出るようになりました。奥にある家や、家を追加する場所の目安になります。実際の敷地や塀とは違うことがあります。出したくないときは、印の見かた（？）で切れます。": "Al acercar el mapa, ahora se ven los límites de las parcelas (líneas registrales) como líneas tenues. Ayudan a ubicar casas al fondo o a añadir casas en el lugar correcto. Pueden diferir del terreno real. Se pueden ocultar en la leyenda (?).",
 });
