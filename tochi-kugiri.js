@@ -64,7 +64,10 @@
         if (idbOk()) IDB.set('tk:top', j).catch(() => {});
         return j && j.munis ? j : null;
       } catch (e) {
-        try { const c = idbOk() ? await IDB.get('tk:top') : null; return c && c.munis ? c : null; } catch (x) { return null; }
+        try { const c = idbOk() ? await IDB.get('tk:top') : null; if (c && c.munis) return c; } catch (x) { /* 下へ */ }
+        // 404＝表がない会衆（もう聞かない）。それ以外（電波がないなど）は、1分後にもう一度聞けるようにする（監査 Minor3）
+        if (!/http 404/.test(String(e && e.message))) setTimeout(() => { if (TK.top === null) TK.top = undefined; }, 60000);
+        return null;
       }
     })();
     TK.top = await TK.top;
@@ -76,6 +79,7 @@
         try {
           const j = await fetchJson(code + '/index.json');
           if (idbOk()) { IDB.set('tk:cidx:' + code, j).catch(() => {}); tkSweep(code, j.asof).catch(() => {}); }
+          try { tkLegendPaint(); } catch (x) { /* 凡例の出典を新しくするだけ（監査 Minor7） */ }
           return j;
         } catch (e) {
           try { const c = idbOk() ? await IDB.get('tk:cidx:' + code) : null; return c && c.asof === asof ? c : c || null; } catch (x) { return null; }
@@ -107,7 +111,11 @@
         } catch (e) { j = null; }
       }
       if (j) TK.azas.set(key, decodeAza(j));
-      else { TK.azas.set(key, 'bad'); TK.bad++; setTimeout(() => { if (TK.azas.get(key) === 'bad') TK.azas.delete(key); }, 60000); } // 1分後にもう一度ためせる
+      else {
+        TK.azas.set(key, 'bad'); TK.bad++;
+        // 1分後にもう一度ためせる（消したら描き直しも仕掛ける・監査 Minor6）
+        setTimeout(() => { if (TK.azas.get(key) === 'bad') { TK.azas.delete(key); try { renderTochiKugiri(); } catch (x) { /* */ } } }, 60000);
+      }
       if (done) done();
     })();
     return null;
@@ -212,7 +220,7 @@
   function tkLegendPaint() {
     const lg = document.getElementById('legend'); if (!lg) return;
     if (TK.top === undefined) { tkTop().then(() => { if (TK.top) tkLegendPaint(); }).catch(() => {}); return; }
-    if (!TK.top) return; // 表がない会衆には出さない
+    if (!TK.top || !TK.top.munis) return; // 表がない会衆には出さない（読み込みの途中＝Promise のあいだも出さない・監査 Minor4）
     let b = document.getElementById('tkLegend');
     if (!b) {
       b = document.createElement('div'); b.id = 'tkLegend'; lg.appendChild(b);
@@ -310,7 +318,8 @@
         const v = idx.azas[aza];
         if (!v.b || !boxes.some(bb => boxHit(v.b, bb))) continue;
         const key = idx.code + '/' + v.f;
-        if (TK.azas.get(key) === undefined || TK.azas.get(key) === 'bad') {
+        if (TK.azas.get(key) === 'bad') TK.azas.delete(key); // 前に読めなかった字は、読み直してから印刷する（読めないままだと待ち続けて印刷が止まる・監査 Critical1）
+        if (TK.azas.get(key) === undefined) {
           await new Promise(res => { const r = tkAza(idx.code, v.f, idx.asof, res); if (r) res(); });
         } else if (TK.azas.get(key) === 'loading') {
           await new Promise(res => { const t = setInterval(() => { const g = TK.azas.get(key); if (g !== 'loading') { clearInterval(t); res(); } }, 100); });
@@ -321,13 +330,11 @@
   const _s12Load = window.s12Load;
   if (typeof _s12Load === 'function') {
     window.s12Load = async function (cards) {
+      // 係のS-12・伝道者の「印刷・送る」・紙の予備ロボットの全部がここを通るので、入れるかどうかはここで決める（監査 Important2）
+      TK.cur12 = TK.s12;
       try { if (TK.cur12) await tkPreload(cards); } catch (e) { console.error(e); }
       return _s12Load.apply(this, arguments);
     };
-  }
-  const _printS12 = window.printS12;
-  if (typeof _printS12 === 'function') {
-    window.printS12 = function () { TK.cur12 = TK.s12; return _printS12.apply(this, arguments); };
   }
   /* 線のSVG：区域の外の白いおおい（fill-rule="evenodd"）の直後＝家・目印より下に入れる */
   function tkS12Svg(svg, c) {

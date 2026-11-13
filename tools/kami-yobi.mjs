@@ -187,7 +187,10 @@ async function main() {
     for (const f of plan.files) {
       if (!FORCE && had[f.name] && had[f.name].h === f.sig) { skipped++; continue; }
       const before = await page.evaluate(() => window.__tileBad + (window.tochiKugiri ? window.tochiKugiri.bad() : 0));
-      await page.evaluate(async ids => { await printS12(ids, 'a6', true); }, f.ids);
+      // 万一画面側が固まっても、週次ジョブ全体が止まらないように3分で打ち切る（次の回に作り直される）
+      await page.evaluate(async ids => {
+        await Promise.race([printS12(ids, 'a6', true), new Promise((_, rej) => setTimeout(() => rej(new Error('S-12 の準備が3分で終わりませんでした')), 180000))]);
+      }, f.ids);
       const bad = (await page.evaluate(() => window.__tileBad + (window.tochiKugiri ? window.tochiKugiri.bad() : 0))) - before; // 土地の区切りの表が読めなかったときも、印を残さず次の回に作り直す
       const pdf = await render();
       // 地図の画像が欠けたときは、印を残さない（次の回にもう一度作る）
