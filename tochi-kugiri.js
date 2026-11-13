@@ -152,6 +152,8 @@
   const TK_CAP = 2500; // 一度に描く土地の数の上限（それより多い分は、もう少し拡大すると出る）
   function renderTochiKugiri() {
     if (!map) return;
+    const sz = map.getSize();
+    if (!sz.x || !sz.y) return; // 地図のタブがまだ開いていない（開いたときに renderHouses から呼ばれる）
     tkEnsure();
     if (!tkShow()) { if (lastSig) { tkGroup.clearLayers(); lastSig = ''; } return; }
     const top = TK.top;
@@ -380,6 +382,7 @@
       return Object.keys(top.munis).map(m => top.munis[m].code + ':' + (top.munis[m].asof || '')).sort().join(' ');
     },
     bad: () => TK.bad,
+    dbg: () => lastSig, // 確かめ用：今描いている内容の印（ズーム:範囲:土地の数:地図の種類）
     _t: TK_API // 確かめ用
   };
 })();
