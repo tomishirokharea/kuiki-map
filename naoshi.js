@@ -41,6 +41,7 @@
   css.textContent = `
   .fixline{display:flex;align-items:center;gap:10px;background:#F2F6FB;border:1px solid #C9D7E8;border-radius:12px;padding:10px 12px;margin:8px 0}
   .fixline span{flex:1;line-height:1.4}
+  .fixline .fxlater{display:block;color:#5E6E77;margin-top:4px}
   .fixline .btn{flex:none;min-height:44px}
   body.simple .fixline .btn{min-height:52px;font-size:18px}
   .fixrow{display:flex;align-items:center;gap:10px;border-bottom:1px solid #E1E5EA;padding:10px 2px}
@@ -216,7 +217,12 @@
   function fixLineHtml(k) {
     const v = visitsOf(k).find(x => isToday(x.at) && canFixVisit(x));
     if (!v) return '';
-    return `<div class="fixline"><span><b>${v.by === me().id ? 'あなたの記録' : '今日の記録'}</b>：今日 ${hhmm(v.at)}　${RESULT_LABEL[v.result]}</span><button type="button" class="btn small" data-fxline="${esc(v.id)}">直す</button></div>`;
+    // あとから、ほかの人（自分では直せない人）が今日ちがう結果を記録しているとき：そのことと、記録し直さなくてよいことを書く。
+    // 記録し直すと、時刻が今になってしまうため（こまったこと yakq2v・9e0blc・2026.13.150）。名前は出さない
+    const last = visitsOf(k)[0];
+    const later = last && last !== v && last.by !== me().id && isToday(last.at) && last.result !== v.result
+      ? `<small class="fxlater">このあと ${hhmm(last.at)} に、ほかの人が「${RESULT_LABEL[last.result]}」と記録しています。${v.by === me().id ? 'あなたの' : 'この'}記録はそのまま残ります。記録し直す必要はありません。</small>` : '';
+    return `<div class="fixline"><span><b>${v.by === me().id ? 'あなたの記録' : '今日の記録'}</b>：今日 ${hhmm(v.at)}　${RESULT_LABEL[v.result]}${later}</span><button type="button" class="btn small" data-fxline="${esc(v.id)}">直す</button></div>`;
   }
   function bindFixLine(S, back) {
     $$('[data-fxline]', S).forEach(b => b.onclick = () => {
