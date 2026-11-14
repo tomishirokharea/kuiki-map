@@ -10591,7 +10591,7 @@ function stopHeading(north) {
 }
 
 /* ---------- 向きの確かめ（2026.13.148・一時的な調べもの） ----------
-   向きモードで地図の北がずれる件を調べるため、「北」ボタンを長く押す（約1秒）と、向きの数字を地図の上に出す。
+   向きモードで地図の北がずれる件を調べるため、向きモードのときに「北」ボタンを長く押す（約1.5秒）と、向きの数字を地図の上に出す。
    数字は画面に出すだけで、どこにも送らない。ふつうに押したときの動き（北が上にもどる）は変えない */
 const MUKI = { el: null, timer: 0, probe: null, eat: 0 };
 function mukiProbe() {
@@ -10651,6 +10651,7 @@ function bindMukiDiag() {
   const cancel = () => { clearTimeout(t); t = 0; };
   nb.addEventListener('pointerdown', () => { cancel(); MUKI.eat = 0; if (!HEAD.on) return; t = setTimeout(() => { t = 0; MUKI.eat = Date.now(); mukiShow(); }, 1500); });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => nb.addEventListener(n, cancel));
+  nb.addEventListener('pointerup', () => { if (MUKI.eat) MUKI.eat = Date.now(); }); // 長く押し続けても、指をはなしたあとの「押した」で向きモードが止まらないように（再監査 Minor）
   nb.addEventListener('click', e => { const ate = MUKI.eat && Date.now() - MUKI.eat < 1500; MUKI.eat = 0; if (ate) { e.stopImmediatePropagation(); e.preventDefault(); } }, true); // 長押しのすぐあとの「押した」だけ止める（時間がたったら止めない）
   document.addEventListener('visibilitychange', () => { if (document.hidden) mukiHide(); }); // アプリを閉じたら消す
   nb.addEventListener('contextmenu', e => e.preventDefault());
