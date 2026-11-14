@@ -249,6 +249,8 @@ window.DOUGA = DOUGA;
     if (!ready() || isPractice() || !list().length) return '';
     return '<button type="button" class="btn block dg-set" data-dg-list data-notr>▶ ' + escH(T('row')) + '</button>';
   };
+  // 歯車の「起動と案内」（かんたんモードは1画面の中）に出す（差しこみ口・2026.13.145）
+  (window.UI_SLOTS = window.UI_SLOTS || { feat: [], map: [], start: [] }).start.push(function () { return window.dougaSettingsRow(); });
   function openList() {
     var L = list(); if (!L.length || typeof setSheet !== 'function') return;
     load();

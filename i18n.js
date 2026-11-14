@@ -86,13 +86,14 @@
   }
 
   /* 言語をえらぶボタン（設定の画面・はじめの登録画面に出す） */
-  function picker(onJoin) {
+  // onJoin：はじめの登録画面（見出しと「翻訳されていない文字のコピー」を出さない）／o.noHead：見出しだけ出さない（歯車の「言語」の画面・2026.13.145）
+  function picker(onJoin, o) {
     var btns = Object.keys(NAMES).map(function (k) {
       return '<button type="button" data-kilang="' + k + '" aria-pressed="' + (k === lang) + '">' + NAMES[k] + '</button>';
     }).join('');
     var miss = !onJoin && lang !== 'ja' && MISSING.size
       ? '<p class="hint"><button type="button" class="btn small" data-kimissing>Copiar textos sin traducir (' + MISSING.size + ')</button></p>' : '';
-    return '<div class="kilang" data-notr>' + (onJoin ? '' : '<h3 class="sub feathead">言語 / Idioma</h3>') +
+    return '<div class="kilang" data-notr>' + (onJoin || (o && o.noHead) ? '' : '<h3 class="sub feathead">言語 / Idioma</h3>') +
       '<div class="seg uiseg" role="group" aria-label="言語 / Idioma">' + btns + '</div>' + miss + '</div>';
   }
   function missingList() {

@@ -181,10 +181,13 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
   }
   /* index.html・各画面の setBase の呼び出しは「本人の選び」として覚える */
   window.setBase = function (name) {
-    if (!map) return;
+    // 地図を作る前（ホームなどで歯車を開いたとき）でも、選んだものを覚える。地図を作るときに setupKinds が使う（2026.13.145）
     try { if (Store.data && (name === 'pale' || name === 'std' || name === 'photo')) lsSet(kindKey(), name); } catch (e) { /* 覚えられなくても動く */ }
+    if (!map) return;
     applyBase(name);
   };
+  /* 今選んでいる地図の見た目（地図を作る前は、覚えている選び） */
+  window.baseWant = () => (map && baseLayers.std ? baseName : wantKind());
   /* 「写真にする／地図にする」：写真から戻るときは、直前の地図の種類にもどる */
   document.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('#addBase');
@@ -206,13 +209,14 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
   function patchBasePick() {
     const pale = document.querySelector('#sheet [data-ui="base"][data-v="pale"]');
     if (!pale || document.querySelector('#sheet [data-ui="base"][data-v="std"]')) return;
-    pale.classList.toggle('on', baseName === 'pale');
-    pale.setAttribute('aria-pressed', String(baseName === 'pale'));
+    const bw = window.baseWant();
+    pale.classList.toggle('on', bw === 'pale');
+    pale.setAttribute('aria-pressed', String(bw === 'pale'));
     pale.innerHTML = '<i class="bprev pale"></i>見やすい地図';
     const std = pale.cloneNode(false);
     std.dataset.v = 'std';
-    std.className = 'choice' + (baseName === 'std' ? ' on' : '');
-    std.setAttribute('aria-pressed', String(baseName === 'std'));
+    std.className = 'choice' + (bw === 'std' ? ' on' : '');
+    std.setAttribute('aria-pressed', String(bw === 'std'));
     std.innerHTML = '<i class="bprev std"></i>地名の多い地図';
     pale.after(std);
     const box = pale.parentNode;
@@ -493,20 +497,43 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     lmGroup.clearLayers();
     if (!lmOn() || !LM.items.length) return;
     const z = map.getZoom(), b = map.getBounds().pad(0.25), vis = typeof rotVisTest === 'function' ? rotVisTest(0.25) : null;
-    let cand = LM.items.filter(it => (z >= 15 || it.kind === 'kaikan') && b.contains([it.lat, it.lng]) && (!vis || vis(it.lat, it.lng)));
+    // 名前がはっきり出る大きさ（各自の設定・はじめ16＝今まで）。その0.75段手前から薄く出はじめる（2026.13.145）
+    // 薄く出はじめるのは、値の0.75段手前から。ただし値が16以上のときは16より手前では出さない（はじめの16は今までどおり16からはっきり出る・再監査 Important1）
+    const full = typeof lmNameFull === 'function' ? lmNameFull() : 16, FADE = 0.75;
+    const start = full >= 16 ? Math.max(16, full - FADE) : full - FADE;
+    const nop = full - start <= 0 ? (z >= full - 1e-9 ? 1 : 0) : Math.max(0, Math.min(1, (z - start) / (full - start)));
+    // 印：今までどおり拡大15から（会館はいつも）。名前を15より縮めても出す設定のときは、名前の出はじめから印も出す
+    const markMin = Math.min(15, start);
+    let cand = LM.items.filter(it => (z >= markMin || it.kind === 'kaikan') && b.contains([it.lat, it.lng]) && (!vis || vis(it.lat, it.lng)));
     cand.sort((a, c) => lmPri(a.kind) - lmPri(c.kind));
     cand = cand.slice(0, 200);
-    const names = z >= 16;
+    const names = nop > 0;
+    // 拡大16より縮めているときは、重なる名前を出さない（会館 → 学校 → … の順に残す）。16以上は今までどおり
+    const placed = [], cull = z < 16, simpleUi = document.body.classList.contains('simple');
+    // 地図を回しているときは、画面の上での位置で重なりを比べる（再監査 Minor2）
+    const c0 = map.getSize().divideBy(2), rad = map._kmRad || 0;
+    const scr = ll => { const p = map.latLngToContainerPoint(ll); return rad && typeof rotPt === 'function' ? c0.add(rotPt(p.subtract(c0), rad)) : p; };
     cand.forEach(it => {
-      L.marker([it.lat, it.lng], { pane: 'lmPane', interactive: false, keyboard: false,
+      const mark = () => L.marker([it.lat, it.lng], { pane: 'lmPane', interactive: false, keyboard: false,
         icon: L.divIcon({ className: 'lm-mark', html: `<span class="lmchip">${esc(lmKindMark(it.kind))}</span>`, iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(lmGroup);
+      // 拡大15より縮めているときは、会館のほかは、名前を出せた目印だけ印を出す（縮めた地図が印で混まないように・再監査 Minor3）
+      const lowZ = z < 15 && it.kind !== 'kaikan';
+      if (!lowZ) mark();
       if (names) {
         const a = Array.from(it.name), t = a.length > 10 ? a.slice(0, 10).join('') + '…' : it.name;
+        if (cull) {
+          const p = scr([it.lat, it.lng]), fs = simpleUi ? 16 : 14;
+          const w = Array.from(t).length * fs + 8, r = [p.x - w / 2, p.y + 12, p.x + w / 2, p.y + 14 + fs * 1.3];
+          if (placed.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) return;
+          placed.push(r);
+        }
+        if (lowZ) mark();
         L.marker([it.lat, it.lng], { pane: 'lmLabelPane', interactive: false, keyboard: false,
-          icon: L.divIcon({ className: 'lm-label', html: `<span data-notr>${esc(t)}</span>`, iconSize: [0, 0] }) }).addTo(lmGroup);
+          icon: L.divIcon({ className: 'lm-label', html: `<span data-notr${nop < 1 ? ` style="opacity:${nop.toFixed(2)}"` : ''}>${esc(t)}</span>`, iconSize: [0, 0] }) }).addTo(lmGroup);
       }
     });
   }
+  window.lmRepaint = () => { try { lmRender(); } catch (e) { console.error(e); } }; // 歯車の「目印の名前」を変えたとき
   /* 凡例（「?」）の中：目印を出す（入／切）・印の見かた・出典 */
   function lmLegendPaint() {
     const lg = document.getElementById('legend'); if (!lg) return;

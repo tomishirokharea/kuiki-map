@@ -1185,15 +1185,12 @@
     return `<div class="featrow"><p><b>おすすめのタブを出す</b><small>下のタブに「おすすめ」を出します。回り終えた区域で、まだ会えていない家を、近くの数軒ずつえらべます</small></p>${seg('tab', recoTabOn() ? 'on' : 'off')}</div>
       <div class="featrow"><p><b>おすすめにふり返りを出す</b><small>あなたの記録のふり返りを、おすすめのいちばん下に出します（このスマホの中だけ）</small></p>${seg('rev', revOn() ? 'on' : 'off')}</div>`;
   }
+  // 歯車の「使う機能」に、おすすめのタブ・ふり返りを差しこむ（文字の置きかえをやめて、差しこみ口を使う・2026.13.145）
+  (window.UI_SLOTS = window.UI_SLOTS || { feat: [], map: [], start: [] }).feat.push(() => (Store.data ? prefRows() : ''));
   const _setSheet = window.setSheet;
   window.setSheet = function (html) {
     try {
       if (typeof html === 'string') {
-        if (html.indexOf('id="uiReset"') >= 0 && html.indexOf('<h3 class="sub">ホームに出すもの</h3>') >= 0 && Store.data) {
-          html = html.replace('<h3 class="sub">ホームに出すもの</h3>', prefRows() + '<h3 class="sub">ホームに出すもの</h3>')
-            .replace('その日はじめて開いたときに、ひと言・今日の目標・今の時間帯におすすめの家を出します（まわりをさわると閉じます）', 'その日はじめて開いたときに、ひと言・今日の目標を出します（まわりをさわると閉じます）')
-            .replace('今日の集まり・自分の予定・再訪問の約束・区域カード・今がチャンスの留守宅カードを、ホームのいちばん上にまとめます', '今日の集まり・自分の予定・再訪問の約束・区域カードを、ホームのいちばん上にまとめます');
-        }
         if (html.indexOf('data-evdel') >= 0) {
           myData().events.filter(e => e.tid).forEach(e => {
             html = html.replace(`<button class="btn small danger" data-evdel="${esc(e.id)}">`, `${evBtn(e.id)}<button class="btn small danger" data-evdel="${esc(e.id)}">`);
@@ -1545,16 +1542,9 @@
         return r;
       };
     }
-    const _ss = window.setSheet;
-    window.setSheet = function (html) {
-      try {
-        if (typeof html === 'string' && html.indexOf('id="uiReset"') >= 0 && UI.mode === 'detail') {
-          html = html.replace('<button class="btn block" id="uiReset">', TM.gearHtml() + '<button class="btn block" id="uiReset">');
-          setTimeout(() => TM.fillSize(), 0);
-        }
-      } catch (e) { console.error(e); }
-      return _ss.call(this, html);
-    };
+    // 歯車の「地図」に、保存した地図を差しこむ（くわしいモードだけ。差しこみ口を使う・2026.13.145）
+    (window.UI_SLOTS = window.UI_SLOTS || { feat: [], map: [], start: [] }).map.push(() => (UI.mode === 'detail' ? TM.gearHtml() : ''));
+    (window.UI_AFTER = window.UI_AFTER || []).push(() => { if (document.getElementById('kgTileRow')) TM.fillSize(); });
     window.KMTile = TM;
     setTimeout(() => { try { TM.later(100, true); } catch (e) { /* なにもしない */ } }, 1200);
   })();
