@@ -3319,6 +3319,7 @@ window.KUIKI_I18N.es = {
 "← 全体でも出す": "← Mostrar aun alejado",
 "目印の名前を出す大きさ": "Acercamiento para mostrar nombres de puntos de referencia",
 "会館・学校などの目印の名前を、地図をどのくらい縮めても出すかを選べるようにしました（歯車 → 地図 → 建物の名前）。地図を縮めて場所を探すときに使えます。": "Ahora puede elegir desde qué nivel de alejamiento se muestran los nombres de los puntos de referencia (Salón del Reino, escuelas, etc.) (engranaje → Mapa → Nombres de edificios). Sirve para encontrar lugares con el mapa alejado.",
+"iPhoneで、向きに合わせた地図が実際の向きと90°ほどずれることがあったのを直しました。": "En iPhone, el mapa orientado hacia donde usted mira a veces quedaba girado unos 90° respecto a la dirección real. Ya está corregido.",
 "地図の右下の現在地ボタンが青いときにもう一度押すと、向いている方に合わせるようにしました（Googleマップと同じ）。歩くと現在地がついてきます。地図を指で動かすか、ボタンをもう一度押すと、ふつうの地図にもどります。": "Si el botón de ubicación (abajo a la derecha) está azul y lo vuelve a tocar, el mapa se orienta hacia donde usted mira (como en Google Maps). Al caminar, su ubicación lo sigue. Mueva el mapa con el dedo o toque el botón otra vez para volver al mapa normal.",
 "この端末では向きが分かりません。現在地だけを出します": "Este teléfono no puede saber la orientación. Solo se muestra su ubicación",
 "向きのセンサーを使えませんでした。もう一度ためすときは、アプリを開き直して、出てくる確認で「許可」を押してください": "No se pudo usar el sensor de orientación. Para intentarlo otra vez, vuelva a abrir la app y toque «Permitir» en el aviso",
