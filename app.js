@@ -14066,13 +14066,14 @@ function renderHome() {
 const SWIPE_W = 176;
 let swipedAt = 0; // スワイプした直後の「押した」は、画面を開かない
 function bindSwipe() {
-  let cur = null, sx = 0, sy = 0, dx = 0, moved = false;
+  let cur = null, sx = 0, sy = 0, dx = 0, moved = false, actsSw = null;
   document.addEventListener('pointerdown', e => {
     const body = e.target.closest('.swipe-body');
     // スワイプで出したボタン（取り消し・編集・削除）を押したときは、その行を閉じない。閉じると、押している間に行がボタンに
     // かぶり、指をはなしても押したことにならなかった（ふつうに押す 0.1秒以上で起きる・31-2 の声・2026.13.151）
     const acts = e.target.closest('.swipe-acts'), keep = body ? body.parentNode : acts ? acts.parentNode : null;
     $$('.swipe.open').forEach(x => { if (x !== keep) x.classList.remove('open'); });
+    actsSw = acts ? acts.parentNode : null;
     if (!body || e.target.closest('a, button')) { cur = null; return; }
     cur = body; sx = e.clientX; sy = e.clientY; dx = 0; moved = false;
   }, true);
@@ -14089,6 +14090,9 @@ function bindSwipe() {
     cur.style.transform = `translateX(${dx}px)`;
   }, true);
   const end = () => {
+    // ボタンを押したまま指をずらして離した（押したことにならない）ときも、今までどおり行を閉じる。
+    // 押したこと（click）が届くまで待ってから閉じる（すぐ閉じると、行がボタンにかぶって届かなくなる）
+    if (actsSw) { const sw = actsSw; actsSw = null; setTimeout(() => sw.classList.remove('open'), 400); }
     if (!cur) return;
     const b = cur; cur = null;
     b.style.transition = ''; b.style.transform = '';

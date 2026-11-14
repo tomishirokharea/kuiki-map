@@ -100,6 +100,43 @@ for (const ms of [40, 120, 250, 400]) {
   await ctx.close();
 }
 
+/* 1b. 指（タッチ）で：iPad と同じ touch の事件で、スワイプ →「取り消し」を ms ミリ秒押す */
+for (const ms of [150, 300]) {
+  const ctx = await b.newContext({ viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true });
+  const pg = await ctx.newPage(); const cdp = await ctx.newCDPSession(pg);
+  await pg.route('**/*', r => /gsi\.go\.jp|fonts\.g|script\.google|open-meteo/.test(r.request().url()) ? r.abort() : r.continue());
+  await pg.route('**/config.js', r => r.fulfill({ status: 200, contentType: 'application/javascript', body: CFG }));
+  await pg.goto(`http://localhost:${port}/index.html`);
+  await pg.waitForFunction(() => typeof openTarget === 'function' && typeof Store !== 'undefined' && Store.data);
+  await pg.evaluate(() => { const s = document.getElementById('splash'); if (s) s.remove(); UI.mode = 'detail'; applyUi(); renderAll(); });
+  await houseScene(pg, 1);
+  const T = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+  const bx = await (await pg.$('#sheet .swipe-body')).boundingBox(), y = bx.y + bx.height / 2, x0 = bx.x + bx.width - 20;
+  await T('touchStart', x0, y); for (let i = 1; i <= 10; i++) { await T('touchMove', x0 - 25 * i, y); await pg.waitForTimeout(16); } await T('touchEnd');
+  await pg.waitForTimeout(400);
+  const d = await (await pg.$('#sheet [data-vdel]')).boundingBox();
+  await T('touchStart', d.x + d.width / 2, d.y + d.height / 2); await pg.waitForTimeout(ms); await T('touchEnd');
+  await pg.waitForTimeout(600);
+  ok(await askOpen(pg), `指で ${ms}ms：「取り消し」を1回押すと確認が出る`, null);
+  // 確認で「やめる」→ 記録は残り、行は閉じている（今までどおり）
+  await askCancel(pg); await pg.waitForTimeout(500);
+  const r = await pg.evaluate(() => ({ n: D().visits.filter(v => v.houseId === __hid).length, open: !!document.querySelector('#sheet .swipe.open') }));
+  ok(r.n === 1 && !r.open, `指で ${ms}ms：「やめる」なら記録は残り、行は閉じる`, r);
+  await ctx.close();
+}
+// 押したまま指をずらして離す（押したことにならない）→ 確認は出ず、行は閉じる（今までどおり）
+{
+  const { pg, ctx } = await page();
+  await houseScene(pg, 1);
+  await swipe(pg, await pg.$('#sheet .swipe-body'));
+  const d = await (await pg.$('#sheet [data-vdel]')).boundingBox();
+  await pg.mouse.move(d.x + d.width / 2, d.y + d.height / 2); await pg.mouse.down(); await pg.waitForTimeout(150);
+  await pg.mouse.move(d.x - 200, d.y - 150, { steps: 5 }); await pg.mouse.up(); await pg.waitForTimeout(700);
+  const r = await pg.evaluate(() => ({ ask: !document.querySelector('#askBox').hidden, open: !!document.querySelector('#sheet .swipe.open') }));
+  ok(!r.ask && !r.open, '押したまま指をずらして離すと、確認は出ず、行は閉じる', r);
+  await ctx.close();
+}
+
 /* 2. 予定の行（ホーム）：左にスワイプ →「編集」「削除」 */
 async function schedScene(pg) {
   return pg.evaluate(() => {
