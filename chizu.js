@@ -497,20 +497,34 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     lmGroup.clearLayers();
     if (!lmOn() || !LM.items.length) return;
     const z = map.getZoom(), b = map.getBounds().pad(0.25), vis = typeof rotVisTest === 'function' ? rotVisTest(0.25) : null;
-    let cand = LM.items.filter(it => (z >= 15 || it.kind === 'kaikan') && b.contains([it.lat, it.lng]) && (!vis || vis(it.lat, it.lng)));
+    // 名前がはっきり出る大きさ（各自の設定・はじめ16＝今まで）。その0.75段手前から薄く出はじめる（2026.13.145）
+    const full = typeof lmNameFull === 'function' ? lmNameFull() : 16, FADE = 0.75;
+    const nop = Math.max(0, Math.min(1, (z - (full - FADE)) / FADE));
+    // 印：今までどおり拡大15から（会館はいつも）。名前を15より縮めても出す設定のときは、名前の出はじめから印も出す
+    const markMin = Math.min(15, full - FADE);
+    let cand = LM.items.filter(it => (z >= markMin || it.kind === 'kaikan') && b.contains([it.lat, it.lng]) && (!vis || vis(it.lat, it.lng)));
     cand.sort((a, c) => lmPri(a.kind) - lmPri(c.kind));
     cand = cand.slice(0, 200);
-    const names = z >= 16;
+    const names = nop > 0;
+    // 拡大16より縮めているときは、重なる名前を出さない（会館 → 学校 → … の順に残す）。16以上は今までどおり
+    const placed = [], cull = z < 16, simpleUi = document.body.classList.contains('simple');
     cand.forEach(it => {
       L.marker([it.lat, it.lng], { pane: 'lmPane', interactive: false, keyboard: false,
         icon: L.divIcon({ className: 'lm-mark', html: `<span class="lmchip">${esc(lmKindMark(it.kind))}</span>`, iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(lmGroup);
       if (names) {
         const a = Array.from(it.name), t = a.length > 10 ? a.slice(0, 10).join('') + '…' : it.name;
+        if (cull) {
+          const p = map.latLngToContainerPoint([it.lat, it.lng]), fs = simpleUi ? 16 : 14;
+          const w = Array.from(t).length * fs + 8, r = [p.x - w / 2, p.y + 12, p.x + w / 2, p.y + 14 + fs * 1.3];
+          if (placed.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) return;
+          placed.push(r);
+        }
         L.marker([it.lat, it.lng], { pane: 'lmLabelPane', interactive: false, keyboard: false,
-          icon: L.divIcon({ className: 'lm-label', html: `<span data-notr>${esc(t)}</span>`, iconSize: [0, 0] }) }).addTo(lmGroup);
+          icon: L.divIcon({ className: 'lm-label', html: `<span data-notr${nop < 1 ? ` style="opacity:${nop.toFixed(2)}"` : ''}>${esc(t)}</span>`, iconSize: [0, 0] }) }).addTo(lmGroup);
       }
     });
   }
+  window.lmRepaint = () => { try { lmRender(); } catch (e) { console.error(e); } }; // 歯車の「目印の名前」を変えたとき
   /* 凡例（「?」）の中：目印を出す（入／切）・印の見かた・出典 */
   function lmLegendPaint() {
     const lg = document.getElementById('legend'); if (!lg) return;

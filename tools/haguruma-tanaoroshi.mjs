@@ -60,10 +60,17 @@ function collectInPage() {
   S.querySelectorAll('[data-kilang]').forEach(e => add(`kilang:${e.getAttribute('data-kilang')}`));
   S.querySelectorAll('[data-kimissing]').forEach(() => add('kimissing'));
   S.querySelectorAll('[data-dg-list]').forEach(() => add('dg-list'));
-  ['uiPct', 'uiPct100', 'uiSplash', 'uiSplashTry', 'uiLabOp', 'uiLineOp', 'wheel', 'lbar', 'uiReset', 'kgTileClear'].forEach(id => { if (S.querySelector('#' + id)) add('id:' + id); });
+  ['uiPct', 'uiPct100', 'uiSplash', 'uiSplashTry', 'uiLabOp', 'uiLineOp', 'uiLmZ', 'wheel', 'lbar', 'uiReset', 'kgTileClear'].forEach(id => { if (S.querySelector('#' + id)) add('id:' + id); });
   S.querySelectorAll('[data-nz]').forEach(e => add(`nz:${e.dataset.nz}`));
   if (S.querySelector('[data-close]')) add('close');
   if (S.querySelector('.appver')) add('appver');
+  // 文字（見出し・項目名・説明・ボタン）：場所が変わっても、文が消えていないかを見る（監査 Minor6）
+  const norm = t => t.replace(/\s+/g, ' ').trim();
+  S.querySelectorAll('h2,h3,p.q,.featrow b,.featrow small,.hint,summary,button,.nzlabel,.nzends span').forEach(e => {
+    if (e.closest('.setcats') || e.matches('[data-uiback]')) return;   // 目次の行と「‹ 設定」は新しい形だけのもの
+    const t = norm(e.textContent || '').replace(/\(\d+\)/g, '(n)'); // 「翻訳されていない文字のコピー（39）」の数は、そのときどきで変わる
+    if (t && !/版 \d{4}\.\d+\.\d+/.test(t)) add('text:' + t);
+  });
   return [...out];
 }
 
@@ -129,17 +136,22 @@ async function main() {
   }
   if (CHECK) {
     const before = JSON.parse(fs.readFileSync(CHECK, 'utf8')).conditions;
-    let miss = 0, ok = 0, added = new Set();
+    // わざと変えた文字（指示書どおり）：見出し「地図に出す名前」→「建物の名前」、「奉仕の予定」→「ホームに出すもの」の中へ
+    const ALLOWED_GONE = new Set(['text:地図に出す名前', 'text:奉仕の予定', 'text:Nombres en el mapa', 'text:Agenda de predicación']);
+    const JP = /[\u3040-\u30ff\u4e00-\u9fff]/;
+    let miss = 0, ok = 0, added = new Set(), allowed = new Set();
     for (const [k, b] of Object.entries(before)) {
       const a = result[k];
       if (!a) { console.log(`✕ 条件がありません：${k}`); miss++; continue; }
       const have = new Set(a.items);
-      const lost = b.items.filter(x => !have.has(x));
+      // スペイン語で、前は日本語のまま出ていた文が訳されて消えたものも数えない（訳が入っただけ）
+      const lost = b.items.filter(x => !have.has(x) && !(ALLOWED_GONE.has(x) && allowed.add(x)) && !(k.startsWith('es|') && x.startsWith('text:') && JP.test(x) && allowed.add(x + '（訳が入った）')));
       if (lost.length) { miss += lost.length; console.log(`✕ ${k}（開いた画面 ${a.view}）で無くなった部品：${lost.join('、')}`); }
       else ok++;
       a.items.filter(x => !b.items.includes(x)).forEach(x => added.add(x));
     }
     console.log(`条件 ${Object.keys(before).length} のうち ${ok} は全部の部品あり。無くなった部品 ${miss}`);
+    console.log(`わざと変えた文字（数えない）：${[...allowed].join('、') || 'なし'}`);
     console.log(`新しく増えた部品の種類：${[...added].sort().join('、') || 'なし'}`);
     if (miss || errors.length) { console.log('結果：不合格'); process.exit(1); }
     console.log('結果：合格（今ある部品は全部残っています）');

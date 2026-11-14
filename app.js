@@ -10478,8 +10478,21 @@ function nameZoomSlider(key) {
     <input type="range" class="nzrange" data-nz="${key}" min="-2" max="3" step="0.5" value="${v}" aria-label="名前を出す大きさ">
     <p class="nzends"><span>← 縮めても出す</span><span>拡大したときだけ →</span></p></div>`;
 }
+/* 目印（会館・学校など）の名前が、はっきり出る地図の大きさ（各自・はじめ16＝今まで）。その少し手前（0.75段）から薄く出はじめる（2026.13.145）
+   地図の場所を見つけるためのものなので、いちばん左は地域の全体が見えているときから出せる */
+const lmNameFull = () => { const v = Number(UI.lmNameZ); return isFinite(v) && v > 0 ? Math.max(11, Math.min(19, v)) : 16; };
+function lmNameZText(v) {
+  return v <= 12.5 ? '地域の全体が見えているときから' : v <= 13.5 ? '町がいくつか見えるときから' : v <= 14.5 ? '町が1つ見えるくらいから'
+    : v <= 15.5 ? '区域がいくつか見えるくらいから' : v <= 16.5 ? '区域1つくらいから' : v <= 17.5 ? '通りが見えるくらいから' : '家がよく見えるときだけ';
+}
+function lmNameSlider() {
+  const v = lmNameFull();
+  return `<div class="nzbox"><p class="nzlabel">はっきり出る大きさ：<b id="uiLmZOut">${lmNameZText(v)}</b></p>
+    <input type="range" class="nzrange" id="uiLmZ" min="12" max="18" step="0.5" value="${v}" aria-label="目印の名前を出す大きさ">
+    <p class="nzends"><span>← 全体でも出す</span><span>拡大したときだけ →</span></p></div>`;
+}
 const ICONS = ['区', '家', '図', '心', '🏠', '🗺️', '📖', '🚪', '✅', '⭐', '🚶', '☀️'];
-const UI_DEFAULT = { fTime: 'off', fTimer: 'on', hello: 'on', fFollow: 'off', todayOn: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', labOp: 40, lineOp: 35, mapRot: 'on', mode: 'simple', size: 'normal', pct: 0, icon: '区', iconText: '', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
+const UI_DEFAULT = { fTime: 'off', fTimer: 'on', hello: 'on', fFollow: 'off', todayOn: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', labOp: 40, lineOp: 35, lmNameZ: 16, mapRot: 'on', mode: 'simple', size: 'normal', pct: 0, icon: '区', iconText: '', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
 /* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
   standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
@@ -10888,12 +10901,12 @@ function openUiSheet() {
     let b;
     if (!det) {
       // かんたんモード：目次にせず1画面（地図の見た目・画面の見え方・文字の大きさ・番号と線の濃さ・機能をふやす・はじめの案内・使い方の動画・言語）
-      b = `<h2 id="sheetTitle" tabindex="-1">設定</h2>` + S_BASE + S_VIEW + S_TEXT + S_NOUDO +
+      b = `<h2 id="sheetTitle" class="uititle" tabindex="-1">設定</h2>` + S_BASE + S_VIEW + S_TEXT + S_NOUDO +
         `<details class="kmore"${uiKOpen ? ' open' : ''}><summary>機能をふやす</summary>${F_FEAT}</details>` +
         S_GUIDE_SIMPLE + uiSlot('start') + (window.KI ? KI.picker(false) : '') +
         `<p class="hint">「くわしく」にすると、テーマの色・文字の種類・地図の印の大きさなども、自分の好みに変えられます。</p>` + tail;
     } else if (page === 'top') {
-      b = `<h2 id="sheetTitle" tabindex="-1">設定</h2>` + S_BASE + S_VIEW + uiCatList() + tail;
+      b = `<h2 id="sheetTitle" class="uititle" tabindex="-1">設定</h2>` + S_BASE + S_VIEW + uiCatList() + tail;
     } else {
       const cat = UI_CATS.find(c => c[0] === page);
       let body = '';
@@ -10933,6 +10946,7 @@ function openUiSheet() {
         <div class="featrow"><p><b>学校・役所・お店などの名前</b><small>家の種別をえらんで、名前を入れた建物です</small></p>${seg('fcName', [['off', '出さない'], ['on', '出す']])}
           ${UI.fcName === 'on' ? nameZoomSlider('fcZoom') : ''}</div>
         ${UI.aptName === 'on' || UI.fcName === 'on' ? `<div class="featrow"><p><b>名前を出す範囲</b><small>「全体」にすると、区域をえらんでいるときも、ほかの区域の建物の名前が薄く出ます</small></p>${seg('nameScope', [['sel', 'えらんだ区域だけ'], ['all', '地図に見えている全体']], UI.nameScope || 'sel')}</div>` : ''}
+        <div class="featrow"><p><b>目印（会館・学校など）の名前</b><small>地図の場所を見つけやすくするための名前です。左にするほど、地図を縮めても出ます。縮めたときに重なる名前は出しません（会館・学校を先に出します）</small></p>${lmNameSlider()}</div>
         <h3 class="sub">自分の区域を回るとき</h3>
         <p class="q">自分の区域を回るときの表示</p>${seg('round', [['reco', 'おすすめ順'], ['progress', '進み具合']], me().roundMode || 'reco')}
         ${uiSlot('map')}`;
@@ -10950,7 +10964,7 @@ function openUiSheet() {
       } else if (page === 'lang') {
         body = window.KI ? KI.picker(false, { noHead: true }) : '';
       }
-      b = `<button type="button" class="btn back" data-uiback>‹ 設定</button><h2 id="sheetTitle" tabindex="-1"${page === 'lang' ? ' data-notr' : ''}>${cat ? cat[1] : '設定'}</h2>` + body +
+      b = `<button type="button" class="btn back" data-uiback>‹ 設定</button><h2 id="sheetTitle" class="uititle" tabindex="-1"${page === 'lang' ? ' data-notr' : ''}>${cat ? cat[1] : '設定'}</h2>` + body +
         `<button class="btn primary block" data-close>閉じる</button>`;
     }
     b = `<div class="grabrow"><span class="grab" aria-hidden="true"></span><button type="button" class="xmini" data-close aria-label="閉じる">×</button></div><p class="grabhint">下にスワイプすると、設定を残して閉じます</p>` + b;
@@ -10991,6 +11005,12 @@ function openUiSheet() {
       rs.oninput = () => { $('#uiSplashOut').textContent = rs.value + '秒'; };
       rs.onchange = () => { UI.splashSec = Number(rs.value); uiSave(); };
       $('#uiSplashTry').onclick = () => { closeSheet(); splashAgain(true); };
+    }
+    // 目印の名前を出す大きさ：動かしている間は文字だけ、指をはなしたら保存して地図に出す
+    if ($('#uiLmZ')) {
+      const rz = $('#uiLmZ');
+      rz.oninput = () => { $('#uiLmZOut').textContent = lmNameZText(Number(rz.value)); };
+      rz.onchange = () => { UI.lmNameZ = Number(rz.value); uiSave(); if (typeof window.lmRepaint === 'function') window.lmRepaint(); };
     }
     $$('[data-nz]', $('#sheet')).forEach(r => {
       const k = r.dataset.nz;
@@ -11041,7 +11061,9 @@ function openUiSheet() {
   };
   /* 目次（くわしいモードの最初の画面）。今の設定の1行は、言葉ごとに span に分ける（スペイン語の辞書で1つずつ訳せるように） */
   function uiCatList() {
-    const dot = '<span class="dot" aria-hidden="true" data-notr>' + (window.KI && KI.lang !== 'ja' ? ' · ' : '・') + '</span>';
+    // 区切り：見た目は「・」、読み上げでは「、」（つながって聞こえないように・監査 Minor2）
+    const es = window.KI && KI.lang !== 'ja';
+    const dot = `<span class="dot" data-notr><span aria-hidden="true">${es ? ' · ' : '・'}</span><span class="vh">${es ? ', ' : '、'}</span></span>`;
     const line = parts => parts.filter(Boolean).map(x => `<span>${esc(x)}</span>`).join(dot);
     const on = (k, d) => (UI[k] || d) === 'on';
     const pct = Math.round(zoomOf(uiEff()) * 100);
