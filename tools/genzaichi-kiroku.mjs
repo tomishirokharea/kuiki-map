@@ -84,6 +84,31 @@ async function main() {
       await page.evaluate(() => map.setView([26.17, 127.70], 15, { animate: false })); await page.waitForTimeout(300);
       await page.click('#btnLocate'); await page.waitForTimeout(800);
       rec[`${mode}.tapAgain`] = await st(page);
+      // 青いまま、指を使わずに地図が動いたあと（区域をえらぶ・拡大縮小）にもう一度押す：現在地へもどって拡大18（スマホでも PC でも）
+      const mobileUA = () => page.evaluate(() => Object.defineProperty(navigator, 'userAgent', { configurable: true, get: () => 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36' }));
+      for (const ua of ['pc', 'phone']) {
+        if (ua === 'phone') await mobileUA();
+        await page.evaluate(() => map.setView(myPos, 18, { animate: false })); await page.click('#btnLocate'); await page.waitForTimeout(700); // 青にする（スマホ：もし向きモードに入ったら、もう一度押して出る）
+        await page.evaluate(() => { if (typeof HEAD !== 'undefined' && HEAD.on) document.getElementById('btnLocate').click(); });
+        await page.waitForTimeout(600);
+        await page.evaluate(() => { const t = D().territories.find(x => okPoly(x.polygon)); if (t) map.fitBounds(L.latLngBounds(t.polygon), { animate: false }); }); await page.waitForTimeout(300);
+        await page.click('#btnLocate'); await page.waitForTimeout(800);
+        const a = await st(page);
+        rec[`${mode}.${ua}.afterSelectTap`] = { center: a.center, zoom: a.zoom, btnOn: a.btnOn, mapDeg: a.mapDeg };
+        await page.evaluate(() => { if (typeof HEAD !== 'undefined' && HEAD.on) document.getElementById('btnLocate').click(); });
+        await page.waitForTimeout(600);
+        await page.evaluate(() => map.setZoom(14, { animate: false })); await page.waitForTimeout(300);
+        await page.click('#btnLocate'); await page.waitForTimeout(800);
+        const z = await st(page);
+        rec[`${mode}.${ua}.afterZoomTap`] = { center: z.center, zoom: z.zoom, btnOn: z.btnOn, mapDeg: z.mapDeg };
+        await page.evaluate(() => { if (typeof HEAD !== 'undefined' && HEAD.on) document.getElementById('btnLocate').click(); });
+        await page.waitForTimeout(600);
+      }
+      // PC：青いまま、現在地にいるときにもう一度押す → 今までどおり（向きモードに入らない）
+      await page.evaluate(() => Object.defineProperty(navigator, 'userAgent', { configurable: true, get: () => 'Mozilla/5.0 (X11; Linux x86_64) Chrome/130 Safari/537.36' }));
+      await page.evaluate(() => map.setView(myPos, 18, { animate: false })); await page.click('#btnLocate'); await page.waitForTimeout(700);
+      await page.click('#btnLocate'); await page.waitForTimeout(800);
+      { const a = await st(page); rec[`${mode}.pc.tapAtMe`] = { center: a.center, zoom: a.zoom, btnOn: a.btnOn, mapDeg: a.mapDeg, head: await page.evaluate(() => typeof HEAD !== 'undefined' && HEAD.on) }; }
       // 線引きなどのとき（normal 以外）はボタンを隠す
       await page.evaluate(() => setMode('draw')); await page.waitForTimeout(100);
       rec[`${mode}.drawMode`] = { btnHidden: (await st(page)).btnHidden };
@@ -105,6 +130,7 @@ async function main() {
         const orient = h => page.evaluate(hh => { for (let i = 0; i < 30; i++) window.dispatchEvent(new DeviceOrientationEvent('deviceorientationabsolute', { alpha: (360 - hh) % 360, beta: 10, gamma: 0, absolute: true })); }, h);
         const hs = () => page.evaluate(() => { const b = document.getElementById('btnLocate'), sp = HEAD.cone && HEAD.cone.getElement() && HEAD.cone.getElement().firstElementChild;
           return { on: HEAD.on, head: b.classList.contains('head'), btnOn: b.classList.contains('on'), deg: Math.round(mapDeg), cone: sp ? Math.round(parseFloat(sp.style.transform.replace('rotate(', ''))) : null }; });
+        await page.evaluate(() => Object.defineProperty(navigator, 'userAgent', { configurable: true, get: () => 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36' })); // 向きモードはスマホだけ
         await page.evaluate(() => { UI.mapRot = 'on'; uiSave(); setMapDeg(0); map.fire('dragstart'); map.setView([26.17, 127.70], 15, { animate: false }); }); // ボタンの青をいったん消す
         await page.click('#btnLocate'); await page.waitForTimeout(700);
         await page.click('#btnLocate'); await page.waitForTimeout(300);
@@ -112,6 +138,24 @@ async function main() {
         rec[`${mode}.head.east`] = await hs();
         await page.evaluate(() => map.fire('dragstart')); await page.waitForTimeout(150);
         rec[`${mode}.head.drag`] = await hs();
+        // 向きモード中に2本指でひねる → 向きモードをやめる（くわしいモードで回せる人）
+        await page.evaluate(() => { setMapDeg(0); map.setView(myPos, 18, { animate: false }); });
+        await page.click('#btnLocate'); await page.waitForTimeout(700); await page.click('#btnLocate'); await page.waitForTimeout(300); await orient(90); await page.waitForTimeout(200);
+        if (await page.evaluate(() => rotAllowed())) {
+          const box = await page.locator('#map').boundingBox(), cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+          const cdp = await page.context().newCDPSession(page);
+          const tp = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
+          await tp('touchStart', [{ x: cx - 60, y: cy, id: 1 }, { x: cx + 60, y: cy, id: 2 }]);
+          for (let i = 1; i <= 8; i++) { const a = i * 7 * Math.PI / 180; await tp('touchMove', [{ x: cx - 60 * Math.cos(a), y: cy - 60 * Math.sin(a), id: 1 }, { x: cx + 60 * Math.cos(a), y: cy + 60 * Math.sin(a), id: 2 }]); }
+          await tp('touchEnd', []);
+          await page.waitForTimeout(300);
+          rec[`${mode}.head.twist`] = { on: (await hs()).on };
+        }
+        // センサーのない端末：3秒で向きモードをやめて、青にもどす
+        await page.evaluate(() => { if (HEAD.on) document.getElementById('btnLocate').click(); map.fire('dragstart'); map.setView(myPos, 18, { animate: false }); });
+        await page.waitForTimeout(500);
+        await page.click('#btnLocate'); await page.waitForTimeout(700); await page.click('#btnLocate'); await page.waitForTimeout(3500);
+        rec[`${mode}.head.noSensor`] = await hs();
       }
       errors.push(...page.errs.map(e => mode + ': ' + e));
       await ctx.close();

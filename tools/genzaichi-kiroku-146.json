@@ -1,5 +1,5 @@
 {
- "made": "2026-11-14T02:48:37.366Z",
+ "made": "2026-11-14T03:07:53.498Z",
  "rec": {
   "detail.before": {
    "myPos": null,
@@ -66,6 +66,52 @@
    "mapDeg": 0,
    "northHidden": true
   },
+  "detail.pc.afterSelectTap": {
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "mapDeg": 0
+  },
+  "detail.pc.afterZoomTap": {
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "mapDeg": 0
+  },
+  "detail.phone.afterSelectTap": {
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "mapDeg": 0
+  },
+  "detail.phone.afterZoomTap": {
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "mapDeg": 0
+  },
+  "detail.pc.tapAtMe": {
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "mapDeg": 0,
+   "head": false
+  },
   "detail.drawMode": {
    "btnHidden": true
   },
@@ -103,6 +149,16 @@
    "head": false,
    "btnOn": false,
    "deg": -90,
+   "cone": null
+  },
+  "detail.head.twist": {
+   "on": false
+  },
+  "detail.head.noSensor": {
+   "on": false,
+   "head": false,
+   "btnOn": true,
+   "deg": -48,
    "cone": null
   },
   "detail.denied": {
@@ -176,6 +232,52 @@
    "mapDeg": 0,
    "northHidden": true
   },
+  "simple.pc.afterSelectTap": {
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "mapDeg": 0
+  },
+  "simple.pc.afterZoomTap": {
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "mapDeg": 0
+  },
+  "simple.phone.afterSelectTap": {
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "mapDeg": 0
+  },
+  "simple.phone.afterZoomTap": {
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "mapDeg": 0
+  },
+  "simple.pc.tapAtMe": {
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "mapDeg": 0,
+   "head": false
+  },
   "simple.drawMode": {
    "btnHidden": true
   },
@@ -208,6 +310,13 @@
    "on": false,
    "head": false,
    "btnOn": false,
+   "deg": 0,
+   "cone": null
+  },
+  "simple.head.noSensor": {
+   "on": false,
+   "head": false,
+   "btnOn": true,
    "deg": 0,
    "cone": null
   },
