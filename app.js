@@ -10487,7 +10487,7 @@ function drawPos(p) {
      かんたんモード・「回さない」の人は地図は回さず、扇形だけ
    ・地図を指で動かす・地図の画面を離れる・アプリを閉じる・線引きなどにすると終わる（電池のため）。ボタンをもう一度押すと、北が上の地図にもどる
    ・位置と向きはスマホの中だけで使う（サーバーには送らない） */
-const HEAD = { on: false, watch: null, sm: null, raf: 0, gotAt: 0, cone: null, ev: null, timer: 0, drawDeg: 0, drawAt: 0 };
+const HEAD = { on: false, na: false, watch: null, sm: null, raf: 0, gotAt: 0, cone: null, ev: null, timer: 0, drawDeg: 0, drawAt: 0 };
 function headingOf(e) {
   let h = null;
   if (typeof e.webkitCompassHeading === 'number' && isFinite(e.webkitCompassHeading) && e.webkitCompassHeading >= 0) h = e.webkitCompassHeading; // iPhone：北から時計回り
@@ -10529,13 +10529,13 @@ function headApply() {
 async function startHeading() {
   const DOE = window.DeviceOrientationEvent;
   if (!DOE) { toast('この端末では向きが分かりません。現在地だけを出します'); return; }
-  const stillOk = () => currentView === 'map' && mode === 'normal' && !HEAD.on; // 許可の返事を待つ間に画面が変わっていないか（監査 Minor5）
+  const stillOk = () => currentView === 'map' && mode === 'normal' && !HEAD.on && $('#btnLocate').classList.contains('on'); // 許可の返事を待つ間に画面が変わった・地図を動かしたら始めない（監査 Minor5・再監査）
   // iPhone：向きのセンサーを使ってよいかを聞く（ボタンを押したときにしか聞けない）。
   // Android の Chrome にも同じ名前の関数があるが、許可されなくても向きが届くことがあるので、iPhone・iPad のときだけ止める
   if (typeof DOE.requestPermission === 'function') {
     let r = 'denied';
     try { r = await DOE.requestPermission(); } catch (e) { r = 'denied'; }
-    if (r !== 'granted' && isIOS()) { toast('向きのセンサーを使えませんでした。もう一度ためすときは、アプリを開き直して、出てくる確認で「許可」を押してください'); return; }
+    if (r !== 'granted' && isIOS()) { HEAD.na = true; toast('向きのセンサーを使えませんでした。もう一度ためすときは、アプリを開き直して、出てくる確認で「許可」を押してください'); return; }
   }
   if (!stillOk()) return;
   HEAD.on = true; HEAD.sm = null; HEAD.gotAt = 0; HEAD.drawDeg = mapDeg; HEAD.drawAt = 0;
@@ -10558,7 +10558,7 @@ async function startHeading() {
   }
   clearTimeout(HEAD.timer);
   // 3秒たっても向きが届かない（センサーのない端末）：向きモードをやめて、ふつうの現在地（青）にもどす（監査 Important3）
-  HEAD.timer = setTimeout(() => { if (HEAD.on && !HEAD.gotAt) { stopHeading(false); toast('この端末では向きが分からないため、ふつうの現在地の表示にもどしました'); } }, 3000);
+  HEAD.timer = setTimeout(() => { if (HEAD.on && !HEAD.gotAt) { HEAD.na = true; stopHeading(false); toast('この端末では向きが分からないため、ふつうの現在地の表示にもどしました'); } }, 3000);
 }
 /* 向きモードをやめる（north：北が上の地図にもどす） */
 function stopHeading(north) {
@@ -16242,7 +16242,8 @@ function bindStatic() {
     // 向きモードに入るのは、スマホで、地図が今も現在地を見ている（真ん中・拡大18以上）ときだけ。
     // 区域をえらんだ・拡大縮小したあとなどは、今までどおり現在地へもどる（監査 Important1）
     const atMe = () => { if (!myPos || map.getZoom() < 17.9) return false; const c = map.latLngToContainerPoint(map.getCenter()), q = map.latLngToContainerPoint(myPos); return c.distanceTo(q) <= 24; };
-    if (b.classList.contains('on') && mode === 'normal' && isMobile() && atMe()) { startHeading(); return; }
+    // 向きが使えないと分かった端末（センサーなし・iPhone で断った）は、この起動の間は今までどおり現在地を取り直す（再監査）
+    if (b.classList.contains('on') && mode === 'normal' && isMobile() && !HEAD.na && atMe()) { startHeading(); return; }
     locate(() => { map.setView(myPos, Math.max(map.getZoom(), 18)); b.classList.add('on'); });
   };
   map.on('dragstart', () => { $('#btnLocate').classList.remove('on'); stopHeading(false); }); // 地図を動かしたら、青い（追いかけ中の）表示と向きモードをやめる
