@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.146';
+var APP_JS_VER = '2026.13.147';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2810,6 +2810,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.147', items: [
+    ['地', 'iPhoneで、向きに合わせた地図が実際の向きと90°ほどずれることがあったのを直しました。']
+  ] },
   { v: '2026.13.146', items: [
     ['地', '地図の右下の現在地ボタンが青いときにもう一度押すと、向いている方に合わせるようにしました（Googleマップと同じ）。歩くと現在地がついてきます。地図を指で動かすか、ボタンをもう一度押すと、ふつうの地図にもどります。']
   ] },
@@ -10493,8 +10496,17 @@ function headingOf(e) {
   if (typeof e.webkitCompassHeading === 'number' && isFinite(e.webkitCompassHeading) && e.webkitCompassHeading >= 0) h = e.webkitCompassHeading; // iPhone：北から時計回り
   else if (typeof e.alpha === 'number' && isFinite(e.alpha) && (e.absolute || HEAD.ev === 'deviceorientationabsolute')) h = 360 - e.alpha;   // Android：北からの向き（反時計回り）を直す
   if (h === null) return null;
-  const so = screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle : (typeof window.orientation === 'number' ? window.orientation : 0);
-  return ((h + so) % 360 + 360) % 360; // 画面を横にしているときは、その分を足す
+  return ((h + screenAngle()) % 360 + 360) % 360; // 画面を横にしているときは、その分を足す
+}
+/* 画面を回している角度（左に回すと 90・右に回すと 270）。
+   iPhone の screen.orientation.angle は、縦のままでも 90 を返したり、横で左右が逆になったりして、向きが 90° ずれる原因になる。
+   そこで iPhone・Android の両方で意味が同じ window.orientation を先に使い、画面が縦長なのに横の値が来たときは 0 とみなす */
+function screenAngle() {
+  let a = typeof window.orientation === 'number' ? window.orientation
+    : (screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle : 0);
+  a = ((Math.round(a) % 360) + 360) % 360;
+  if ((a === 90 || a === 270) && innerHeight >= innerWidth) a = 0;
+  return a;
 }
 function headOrient(e) {
   if (!HEAD.on) return;
