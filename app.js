@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.145';
+var APP_JS_VER = '2026.13.146';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2810,6 +2810,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.146', items: [
+    ['地', '地図の右下の現在地ボタンが青いときにもう一度押すと、向いている方に合わせるようにしました（Googleマップと同じ）。歩くと現在地がついてきます。地図を指で動かすか、ボタンをもう一度押すと、ふつうの地図にもどります。']
+  ] },
   { v: '2026.13.145', items: [
     ['設', '歯車の設定を、分類ごとの目次にしました。地図の見た目（見やすい地図・地名の多い地図・写真）は、どの画面から開いても、いちばん上で変えられます。'],
     ['地', '会館・学校などの目印の名前を、地図をどのくらい縮めても出すかを選べるようにしました（歯車 → 地図 → 建物の名前）。地図を縮めて場所を探すときに使えます。']
@@ -3540,6 +3543,7 @@ function bindRotate() {
       if (Math.abs(d) < ROT_START) return;
       g.on = true; g.base = d;
       cancelAnimationFrame(rotAnim);
+      stopHeading(false); // 向きモード中に2本指でひねったら、向きモードをやめて指で回す（監査 Important2）
       map.closePopup();
     }
     setMapDeg(g.d0 + degNorm(d - g.base));
@@ -3567,7 +3571,7 @@ function bindRotate() {
   el.addEventListener('click', e => { if (Date.now() - rotEndAt < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
   map.on('resize', () => { if (mapDeg) setMapDeg(mapDeg); });
   map.on('moveend', () => { lastMoveEnd = Date.now(); });
-  $('#btnNorth').onclick = () => animateMapDeg(0);
+  $('#btnNorth').onclick = () => { stopHeading(false); animateMapDeg(0); }; // 向きモードのときは、それもやめる（Googleマップの方位のボタンと同じ）
 }
 /* 設定で「回さない」にしたとき */
 function applyRotSetting() {
@@ -4585,6 +4589,7 @@ function setMode(m) {
   toggleLegend(false);
   $('#legendBtn').hidden = m === 'draw' || m === 'sen' || m === 'tok';
   $('#btnLocate').hidden = m !== 'normal';
+  if (m !== 'normal') stopHeading(false); // 線引き・家の追加などのときは向きモードを止める
   if (map) {
     if (m === 'normal') zoomCtl.remove(); else zoomCtl.addTo(map); // ふだんは指で拡大・縮小。作業中だけ＋−を出す
     map.options.zoomDelta = m === 'draw' ? 0.25 : 1;
@@ -10455,19 +10460,118 @@ function locate(after) {
   if (lb) lb.classList.add('busy');
   navigator.geolocation.getCurrentPosition(p => {
     if (lb) lb.classList.remove('busy');
-    myPos = [p.coords.latitude, p.coords.longitude];
-    if (map) { // Googleマップのような、青い点と、だいたいの範囲の薄い円
-      if (posMarker) map.removeLayer(posMarker);
-      posMarker = L.layerGroup([
-        L.circle(myPos, { radius: Math.min(p.coords.accuracy || 30, 300), color: '#1A73E8', weight: 1, opacity: 0.35, fillColor: '#1A73E8', fillOpacity: 0.12, interactive: false }),
-        L.circleMarker(myPos, { radius: 9, color: '#fff', weight: 3, fillColor: '#1A73E8', fillOpacity: 1, interactive: false })
-      ]).addTo(map);
-    }
+    drawPos(p);
     after && after();
   }, () => {
     if (lb) lb.classList.remove('busy', 'on');
     toast('現在地を取得できませんでした。端末の位置情報の設定を確認してください');
   }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+/* 現在地の青い点と、だいたいの範囲の薄い円（Googleマップのような）を描く */
+function drawPos(p) {
+  myPos = [p.coords.latitude, p.coords.longitude];
+  if (!map) return;
+  if (posMarker) map.removeLayer(posMarker);
+  posMarker = L.layerGroup([
+    L.circle(myPos, { radius: Math.min(p.coords.accuracy || 30, 300), color: '#1A73E8', weight: 1, opacity: 0.35, fillColor: '#1A73E8', fillOpacity: 0.12, interactive: false }),
+    L.circleMarker(myPos, { radius: 9, color: '#fff', weight: 3, fillColor: '#1A73E8', fillOpacity: 1, interactive: false })
+  ]).addTo(map);
+  if (HEAD.cone) HEAD.cone.setLatLng(myPos);
+}
+
+/* ---------- 向きモード（2026.13.146） ----------
+   Googleマップのように、現在地ボタンが青い（現在地にいる）ときにもう一度押すと「向き」に合わせる
+   ・歩くと青い点と地図がついてくる。青い点に、スマホを向けている方の扇形を出す
+   ・地図を回せる人（くわしいモード・設定「2本指で地図を回す：回せる」）は、向いている方が上になるように地図を回す。
+     かんたんモード・「回さない」の人は地図は回さず、扇形だけ
+   ・地図を指で動かす・地図の画面を離れる・アプリを閉じる・線引きなどにすると終わる（電池のため）。ボタンをもう一度押すと、北が上の地図にもどる
+   ・位置と向きはスマホの中だけで使う（サーバーには送らない） */
+const HEAD = { on: false, na: false, watch: null, sm: null, raf: 0, gotAt: 0, cone: null, ev: null, timer: 0, drawDeg: 0, drawAt: 0 };
+function headingOf(e) {
+  let h = null;
+  if (typeof e.webkitCompassHeading === 'number' && isFinite(e.webkitCompassHeading) && e.webkitCompassHeading >= 0) h = e.webkitCompassHeading; // iPhone：北から時計回り
+  else if (typeof e.alpha === 'number' && isFinite(e.alpha) && (e.absolute || HEAD.ev === 'deviceorientationabsolute')) h = 360 - e.alpha;   // Android：北からの向き（反時計回り）を直す
+  if (h === null) return null;
+  const so = screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle : (typeof window.orientation === 'number' ? window.orientation : 0);
+  return ((h + so) % 360 + 360) % 360; // 画面を横にしているときは、その分を足す
+}
+function headOrient(e) {
+  if (!HEAD.on) return;
+  const h = headingOf(e);
+  if (h === null) return;
+  HEAD.gotAt = Date.now();
+  // 少しの揺れでは動かさない（なめらかにする）
+  HEAD.sm = HEAD.sm === null ? h : ((HEAD.sm + degNorm(h - HEAD.sm) * 0.25) % 360 + 360) % 360;
+  if (!HEAD.raf) HEAD.raf = requestAnimationFrame(headApply);
+}
+function headApply() {
+  HEAD.raf = 0;
+  if (!HEAD.on || HEAD.sm === null || !map) return;
+  if (!HEAD.cone && myPos) {
+    HEAD.cone = L.marker(myPos, { pane: 'headPane', interactive: false, keyboard: false,
+      icon: L.divIcon({ className: 'headcone', iconSize: [96, 96], iconAnchor: [48, 48],
+        html: '<span><svg viewBox="0 0 96 96" aria-hidden="true"><defs><radialGradient id="hcGrad" cx="50%" cy="100%" r="100%"><stop offset="0" stop-color="#1A73E8" stop-opacity=".5"/><stop offset="1" stop-color="#1A73E8" stop-opacity="0"/></radialGradient></defs><path d="M48 48 L28 3 A48 48 0 0 1 68 3 Z" fill="url(#hcGrad)"/></svg></span>' }) }).addTo(map);
+  }
+  if (rotAllowed()) {
+    const to = -HEAD.sm;
+    if (Math.abs(degNorm(to - mapDeg)) > 2) setMapDeg(to);
+    // 回したあと、四すみの家の印・区域の番号を出し直す（なんども描き直さないように間をあける）
+    if (Math.abs(degNorm(mapDeg - HEAD.drawDeg)) > 8 && Date.now() - HEAD.drawAt > 700) {
+      HEAD.drawDeg = mapDeg; HEAD.drawAt = Date.now();
+      renderHouses(); if (window.repaintTerrLabels) repaintTerrLabels();
+    }
+  }
+  const el = HEAD.cone && HEAD.cone.getElement();
+  const sp = el && el.firstElementChild;
+  if (sp) sp.style.transform = `rotate(${HEAD.sm + mapDeg}deg)`; // 画面の上での向き（地図を回した分も足す）
+}
+async function startHeading() {
+  const DOE = window.DeviceOrientationEvent;
+  if (!DOE) { toast('この端末では向きが分かりません。現在地だけを出します'); return; }
+  const stillOk = () => currentView === 'map' && mode === 'normal' && !HEAD.on && $('#btnLocate').classList.contains('on'); // 許可の返事を待つ間に画面が変わった・地図を動かしたら始めない（監査 Minor5・再監査）
+  // iPhone：向きのセンサーを使ってよいかを聞く（ボタンを押したときにしか聞けない）。
+  // Android の Chrome にも同じ名前の関数があるが、許可されなくても向きが届くことがあるので、iPhone・iPad のときだけ止める
+  if (typeof DOE.requestPermission === 'function') {
+    let r = 'denied';
+    try { r = await DOE.requestPermission(); } catch (e) { r = 'denied'; }
+    if (r !== 'granted' && isIOS()) { HEAD.na = true; toast('向きのセンサーを使えませんでした。もう一度ためすときは、アプリを開き直して、出てくる確認で「許可」を押してください'); return; }
+  }
+  if (!stillOk()) return;
+  HEAD.on = true; HEAD.sm = null; HEAD.gotAt = 0; HEAD.drawDeg = mapDeg; HEAD.drawAt = 0;
+  HEAD.ev = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+  window.addEventListener(HEAD.ev, headOrient, true);
+  if (navigator.geolocation) {
+    HEAD.watch = navigator.geolocation.watchPosition(p => {
+      if (!HEAD.on) return;
+      drawPos(p);
+      // 止まっているときは地図を動かさない（家の印を何度も作り直さないように・監査 Minor4）
+      if (map) { const c = map.latLngToContainerPoint(map.getCenter()), q = map.latLngToContainerPoint(myPos); if (c.distanceTo(q) > 6) map.panTo(myPos, { animate: true, duration: 0.5 }); }
+    }, () => { /* 取れないときは前の位置のまま */ }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 });
+  }
+  const b = $('#btnLocate');
+  if (b) { b.classList.add('on', 'head'); b.setAttribute('aria-label', '向きに合わせています（押すと、北が上の地図にもどります）'); }
+  if (!lsGet('kuiki_head_tip')) {
+    lsSet('kuiki_head_tip', '1');
+    toast(rotAllowed() ? '向いている方が上になるように、地図を回します。地図を指で動かすと、ふつうの地図にもどります'
+      : '青い点に、向いている方を出します。地図を指で動かすと、ふつうの地図にもどります');
+  }
+  clearTimeout(HEAD.timer);
+  // 3秒たっても向きが届かない（センサーのない端末）：向きモードをやめて、ふつうの現在地（青）にもどす（監査 Important3）
+  HEAD.timer = setTimeout(() => { if (HEAD.on && !HEAD.gotAt) { HEAD.na = true; stopHeading(false); toast('この端末では向きが分からないため、ふつうの現在地の表示にもどしました'); } }, 3000);
+}
+/* 向きモードをやめる（north：北が上の地図にもどす） */
+function stopHeading(north) {
+  if (!HEAD.on) return;
+  HEAD.on = false;
+  window.removeEventListener(HEAD.ev, headOrient, true);
+  if (HEAD.watch !== null && navigator.geolocation) navigator.geolocation.clearWatch(HEAD.watch);
+  HEAD.watch = null; clearTimeout(HEAD.timer); cancelAnimationFrame(HEAD.raf); HEAD.raf = 0;
+  if (HEAD.cone && map) map.removeLayer(HEAD.cone);
+  HEAD.cone = null;
+  const b = $('#btnLocate');
+  if (b) { b.classList.remove('head'); b.setAttribute('aria-label', '現在地を表示'); }
+  if (map && north && mapDeg) animateMapDeg(0); // 向きはそのまま残すときは、描き直さない（動かしたあとの moveend で描かれる・監査 Minor7）
 }
 
 /* ---------- 表示の設定（このスマホ・この人だけ。サーバーには送らない） ----------
@@ -15866,7 +15970,7 @@ function showView(name) {
   if (name === 'admin' && !isAdmin()) name = 'cards'; // ②の対応：グループ監督は「グループ」タブがなくなったため、係の画面には入れない
   if (name === 'follow' && !featFollow()) name = 'cards';
   if (currentView === 'map' && name !== 'map' && mode !== 'normal') { if (draw) endDraw(); else setMode('normal'); }
-  if (name !== 'map') { clearTarget(); followMap = false; hideNextPanel(); if (window.dncPickEnd) window.dncPickEnd(true); }
+  if (name !== 'map') { clearTarget(); followMap = false; hideNextPanel(); if (window.dncPickEnd) window.dncPickEnd(true); stopHeading(false); } // 地図を離れたら向きモードも止める
   if (name !== 'admin' && window.KR && KR.clear) { try { KR.clear(); } catch (e) { /* 何もしない */ } } // 係の画面を出たら、［← 状況にもどる］と光を消す
   currentView = name;
   $$('.view').forEach(v => { v.hidden = v.id !== 'view-' + name; });
@@ -16131,8 +16235,22 @@ function bindStatic() {
       if (!flushing) flush();
     }
   };
-  $('#btnLocate').onclick = () => locate(() => { map.setView(myPos, Math.max(map.getZoom(), 18)); $('#btnLocate').classList.add('on'); });
-  map.on('dragstart', () => $('#btnLocate').classList.remove('on')); // 地図を動かしたら、青い（追いかけ中の）表示をやめる
+  // 現在地ボタン：1回目は今までどおり現在地へ。青い（現在地にいる）ときにもう一度押すと向きモード、向きモードで押すと北が上にもどる（2026.13.146）
+  $('#btnLocate').onclick = () => {
+    const b = $('#btnLocate');
+    if (HEAD.on) { stopHeading(true); if (myPos) map.setView(myPos, Math.max(map.getZoom(), 18)); b.classList.add('on'); return; }
+    // 向きモードに入るのは、スマホで、地図が今も現在地を見ている（真ん中・拡大18以上）ときだけ。
+    // 区域をえらんだ・拡大縮小したあとなどは、今までどおり現在地へもどる（監査 Important1）
+    const atMe = () => { if (!myPos || map.getZoom() < 17.9) return false; const c = map.latLngToContainerPoint(map.getCenter()), q = map.latLngToContainerPoint(myPos); return c.distanceTo(q) <= 24; };
+    // 向きが使えないと分かった端末（センサーなし・iPhone で断った）は、この起動の間は今までどおり現在地を取り直す（再監査）
+    if (b.classList.contains('on') && mode === 'normal' && isMobile() && !HEAD.na && atMe()) { startHeading(); return; }
+    locate(() => { map.setView(myPos, Math.max(map.getZoom(), 18)); b.classList.add('on'); });
+  };
+  map.on('dragstart', () => { $('#btnLocate').classList.remove('on'); stopHeading(false); }); // 地図を動かしたら、青い（追いかけ中の）表示と向きモードをやめる
+  map.createPane('headPane'); // 向きの扇形：青い点（overlayPane 400）のすぐ下
+  map.getPane('headPane').style.zIndex = 399;
+  map.getPane('headPane').style.pointerEvents = 'none';
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stopHeading(false); }); // アプリを閉じたら止める（電池のため）
   $('#zoomHint').onclick = () => { clearTimeout(zoomHintTimer); $('#zoomHint').hidden = true; };
   // 「?」：下の案内を隠しているときは、まず案内をもう一度出す。出ているときは印の見かたを開く
   $('#legendBtn').onclick = () => {
