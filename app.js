@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.144';
+var APP_JS_VER = '2026.13.145';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2810,6 +2810,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.145', items: [
+    ['設', '歯車の設定を、分類ごとの目次にしました。地図の見た目（見やすい地図・地名の多い地図・写真）は、どの画面から開いても、いちばん上で変えられます。']
+  ] },
   { v: '2026.13.144', items: [
     ['地', '地図の区域の番号を、白い札から白いふちの文字に変え、番号と区域の線をうすくしました。地図の地名や道が見やすくなります。濃さは、地図の画面の歯車（設定）の「区域の番号の濃さ」「区域の線の濃さ」で、自分に合うように変えられます。区域をえらぶと、その区域の番号と線は濃く出ます。']
   ] },
@@ -10802,15 +10805,34 @@ function setBase(name) {
     if (name === 'pale') { baseLayers.paleLow.addTo(map); baseLayers.paleLow.bringToBack(); } else map.removeLayer(baseLayers.paleLow);
   }
 }
+/* 歯車の設定に、ほかのファイルが部品を差しこむ口（2026.13.145）。文字の置きかえで差しこむと、目印の文が変わったときに黙って消えるため
+   feat：使う機能（おすすめのタブ・ふり返り）／map：地図（保存した地図）／start：起動と案内（使い方の動画）
+   UI_AFTER：シートを作ったあとに呼ぶ（差しこんだ部品の後処理） */
+window.UI_SLOTS = window.UI_SLOTS || { feat: [], map: [], start: [] };
+window.UI_AFTER = window.UI_AFTER || [];
+const uiSlot = name => (window.UI_SLOTS[name] || []).map(f => { try { return f() || ''; } catch (e) { console.error(e); return ''; } }).join('');
+let uiKOpen = false; // かんたんモードの「機能をふやす」を開いていたか（開き直しても覚えておく）
+/* 歯車の目次の6つの分類（id・名前・アイコンの線） */
+const UI_CATS = [
+  ['text', '文字と色', '<path d="M4 19 10 5l6 14M6.5 14h7"/><circle cx="18.5" cy="16.5" r="2.5"/>'],
+  ['map', '地図', '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>'],
+  ['feat', '使う機能', '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 12l3 3 5-6"/>'],
+  ['show', '画面に出すもの', '<rect x="5" y="2" width="14" height="20" rx="3"/><path d="M9 7h6M9 11h6M9 15h4"/>'],
+  ['start', '起動と案内', '<circle cx="12" cy="12" r="9"/><path d="M10 8.5l5.5 3.5-5.5 3.5z"/>'],
+  ['lang', '言語 / Idioma', '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>']
+];
 function openUiSheet() {
   const tab = currentView;
+  // page：'top'（最初の画面）か、分類（text・map・feat・show・start・lang）。歯車を開くたびに最初の画面から
+  let page = 'top', lastCat = null;
   const paint = keep => {
     const top = keep ? $('#sheet').scrollTop : 0, det = UI.mode === 'detail';
+    if (!det) page = 'top'; // かんたんモードは目次にしない（1画面）
     const seg = (key, opts, cur, cls) => `<div class="seg uiseg${cls ? ' ' + cls : ''}" role="group">${opts.map(([v, l]) =>
       `<button type="button" data-ui="${key}" data-v="${v}" aria-pressed="${(cur === undefined ? UI[key] : cur) === v}">${l}</button>`).join('')}</div>`;
     const sizeOpts = (det ? ['small', 'normal', 'large', 'xlarge'] : ['normal', 'large', 'xlarge']).map(k => [k, SIZES[k][1]]);
     const SAMPLE = 'あいう 区域マップ';
-    if (det) Object.keys(FONTS).forEach(k => loadFont(k, SAMPLE + FONTS[k][1]));
+    if (det && page === 'text') Object.keys(FONTS).forEach(k => loadFont(k, SAMPLE + FONTS[k][1]));
     const pct = Math.round(zoomOf(uiEff()) * 100);
     const S_SIZE = det
       ? `<p class="q">文字の大きさ</p>
@@ -10824,55 +10846,59 @@ function openUiSheet() {
            `<button type="button" class="fontbtn" data-ui="font" data-v="${k}" aria-pressed="${UI.font === k}" style="font-family:${esc(fontStack(k))}"><span>${SAMPLE}</span><small>${v[1]}（${v[3]}）</small></button>`).join('')}</div>
          <p class="hint">手書きやポップの文字は、かわいい反面、読みにくいことがあります。数字や小さい文字が読みにくいときは「見やすいゴシック」にもどしてください。</p>
          <p class="q">文字や線のこさ</p>${seg('contrast', [['normal', '標準'], ['strong', 'くっきり']])}` : '');
-    const S_FEAT = `<h3 class="sub feathead">使う機能</h3>
-      <p class="hint">はじめは、区域を回って「会えた・留守」を記録するだけの、かんたんな形です。必要な機能だけ「使う」にしてください。</p>
+    // 使う機能（奉仕時間・タイマー・再訪問）
+    const F_FEAT = `<p class="hint">はじめは、区域を回って「会えた・留守」を記録するだけの、かんたんな形です。必要な機能だけ「使う」にしてください。</p>
       <div class="featrow"><p><b>奉仕時間</b><small>時間を残す・今月の目標と計画・月末の奉仕報告</small></p>${seg('fTime', [['off', '使わない'], ['on', '使う']])}</div>
       ${featTime() ? `<div class="featrow sub2"><p><b>タイマー</b><small>使う：「奉仕スタート」「奉仕終了」を押すだけで時間を記録します。月末の夜8時すぎには、奉仕報告の画面を出します。<br>使わない：ホームで、今日の時間を時間と分のダイヤルで入れます</small></p>${seg('fTimer', [['on', '使う'], ['off', '使わない']], UI.fTimer || 'on')}</div>` : ''}
       <div class="featrow"><p><b>再訪問</b><small>会えたあとに「再訪問する」をえらぶと、メモを残して、下の「再訪問」タブで管理できます（メモは${memoSyncOn() ? '暗号化して、同じ人のほかの端末とも同じになります' : 'このスマホの中だけ'}）</small></p>${seg('fFollow', [['off', '使わない'], ['on', '使う']])}</div>
-      <h3 class="sub">ホームに出すもの</h3>
-      <div class="featrow"><p><b>毎日はじめのひと言</b><small>その日はじめて開いたときに、ひと言・今日の目標・今の時間帯におすすめの家を出します（まわりをさわると閉じます）</small></p>${seg('hello', [['on', '出す'], ['off', '出さない']], UI.hello || 'on')}</div>
-      <div class="featrow"><p><b>今日やること</b><small>今日の集まり・自分の予定・再訪問の約束・区域カード・今がチャンスの留守宅カードを、ホームのいちばん上にまとめます</small></p>${seg('todayOn', [['off', '出さない'], ['on', '出す']])}</div>
+      ${uiSlot('feat')}`;
+    // 画面に出すもの（ホーム・区域カード・家の画面）
+    const F_SHOW = `<h3 class="sub feathead">ホームに出すもの</h3>
+      <div class="featrow"><p><b>毎日はじめのひと言</b><small>その日はじめて開いたときに、ひと言・今日の目標を出します（まわりをさわると閉じます）</small></p>${seg('hello', [['on', '出す'], ['off', '出さない']], UI.hello || 'on')}</div>
+      <div class="featrow"><p><b>今日やること</b><small>今日の集まり・自分の予定・再訪問の約束・区域カードを、ホームのいちばん上にまとめます</small></p>${seg('todayOn', [['off', '出さない'], ['on', '出す']])}</div>
+      <div class="featrow"><p><b>予定の一覧</b><small>ホームの「奉仕の予定」で、カレンダーの下の一覧に出す予定</small></p>${seg('calList', [['upcoming', '今日から'], ['all', 'その月すべて']], UI.calList || 'upcoming')}</div>
       <h3 class="sub">区域カードに出すもの</h3>
       <div class="featrow"><p><b>進み具合</b><small>受け取ってから訪ねた家・部屋の数と、横のバー</small></p>${seg('cProg', [['off', '出さない'], ['on', '出す']])}</div>
       <div class="featrow"><p><b>今のおすすめ</b><small>今の時間帯に訪ねるとよい家の数</small></p>${seg('cReco', [['off', '出さない'], ['on', '出す']])}</div>
-      <h3 class="sub">地図に出す名前</h3>
-      <div class="featrow"><p><b>マンション・アパートの名前</b><small>はじめは、区域カードから地図を開いたときの大きさから出ます</small></p>${seg('aptName', [['off', '出さない'], ['on', '出す']])}
-        ${UI.aptName === 'on' ? nameZoomSlider('aptZoom') : ''}</div>
-      <div class="featrow"><p><b>学校・役所・お店などの名前</b><small>家の種別をえらんで、名前を入れた建物です</small></p>${seg('fcName', [['off', '出さない'], ['on', '出す']])}
-        ${UI.fcName === 'on' ? nameZoomSlider('fcZoom') : ''}</div>
-      ${UI.aptName === 'on' || UI.fcName === 'on' ? `<div class="featrow"><p><b>名前を出す範囲</b><small>「全体」にすると、区域をえらんでいるときも、ほかの区域の建物の名前が薄く出ます</small></p>${seg('nameScope', [['sel', 'えらんだ区域だけ'], ['all', '地図に見えている全体']], UI.nameScope || 'sel')}</div>` : ''}
-      <h3 class="sub">奉仕の予定</h3>
-      <div class="featrow"><p><b>予定の一覧</b><small>ホームの「奉仕の予定」で、カレンダーの下の一覧に出す予定</small></p>${seg('calList', [['upcoming', '今日から'], ['all', 'その月すべて']], UI.calList || 'upcoming')}</div>
       <h3 class="sub">家の画面に出すもの</h3>
       <div class="featrow"><p><b>これまで留守だった時間帯</b><small>「平日の朝・土日の昼に留守でした。ほかの時間帯に訪ねてみてください」の案内</small></p>${seg('cSlot', [['off', '出さない'], ['on', '出す']])}</div>`;
-    // 地図の画面から開いたときは、地図の見た目（ふつうの地図／写真）をいちばん上に出す
-    const S_BASE = tab === 'map' ? `<h3 class="sub feathead">地図の見た目</h3>
+    // 地図の見た目：どの画面から開いても出す（地図を作る前でも、自分の選びが分かるように baseWant を使う）
+    const bw = typeof window.baseWant === 'function' ? window.baseWant() : baseName;
+    const S_BASE = `<h3 class="sub feathead">地図の見た目</h3>
       <div class="choices two basepick">
-        <button class="choice${baseName === 'pale' ? ' on' : ''}" data-ui="base" data-v="pale" aria-pressed="${baseName === 'pale'}"><i class="bprev pale"></i>地図</button>
-        <button class="choice${baseName === 'photo' ? ' on' : ''}" data-ui="base" data-v="photo" aria-pressed="${baseName === 'photo'}"><i class="bprev photo"></i>写真<small>空から見た写真</small></button>
-      </div>
-      <p class="q">区域の線の色</p>
-      <div class="linecolors">${Object.entries(TERR_COLORS).map(([k, v]) =>
-        `<button type="button" class="lcbtn" data-ui="terrColor" data-v="${k}" aria-pressed="${(UI.terrColor || 'theme') === k}"><i style="background:${k === 'theme' ? accentColor() : v[0]}"></i>${v[1]}</button>`).join('')}</div>
-      <p class="q">区域の線の太さ</p>${seg('terrWidth', [['thin', '細い'], ['normal', 'ふつう'], ['thick', '太い']], UI.terrWidth || 'normal')}
-      <div class="noudo">
+        <button class="choice${bw === 'pale' ? ' on' : ''}" data-ui="base" data-v="pale" aria-pressed="${bw === 'pale'}"><i class="bprev pale"></i>地図</button>
+        <button class="choice${bw === 'photo' ? ' on' : ''}" data-ui="base" data-v="photo" aria-pressed="${bw === 'photo'}"><i class="bprev photo"></i>写真<small>空から見た写真</small></button>
+      </div>`;
+    const S_NOUDO = `<div class="noudo">
         <p class="q">区域の番号の濃さ</p>
         <div class="zoomrow"><input type="range" id="uiLabOp" min="0" max="100" step="5" value="${Math.round(terrLabOp() * 100)}" aria-label="区域の番号の濃さ（％）"><output id="uiLabOpOut">${Math.round(terrLabOp() * 100)}%</output></div>
         <p class="q">区域の線の濃さ</p>
         <div class="zoomrow"><input type="range" id="uiLineOp" min="0" max="100" step="5" value="${Math.round(terrLineOp() * 100)}" aria-label="区域の線の濃さ（％）"><output id="uiLineOpOut">${Math.round(terrLineOp() * 100)}%</output></div>
         <p class="hint hint-must">0%にすると見えなくなります。区域をえらぶと、その区域の番号と線は濃く出ます。</p>
-      </div>
-      ${rotSupported() ? `<p class="q">2本指で地図を回す</p>${seg('mapRot', [['on', '回せる'], ['off', '回さない']], UI.mapRot || 'on')}
-      <p class="hint">2本の指でひねるように動かすと、地図の向きが変わります。右下の「北」のボタンで、北が上にもどります。</p>` : ''}` : '';
-    let S_VIEW = `<h3 class="sub feathead">画面の見え方</h3>
+      </div>`;
+    const S_VIEW = `<h3 class="sub feathead">画面の見え方</h3>
       <div class="choices two">
         <button class="choice${det ? '' : ' on'}" data-ui="mode" data-v="simple" aria-pressed="${!det}">かんたん<small>文字の大きさだけ</small></button>
         <button class="choice${det ? ' on' : ''}" data-ui="mode" data-v="detail" aria-pressed="${det}">くわしく<small>色・文字・地図など</small></button>
       </div>`;
+    const S_GUIDE_SIMPLE = `<p class="q">はじめの案内（使い方の動画のお知らせなど）</p>${seg('guide', [['auto', '最初の数日だけ'], ['on', 'いつも出す'], ['off', '出さない']], UI.guide || 'auto')}`;
+    const tail = `<button class="btn block" id="uiReset">見え方を最初にもどす</button><button class="btn primary block" data-close>閉じる</button>` +
+      // この端末で動いているアプリの版（更新が届いたかを、だれでも確かめられるように。2026-10-29）
+      `<p class="muted appver" style="text-align:center;margin-top:12px;font-size:15px">区域マップ 版 ${esc(APP_VERSION)}</p>`; // hint は「説明を出さない」で消えるので使わない
+    let b;
     if (!det) {
-      S_VIEW += S_TEXT + `<p class="q">はじめの案内（使い方の動画のお知らせなど）</p>${seg('guide', [['auto', '最初の数日だけ'], ['on', 'いつも出す'], ['off', '出さない']], UI.guide || 'auto')}<p class="hint">「くわしく」にすると、テーマの色・文字の種類・地図の印の大きさなども、自分の好みに変えられます。</p>`;
+      // かんたんモード：目次にせず1画面（地図の見た目・画面の見え方・文字の大きさ・番号と線の濃さ・機能をふやす・はじめの案内・使い方の動画・言語）
+      b = `<h2 id="sheetTitle" tabindex="-1">設定</h2>` + S_BASE + S_VIEW + S_TEXT + S_NOUDO +
+        `<details class="kmore"${uiKOpen ? ' open' : ''}><summary>機能をふやす</summary>${F_FEAT}</details>` +
+        S_GUIDE_SIMPLE + uiSlot('start') + (window.KI ? KI.picker(false) : '') +
+        `<p class="hint">「くわしく」にすると、テーマの色・文字の種類・地図の印の大きさなども、自分の好みに変えられます。</p>` + tail;
+    } else if (page === 'top') {
+      b = `<h2 id="sheetTitle" tabindex="-1">設定</h2>` + S_BASE + S_VIEW + uiCatList() + tail;
     } else {
-      const S_COLOR = `<h3 class="sub">テーマの色</h3>
+      const cat = UI_CATS.find(c => c[0] === page);
+      let body = '';
+      if (page === 'text') {
+        body = S_TEXT + `<h3 class="sub">テーマの色</h3>
         <p class="hint">上の帯・ボタン・区域の線や番号など、画面ぜんぶの色が変わります。</p>
         <div class="swatches">${Object.entries(THEMES).map(([k, v]) =>
           `<button type="button" class="swatch" data-ui="theme" data-v="${k}" aria-pressed="${UI.theme === k}" style="--c:${v[1]}"><i style="background:linear-gradient(135deg,${v[0]} 50%,${v[1]} 50%)"></i>${v[3]}</button>`).join('')}
@@ -10886,34 +10912,64 @@ function openUiSheet() {
             <p class="wpacc"><i id="wpAcc"></i>区域の線・番号</p>
             <p class="hint">円で色あいを、右のバーで明るさをえらびます。バーのいちばん上は白、いちばん下は黒です。帯やボタンの文字は、読みやすいように自動で白か黒になります。</p></div>
         </div>` : ''}
-        <p class="hint">地図の緑のチェック（訪ねた家）と、会えた・留守・拒否の色は変わりません。</p>`;
-      const S_SCREEN = `<h3 class="sub">画面</h3>
+        <p class="hint">地図の緑のチェック（訪ねた家）と、会えた・留守・拒否の色は変わりません。</p>
+        <h3 class="sub">画面</h3>
+        <p class="q">ボタンの間隔</p>${seg('density', [['normal', 'ゆったり'], ['compact', 'コンパクト']])}
+        <p class="q">説明の文</p>${seg('hints', [['show', '表示する'], ['hide', 'かくす']])}`;
+      } else if (page === 'map') {
+        body = `<h3 class="sub feathead">地図の印と操作</h3>
+        <p class="q">家の印の大きさ</p>${seg('pin', Object.entries(PINS).map(([k, v]) => [k, v[1]]))}
+        ${rotSupported() ? `<p class="q">2本指で地図を回す</p>${seg('mapRot', [['on', '回せる'], ['off', '回さない']], UI.mapRot || 'on')}
+        <p class="hint">2本の指でひねるように動かすと、地図の向きが変わります。右下の「北」のボタンで、北が上にもどります。</p>` : ''}
+        <h3 class="sub">区域の線と番号</h3>
+        <p class="q">区域の線の色</p>
+        <div class="linecolors">${Object.entries(TERR_COLORS).map(([k, v]) =>
+          `<button type="button" class="lcbtn" data-ui="terrColor" data-v="${k}" aria-pressed="${(UI.terrColor || 'theme') === k}"><i style="background:${k === 'theme' ? accentColor() : v[0]}"></i>${v[1]}</button>`).join('')}</div>
+        <p class="q">区域の線の太さ</p>${seg('terrWidth', [['thin', '細い'], ['normal', 'ふつう'], ['thick', '太い']], UI.terrWidth || 'normal')}
+        ${S_NOUDO}
+        <h3 class="sub">建物の名前</h3>
+        <div class="featrow"><p><b>マンション・アパートの名前</b><small>はじめは、区域カードから地図を開いたときの大きさから出ます</small></p>${seg('aptName', [['off', '出さない'], ['on', '出す']])}
+          ${UI.aptName === 'on' ? nameZoomSlider('aptZoom') : ''}</div>
+        <div class="featrow"><p><b>学校・役所・お店などの名前</b><small>家の種別をえらんで、名前を入れた建物です</small></p>${seg('fcName', [['off', '出さない'], ['on', '出す']])}
+          ${UI.fcName === 'on' ? nameZoomSlider('fcZoom') : ''}</div>
+        ${UI.aptName === 'on' || UI.fcName === 'on' ? `<div class="featrow"><p><b>名前を出す範囲</b><small>「全体」にすると、区域をえらんでいるときも、ほかの区域の建物の名前が薄く出ます</small></p>${seg('nameScope', [['sel', 'えらんだ区域だけ'], ['all', '地図に見えている全体']], UI.nameScope || 'sel')}</div>` : ''}
+        <h3 class="sub">自分の区域を回るとき</h3>
+        <p class="q">自分の区域を回るときの表示</p>${seg('round', [['reco', 'おすすめ順'], ['progress', '進み具合']], me().roundMode || 'reco')}
+        ${uiSlot('map')}`;
+      } else if (page === 'feat') {
+        body = F_FEAT;
+      } else if (page === 'show') {
+        body = F_SHOW;
+      } else if (page === 'start') {
+        body = `<p class="q">開いたときの画面</p>${seg('start', [['home', 'ホーム'], ['cards', '区域カード'], ['map', '地図']].concat(recoOn() ? [['reco', 'おすすめ']] : []))}
         <p class="q">起動のあいさつ（「さぁ、奉仕に行こう！」）</p>${seg('splash', [['on', '出す'], ['off', '出さない']])}
         ${UI.splash !== 'off' ? `<div class="zoomrow"><input type="range" id="uiSplash" min="1" max="5" step="0.5" value="${UI.splashSec || 1.8}" aria-label="あいさつを出す時間（秒）"><output id="uiSplashOut">${UI.splashSec || 1.8}秒</output></div>
           <div class="row"><button type="button" class="btn small" id="uiSplashTry">ためしに見る</button></div>` : ''}
         <p class="q">はじめの案内（使い方の動画のお知らせ・「拡大すると家の印が出ます」など）</p>${seg('guide', [['auto', '最初の数日だけ'], ['on', 'いつも出す'], ['off', '出さない']])}
-        <p class="q">ボタンの間隔</p>${seg('density', [['normal', 'ゆったり'], ['compact', 'コンパクト']])}
-        <p class="q">説明の文</p>${seg('hints', [['show', '表示する'], ['hide', 'かくす']])}
-        <p class="q">開いたときの画面</p>${seg('start', [['home', 'ホーム'], ['cards', '区域カード'], ['map', '地図']].concat(recoOn() ? [['reco', 'おすすめ']] : []))}`;
-      const S_MAP = `<h3 class="sub">地図</h3>
-        <p class="q">家の印の大きさ</p>${seg('pin', Object.entries(PINS).map(([k, v]) => [k, v[1]]))}
-        <p class="q">自分の区域を回るときの表示</p>${seg('round', [['reco', 'おすすめ順'], ['progress', '進み具合']], me().roundMode || 'reco')}`;
-      // ホーム画面のアイコンの絵は「ホーム画面に追加」の案内の中でえらぶ（2026.13.82。設定で変えてもホーム画面のアイコンは変わらないため）
-      S_VIEW += (tab === 'map' ? [S_MAP, S_TEXT, S_COLOR, S_SCREEN] : tab === 'reco' || tab === 'cards' ? [S_TEXT, S_COLOR, S_SCREEN, S_MAP] : [S_TEXT, S_SCREEN, S_COLOR, S_MAP]).join('');
+        ${uiSlot('start')}`;
+      } else if (page === 'lang') {
+        body = window.KI ? KI.picker(false, { noHead: true }) : '';
+      }
+      b = `<button type="button" class="btn back" data-uiback>‹ 設定</button><h2 id="sheetTitle" tabindex="-1"${page === 'lang' ? ' data-notr' : ''}>${cat ? cat[1] : '設定'}</h2>` + body +
+        `<button class="btn primary block" data-close>閉じる</button>`;
     }
-    // 「画面の見え方」をいちばん上に（地図の画面では、地図の見た目のすぐ下）
-    // ①の対応：説明文つきの通常の見出し（headHtml）ではなく、タイトルだけのコンパクトな見出しにして画面を広く使う。
-    // 閉じる✕ボタンはこれまでと同じ場所・同じ動きのまま（スクロールしても上に固定）。
-    // 帯（見出しの行）はなし。下にスワイプすると、設定を残して閉じる（小さな「×」と、いちばん下の「閉じる」でも閉じられる）
-    let b = `<h2 id="sheetTitle" class="vh">設定</h2>` + (window.dougaSettingsRow ? dougaSettingsRow() : '') + (window.KI ? KI.picker(false) : '') + S_BASE + S_VIEW + S_FEAT;
-    b += `<button class="btn block" id="uiReset">見え方を最初にもどす</button><button class="btn primary block" data-close>閉じる</button>`;
-    // この端末で動いているアプリの版（更新が届いたかを、だれでも確かめられるように。2026-10-29）
-    b += `<p class="muted appver" style="text-align:center;margin-top:12px;font-size:15px">区域マップ 版 ${esc(APP_VERSION)}</p>`; // hint は「説明を出さない」で消えるので使わない
     b = `<div class="grabrow"><span class="grab" aria-hidden="true"></span><button type="button" class="xmini" data-close aria-label="閉じる">×</button></div><p class="grabhint">下にスワイプすると、設定を残して閉じます</p>` + b;
     setSheet(b);
     $('#sheet').dataset.swipe = '1';
     if (keep) $('#sheet').scrollTop = top;
     if ($('#wheel')) bindWheel();
+    // 目次の行・‹ 設定（開いた画面の見出しにフォーカス／戻ったら押した行にフォーカス）
+    $$('[data-page]', $('#sheet')).forEach(x => x.onclick = () => {
+      page = lastCat = x.dataset.page; paint(false);
+      const h = $('#sheetTitle'); if (h) h.focus({ preventScroll: true });
+    });
+    const back = $('#sheet [data-uiback]');
+    if (back) back.onclick = () => {
+      page = 'top'; paint(false);
+      const r = lastCat && $(`#sheet [data-page="${lastCat}"]`); if (r) r.focus();
+    };
+    const km = $('#sheet details.kmore');
+    if (km) km.addEventListener('toggle', () => { uiKOpen = km.open; });
     // 区域の番号・線の濃さ：動かしている間も地図にすぐ出す（描き直しは1コマに1回まで）。指をはなしたら保存
     [['uiLabOp', 'labOp'], ['uiLineOp', 'lineOp']].forEach(([id, k]) => {
       const r = $('#' + id); if (!r) return;
@@ -10969,15 +11025,45 @@ function openUiSheet() {
       if (k === 'mapRot') applyRotSetting();
       if (k === 'aptName' || k === 'fcName' || k === 'pin' || k === 'nameScope') renderHouses();
       if (k === 'calList' || k === 'todayOn' || k === 'fTimer') renderHome();
+      if (k === 'mode') page = 'top'; // かんたん／くわしくを切りかえたら、最初の画面から
       paint(k !== 'mode');
     });
-    $('#uiReset').onclick = async () => {
+    const rs = $('#uiReset');
+    if (rs) rs.onclick = async () => {
       if (!await ask('画面の見え方を、最初の状態にもどします（「使う機能」はそのままです）。よろしいですか？')) return;
       UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fTimer: UI.fTimer, hello: UI.hello, fFollow: UI.fFollow, cProg: UI.cProg, cReco: UI.cReco, todayOn: UI.todayOn, icon: UI.icon, iconText: UI.iconText, appName: UI.appName }); uiSave(); applyUi(); setBase('pale'); applyRotSetting(); // 使う機能・区域カードに出すもの・ホーム画面のアイコンはそのまま
       toast('表示の設定を最初にもどしました');
+      page = 'top';
       paint(false);
     };
+    // 差しこんだ部品の後処理（保存した地図の大きさなど）
+    window.UI_AFTER.forEach(f => { try { f(); } catch (e) { console.error(e); } });
   };
+  /* 目次（くわしいモードの最初の画面）。今の設定の1行は、言葉ごとに span に分ける（スペイン語の辞書で1つずつ訳せるように） */
+  function uiCatList() {
+    const dot = '<span class="dot" aria-hidden="true" data-notr>' + (window.KI && KI.lang !== 'ja' ? ' · ' : '・') + '</span>';
+    const line = parts => parts.filter(Boolean).map(x => `<span>${esc(x)}</span>`).join(dot);
+    const on = (k, d) => (UI[k] || d) === 'on';
+    const pct = Math.round(zoomOf(uiEff()) * 100);
+    const tb = document.getElementById('tabReco');
+    const feats = [featTime() && '奉仕時間', featFollow() && '再訪問', !!tb && !tb.hidden && 'おすすめ'].filter(Boolean);
+    const startName = { home: 'ホーム', cards: '区域カード', map: '地図', reco: 'おすすめ' }[UI.start] || 'ホーム';
+    const guideName = { auto: '最初の数日だけ', on: 'いつも出す', off: '出さない' }[UI.guide || 'auto'];
+    const sum = {
+      text: [`大きさ ${pct}%`, (FONTS[UI.font] || FONTS.ud)[1], UI.theme === 'custom' ? 'じぶんの色' : (THEMES[UI.theme] || THEMES.standard)[3]],
+      map: [`家の印 ${(PINS[uiEff().pin] || PINS.normal)[1]}`, `番号の濃さ ${Math.round(terrLabOp() * 100)}%`, `線の濃さ ${Math.round(terrLineOp() * 100)}%`],
+      feat: feats.length ? feats : ['記録だけ'],
+      show: [`ホーム ${(on('hello', 'on') ? 1 : 0) + (on('todayOn', 'off') ? 1 : 0)}つ`, `区域カード ${(on('cProg', 'off') ? 1 : 0) + (on('cReco', 'off') ? 1 : 0)}つ`, `家の画面 ${on('cSlot', 'on') ? 1 : 0}つ`],
+      start: [`開いたら ${startName}`, `案内 ${guideName}`],
+      lang: null
+    };
+    return `<div class="setcats">${UI_CATS.map(([id, name, ico]) => {
+      const now = id === 'map' && tab === 'map' ? '<span class="nowtag">いまの画面</span>' : '';
+      const l2 = id === 'lang' ? `<span data-notr>${esc(window.KI ? KI.names[KI.lang] || '' : '日本語')}</span>` : line(sum[id]);
+      return `<button type="button" class="setcat" data-page="${id}"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ico}</svg>` +
+        `<span class="sctx"><b${id === 'lang' ? ' data-notr' : ''}>${esc(name)}${now}</b><small>${l2}</small></span><span class="chev" aria-hidden="true">›</span></button>`;
+    }).join('')}</div>`;
+  }
   paint(false);
 }
 

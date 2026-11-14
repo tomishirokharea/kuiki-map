@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.144"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
+<meta name="app-version" content="2026.13.145"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -1352,6 +1352,18 @@ img,canvas,video{max-width:100%}
 .featrow small{display:block;color:var(--ink2);font-size:15px;line-height:1.5;font-weight:400}
 .featrow .uiseg{margin:8px 0 0}
 .sub.feathead{margin-top:4px}
+.setcats{background:#fff;border:2px solid var(--line);border-radius:12px;margin:14px 0 12px;overflow:hidden} /* 歯車の目次（2026.13.145） */
+.setcat{display:flex;align-items:center;gap:12px;width:100%;min-height:72px;padding:10px 12px;border:0;border-top:2px solid var(--line);background:none;text-align:left;color:var(--ink);font:inherit;cursor:pointer}
+.setcat:first-child{border-top:0}
+.setcat:focus-visible{outline:3px solid var(--brand);outline-offset:-3px}
+.setcat .ico{flex:0 0 44px;width:44px;height:44px;padding:9px;border-radius:12px;background:var(--terr-soft);stroke:var(--terr);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.setcat .sctx{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.setcat .sctx b{font-size:19px;line-height:1.3;overflow-wrap:anywhere}
+.setcat .sctx small{font-size:15px;line-height:1.45;color:var(--ink2);font-weight:400;overflow-wrap:anywhere}
+.setcat .chev{flex:0 0 auto;font-size:28px;line-height:1;color:var(--ink2);padding-left:2px}
+.setcat .nowtag{display:inline-block;margin-left:8px;padding:0 8px;border:2px solid var(--terr);border-radius:999px;background:var(--terr-soft);color:var(--terr);font-size:13px;font-weight:700;line-height:1.6;vertical-align:2px;white-space:nowrap}
+.btn.back{min-height:44px;padding:0 12px;margin:0 0 6px;border-color:var(--line);font-size:17px}
+#sheet h2#sheetTitle{margin:4px 0 8px}
 body:not(.f-follow) #cardTabs{display:none!important}
 body:not(.f-follow) #paneMine{margin-top:14px}
 .pill,.who>span{white-space:nowrap}

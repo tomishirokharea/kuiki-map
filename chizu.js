@@ -181,10 +181,13 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
   }
   /* index.html・各画面の setBase の呼び出しは「本人の選び」として覚える */
   window.setBase = function (name) {
-    if (!map) return;
+    // 地図を作る前（ホームなどで歯車を開いたとき）でも、選んだものを覚える。地図を作るときに setupKinds が使う（2026.13.145）
     try { if (Store.data && (name === 'pale' || name === 'std' || name === 'photo')) lsSet(kindKey(), name); } catch (e) { /* 覚えられなくても動く */ }
+    if (!map) return;
     applyBase(name);
   };
+  /* 今選んでいる地図の見た目（地図を作る前は、覚えている選び） */
+  window.baseWant = () => (map && baseLayers.std ? baseName : wantKind());
   /* 「写真にする／地図にする」：写真から戻るときは、直前の地図の種類にもどる */
   document.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('#addBase');
@@ -206,13 +209,14 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
   function patchBasePick() {
     const pale = document.querySelector('#sheet [data-ui="base"][data-v="pale"]');
     if (!pale || document.querySelector('#sheet [data-ui="base"][data-v="std"]')) return;
-    pale.classList.toggle('on', baseName === 'pale');
-    pale.setAttribute('aria-pressed', String(baseName === 'pale'));
+    const bw = window.baseWant();
+    pale.classList.toggle('on', bw === 'pale');
+    pale.setAttribute('aria-pressed', String(bw === 'pale'));
     pale.innerHTML = '<i class="bprev pale"></i>見やすい地図';
     const std = pale.cloneNode(false);
     std.dataset.v = 'std';
-    std.className = 'choice' + (baseName === 'std' ? ' on' : '');
-    std.setAttribute('aria-pressed', String(baseName === 'std'));
+    std.className = 'choice' + (bw === 'std' ? ' on' : '');
+    std.setAttribute('aria-pressed', String(bw === 'std'));
     std.innerHTML = '<i class="bprev std"></i>地名の多い地図';
     pale.after(std);
     const box = pale.parentNode;

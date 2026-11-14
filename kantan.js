@@ -147,57 +147,15 @@
 
   /* =========================================================
      第2段（3）設定（歯車）
-     ・出すもの：言語・画面の見え方・文字の大きさ・地図／写真・区域の番号と線の濃さ
-     ・「機能をふやす」（たたんだ見出し）の中に、奉仕時間と再訪問だけ
+     ・2026.13.145：かんたんモードの1画面（地図の見た目・画面の見え方・文字の大きさ・番号と線の濃さ・機能をふやす・はじめの案内・
+       使い方の動画・言語）は app.js の openUiSheet が最初から作る（ここで部品を消して形を変えるのはやめた）
      ========================================================= */
-  let kOpen = false;
-  function trimSettings() {
-    const body = document.getElementById('sheetBody');
-    if (!body) return;
-    const kids = [...body.children];
-    const h3 = el => (el.tagName === 'H3' ? el.textContent.trim() : '');
-    // 地図の画面から開いたとき：「地図／写真」と「区域の番号・線の濃さ」だけ残す（線の色・太さ・地図の回転は出さない）
-    const baseH = kids.find(el => h3(el) === '地図の見た目');
-    if (baseH) {
-      const viewH = kids.find(el => h3(el) === '画面の見え方');
-      let on = false;
-      for (const el of kids) {
-        if (el === baseH) { on = true; continue; }
-        if (!on) continue;
-        if (el === viewH) break;
-        if (el.classList && (el.classList.contains('basepick') || el.classList.contains('noudo'))) continue; // 地図／写真と、番号・線の濃さは残す（2026.13.144）
-        el.remove();
-      }
-    }
-    // 使う機能：奉仕時間・（タイマー）・再訪問だけを、「機能をふやす」の中に入れる
-    const featH = kids.find(el => h3(el) === '使う機能');
-    if (featH) {
-      const keep = [], drop = [];
-      let inKeep = true, on = false;
-      for (const el of kids) {
-        if (el === featH) { on = true; continue; }
-        if (!on) continue;
-        if (el.id === 'uiReset') break;
-        if (el.tagName === 'H3') { inKeep = false; drop.push(el); continue; }
-        (inKeep ? keep : drop).push(el);
-      }
-      drop.forEach(e => e.remove());
-      const det = document.createElement('details');
-      det.className = 'kmore';
-      if (kOpen) det.open = true;
-      det.innerHTML = '<summary>機能をふやす</summary>';
-      keep.forEach(e => det.appendChild(e));
-      featH.replaceWith(det);
-      det.addEventListener('toggle', () => { kOpen = det.open; });
-    }
-  }
   const _setSheet = window.setSheet;
   window.setSheet = function (html) {
     const s = String(html);
     if (ADMIN_SHEET.test(s)) admSheet = true;
     _setSheet.apply(this, arguments);
     syncAdm();
-    try { if (simple() && s.indexOf('id="uiReset"') >= 0) trimSettings(); } catch (e) { console.error(e); }
   };
   const _closeSheet = window.closeSheet;
   window.closeSheet = function () {
