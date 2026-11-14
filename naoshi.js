@@ -42,6 +42,9 @@
   .fixline{display:flex;align-items:center;gap:10px;background:#F2F6FB;border:1px solid #C9D7E8;border-radius:12px;padding:10px 12px;margin:8px 0}
   .fixline span{flex:1;line-height:1.4}
   .fixline .fxlater{display:block;color:#5E6E77;margin-top:4px}
+  .fixline .fxmet{display:block;margin-top:8px;min-height:44px}
+  body.simple .fixline .fxlater{font-size:16px}
+  body.simple .fixline .fxmet{min-height:52px;font-size:17px}
   .fixline .btn{flex:none;min-height:44px}
   body.simple .fixline .btn{min-height:52px;font-size:18px}
   .fixrow{display:flex;align-items:center;gap:10px;border-bottom:1px solid #E1E5EA;padding:10px 2px}
@@ -217,12 +220,22 @@
   function fixLineHtml(k) {
     const v = visitsOf(k).find(x => isToday(x.at) && canFixVisit(x));
     if (!v) return '';
-    // あとから、ほかの人（自分では直せない人）が今日ちがう結果を記録しているとき：そのことと、記録し直さなくてよいことを書く。
-    // 記録し直すと、時刻が今になってしまうため（こまったこと yakq2v・9e0blc・2026.13.150）。名前は出さない
+    // 地図の印（pinState）と、ここに出す記録が食い違うときは、わけを書く（こまったこと yakq2v・9e0blc・2026.13.150）。名前は出さない
     const last = visitsOf(k)[0];
-    const later = last && last !== v && last.by !== me().id && isToday(last.at) && last.result !== v.result
-      ? `<small class="fxlater">このあと ${hhmm(last.at)} に、ほかの人が「${RESULT_LABEL[last.result]}」と記録しています。${v.by === me().id ? 'あなたの' : 'この'}記録はそのまま残ります。記録し直す必要はありません。</small>` : '';
-    return `<div class="fixline"><span><b>${v.by === me().id ? 'あなたの記録' : '今日の記録'}</b>：今日 ${hhmm(v.at)}　${RESULT_LABEL[v.result]}${later}</span><button type="button" class="btn small" data-fxline="${esc(v.id)}">直す</button></div>`;
+    let note = '';
+    if (last && last !== v && v.by === me().id && last.by !== me().id && isToday(last.at) && last.result !== v.result) {
+      // あとから、ほかの人（自分では直せない人）がちがう結果を記録した。記録し直すと時刻が今になるので、その必要がないことも書く
+      note = `<small class="fxlater">このあと ${hhmm(last.at)} に、ほかの人が「${RESULT_LABEL[last.result]}」と記録しています。あなたの記録はそのまま残ります。記録し直す必要はありません。</small>`;
+    } else if (v.result === 'away') {
+      // 今回の巡回で会えているので、留守の記録でも地図は「会」（監査 I-2）。会えたの記録を直せるなら、その入口も出す
+      const h = houseById(v.houseId), m = sum(k).met;
+      if (h && m && m !== v && pinState(k, periodStart(h)) === 'met') {
+        const fx = isToday(m.at) && canFixVisit(m);
+        note = `<small class="fxlater">この家は、${isToday(m.at) ? '今日 ' + hhmm(m.at) : '今回 ' + fmtDate(m.at)} に会えています。そのため地図には「会」と出ます。${fx ? '会えたがまちがいのときは、その記録を直してください。' : ''}</small>` +
+          (fx ? `<button type="button" class="btn small fxmet" data-fxline="${esc(m.id)}">会えたの記録を直す</button>` : '');
+      }
+    }
+    return `<div class="fixline"><span><b>${v.by === me().id ? 'あなたの記録' : '今日の記録'}</b>：今日 ${hhmm(v.at)}　${RESULT_LABEL[v.result]}${note}</span><button type="button" class="btn small" data-fxline="${esc(v.id)}">直す</button></div>`;
   }
   function bindFixLine(S, back) {
     $$('[data-fxline]', S).forEach(b => b.onclick = () => {
