@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.147';
+var APP_JS_VER = '2026.13.148';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -3575,6 +3575,7 @@ function bindRotate() {
   map.on('resize', () => { if (mapDeg) setMapDeg(mapDeg); });
   map.on('moveend', () => { lastMoveEnd = Date.now(); });
   $('#btnNorth').onclick = () => { stopHeading(false); animateMapDeg(0); }; // 向きモードのときは、それもやめる（Googleマップの方位のボタンと同じ）
+  bindMukiDiag(); // 長く押すと、向きの確かめの数字を出す（2026.13.148・一時的）
 }
 /* 設定で「回さない」にしたとき */
 function applyRotSetting() {
@@ -10513,6 +10514,7 @@ function screenAngle(iphone) {
 function headOrient(e) {
   if (!HEAD.on) return;
   const h = headingOf(e);
+  HEAD.raw = e; HEAD.h = h; // 向きの確かめ（mukiDiag）で見る
   if (h === null) return;
   HEAD.gotAt = Date.now();
   // 少しの揺れでは動かさない（なめらかにする）
@@ -10586,6 +10588,70 @@ function stopHeading(north) {
   const b = $('#btnLocate');
   if (b) { b.classList.remove('head'); b.setAttribute('aria-label', '現在地を表示'); }
   if (map && north && mapDeg) animateMapDeg(0); // 向きはそのまま残すときは、描き直さない（動かしたあとの moveend で描かれる・監査 Minor7）
+}
+
+/* ---------- 向きの確かめ（2026.13.148・一時的な調べもの） ----------
+   向きモードで地図の北がずれる件を調べるため、「北」ボタンを長く押す（約1秒）と、向きの数字を地図の上に出す。
+   数字は画面に出すだけで、どこにも送らない。ふつうに押したときの動き（北が上にもどる）は変えない */
+const MUKI = { el: null, timer: 0, probe: null, eat: false };
+function mukiProbe() {
+  // 地図の中に見えない点を2つ置き、実際に画面に描かれた位置から「画面での北の向き」を測る（CSSで回した分もふくめて）
+  if (!map) return null;
+  if (!MUKI.probe) {
+    const pane = map.getPane('kmDiag') || map.createPane('kmDiag');
+    pane.style.pointerEvents = 'none';
+    const mk = () => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0'; pane.appendChild(d); return d; };
+    MUKI.probe = [mk(), mk()];
+  }
+  const c = map.getCenter(), lp = map.latLngToLayerPoint(c), np = map.latLngToLayerPoint([c.lat + 0.001, c.lng]);
+  L.DomUtil.setPosition(MUKI.probe[0], lp); L.DomUtil.setPosition(MUKI.probe[1], np);
+  const a = MUKI.probe[0].getBoundingClientRect(), b = MUKI.probe[1].getBoundingClientRect();
+  const dx = b.left - a.left, dy = b.top - a.top;
+  return ((Math.atan2(dx, -dy) * 180 / Math.PI) % 360 + 360) % 360; // 上から時計回り
+}
+function mukiText() {
+  const e = HEAD.raw || {}, r = v => (typeof v === 'number' && isFinite(v) ? Math.round(v * 10) / 10 : String(v));
+  const pane = map && map.getPane('mapPane'), cs = pane ? getComputedStyle(pane) : {};
+  const nb = $('#btnNorth'), ndl = nb && nb.querySelector('.ndl');
+  const measured = mukiProbe();
+  return [
+    '版：' + APP_JS_VER + '　開き方：' + (navigator.standalone ? 'ホーム画面' : 'ブラウザ'),
+    '向きモード：' + (HEAD.on ? 'オン' : 'オフ') + '　合図：' + (HEAD.ev || '-') + '　表示：' + UI.mode + '・回す：' + UI.mapRot + '・回せる：' + rotAllowed(),
+    'コンパス（webkitCompassHeading）：' + r(e.webkitCompassHeading) + '　alpha：' + r(e.alpha) + '　absolute：' + r(e.absolute),
+    '計算した向き：' + r(HEAD.h) + '　なめらかにした向き：' + r(HEAD.sm),
+    '画面の角度：window.orientation ' + r(window.orientation) + '・screen ' + (screen.orientation ? screen.orientation.angle : '-') + '・使った値 ' + screenAngle(/iPhone|iPod/.test(navigator.userAgent)) + '　窓 ' + innerWidth + '×' + innerHeight,
+    '地図を回した角度（mapDeg）：' + r(mapDeg) + '　地図の回し（rotate）：' + (pane ? (pane.style.rotate || '-') + ' / ' + (cs.rotate || '-') : '-'),
+    '画面での北（はず）：' + r(((mapDeg % 360) + 360) % 360) + '　画面での北（測った）：' + r(measured),
+    '北ボタンの針：' + (ndl ? (getComputedStyle(ndl).rotate || '-') : '-')
+  ].join('\n');
+}
+function mukiShow() {
+  if (!MUKI.el) {
+    const d = document.createElement('div');
+    d.id = 'mukiDiag'; d.setAttribute('data-notr', ''); d.setAttribute('role', 'status');
+    d.style.cssText = 'position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 70px);z-index:3000;background:rgba(255,255,255,.93);color:#111;border:2px solid #1A3A5C;border-radius:10px;padding:8px;font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-all';
+    d.innerHTML = '<pre style="margin:0;font:inherit;white-space:pre-wrap"></pre><div style="display:flex;gap:8px;margin-top:6px"><button type="button" class="btn" data-mk="copy" style="flex:1">数字をコピー</button><button type="button" class="btn" data-mk="close" style="flex:1">閉じる</button></div>';
+    d.querySelector('[data-mk="copy"]').onclick = () => {
+      const t = mukiText();
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('コピーしました')).catch(() => { window.prompt('この文字をコピーしてください', t); });
+    };
+    d.querySelector('[data-mk="close"]').onclick = mukiHide;
+    document.body.appendChild(d); MUKI.el = d;
+  }
+  MUKI.el.hidden = false;
+  const tick = () => { if (!MUKI.el || MUKI.el.hidden) return; MUKI.el.firstChild.textContent = mukiText(); MUKI.timer = setTimeout(tick, 300); };
+  clearTimeout(MUKI.timer); tick();
+}
+function mukiHide() { clearTimeout(MUKI.timer); if (MUKI.el) MUKI.el.hidden = true; }
+/* 「北」ボタンを約1秒押し続けたら、確かめの数字を出す（そのあとの「押した」は北にもどさない） */
+function bindMukiDiag() {
+  const nb = $('#btnNorth'); if (!nb) return;
+  let t = 0;
+  const cancel = () => { clearTimeout(t); t = 0; };
+  nb.addEventListener('pointerdown', () => { cancel(); MUKI.eat = false; t = setTimeout(() => { t = 0; MUKI.eat = true; mukiShow(); }, 900); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => nb.addEventListener(n, cancel));
+  nb.addEventListener('click', e => { if (MUKI.eat) { MUKI.eat = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true); // 長押しのすぐあとの「押した」だけ止める
+  nb.addEventListener('contextmenu', e => e.preventDefault());
 }
 
 /* ---------- 表示の設定（このスマホ・この人だけ。サーバーには送らない） ----------
