@@ -147,7 +147,7 @@
 
   /* =========================================================
      第2段（3）設定（歯車）
-     ・出すもの：言語・画面の見え方・文字の大きさ・地図／写真
+     ・出すもの：言語・画面の見え方・文字の大きさ・地図／写真・区域の番号と線の濃さ
      ・「機能をふやす」（たたんだ見出し）の中に、奉仕時間と再訪問だけ
      ========================================================= */
   let kOpen = false;
@@ -156,7 +156,7 @@
     if (!body) return;
     const kids = [...body.children];
     const h3 = el => (el.tagName === 'H3' ? el.textContent.trim() : '');
-    // 地図の画面から開いたとき：「地図／写真」だけ残す（線の色・太さ・地図の回転は出さない）
+    // 地図の画面から開いたとき：「地図／写真」と「区域の番号・線の濃さ」だけ残す（線の色・太さ・地図の回転は出さない）
     const baseH = kids.find(el => h3(el) === '地図の見た目');
     if (baseH) {
       const viewH = kids.find(el => h3(el) === '画面の見え方');
@@ -165,7 +165,7 @@
         if (el === baseH) { on = true; continue; }
         if (!on) continue;
         if (el === viewH) break;
-        if (el.classList && el.classList.contains('basepick')) continue;
+        if (el.classList && (el.classList.contains('basepick') || el.classList.contains('noudo'))) continue; // 地図／写真と、番号・線の濃さは残す（2026.13.144）
         el.remove();
       }
     }

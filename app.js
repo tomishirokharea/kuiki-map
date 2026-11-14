@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.143';
+var APP_JS_VER = '2026.13.144';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2810,6 +2810,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.144', items: [
+    ['地', '地図の区域の番号を、白い札から白いふちの文字に変え、番号と区域の線をうすくしました。地図の地名や道が見やすくなります。濃さは、地図の画面の歯車（設定）の「区域の番号の濃さ」「区域の線の濃さ」で、自分に合うように変えられます。区域をえらぶと、その区域の番号と線は濃く出ます。']
+  ] },
   { v: '2026.13.143', items: [
     ['地', '地図を拡大すると、土地の区切り（登記上の土地の線）がうすい線で出るようになりました。奥にある家や、家を追加する場所の目安になります。実際の敷地や塀とは違うことがあります。出したくないときは、印の見かた（？）で切れます。']
   ] },
@@ -4128,7 +4131,8 @@ function renderParents(cur) {
   const curT = cur ? terrById(cur) : null;
   ps.forEach((t, pno) => {
     const on = !!curT && curT.pno === pno;
-    L.polygon(t.pp, { color: '#1E3A5F', weight: on ? 6 : 4.5, opacity: curT && !on ? 0.45 : 0.9, fill: false, interactive: false }).addTo(terrLayer);
+    const po = 0.9 * terrLineOp(); // 親の線の濃さも「区域の線の濃さ」に合わせる（100%で今までと同じ0.9）
+    L.polygon(t.pp, { color: '#1E3A5F', weight: on ? 6 : 4.5, opacity: curT && !on ? Math.min(0.45, po) : on ? 0.9 : po, fill: false, interactive: false }).addTo(terrLayer);
   });
 }
 /* 区域の線の中をタップしたとき */
@@ -4164,7 +4168,7 @@ function renderTerrs() {
   terrTaps = [];
   const cur = selTerrId();
   const tapOk = mode === 'normal'; // 線引き・家の追加のときは、地図のタップを区域の選択に使わない
-  const lock = lockOn(), okT = lock ? openTerrIds() : null;
+  const lock = lockOn(), okT = lock ? openTerrIds() : null, lop = terrLineOp();
   // 灰色でも、まだだれも持っていない「区域をもらう」一覧の区域は、線をタップして、くわしい情報を見て受け取る・係に頼むができる（2026-11-08。中の家は今までどおり記録できない）
   const pickT = lock && tapOk ? new Set(freeTerrs().filter(t => !t.holder).map(t => t.id)) : null;
   const list = polyTerrs().slice().sort((a, b) => (b.rest ? 1 : 0) - (a.rest ? 1 : 0)); // 親の残りの部分は下に描く（枝番を押せるように）
@@ -4174,7 +4178,7 @@ function renderTerrs() {
     const tap = tapOk && (!gray || pickT.has(t.id)); // 灰色でも、もらえる区域は線をタップできる
     const col = gray ? '#9AA5A0' : terrLineColor();
     const poly = L.polygon(t.polygon, {
-      color: col, weight: terrLineWidth(on), opacity: dim ? 0.3 : 1,
+      color: col, weight: terrLineWidth(on), opacity: on ? 1 : dim ? Math.min(0.3, lop) : lop, // えらんだ区域の線はいつも濃く
       fillColor: col, fillOpacity: gray ? 0.12 : on ? 0.07 : 0.02,
       interactive: tap, bubblingMouseEvents: false
     }).addTo(terrLayer);
@@ -10472,7 +10476,7 @@ function nameZoomSlider(key) {
     <p class="nzends"><span>← 縮めても出す</span><span>拡大したときだけ →</span></p></div>`;
 }
 const ICONS = ['区', '家', '図', '心', '🏠', '🗺️', '📖', '🚪', '✅', '⭐', '🚶', '☀️'];
-const UI_DEFAULT = { fTime: 'off', fTimer: 'on', hello: 'on', fFollow: 'off', todayOn: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', mapRot: 'on', mode: 'simple', size: 'normal', pct: 0, icon: '区', iconText: '', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
+const UI_DEFAULT = { fTime: 'off', fTimer: 'on', hello: 'on', fFollow: 'off', todayOn: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', labOp: 40, lineOp: 35, mapRot: 'on', mode: 'simple', size: 'normal', pct: 0, icon: '区', iconText: '', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
 /* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
   standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
@@ -10615,6 +10619,10 @@ const accentColor = () => themeOf(uiEff())[1];
 /* 区域の線の色（各自の設定） */
 const TERR_COLORS = { theme: ['', 'テーマの色'], red: ['#D32F2F', '赤'], orange: ['#E65100', 'だいだい'], blue: ['#1565C0', '青'], purple: ['#6A1B9A', 'むらさき'], black: ['#263238', '黒'] };
 const terrLineColor = () => { const v = TERR_COLORS[UI.terrColor || 'theme']; return v && v[0] ? v[0] : accentColor(); };
+/* 区域の番号・線の濃さ（各自・0〜1）。区域をえらんでいないときの見え方。えらんだ区域は、いつも濃く出す（2026.13.144） */
+const pctOf = (v, d) => { const n = v === null || v === undefined || v === '' ? NaN : Number(v); return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) / 100 : d / 100; };
+const terrLabOp = () => pctOf(UI.labOp, 40);
+const terrLineOp = () => pctOf(UI.lineOp, 35);
 const terrLineWidth = on => { const w = UI.terrWidth === 'thin' ? 2 : UI.terrWidth === 'thick' ? 7 : 3; return on ? w + 2 : w; };
 /* くわしくモードでは、スライダーで決めた％（80〜160）を使う */
 const zoomOf = e => (UI.mode === 'detail' && e.pct ? e.pct / 100 : (SIZES[e.size] || SIZES.normal)[0]);
@@ -10675,6 +10683,7 @@ function applyUi() {
   setThemeVars(themeOf(e));
   r.setProperty('--z', String(zoomOf(e)));
   r.setProperty('--pin', String(pinScale()));
+  r.setProperty('--labop', String(terrLabOp()));
   r.setProperty('--font', fontStack(e.font));
   loadFont(e.font); // 標準以外の文字は、使うときだけ読み込む
   document.body.classList.toggle('simple', UI.mode !== 'detail');
@@ -10846,6 +10855,13 @@ function openUiSheet() {
       <div class="linecolors">${Object.entries(TERR_COLORS).map(([k, v]) =>
         `<button type="button" class="lcbtn" data-ui="terrColor" data-v="${k}" aria-pressed="${(UI.terrColor || 'theme') === k}"><i style="background:${k === 'theme' ? accentColor() : v[0]}"></i>${v[1]}</button>`).join('')}</div>
       <p class="q">区域の線の太さ</p>${seg('terrWidth', [['thin', '細い'], ['normal', 'ふつう'], ['thick', '太い']], UI.terrWidth || 'normal')}
+      <div class="noudo">
+        <p class="q">区域の番号の濃さ</p>
+        <div class="zoomrow"><input type="range" id="uiLabOp" min="0" max="100" step="5" value="${Math.round(terrLabOp() * 100)}" aria-label="区域の番号の濃さ（％）"><output id="uiLabOpOut">${Math.round(terrLabOp() * 100)}%</output></div>
+        <p class="q">区域の線の濃さ</p>
+        <div class="zoomrow"><input type="range" id="uiLineOp" min="0" max="100" step="5" value="${Math.round(terrLineOp() * 100)}" aria-label="区域の線の濃さ（％）"><output id="uiLineOpOut">${Math.round(terrLineOp() * 100)}%</output></div>
+        <p class="hint">うすくすると、地図の地名や道が見やすくなります。0%にすると見えなくなります。区域をえらぶと、その区域の番号と線は濃く出ます。</p>
+      </div>
       ${rotSupported() ? `<p class="q">2本指で地図を回す</p>${seg('mapRot', [['on', '回せる'], ['off', '回さない']], UI.mapRot || 'on')}
       <p class="hint">2本の指でひねるように動かすと、地図の向きが変わります。右下の「北」のボタンで、北が上にもどります。</p>` : ''}` : '';
     let S_VIEW = `<h3 class="sub feathead">画面の見え方</h3>
@@ -10898,6 +10914,19 @@ function openUiSheet() {
     $('#sheet').dataset.swipe = '1';
     if (keep) $('#sheet').scrollTop = top;
     if ($('#wheel')) bindWheel();
+    // 区域の番号・線の濃さ：動かしている間も地図にすぐ出す（描き直しは1コマに1回まで）。指をはなしたら保存
+    [['uiLabOp', 'labOp'], ['uiLineOp', 'lineOp']].forEach(([id, k]) => {
+      const r = $('#' + id); if (!r) return;
+      let raf = 0;
+      const show = () => {
+        UI[k] = Number(r.value); $('#' + id + 'Out').textContent = r.value + '%';
+        document.documentElement.style.setProperty('--labop', String(terrLabOp()));
+        if (raf) return;
+        raf = requestAnimationFrame(() => { raf = 0; if (map) renderTerrs(); });
+      };
+      r.oninput = show;
+      r.onchange = () => { show(); uiSave(); };
+    });
     if ($('#uiSplash')) {
       const rs = $('#uiSplash');
       rs.oninput = () => { $('#uiSplashOut').textContent = rs.value + '秒'; };
