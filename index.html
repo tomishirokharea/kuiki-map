@@ -508,8 +508,9 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .uiseg{display:flex;flex-wrap:wrap;width:100%;margin:4px 0 6px}
 .uiseg button{flex:1;min-width:84px}
 .uiseg.sizeseg button{flex:1 1 auto;min-width:0;padding:0 10px;white-space:nowrap} /* 文字の大きさ：「とても大きく」を2行に折らない（文字を「とても大きく」にした幅360pxのスマホでも1行・点検④U11） */
-.swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
-.swatch{min-height:56px;border-radius:12px;border:3px solid var(--line);background:#fff;font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;padding:0 10px}
+.swatches{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:6px} /* minmax(0,…)：文字を大きくしても横にはみ出さない（2026.13.145） */
+#sheet .swatches{grid-template-columns:repeat(auto-fill,minmax(min(100%,max(7.2em,30%)),1fr))} /* 歯車の中は、文字の大きさに合わせて列の数を変える（160%・スペイン語でもはみ出さない） */
+.swatch{min-height:56px;min-width:0;border-radius:12px;border:3px solid var(--line);background:#fff;font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;padding:0 10px;text-align:left;overflow-wrap:anywhere}
 .swatch i{width:26px;height:26px;border-radius:50%;background:var(--c);flex:none}
 .swatch[aria-pressed="true"]{border-color:var(--brand-ink);background:var(--terr-soft);box-shadow:0 0 0 2px var(--brand-ink)}
 .swatch.custom i{background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red)}
@@ -531,9 +532,9 @@ body.focusmode header.top,body.focusmode nav.tabs{display:none}
 .wpacc{display:flex;align-items:center;gap:8px;margin:8px 0 0;font-size:15px;color:var(--ink2)}
 .wpacc i{flex:none;width:34px;height:6px;border-radius:3px}
 .wheelprev .soft{height:40px;border-radius:12px;display:flex;align-items:center;padding:0 12px;border:2px solid var(--line)}
-.fontgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px}
-.fontbtn{min-height:74px;border-radius:12px;border:3px solid var(--line);background:#fff;padding:6px 10px;text-align:left;display:flex;flex-direction:column;justify-content:center;gap:2px;line-height:1.3}
-.fontbtn span{font-size:21px}
+.fontgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:6px}
+.fontbtn{min-height:74px;min-width:0;overflow-wrap:anywhere;border-radius:12px;border:3px solid var(--line);background:#fff;padding:6px 10px;text-align:left;display:flex;flex-direction:column;justify-content:center;gap:2px;line-height:1.3}
+.fontbtn span{font-size:21px;min-width:0;overflow-wrap:anywhere}
 .fontbtn small{font-size:12px;color:var(--ink2);font-family:"BIZ UDPGothic",sans-serif}
 .fontbtn[aria-pressed="true"]{border-color:var(--brand-ink);background:var(--terr-soft);box-shadow:0 0 0 2px var(--brand-ink)}
 body.simple .adv{display:none!important}
@@ -1276,7 +1277,7 @@ img,canvas,video{max-width:100%}
   .btn{padding:0 12px}
   .timer .tclock{font-size:40px}
   .timer .tbig{min-width:0;width:100%}
-  .swatches{grid-template-columns:repeat(2,1fr)}
+  .swatches{grid-template-columns:repeat(2,minmax(0,1fr))}
   .iconpick{grid-template-columns:repeat(4,1fr)}
   nav.tabs button{font-size:13px}
   .atabs button{font-size:15px}
