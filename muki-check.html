@@ -4,10 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
-<!-- ホーム画面に追加すると、区域マップのアプリと同じ「アプリの形」で開く（その形でだけ値がちがうかを確かめるため） -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="向きの確認">
 <title>向きの確認（区域マップ）</title>
 <!-- 向きモードが実際とずれるときに、スマホが返している向きの数字を見るための確認用ページ（2026-11-14）。
      地図・区域・家の情報は読みません。このページで調べた数字は、どこにも送りません（画面に出すだけ） -->
@@ -57,15 +53,6 @@
     if (typeof last.webkitCompassHeading === 'number' && last.webkitCompassHeading >= 0) return last.webkitCompassHeading;
     return null;
   }
-  // 区域マップ 2026.13.147 の screenAngle() と同じ計算（ちがいがないかを見るため）
-  function appAngle(iphone) {
-    var a = typeof window.orientation === 'number' ? window.orientation
-      : (screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle : 0);
-    a = ((Math.round(a) % 360) + 360) % 360;
-    if (iphone && (a === 90 || a === 270) && innerHeight > innerWidth) a = 0;
-    return a;
-  }
-  function appHeading(h) { return ((h + appAngle(/iPhone|iPod/.test(navigator.userAgent))) % 360 + 360) % 360; }
   function rows() {
     var h = heading();
     return [
@@ -82,10 +69,7 @@
       ['公開中の区域マップの版', appVer],
       ['この端末にある控え', cacheNames],
       ['端末', navigator.userAgent],
-      ['画面（screen）の幅×高さ', screen.width + '×' + screen.height],
-      ['縦長と見ているか（matchMedia）', (function () { try { return matchMedia('(orientation: portrait)').matches ? '縦' : '横'; } catch (e) { return '?'; } })()],
-      ['計算した向き', h === null ? '-' : n(h, 0)],
-      ['区域マップ（147）の計算での向き', h === null ? '-' : n(appHeading(h), 0) + '（画面の角度 ' + appAngle(true) + '）']
+      ['計算した向き', h === null ? '-' : n(h, 0)]
     ];
   }
   function draw() {
