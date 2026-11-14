@@ -289,4 +289,12 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "再訪問の印を{0}件消しました": "Se borraron {0} marcas de revisita",
 "会えた記録のない家が「引き継ぎを待っている家」に出ることがあったのを直しました。": "Se corrigió que a veces aparecieran casas sin registro de «En casa» en «Casas que esperan a otro publicador».",
 "記録のリセットのときに、再訪問の印（引き継ぎ待ち・リストから外した）も一緒に消すようにしました。前のリセットで残った印は、設定タブの「保守」にある「残っている再訪問の印」から、確かめて消せます（残っているときだけ出ます）。": "Al reiniciar los registros, ahora también se borran las marcas de revisita (espera de traspaso y quitadas de la lista). Las marcas que quedaron del reinicio anterior se pueden revisar y borrar en «Marcas de revisita sobrantes», dentro de «Mantenimiento» en la pestaña Ajustes (solo aparece si hay alguna).",
+// 会えたあとのほかの人の留守（2026.13.150）
+"このあと {0} に、ほかの人が「{1}」と記録しています。あなたの記録はそのまま残ります。記録し直す必要はありません。": "Después, a las {0}, otra persona registró «{1}». Su registro se conserva. No hace falta registrarlo de nuevo.",
+"この家は、今日 {0} に会えています。そのため地図には「会」と出ます。会えたがまちがいのときは、その記録を直してください。": "Hoy a las {0} ya lo encontraron. Por eso el mapa muestra «会». Si «En casa» fue un error, corrija ese registro.",
+"この家は、今日 {0} に会えています。そのため地図には「会」と出ます。": "Hoy a las {0} ya lo encontraron. Por eso el mapa muestra «会».",
+"この家は、今回 {0} に会えています。そのため地図には「会」と出ます。": "En esta vuelta ya lo encontraron ({0}). Por eso el mapa muestra «会».",
+"会えたの記録を直す": "Corregir el registro «En casa»",
+"会えた家に、あとからほかの人が「留守」と記録すると、地図の印が「留」になっていたのを直しました。区域を受け取ってから一度でも会えた家は「会」と出ます。": "Se corrigió que, si otra persona registraba «Ausente» después en una casa donde ya lo encontraron, la marca del mapa mostraba «留». Ahora las casas donde lo encontraron al menos una vez desde que se recibió el territorio muestran «会».",
+"そのとき家の画面にも、わけが出るようにしました（あとの記録がほかの人のもの・前に会えているので「会」と出る、など）。あなたの記録はそのまま残るので、記録し直す必要はありません。": "En ese caso, la pantalla de la casa ahora explica el motivo (el registro posterior es de otra persona, o ya lo encontraron antes y por eso muestra «会», etc.). Su registro se conserva, así que no hace falta registrarlo de nuevo.",
 });

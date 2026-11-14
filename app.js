@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.149';
+var APP_JS_VER = '2026.13.150';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2810,6 +2810,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.150', items: [
+    ['地', '会えた家に、あとからほかの人が「留守」と記録すると、地図の印が「留」になっていたのを直しました。区域を受け取ってから一度でも会えた家は「会」と出ます。'],
+    ['直', 'そのとき家の画面にも、わけが出るようにしました（あとの記録がほかの人のもの・前に会えているので「会」と出る、など）。あなたの記録はそのまま残るので、記録し直す必要はありません。']
+  ] },
   { v: '2026.13.147', items: [
     ['地', 'iPhoneで、向きに合わせた地図が実際の向きと90°ほどずれることがあったのを直しました。']
   ] },
@@ -3772,8 +3776,13 @@ function periodStart(h) {
 function pinState(k, since) {
   if (dncAt(k)) return 'dnc';
   const v = sum(k).last;
-  return v && since && v.at >= since ? v.result : 'plain';
+  if (!v || !since || v.at < since) return 'plain';
+  return v.result === 'away' && metFrom(k, since) ? 'met' : v.result;
 }
+/* 今回の巡回（since から）で一度でも会えたか。会えたあとに留守の記録が付いても「会えた」に数える
+   （区域の進み具合・留守宅カードの metBetween と同じ考え方。地図の印が「留」になり、家の画面の「あなたの記録：会えた」と
+   食い違っていた・こまったこと yakq2v・9e0blc・2026.13.150） */
+function metFrom(k, since) { const m = since ? sum(k).met : null; return !!m && m.at >= since; }
 /* 集合住宅で、今回まだ訪ねていない部屋の数 */
 function aptTodo(h, since) {
   return h.units.filter(u => { const k = K(h.id, u); return !dncAt(k) && pinState(k, since) === 'plain' && !recentMet(k); }).length;
@@ -6479,7 +6488,9 @@ function openAptSeq(hid, startUnit) {
     // 部屋のボタン：前回の結果は色だけでなく「会・留・拒」の字でも見せる。部屋が多い建物は階ごとに分ける（点検④U3）
     const chip = u => {
       // 色と字は、見出しと同じ「今の巡回（受け取ってから）」の結果で出す。前の巡回の結果は出さない（総点検 L5・2026.13.105）
-      const i = h.units.indexOf(u), s0 = statusOf(K(hid, u)), s1 = s0 === 'dnc' || !inRound || visitedSince(K(hid, u), since) ? s0 : 'new', s = s1 === 'dnc' && skipAt(K(hid, u)) ? 'skip' : s1, uk = dispUnitKind(h, u), g = UST_GLYPH[s];
+      // 今回の巡回で会えた部屋は、あとから留守の記録が付いても「会」（地図の印 pinState と同じ「いつから」で決める。
+      // 受け取っていない区域・留守宅カードの段階は periodStart（返却・回り終えた日から）・2026.13.150）
+      const i = h.units.indexOf(u), s0 = statusOf(K(hid, u)), s1 = s0 === 'dnc' || !inRound || visitedSince(K(hid, u), since) ? (s0 === 'away' && metFrom(K(hid, u), inRound ? since : periodStart(h)) ? 'met' : s0) : 'new', s = s1 === 'dnc' && skipAt(K(hid, u)) ? 'skip' : s1, uk = dispUnitKind(h, u), g = UST_GLYPH[s];
       return `<button class="uchip st-${s}${i === idx && !st.finished ? ' cur' : ''}${doneToday(u) ? ' donec' : ''}${!mine ? '' : isMine(u) ? ' mine' : ' notmine'}" data-jump="${i}" aria-label="${esc(unitTitle(h, u))}${isMine(u) ? '' : '（ほかの人の範囲）'}${uk !== 'home' ? '（' + kindName(uk) + '）' : ''}${g ? (s === 'skip' ? '（' + UST_NAME[s] + '）' : '（前回 ' + UST_NAME[s] + '）') : ''}へ">${kindBadge(uk, K(hid, u))}${g ? `<b class="ust" aria-hidden="true">${g}</b>` : ''}${esc(uName(h, u))}</button>`;
     };
     const groups = h.units.length > 10 ? unitGroups(h) : [];
