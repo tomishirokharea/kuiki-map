@@ -138,14 +138,15 @@ async function main() {
     const before = JSON.parse(fs.readFileSync(CHECK, 'utf8')).conditions;
     // わざと変えた文字（指示書どおり）：見出し「地図に出す名前」→「建物の名前」、「奉仕の予定」→「ホームに出すもの」の中へ
     const ALLOWED_GONE = new Set(['text:地図に出す名前', 'text:奉仕の予定', 'text:Nombres en el mapa', 'text:Agenda de predicación']);
-    const JP = /[\u3040-\u30ff\u4e00-\u9fff]/;
+    // スペイン語で、前は日本語のまま出ていて今回訳が入った文（決まった一覧だけ・再監査 Minor4）
+    const TRANSLATED = new Set(['text:Abc Mapa de Territoriosドット（ゲーム風）（ポップ）', 'text:はじめの案内（使い方の動画のお知らせ・「拡大すると家の印が出ます」など）']);
     let miss = 0, ok = 0, added = new Set(), allowed = new Set();
     for (const [k, b] of Object.entries(before)) {
       const a = result[k];
       if (!a) { console.log(`✕ 条件がありません：${k}`); miss++; continue; }
       const have = new Set(a.items);
       // スペイン語で、前は日本語のまま出ていた文が訳されて消えたものも数えない（訳が入っただけ）
-      const lost = b.items.filter(x => !have.has(x) && !(ALLOWED_GONE.has(x) && allowed.add(x)) && !(k.startsWith('es|') && x.startsWith('text:') && JP.test(x) && allowed.add(x + '（訳が入った）')));
+      const lost = b.items.filter(x => !have.has(x) && !(ALLOWED_GONE.has(x) && allowed.add(x)) && !(k.startsWith('es|') && TRANSLATED.has(x) && allowed.add(x + '（訳が入った）')));
       if (lost.length) { miss += lost.length; console.log(`✕ ${k}（開いた画面 ${a.view}）で無くなった部品：${lost.join('、')}`); }
       else ok++;
       a.items.filter(x => !b.items.includes(x)).forEach(x => added.add(x));

@@ -3318,4 +3318,5 @@ window.KUIKI_I18N.es = {
 "家がよく見えるときだけ": "solo cuando se ven bien las casas",
 "← 全体でも出す": "← Mostrar aun alejado",
 "目印の名前を出す大きさ": "Acercamiento para mostrar nombres de puntos de referencia",
+"会館・学校などの目印の名前を、地図をどのくらい縮めても出すかを選べるようにしました（歯車 → 地図 → 建物の名前）。地図を縮めて場所を探すときに使えます。": "Ahora puede elegir desde qué nivel de alejamiento se muestran los nombres de los puntos de referencia (Salón del Reino, escuelas, etc.) (engranaje → Mapa → Nombres de edificios). Sirve para encontrar lugares con el mapa alejado.",
 };
