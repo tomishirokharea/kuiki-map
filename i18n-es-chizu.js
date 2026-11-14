@@ -130,6 +130,6 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "区域の線の濃さ": "Intensidad de las líneas de territorio",
 "区域の番号の濃さ（％）": "Intensidad de los números de territorio (%)",
 "区域の線の濃さ（％）": "Intensidad de las líneas de territorio (%)",
-"うすくすると、地図の地名や道が見やすくなります。0%にすると見えなくなります。区域をえらぶと、その区域の番号と線は濃く出ます。": "Al hacerlos más tenues, se ven mejor los nombres de lugares y las calles del mapa. Con 0 % dejan de verse. Al elegir un territorio, su número y sus líneas se ven intensos.",
+"0%にすると見えなくなります。区域をえらぶと、その区域の番号と線は濃く出ます。": "Con 0 % dejan de verse. Al elegir un territorio, su número y sus líneas se ven intensos.",
 "地図の区域の番号を、白い札から白いふちの文字に変え、番号と区域の線をうすくしました。地図の地名や道が見やすくなります。濃さは、地図の画面の歯車（設定）の「区域の番号の濃さ」「区域の線の濃さ」で、自分に合うように変えられます。区域をえらぶと、その区域の番号と線は濃く出ます。": "Los números de territorio del mapa ahora son texto con borde blanco (sin recuadro), y los números y las líneas se ven más tenues, para que se lean mejor los nombres de lugares y las calles. Puede ajustar la intensidad a su gusto en el engranaje (Ajustes) de la pantalla del mapa: «Intensidad de los números de territorio» e «Intensidad de las líneas de territorio». Al elegir un territorio, su número y sus líneas se ven intensos.",
 });

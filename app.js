@@ -10860,7 +10860,7 @@ function openUiSheet() {
         <div class="zoomrow"><input type="range" id="uiLabOp" min="0" max="100" step="5" value="${Math.round(terrLabOp() * 100)}" aria-label="区域の番号の濃さ（％）"><output id="uiLabOpOut">${Math.round(terrLabOp() * 100)}%</output></div>
         <p class="q">区域の線の濃さ</p>
         <div class="zoomrow"><input type="range" id="uiLineOp" min="0" max="100" step="5" value="${Math.round(terrLineOp() * 100)}" aria-label="区域の線の濃さ（％）"><output id="uiLineOpOut">${Math.round(terrLineOp() * 100)}%</output></div>
-        <p class="hint">うすくすると、地図の地名や道が見やすくなります。0%にすると見えなくなります。区域をえらぶと、その区域の番号と線は濃く出ます。</p>
+        <p class="hint hint-must">0%にすると見えなくなります。区域をえらぶと、その区域の番号と線は濃く出ます。</p>
       </div>
       ${rotSupported() ? `<p class="q">2本指で地図を回す</p>${seg('mapRot', [['on', '回せる'], ['off', '回さない']], UI.mapRot || 'on')}
       <p class="hint">2本の指でひねるように動かすと、地図の向きが変わります。右下の「北」のボタンで、北が上にもどります。</p>` : ''}` : '';
@@ -10919,8 +10919,11 @@ function openUiSheet() {
       const r = $('#' + id); if (!r) return;
       let raf = 0;
       const show = () => {
+        const was0 = terrLabOp() <= 0;
         UI[k] = Number(r.value); $('#' + id + 'Out').textContent = r.value + '%';
         document.documentElement.style.setProperty('--labop', String(terrLabOp()));
+        // 番号の濃さは見た目（CSS）だけで変わる。0%をまたぐときだけ札を作り直す（0%の札は作らないため）。線は描き直す（監査 L1）
+        if (k === 'labOp' && was0 === (terrLabOp() <= 0)) return;
         if (raf) return;
         raf = requestAnimationFrame(() => { raf = 0; if (map) renderTerrs(); });
       };

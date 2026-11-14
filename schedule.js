@@ -1943,6 +1943,7 @@ body.duemode .terr-label:not(.duelab){display:none}
 .duelab.off.cp span{font-size:13px}
 .duelab.off.faint span{opacity:calc(var(--labop,.4) * .6)}
 .duelab.off.sel span{font-size:18px;font-weight:800;opacity:1;color:var(--terr);color:color-mix(in srgb,var(--terr) 80%,#000)}
+#map.drawing .duelab.off span{opacity:min(.35,var(--labop,.4))}
 .duelab.off.grp span{color:#5B2E8C}
 .duelab.off.gray span{color:#7B8782}`;
   document.head.appendChild(cssDm);
@@ -1986,6 +1987,7 @@ body.duemode .terr-label:not(.duelab){display:none}
   }
   window.terrNumHidden = () => {
     try {
+      if (typeof terrLabOp === 'function' && terrLabOp() <= 0) return false; // 番号の濃さ0%：拡大しても番号は出ないので、「番号が出ます」とは言わない（監査 L2）
       const on = isAdmin() && !lkLocked() && dmState.on;
       return dmLabelMode(polyTerrs().filter(t => on ? !t.dummy : true), on) === 'none';
     } catch (e) { return false; }
@@ -2041,7 +2043,7 @@ body.duemode .terr-label:not(.duelab){display:none}
     // ボタンは1つだけを同じ行に置く。説明と凡例は、ボタンの下に重ねて出す（行の高さを変えないため）
     const html = `<button type="button" class="btn small ${on ? 'primary' : ''}" data-dmtog aria-pressed="${on}" aria-label="期限で色分け：${on ? '入' : '切'}">期限：${on ? '入' : '切'}</button>` +
       (mode === 'none' || on ? '<div class="dm-drop">' +
-        (mode === 'none' ? '<p class="dm-hint">拡大すると番号が出ます</p>' : '') +
+        (mode === 'none' && (on || typeof terrLabOp !== 'function' || terrLabOp() > 0) ? '<p class="dm-hint">拡大すると番号が出ます</p>' : '') +
         (on ? `<details><summary>凡例（色・記号の意味）</summary><div>${Object.keys(DMC).map(k => `<p><span class="sw" style="background:${DMC[k][0]}"></span>${DMC[k][1]} ${DMC[k][2]}</p>`).join('')}<p>線が破線＝貸出中（番号の横に「貸」）<br>点線＝貸出中止（「止」）</p><p class="muted"><b>番号の札</b>か、色のついた場所を押すと、その区域の詳しい情報（カルテ）が開きます</p></div></details>` : '') +
         '</div>' : '');
     if (show && html !== dmHtml) {
