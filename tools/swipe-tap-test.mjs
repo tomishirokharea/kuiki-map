@@ -137,6 +137,40 @@ for (const ms of [150, 300]) {
   await ctx.close();
 }
 
+// ずれた押し（押したことにならない）→ すぐに押し直す（400ms）→ 2回目で確認が出る（前の押しの「閉じる」が働かない）
+{
+  const { pg, ctx } = await page();
+  await houseScene(pg, 1);
+  await swipe(pg, await pg.$('#sheet .swipe-body'));
+  const d = await (await pg.$('#sheet [data-vdel]')).boundingBox(), cx = d.x + d.width / 2, cy = d.y + d.height / 2;
+  await pg.mouse.move(cx, cy); await pg.mouse.down(); await pg.waitForTimeout(80);
+  await pg.mouse.move(cx - 200, cy - 150, { steps: 3 }); await pg.mouse.up(); // ずれて、押したことにならない
+  await pg.waitForTimeout(100);
+  await pg.mouse.move(cx, cy); await pg.mouse.down(); await pg.waitForTimeout(400); await pg.mouse.up();
+  await pg.waitForTimeout(500);
+  ok(await askOpen(pg), 'ずれた押しのすぐあとに押し直す（400ms）と、確認が出る', null);
+  await ctx.close();
+}
+// ずらして離す → すぐに同じ行をスワイプし直す → 0.7秒たっても開いたまま
+{
+  const { pg, ctx } = await page();
+  await houseScene(pg, 1);
+  const row = await pg.$('#sheet .swipe-body');
+  const rb = await row.boundingBox();
+  await swipe(pg, row);
+  const d = await (await pg.$('#sheet [data-vdel]')).boundingBox();
+  await pg.mouse.move(d.x + d.width / 2, d.y + d.height / 2); await pg.mouse.down(); await pg.waitForTimeout(60);
+  await pg.mouse.move(d.x - 200, d.y - 150, { steps: 2 }); await pg.mouse.up();
+  // すぐに同じ行をスワイプし直す（閉じていく途中でも、閉じた行でも、左にずらせば開く）
+  const y = rb.y + rb.height / 2, x0 = rb.x + rb.width - 200;
+  await pg.mouse.move(x0, y); await pg.mouse.down();
+  for (let i = 1; i <= 6; i++) await pg.mouse.move(x0 - 40 * i, y);
+  await pg.mouse.up();
+  await pg.waitForTimeout(700);
+  ok(await pg.evaluate(() => !!document.querySelector('#sheet .swipe.open')), 'ずらして離したあと、すぐ同じ行をスワイプし直すと、開いたまま', null);
+  await ctx.close();
+}
+
 /* 2. 予定の行（ホーム）：左にスワイプ →「編集」「削除」 */
 async function schedScene(pg) {
   return pg.evaluate(() => {
