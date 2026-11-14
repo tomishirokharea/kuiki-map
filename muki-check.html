@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>向きの確認（区域マップ）</title>
+<!-- 向きモードが実際とずれるときに、スマホが返している向きの数字を見るための確認用ページ（2026-11-14）。
+     地図・区域・家の情報は読みません。このページで調べた数字は、どこにも送りません（画面に出すだけ） -->
+<style>
+  body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;padding:16px;font-size:18px;line-height:1.5;color:#1a1a1a;background:#fff}
+  h1{font-size:22px;margin:0 0 8px}
+  p{margin:6px 0}
+  button{font:inherit;font-size:20px;font-weight:700;padding:14px 18px;border-radius:12px;border:2px solid #1A3A5C;background:#1A3A5C;color:#fff;width:100%;margin:8px 0}
+  button.sub{background:#fff;color:#1A3A5C}
+  .row{display:flex;gap:12px;align-items:center;justify-content:center;margin:12px 0}
+  .dial{width:150px;height:150px;border-radius:50%;border:3px solid #1A3A5C;position:relative;flex:none}
+  .dial svg{position:absolute;inset:0;width:100%;height:100%}
+  .dial .lab{position:absolute;left:0;right:0;bottom:-28px;text-align:center;font-size:15px}
+  table{border-collapse:collapse;width:100%;font-size:16px;margin-top:28px}
+  td{border-bottom:1px solid #ddd;padding:6px 4px;vertical-align:top;word-break:break-all}
+  td:first-child{width:45%;color:#555}
+  .big{font-size:40px;font-weight:700;text-align:center;margin:4px 0}
+  .note{font-size:15px;color:#555}
+</style>
+</head>
+<body>
+<h1>向きの確認</h1>
+<p>スマホを<b>水平</b>に持ち、<b>画面を縦</b>のままにして、下のボタンを押してください。確認が出たら「許可」を押します。</p>
+<button type="button" id="go">調べはじめる</button>
+<div class="big" id="big">―</div>
+<p class="note" style="text-align:center">↑ スマホの上の方が向いている方角（北が0・東が90・南が180・西が270）。iPhoneの「コンパス」アプリと同じ数字なら正常です。</p>
+<div class="row">
+  <div class="dial"><svg viewBox="0 0 100 100"><g id="needle"><path d="M50 8 58 50H42z" fill="#D32F2F"/><path d="M50 92 58 50H42z" fill="#90A4AE"/><text x="50" y="30" text-anchor="middle" font-size="12" fill="#fff" font-weight="700">北</text></g></svg><div class="lab">この矢印が北を指す</div></div>
+</div>
+<table id="tbl"></table>
+<button type="button" class="sub" id="copy">数字をコピーする</button>
+<p class="note">コピーした文字を、そのままClaudeに送ってください。画面のスクリーンショットでもかまいません。</p>
+<script>
+(function () {
+  var last = null, evName = '-', count = 0, absCount = 0, absLast = null;
+  var appVer = '-', cacheNames = '-';
+  function n(v, d) { return typeof v === 'number' && isFinite(v) ? v.toFixed(d === undefined ? 1 : d) : String(v); }
+  function wo() { return typeof window.orientation === 'number' ? window.orientation : '(なし)'; }
+  function so() { return screen.orientation ? screen.orientation.angle + ' / ' + screen.orientation.type : '(なし)'; }
+  function standalone() {
+    var a = window.navigator.standalone === true ? 'ホーム画面のアプリ' : 'ブラウザ';
+    try { if (matchMedia('(display-mode: standalone)').matches) a += '（standalone）'; } catch (e) {}
+    return a;
+  }
+  function heading() {
+    if (!last) return null;
+    if (typeof last.webkitCompassHeading === 'number' && last.webkitCompassHeading >= 0) return last.webkitCompassHeading;
+    return null;
+  }
+  function rows() {
+    var h = heading();
+    return [
+      ['向きの数字（webkitCompassHeading）', last ? n(last.webkitCompassHeading) : '-'],
+      ['向きの正確さ（webkitCompassAccuracy）', last ? n(last.webkitCompassAccuracy) : '-'],
+      ['alpha / beta / gamma', last ? n(last.alpha) + ' / ' + n(last.beta) + ' / ' + n(last.gamma) : '-'],
+      ['absolute', last ? String(last.absolute) : '-'],
+      ['届いた合図の名前・回数', evName + ' ・ ' + count],
+      ['deviceorientationabsolute の有無・回数', ('ondeviceorientationabsolute' in window ? 'あり' : 'なし') + ' ・ ' + absCount + (absLast ? '（alpha ' + n(absLast.alpha) + '）' : '')],
+      ['window.orientation', String(wo())],
+      ['screen.orientation（角度 / 種類）', so()],
+      ['画面の大きさ（幅×高さ）', innerWidth + '×' + innerHeight],
+      ['開き方', standalone()],
+      ['公開中の区域マップの版', appVer],
+      ['この端末にある控え', cacheNames],
+      ['端末', navigator.userAgent],
+      ['計算した向き', h === null ? '-' : n(h, 0)]
+    ];
+  }
+  function draw() {
+    var h = heading();
+    document.getElementById('big').textContent = h === null ? (last ? '向きの数字が来ていません' : '―') : Math.round(h) + '°';
+    if (h !== null) document.getElementById('needle').setAttribute('transform', 'rotate(' + (-h) + ' 50 50)');
+    var t = document.getElementById('tbl'); t.textContent = '';
+    rows().forEach(function (r) {
+      var tr = document.createElement('tr'), a = document.createElement('td'), b = document.createElement('td');
+      a.textContent = r[0]; b.textContent = r[1]; tr.appendChild(a); tr.appendChild(b); t.appendChild(tr);
+    });
+  }
+  var raf = 0;
+  function onEv(e) {
+    if (e.type === 'deviceorientationabsolute') { absCount++; absLast = e; }
+    else { count++; evName = e.type; if (e.alpha !== null || typeof e.webkitCompassHeading === 'number') last = e; }
+    if (!raf) raf = requestAnimationFrame(function () { raf = 0; draw(); });
+  }
+  document.getElementById('go').onclick = function () {
+    var D = window.DeviceOrientationEvent;
+    function start() {
+      window.addEventListener('deviceorientation', onEv, true);
+      if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', onEv, true);
+      document.getElementById('go').textContent = '調べています…（スマホを回してみてください）';
+      setTimeout(function () { if (!count && !absCount) { document.getElementById('big').textContent = '向きの合図が届きません'; } }, 3000);
+    }
+    if (D && typeof D.requestPermission === 'function') {
+      D.requestPermission().then(function (r) { if (r === 'granted') start(); else document.getElementById('big').textContent = '許可されませんでした（' + r + '）'; })
+        .catch(function (e) { document.getElementById('big').textContent = '許可を聞けませんでした（' + e.message + '）'; });
+    } else start();
+  };
+  document.getElementById('copy').onclick = function () {
+    var s = rows().map(function (r) { return r[0] + '：' + r[1]; }).join('\n');
+    (navigator.clipboard ? navigator.clipboard.writeText(s) : Promise.reject()).then(function () {
+      document.getElementById('copy').textContent = 'コピーしました';
+    }).catch(function () { prompt('この文字をコピーしてください', s); });
+  };
+  fetch('index.html?vcheck=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (t) {
+    var m = t.match(/name="app-version" content="([^"]+)"/); appVer = m ? m[1] : '?'; draw();
+  }).catch(function () { appVer = '取れませんでした'; draw(); });
+  if (window.caches && caches.keys) caches.keys().then(function (k) { cacheNames = k.filter(function (x) { return /kuiki-app/.test(x); }).join(', ') || '(なし)'; draw(); });
+  window.addEventListener('resize', draw);
+  draw();
+})();
+</script>
+</body>
+</html>
