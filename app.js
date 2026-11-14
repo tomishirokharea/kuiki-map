@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.150';
+var APP_JS_VER = '2026.13.151';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2810,6 +2810,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.151', items: [
+    ['直', '左にスワイプして出した「取り消し」（家の記録）や「編集」「削除」（予定）を押しても、1回では働かないことがあったのを直しました。']
+  ] },
   { v: '2026.13.150', items: [
     ['地', '会えた家に、あとからほかの人が「留守」と記録すると、地図の印が「留」になっていたのを直しました。区域を受け取ってから一度でも会えた家は「会」と出ます。'],
     ['直', 'そのとき家の画面にも、わけが出るようにしました（あとの記録がほかの人のもの・前に会えているので「会」と出る、など）。あなたの記録はそのまま残るので、記録し直す必要はありません。']
@@ -14066,7 +14069,10 @@ function bindSwipe() {
   let cur = null, sx = 0, sy = 0, dx = 0, moved = false;
   document.addEventListener('pointerdown', e => {
     const body = e.target.closest('.swipe-body');
-    $$('.swipe.open').forEach(x => { if (!body || x !== body.parentNode) x.classList.remove('open'); });
+    // スワイプで出したボタン（取り消し・編集・削除）を押したときは、その行を閉じない。閉じると、押している間に行がボタンに
+    // かぶり、指をはなしても押したことにならなかった（ふつうに押す 0.1秒以上で起きる・31-2 の声・2026.13.151）
+    const acts = e.target.closest('.swipe-acts'), keep = body ? body.parentNode : acts ? acts.parentNode : null;
+    $$('.swipe.open').forEach(x => { if (x !== keep) x.classList.remove('open'); });
     if (!body || e.target.closest('a, button')) { cur = null; return; }
     cur = body; sx = e.clientX; sy = e.clientY; dx = 0; moved = false;
   }, true);
@@ -14090,6 +14096,11 @@ function bindSwipe() {
   };
   document.addEventListener('pointerup', end, true);
   document.addEventListener('pointercancel', end, true);
+  // ボタンを押したあとは、今までどおり行を閉じる（押したことが届いてから。確認で「やめる」を選んだときも閉じている）
+  document.addEventListener('click', e => {
+    const a = e.target.closest && e.target.closest('.swipe-acts button'); if (!a) return;
+    setTimeout(() => { const sw = a.closest('.swipe'); if (sw) sw.classList.remove('open'); }, 0);
+  });
   // 予定の行を押したとき
   const openRow = r => {
     if (Date.now() - swipedAt < 500) return;
