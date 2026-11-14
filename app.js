@@ -10593,7 +10593,7 @@ function stopHeading(north) {
 /* ---------- 向きの確かめ（2026.13.148・一時的な調べもの） ----------
    向きモードで地図の北がずれる件を調べるため、「北」ボタンを長く押す（約1秒）と、向きの数字を地図の上に出す。
    数字は画面に出すだけで、どこにも送らない。ふつうに押したときの動き（北が上にもどる）は変えない */
-const MUKI = { el: null, timer: 0, probe: null, eat: false };
+const MUKI = { el: null, timer: 0, probe: null, eat: 0 };
 function mukiProbe() {
   // 地図の中に見えない点を2つ置き、実際に画面に描かれた位置から「画面での北の向き」を測る（CSSで回した分もふくめて）
   if (!map) return null;
@@ -10603,7 +10603,7 @@ function mukiProbe() {
     const mk = () => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0'; pane.appendChild(d); return d; };
     MUKI.probe = [mk(), mk()];
   }
-  const c = map.getCenter(), lp = map.latLngToLayerPoint(c), np = map.latLngToLayerPoint([c.lat + 0.001, c.lng]);
+  const lp = map.latLngToLayerPoint(map.getCenter()), np = lp.subtract([0, 100]); // 地図の中で真北に100の点（地図をどれだけ縮めても測れるように）
   L.DomUtil.setPosition(MUKI.probe[0], lp); L.DomUtil.setPosition(MUKI.probe[1], np);
   const a = MUKI.probe[0].getBoundingClientRect(), b = MUKI.probe[1].getBoundingClientRect();
   const dx = b.left - a.left, dy = b.top - a.top;
@@ -10628,7 +10628,7 @@ function mukiText() {
 function mukiShow() {
   if (!MUKI.el) {
     const d = document.createElement('div');
-    d.id = 'mukiDiag'; d.setAttribute('data-notr', ''); d.setAttribute('role', 'status');
+    d.id = 'mukiDiag'; d.setAttribute('data-notr', ''); // 読み上げが止まらなくならないように、知らせる役目（role=status）はつけない
     d.style.cssText = 'position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 70px);z-index:3000;background:rgba(255,255,255,.93);color:#111;border:2px solid #1A3A5C;border-radius:10px;padding:8px;font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-all';
     d.innerHTML = '<pre style="margin:0;font:inherit;white-space:pre-wrap"></pre><div style="display:flex;gap:8px;margin-top:6px"><button type="button" class="btn" data-mk="copy" style="flex:1">数字をコピー</button><button type="button" class="btn" data-mk="close" style="flex:1">閉じる</button></div>';
     d.querySelector('[data-mk="copy"]').onclick = () => {
@@ -10643,14 +10643,16 @@ function mukiShow() {
   clearTimeout(MUKI.timer); tick();
 }
 function mukiHide() { clearTimeout(MUKI.timer); if (MUKI.el) MUKI.el.hidden = true; }
-/* 「北」ボタンを約1秒押し続けたら、確かめの数字を出す（そのあとの「押した」は北にもどさない） */
+/* 向きモードのときに「北」ボタンを約1.5秒押し続けたら、確かめの数字を出す（そのすぐあとの「押した」は北にもどさない）。
+   向きモードでないときは、長く押しても今までどおり（ゆっくり押す人がまちがえて出さないように・監査 Important） */
 function bindMukiDiag() {
   const nb = $('#btnNorth'); if (!nb) return;
   let t = 0;
   const cancel = () => { clearTimeout(t); t = 0; };
-  nb.addEventListener('pointerdown', () => { cancel(); MUKI.eat = false; t = setTimeout(() => { t = 0; MUKI.eat = true; mukiShow(); }, 900); });
+  nb.addEventListener('pointerdown', () => { cancel(); MUKI.eat = 0; if (!HEAD.on) return; t = setTimeout(() => { t = 0; MUKI.eat = Date.now(); mukiShow(); }, 1500); });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => nb.addEventListener(n, cancel));
-  nb.addEventListener('click', e => { if (MUKI.eat) { MUKI.eat = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true); // 長押しのすぐあとの「押した」だけ止める
+  nb.addEventListener('click', e => { const ate = MUKI.eat && Date.now() - MUKI.eat < 1500; MUKI.eat = 0; if (ate) { e.stopImmediatePropagation(); e.preventDefault(); } }, true); // 長押しのすぐあとの「押した」だけ止める（時間がたったら止めない）
+  document.addEventListener('visibilitychange', () => { if (document.hidden) mukiHide(); }); // アプリを閉じたら消す
   nb.addEventListener('contextmenu', e => e.preventDefault());
 }
 
@@ -16050,7 +16052,7 @@ function showView(name) {
   if (name === 'admin' && !isAdmin()) name = 'cards'; // ②の対応：グループ監督は「グループ」タブがなくなったため、係の画面には入れない
   if (name === 'follow' && !featFollow()) name = 'cards';
   if (currentView === 'map' && name !== 'map' && mode !== 'normal') { if (draw) endDraw(); else setMode('normal'); }
-  if (name !== 'map') { clearTarget(); followMap = false; hideNextPanel(); if (window.dncPickEnd) window.dncPickEnd(true); stopHeading(false); } // 地図を離れたら向きモードも止める
+  if (name !== 'map') { clearTarget(); followMap = false; hideNextPanel(); if (window.dncPickEnd) window.dncPickEnd(true); stopHeading(false); mukiHide(); } // 地図を離れたら向きモードも止める（向きの確かめの数字も消す）
   if (name !== 'admin' && window.KR && KR.clear) { try { KR.clear(); } catch (e) { /* 何もしない */ } } // 係の画面を出たら、［← 状況にもどる］と光を消す
   currentView = name;
   $$('.view').forEach(v => { v.hidden = v.id !== 'view-' + name; });
