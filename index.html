@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.145"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
+<meta name="app-version" content="2026.13.146"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -816,6 +816,12 @@ html[lang="es"] .atabs button{font-size:13px;white-space:normal;line-height:1.15
 .locbtn{position:absolute;right:10px;bottom:24px;z-index:520;width:56px;height:56px;border-radius:50%;border:0;background:#fff;color:#5F6368;box-shadow:0 2px 8px #0005;display:grid;place-items:center;padding:0}
 .locbtn svg{width:30px;height:30px}
 .locbtn.on{color:#1A73E8}
+.locbtn .hd{display:none} /* 向きモード（2026.13.146）：ボタンの上に向きの三角を出す（色だけで分けない） */
+.locbtn.head{color:#1A73E8;box-shadow:0 0 0 3px #1A73E8,0 2px 8px #0005}
+.locbtn.head .hd{display:inline}
+.headcone{background:none;border:0;pointer-events:none}
+.headcone span{display:block;width:96px;height:96px;transform-origin:50% 50%}
+.headcone svg{display:block;width:96px;height:96px}
 .locbtn.busy svg{animation:locBusy 1s ease-in-out infinite}
 @keyframes locBusy{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.locbtn.busy svg{animation:none;opacity:.5}}
@@ -1652,7 +1658,7 @@ body.renshu #btnUpd{display:none!important}
       <button type="button" class="zoomhint" id="zoomHint" hidden>地図を拡大すると家の印が出ます<span aria-hidden="true">×</span></button>
       <div class="cardbar" id="cardBar" hidden></div>
       <div class="nextpanel" id="nextPanel" hidden role="region" aria-label="記録のあと"></div>
-      <button type="button" class="locbtn" id="btnLocate" aria-label="現在地を表示"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></button>
+      <button type="button" class="locbtn" id="btnLocate" aria-label="現在地を表示"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/><path class="hd" d="M12 .8 15.6 7.6H8.4z" fill="currentColor" stroke="none"/></svg></button>
       <button type="button" class="northbtn" id="btnNorth" hidden aria-label="地図の北を上にもどす" title="北を上にもどす"><span class="ndl" aria-hidden="true"><svg viewBox="0 0 40 40"><text x="20" y="12" text-anchor="middle" fill="#D32F2F">北</text><path d="M20 14 24.5 25.5H15.5z" fill="#D32F2F"/><path d="M20 37 24.5 25.5H15.5z" fill="#90A4AE"/></svg></span></button>
       <button type="button" class="helpbtn" id="legendBtn" aria-label="この区域のようすと、印の見かた" aria-expanded="false" aria-controls="legend">?</button>
       <div class="legend" id="legend" hidden role="dialog" aria-labelledby="legendTitle">

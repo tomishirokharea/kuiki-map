@@ -1,0 +1,221 @@
+{
+ "made": "2026-11-14T02:48:37.366Z",
+ "rec": {
+  "detail.before": {
+   "myPos": null,
+   "center": [
+    26.16,
+    127.6785
+   ],
+   "zoom": 15,
+   "btnOn": false,
+   "btnBusy": false,
+   "btnHidden": false,
+   "posLayers": 0,
+   "mapDeg": 0,
+   "northHidden": true
+  },
+  "detail.tap1": {
+   "myPos": [
+    26.1612,
+    127.6758
+   ],
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "btnBusy": false,
+   "btnHidden": false,
+   "posLayers": 2,
+   "mapDeg": 0,
+   "northHidden": true
+  },
+  "detail.drag": {
+   "myPos": [
+    26.1612,
+    127.6758
+   ],
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": false,
+   "btnBusy": false,
+   "btnHidden": false,
+   "posLayers": 2,
+   "mapDeg": 0,
+   "northHidden": true
+  },
+  "detail.tapAgain": {
+   "myPos": [
+    26.1612,
+    127.6758
+   ],
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "btnBusy": false,
+   "btnHidden": false,
+   "posLayers": 2,
+   "mapDeg": 0,
+   "northHidden": true
+  },
+  "detail.drawMode": {
+   "btnHidden": true
+  },
+  "detail.normalMode": {
+   "btnHidden": false
+  },
+  "detail.rotAllowed": true,
+  "detail.rotated": {
+   "mapDeg": 40,
+   "northHidden": false
+  },
+  "detail.north": {
+   "mapDeg": 0,
+   "northHidden": true
+  },
+  "detail.rotOff": {
+   "mapDeg": 0
+  },
+  "detail.locateCb": {
+   "called": true,
+   "myPos": [
+    26.1612,
+    127.6758
+   ]
+  },
+  "detail.head.east": {
+   "on": true,
+   "head": true,
+   "btnOn": true,
+   "deg": -90,
+   "cone": 0
+  },
+  "detail.head.drag": {
+   "on": false,
+   "head": false,
+   "btnOn": false,
+   "deg": -90,
+   "cone": null
+  },
+  "detail.denied": {
+   "btnOn": false,
+   "btnBusy": false,
+   "myPos": null,
+   "toast": "現在地を取得できませんでした。端末の位置情報の設定を確認してください"
+  },
+  "simple.before": {
+   "myPos": null,
+   "center": [
+    26.16,
+    127.6785
+   ],
+   "zoom": 15,
+   "btnOn": false,
+   "btnBusy": false,
+   "btnHidden": false,
+   "posLayers": 0,
+   "mapDeg": 0,
+   "northHidden": true
+  },
+  "simple.tap1": {
+   "myPos": [
+    26.1612,
+    127.6758
+   ],
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "btnBusy": false,
+   "btnHidden": false,
+   "posLayers": 2,
+   "mapDeg": 0,
+   "northHidden": true
+  },
+  "simple.drag": {
+   "myPos": [
+    26.1612,
+    127.6758
+   ],
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": false,
+   "btnBusy": false,
+   "btnHidden": false,
+   "posLayers": 2,
+   "mapDeg": 0,
+   "northHidden": true
+  },
+  "simple.tapAgain": {
+   "myPos": [
+    26.1612,
+    127.6758
+   ],
+   "center": [
+    26.1612,
+    127.6758
+   ],
+   "zoom": 18,
+   "btnOn": true,
+   "btnBusy": false,
+   "btnHidden": false,
+   "posLayers": 2,
+   "mapDeg": 0,
+   "northHidden": true
+  },
+  "simple.drawMode": {
+   "btnHidden": true
+  },
+  "simple.normalMode": {
+   "btnHidden": false
+  },
+  "simple.rotAllowed": false,
+  "simple.rotated": {
+   "mapDeg": 0,
+   "northHidden": true
+  },
+  "simple.rotOff": {
+   "mapDeg": 0
+  },
+  "simple.locateCb": {
+   "called": true,
+   "myPos": [
+    26.1612,
+    127.6758
+   ]
+  },
+  "simple.head.east": {
+   "on": true,
+   "head": true,
+   "btnOn": true,
+   "deg": 0,
+   "cone": 90
+  },
+  "simple.head.drag": {
+   "on": false,
+   "head": false,
+   "btnOn": false,
+   "deg": 0,
+   "cone": null
+  },
+  "simple.denied": {
+   "btnOn": false,
+   "btnBusy": false,
+   "myPos": null,
+   "toast": "現在地を取得できませんでした。端末の位置情報の設定を確認してください"
+  }
+ }
+}

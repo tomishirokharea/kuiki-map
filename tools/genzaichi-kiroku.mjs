@@ -99,6 +99,20 @@ async function main() {
       rec[`${mode}.rotOff`] = { mapDeg: (await st(page)).mapDeg };
       // ほかの画面からの locate（区域をもらうの「近い順」など）：あとの処理を呼ぶ
       rec[`${mode}.locateCb`] = await page.evaluate(() => new Promise(res => { let called = false; locate(() => { called = true; }); setTimeout(() => res({ called, myPos: myPos ? myPos.map(v => Math.round(v * 1e5) / 1e5) : null }), 1500); }));
+      // 向きモード（2026.13.146 から）：青いときにもう一度押す → 東を向く → 指で動かす
+      const hasHead = await page.evaluate(() => typeof HEAD !== 'undefined');
+      if (hasHead) {
+        const orient = h => page.evaluate(hh => { for (let i = 0; i < 30; i++) window.dispatchEvent(new DeviceOrientationEvent('deviceorientationabsolute', { alpha: (360 - hh) % 360, beta: 10, gamma: 0, absolute: true })); }, h);
+        const hs = () => page.evaluate(() => { const b = document.getElementById('btnLocate'), sp = HEAD.cone && HEAD.cone.getElement() && HEAD.cone.getElement().firstElementChild;
+          return { on: HEAD.on, head: b.classList.contains('head'), btnOn: b.classList.contains('on'), deg: Math.round(mapDeg), cone: sp ? Math.round(parseFloat(sp.style.transform.replace('rotate(', ''))) : null }; });
+        await page.evaluate(() => { UI.mapRot = 'on'; uiSave(); setMapDeg(0); map.fire('dragstart'); map.setView([26.17, 127.70], 15, { animate: false }); }); // ボタンの青をいったん消す
+        await page.click('#btnLocate'); await page.waitForTimeout(700);
+        await page.click('#btnLocate'); await page.waitForTimeout(300);
+        await orient(90); await page.waitForTimeout(250);
+        rec[`${mode}.head.east`] = await hs();
+        await page.evaluate(() => map.fire('dragstart')); await page.waitForTimeout(150);
+        rec[`${mode}.head.drag`] = await hs();
+      }
       errors.push(...page.errs.map(e => mode + ': ' + e));
       await ctx.close();
       // 位置を使えないとき：お知らせを出し、ボタンを元にもどす
