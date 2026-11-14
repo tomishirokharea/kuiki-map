@@ -10496,16 +10496,18 @@ function headingOf(e) {
   if (typeof e.webkitCompassHeading === 'number' && isFinite(e.webkitCompassHeading) && e.webkitCompassHeading >= 0) h = e.webkitCompassHeading; // iPhone：北から時計回り
   else if (typeof e.alpha === 'number' && isFinite(e.alpha) && (e.absolute || HEAD.ev === 'deviceorientationabsolute')) h = 360 - e.alpha;   // Android：北からの向き（反時計回り）を直す
   if (h === null) return null;
-  return ((h + screenAngle()) % 360 + 360) % 360; // 画面を横にしているときは、その分を足す
+  return ((h + screenAngle(h === e.webkitCompassHeading && /iPhone|iPod/.test(navigator.userAgent))) % 360 + 360) % 360; // 画面を横にしているときは、その分を足す
 }
 /* 画面を回している角度（左に回すと 90・右に回すと 270）。
    iPhone の screen.orientation.angle は、縦のままでも 90 を返したり、横で左右が逆になったりして、向きが 90° ずれる原因になる。
-   そこで iPhone・Android の両方で意味が同じ window.orientation を先に使い、画面が縦長なのに横の値が来たときは 0 とみなす */
-function screenAngle() {
+   そこで iPhone・Android の両方で意味が同じ window.orientation を先に使う。
+   さらに iPhone だけは（縦が本来の向きで、画面の分割もないので）、縦長の画面なのに横の値が来たときは 0 とみなす。
+   iPad・Android タブレット・画面の分割では、縦長の窓でも横の値が正しいことがあるので、この直しはしない */
+function screenAngle(iphone) {
   let a = typeof window.orientation === 'number' ? window.orientation
     : (screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle : 0);
   a = ((Math.round(a) % 360) + 360) % 360;
-  if ((a === 90 || a === 270) && innerHeight >= innerWidth) a = 0;
+  if (iphone && (a === 90 || a === 270) && innerHeight > innerWidth) a = 0;
   return a;
 }
 function headOrient(e) {
