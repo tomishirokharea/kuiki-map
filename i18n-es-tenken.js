@@ -297,4 +297,6 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "会えたの記録を直す": "Corregir el registro «En casa»",
 "会えた家に、あとからほかの人が「留守」と記録すると、地図の印が「留」になっていたのを直しました。区域を受け取ってから一度でも会えた家は「会」と出ます。": "Se corrigió que, si otra persona registraba «Ausente» después en una casa donde ya lo encontraron, la marca del mapa mostraba «留». Ahora las casas donde lo encontraron al menos una vez desde que se recibió el territorio muestran «会».",
 "そのとき家の画面にも、わけが出るようにしました（あとの記録がほかの人のもの・前に会えているので「会」と出る、など）。あなたの記録はそのまま残るので、記録し直す必要はありません。": "En ese caso, la pantalla de la casa ahora explica el motivo (el registro posterior es de otra persona, o ya lo encontraron antes y por eso muestra «会», etc.). Su registro se conserva, así que no hace falta registrarlo de nuevo.",
+// スワイプで出したボタン（2026.13.151）
+"左にスワイプして出した「取り消し」（家の記録）や「編集」「削除」（予定）を押しても、1回では働かないことがあったのを直しました。": "Se corrigió que, a veces, los botones que aparecen al deslizar a la izquierda («Anular» en los registros de una casa, «Editar» y «Borrar» en la agenda) no funcionaban al primer toque.",
 });
