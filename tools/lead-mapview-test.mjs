@@ -71,6 +71,41 @@ for (const [w, simple] of [[1280, false], [390, false], [390, true]]) {
   ok(!errs.length, `${tag}：JS のエラーなし`, errs);
   await ctx.close();
 }
+// アプリを開いた直後（地図をまだ一度も開いていない）に押しても、その区域の大きさで出る（監査 I-1）
+for (const w of [1280, 390]) {
+  const { pg, ctx, ids } = await page(w, false);
+  await pg.evaluate(() => openLeadPick());
+  await pg.waitForTimeout(300);
+  await pg.click(`#sheet [data-leadview="${ids[0]}"]`, { timeout: 3000 }).catch(() => {});
+  await pg.waitForTimeout(1500);
+  const r = await pg.evaluate(id => { const t = terrById(id); const c = map.getCenter(), bb = L.latLngBounds(t.polygon); return { z: map.getZoom(), fit: terrFitZoom(t), inView: map.getBounds().contains(bb.getCenter()), centerIn: bb.pad(0.5).contains(c) }; }, ids[0]);
+  ok(Math.abs(r.z - r.fit) <= 1 && r.inView && r.centerIn, `開いた直後 ${w}px：その区域の大きさで地図に出る（全区域にならない）`, r);
+  await ctx.close();
+}
+// 自分が今日の司会の区域：「司会はしていません」とは出さない（監査 I-2）
+{
+  const { pg, ctx, ids, nos } = await page(390, false);
+  await pg.evaluate(() => openLeadPick());
+  await pg.waitForTimeout(300);
+  await pg.click(`#sheet [data-leadview="${ids[2]}"]`, { timeout: 3000 }).catch(() => {});
+  await pg.waitForTimeout(500);
+  const tt = await pg.evaluate(() => [...document.querySelectorAll('.toast, #toast')].map(x => x.textContent).join(' '));
+  ok(tt.includes(`区域${nos[2]}を地図で出しました`) && !/司会はしていません/.test(tt), '自分が今日の司会の区域：「司会はしていません」とは出さない', tt);
+  ok(await pg.evaluate(id => !!terrById(id).lead && terrById(id).lead.uid === me().id, ids[2]), '自分が今日の司会のまま', null);
+  await ctx.close();
+}
+// 線がない区域：地図で出したとは言わず、線がないことを知らせる（監査 Minor 3）
+{
+  const { pg, ctx, ids, nos } = await page(390, false);
+  await pg.evaluate(id => { terrById(id).polygon = []; Store.save(); openLeadPick(); }, ids[0]);
+  await pg.waitForTimeout(300);
+  await pg.click(`#sheet [data-leadview="${ids[0]}"]`, { timeout: 3000 }).catch(() => {});
+  await pg.waitForTimeout(500);
+  const tt = await pg.evaluate(() => [...document.querySelectorAll('.toast, #toast')].map(x => x.textContent).join(' '));
+  ok(/まだ地図に線が引かれていません/.test(tt) && !/地図で出しました/.test(tt), '線がない区域：線がないことを知らせる', tt);
+  await ctx.close();
+}
+
 // さがす欄（7枚以上）で、かくれた行の「地図で見る」も一緒にかくれる
 {
   const { pg, ctx, ids } = await page(1280, false);

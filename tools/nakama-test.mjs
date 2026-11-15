@@ -243,7 +243,7 @@ await pg.setViewportSize({ width: 375, height: 900 });
 { const fs = await import('node:fs'); const rd = f => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
   const a = (rd('index.html').match(/name="app-version" content="([^"]+)"/) || [])[1], j = (rd('app.js').match(/APP_JS_VER = '([^']+)'/) || [])[1], c = (rd('sw.js').match(/APP_CACHE = 'kuiki-app-v(\d+)'/) || [])[1];
   // 番号は決め打ちにしない（次に版を上げても、そろっているかを確かめる・2026.13.153）
-  ok(!!a && a === j && c === a.split('.').pop() && rd('app.js').includes(`v: '${a}'`) && a >= '2026.13.152', 'T4-23 版がそろう（3か所と更新のお知らせ）', { a, j, c }); }
+  ok(!!a && a === j && c === a.split('.').pop() && rd('app.js').includes(`v: '${a}'`) && Number(c) >= 152, 'T4-23 版がそろう（3か所と更新のお知らせ）', { a, j, c }); }
 ok(errs.length === 0, 'ページのエラー0', errs);
 await b.close();
 console.log(ng ? `NG ${ng}` : '全部OK'); process.exit(ng);

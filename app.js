@@ -8573,12 +8573,14 @@ function openLeadPick() {
   $$('[data-leadtake]', S).forEach(x => x.onclick = () => takeLead(x.dataset.leadtake));
   $$('[data-leadview]', S).forEach(x => x.onclick = () => viewLeadTerr(x.dataset.leadview));
 }
-/* 「司会だけする」の一覧から、司会を引き受けずに地図で見る。今日の司会・担当者・S-13 は何も変わらない（見るだけ） */
+/* 「司会だけする」の一覧から、司会を引き受けずに地図で見る。今日の司会・担当者・S-13 は何も変わらない（見るだけ）。
+   地図へは、区域カードの「ほかの区域を見る」と同じ openTerr で入る（開いた直後でも全区域にならない・監査 I-1） */
 function viewLeadTerr(id) {
   const t = terrById(id); if (!t) return;
-  closeSheet(); showView('map');
-  selectTerr(id, { fit: true });
-  toast(`区域${t.no}を地図で出しました（見るだけです。司会はしていません）`);
+  closeSheet(); openTerr(id);
+  if (!okPoly(t.polygon)) { toast(`区域${t.no}は、まだ地図に線が引かれていません`); return; }
+  // 自分が今日の司会・今日回る人の区域なら「司会はしていません」とは言わない（監査 I-2）
+  toast(myTerr(t) ? `区域${t.no}を地図で出しました` : `区域${t.no}を地図で出しました（見るだけです。司会はしていません）`);
 }
 async function takeLead(id) {
   let t = terrById(id);
