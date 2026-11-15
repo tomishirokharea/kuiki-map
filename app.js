@@ -9409,6 +9409,28 @@ const activeCards = () => { const now = Date.now(); return D().awayCards.filter(
 /* グループで回る留守宅カード：c.group（グループ名）と c.helpers（今日回る人。区域の helpers と同じ形）を持つ */
 const cardHelpers = c => { if (!c || !c.group || D().settings.groupOn === 0) return []; const now = Date.now(); return (c.helpers || []).filter(h => Date.parse(h.until) > now); };
 const isCardHelper = c => cardHelpers(c).some(h => h.uid === me().id);
+/* 仲間が分かる（2026-11-15）：えらばれた人が、カードを開いたときに「今日いっしょに回る人」を見られるようにする。
+   host＝司会（グループ）か担当、others＝ほかの仲間。自分は名前に出さず、人数 n にだけ入れる。名簿にいない人（転出・止めた人）は「不明さん」にせず、名前にも人数にも入れない。 */
+function fellowsOf(t, c) {
+  const my = me().id;
+  const host0 = c ? c.by : ((leadOf(t) || {}).uid || t.holder);
+  const hs = c ? cardHelpers(c) : helpersOf(t);
+  const ok = u => !!u && u !== my && !!userById(u);
+  const host = ok(host0) ? host0 : null;
+  const others = [];
+  hs.forEach(h => { if (ok(h.uid) && h.uid !== host && !others.includes(h.uid)) others.push(h.uid); });
+  return { host, hostRole: c || t.group ? '司会' : '担当', others, n: 1 + (host ? 1 : 0) + others.length };
+}
+function fellowsHtml(t, c, all) {
+  if (!t && !c) return '';
+  if (c ? (c.by === me().id || !isCardHelper(c)) : (t.holder === me().id || isLead(t) || !isHelper(t))) return '';
+  const f = fellowsOf(t, c), names = (f.host ? [f.host] : []).concat(f.others);
+  if (!names.length) return '';
+  const es = !!(window.KI && window.KI.lang === 'es'), more = !all && names.length > 6 ? names.length - 5 : 0;
+  const shown = more ? names.slice(0, 5) : names;
+  const list = shown.map(u => esc(uname(u)) + (es ? '' : 'さん')).join(es ? ', ' : '、');
+  return `<p class="muted fellows" data-ft="${esc((t || {}).id || '')}" data-fc="${esc((c || {}).id || '')}"><b>今日このカードを回る人（あなたをふくめ${f.n}人）：</b>${f.host ? `<span>${f.hostRole}</span> ` : ''}<span data-notr>${list}</span>${more ? ` <button type="button" class="btn small" data-fellowsmore>ほか${more}人</button>` : ''}</p>`;
+}
 const myAwayCount = g => activeCards().filter(c => c.by === me().id && !!c.group === !!g).length; // 個人とグループは別々に数える
 let awayGroupSlot = null, awayGroupMode = 'share'; // グループの留守宅カードの回り方：'share'（シェア）／'split'（分ける）
 /* グループの次の集まり（2週間以内）の時間帯。なければ今の時間帯 */
@@ -16231,6 +16253,12 @@ function bindStatic() {
   $('#adS12').onclick = () => openS12();
   $('#adPerf').onclick = () => { toast('測っています…'); setTimeout(runPerfCheck, 50); };
   $('#adLoadLog').onclick = () => openLoadLog();
+  document.addEventListener('click', e => { // 「ほか○人」：その行を全員の名前にする（覚えない）
+    const m = e.target.closest('[data-fellowsmore]'), p = m && m.closest('.fellows'); if (!p) return;
+    e.stopPropagation();
+    const c = p.dataset.fc ? D().awayCards.find(x => x.id === p.dataset.fc) : null;
+    p.outerHTML = fellowsHtml(terrById(p.dataset.ft), c || null, true);
+  });
   document.addEventListener('click', e => {
     const o = e.target.closest('[data-asgopen], [data-asgok]'); if (!o) return;
     asgMarkSeen(String(o.dataset.asgkeys || o.dataset.asgok || '').split(' ').filter(Boolean));
