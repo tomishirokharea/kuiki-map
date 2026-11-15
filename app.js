@@ -8577,7 +8577,7 @@ function openLeadPick() {
    地図へは、区域カードの「ほかの区域を見る」と同じ openTerr で入る（開いた直後でも全区域にならない・監査 I-1） */
 function viewLeadTerr(id) {
   const t = terrById(id); if (!t) return;
-  closeSheet(); openTerr(id);
+  closeSheet(); openTerr(id, { quiet: true }); // 初めて使う人への「右下の？…（返す）」の案内で、この知らせを上書きしない（再監査 I-1）
   if (!okPoly(t.polygon)) { toast(`区域${t.no}は、まだ地図に線が引かれていません`); return; }
   // 自分が今日の司会・今日回る人の区域なら「司会はしていません」とは言わない（監査 I-2）
   toast(myTerr(t) ? `区域${t.no}を地図で出しました` : `区域${t.no}を地図で出しました（見るだけです。司会はしていません）`);
@@ -16181,11 +16181,12 @@ function updateAdminBadge() {
   b.textContent = badgeCache.n; b.hidden = !badgeCache.n;
 }
 window.setBadgeCount = n => { badgeCache = { n, at: Date.now(), rev: badgeRev }; };
-function openTerr(id) {
+function openTerr(id, opt) {
   firstMapShow = false;
   zoomHintShown = false; // 区域カードから入ったときは、案内をもう一度出す
   showView('map');
   selectTerr(id, { fit: true });
+  if (opt && opt.quiet) return; // 呼んだ側が自分の知らせを出すとき（「司会だけする」の地図で見る）は、「右下の？」の案内を重ねない
   if (beginner()) setTimeout(() => toast(UI.mode !== 'detail' ? '右下の「?」を押すと、印の見かたと「返す」ボタンが出ます' : '右下の「?」を押すと、この区域の進み具合やおすすめ順が見られます', null, null, { below: '#mapTools' }), 2500); // 簡単モードは、おすすめ順を出さないので文を変える
 }
 

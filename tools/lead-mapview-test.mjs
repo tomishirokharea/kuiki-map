@@ -94,6 +94,26 @@ for (const w of [1280, 390]) {
   ok(await pg.evaluate(id => !!terrById(id).lead && terrById(id).lead.uid === me().id, ids[2]), '自分が今日の司会のまま', null);
   await ctx.close();
 }
+// 初めて使う人（案内オン）：3秒たっても「見るだけ」の知らせが残り、「右下の？…」「返す」の案内に替わらない（再監査 I-1）
+for (const simple of [false, true]) {
+  const { pg, ctx, ids } = await page(390, simple);
+  await pg.evaluate(() => { UI.guide = 'on'; openLeadPick(); });
+  await pg.waitForTimeout(300);
+  await pg.click(`#sheet [data-leadview="${ids[0]}"]`, { timeout: 3000 }).catch(() => {});
+  await pg.waitForTimeout(3200);
+  const tt = await pg.evaluate(() => { const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; });
+  ok(/見るだけ/.test(tt) && !/右下/.test(tt) && !/返す/.test(tt), `初めて使う人${simple ? '・かんたん' : ''}：3秒後も「見るだけ」の知らせのまま（ほかの案内に替わらない）`, tt);
+  await ctx.close();
+}
+// 前からの働き：区域カードの「地図をひらく」（openTerr）は、初めて使う人に今までどおり「右下の？」の案内を出す
+{
+  const { pg, ctx, ids } = await page(390, false);
+  await pg.evaluate(id => { UI.guide = 'on'; openTerr(id); }, ids[0]);
+  await pg.waitForTimeout(3000);
+  const tt = await pg.evaluate(() => { const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; });
+  ok(/右下の「\?」/.test(tt), '前からの働き：openTerr は初めて使う人に「右下の？」の案内を出す', tt);
+  await ctx.close();
+}
 // 線がない区域：地図で出したとは言わず、線がないことを知らせる（監査 Minor 3）
 {
   const { pg, ctx, ids, nos } = await page(390, false);
