@@ -160,6 +160,39 @@ for (const w of [375, 1280]) {
   await run(base, `t.holder = my; showView('cards'); renderCards(); return 1;`);
   const r = await pg.evaluate(() => { const x = [...document.querySelectorAll('.tcard')].find(c => c.querySelector('[data-return]')); return x ? { t: x.textContent, f: !!x.querySelector('.fellows') } : null; });
   ok(r && !r.f && /今日回る人（3人）：/.test(r.t) && r.t.includes('今日回る人をえらぶ') && r.t.includes('回る範囲を分ける'), 'T2-19 担当者の画面は今までどおり', r && r.t); }
+/* ---- Task 3：かんたん表示（番号は T3-） ---- */
+await pg.evaluate(() => { UI.mode = 'simple'; });
+await pg.setViewportSize({ width: 375, height: 900 });
+// T3-20 区域カード・留守宅カード・地図の帯
+{ await run(base, `showView('cards'); renderCards(); return 1;`);
+  const r = await pg.evaluate(() => { const tc = [...document.querySelectorAll('.tcard')].filter(x => !x.classList.contains('away')); return tc.map(x => ({ f: !!x.querySelector('.tbody .fellows'), inBtn: !!x.querySelector('button .fellows, .actions .fellows'), t: (x.querySelector('.fellows') || {}).textContent || '', own: !!x.querySelector('[data-return]') })); });
+  ok(r.some(x => x.f && x.t.includes('あなたをふくめ4人') && !x.own && !x.inBtn), 'T3-20 簡単：区域カードに仲間（tbody の中）', r);
+  ok(r.filter(x => x.own).every(x => !x.t), 'T3-20 簡単：担当者の自分のカードには出ない', r); }
+{ await run(base, `const c = { id: 'cx3', terrId: t.id, by: H, group: 'g1', slot: 'sat_am', at: yest, expiresAt: tomorrow, keys: [], helpers: [{ uid: my, until: tomorrow, by: H, at: yest }, { uid: ids[0], until: tomorrow, by: H, at: yest }] }; D().awayCards = (D().awayCards || []).filter(x => x.id !== 'cx3'); D().awayCards.push(c); showView('cards'); renderCards(); return 1;`);
+  const a = await pg.evaluate(() => { const x = document.querySelector('.tcard.away .tbody .fellows'); return x ? { t: x.textContent, inBtn: !!x.closest('button') } : null; });
+  ok(a && a.t.includes('あなたをふくめ3人') && a.t.includes('アキさん') && !a.inBtn, 'T3-20 簡単：留守宅カードに仲間', a); }
+{ await run(base, `D().awayCards = (D().awayCards || []).filter(x => !/^cx/.test(x.id)); delete t.parts; showView('map'); openTerr(t.id); toggleLegend(true); return 1;`);
+  await pg.waitForTimeout(300);
+  const r = await pg.evaluate(() => { const f = document.querySelector('#legendInfo .fellows'); return f ? { t: f.textContent, afterKeep: !!document.querySelector('#kLgKeep') && !!(document.querySelector('#kLgKeep').compareDocumentPosition(f) & 4), inKeep: !!f.closest('#kLgKeep') } : null; });
+  ok(r && r.t.includes('あなたをふくめ4人') && r.afterKeep && !r.inKeep, 'T3-20 簡単：地図の帯（#kLgKeep のあと）に仲間', r); }
+// T3-21 回帰：今日のあなたの範囲・前の人は #kLgKeep に残る／仲間の行と混ざらない
+{ await run(base, `t.parts = [{ id: 'pt1', uids: [my, ids[0]], poly: [[26.18,127.68],[26.181,127.68],[26.181,127.681]], until: tomorrow, at: yest, by: H }]; showView('map'); openTerr(t.id); toggleLegend(true); return 1;`);
+  await pg.waitForTimeout(300);
+  const r = await pg.evaluate(() => { const k = document.querySelector('#kLgKeep'); return { part: !!(k && [...k.querySelectorAll('.okmsg')].some(p => /今日のあなたの範囲/.test(p.textContent))), keepF: !!(k && k.querySelector('.fellows')), f: !!document.querySelector('#legendInfo .fellows') }; });
+  ok(r.part && !r.keepF && r.f, 'T3-21 簡単：今日のあなたの範囲は kLgKeep に残り、仲間の行は別', r); }
+// 担当者の簡単カード・帯は変わらない
+{ await run(base, `t.holder = my; delete t.parts; showView('cards'); renderCards(); return 1;`);
+  const r = await pg.evaluate(() => ({ f: !!document.querySelector('.tcard .fellows') }));
+  ok(!r.f, 'T3-21 簡単：担当者のカードに仲間の行は出ない', r);
+  await run(base, `t.holder = my; showView('map'); openTerr(t.id); toggleLegend(true); return 1;`);
+  await pg.waitForTimeout(300);
+  ok(await pg.evaluate(() => !document.querySelector('#legendInfo .fellows')), 'T3-21 簡単：担当者の帯に仲間の行は出ない'); }
+// はみ出し（幅375・20人・簡単）
+{ await run({ names: many(19) }, `showView('cards'); renderCards(); return 1;`);
+  const a = await pg.evaluate(() => document.documentElement.scrollWidth);
+  await pg.click('.tcard .fellows [data-fellowsmore]');
+  const r = await pg.evaluate(() => ({ w: document.documentElement.scrollWidth, view: currentView, more: !!document.querySelector('.tcard .fellows [data-fellowsmore]') }));
+  ok(a <= 375 && r.w <= 375 && r.view === 'cards' && !r.more, 'T3-20 簡単：20人でもはみ出さず、ほか n人で地図は開かない', { a, ...r }); }
 ok(errs.length === 0, 'ページのエラー0', errs);
 await b.close();
 console.log(ng ? `NG ${ng}` : '全部OK'); process.exit(ng);
