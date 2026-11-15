@@ -193,6 +193,34 @@ await pg.setViewportSize({ width: 375, height: 900 });
   await pg.click('.tcard .fellows [data-fellowsmore]');
   const r = await pg.evaluate(() => ({ w: document.documentElement.scrollWidth, view: currentView, more: !!document.querySelector('.tcard .fellows [data-fellowsmore]') }));
   ok(a <= 375 && r.w <= 375 && r.view === 'cards' && !r.more, 'T3-20 簡単：20人でもはみ出さず、ほか n人で地図は開かない', { a, ...r }); }
+// T4-22 スペイン語の画面：.fellows に日本語が残らない（名前 data-notr はのぞく）
+{ const pe = await ctx.newPage();
+  await pe.route('**/*', r => /gsi\.go\.jp|fonts\.g|script\.google|open-meteo/.test(r.request().url()) ? r.abort() : r.continue());
+  await pe.route('**/config.js', r => r.fulfill({ status: 200, contentType: 'application/javascript', body: CFG }));
+  await pe.goto(`http://localhost:${port}/index.html?lang=es`);
+  await pe.waitForFunction(() => typeof openTarget === 'function' && typeof Store !== 'undefined' && Store.data);
+  const r = await pe.evaluate(() => {
+    const D_ = D(), my = me().id, DAY = 864e5, mk = (id, name) => { let u = userById(id); if (!u) { u = { id, name }; D_.users.push(u); } u.name = name; return id; };
+    const H = mk('u_H', 'Hana'); const ids = ['Aki', 'Bob', 'C3', 'D4', 'E5', 'F6', 'G7', 'H8'].map((n, i) => mk('u_p' + i, n));
+    const t = D_.territories.find(x => x.id), tm = new Date(Date.now() + DAY).toISOString(), yt = new Date(Date.now() - DAY).toISOString();
+    t.holder = H; t.group = 'g1'; delete t.lead; D_.settings.groupOn = 1;
+    t.helpers = [my, ...ids].map(u => ({ uid: u, until: tm, by: H, at: yt }));
+    const box = document.createElement('div'); box.id = 'esbox'; document.body.appendChild(box);
+    box.innerHTML = fellowsHtml(t, null) + fellowsHtml(Object.assign({}, t, { group: undefined }), null);
+    return new Promise(res => setTimeout(() => {
+      const out = [...box.querySelectorAll('.fellows')].map(f => { const c = f.cloneNode(true); c.querySelectorAll('[data-notr]').forEach(n => n.remove()); return { lang: window.KI.lang, t: c.textContent, full: f.textContent }; });
+      res(out);
+    }, 500));
+  });
+  const JPre = /[぀-ヿ㐀-鿿]/;
+  ok(r.length === 2 && r.every(x => x.lang === 'es' && !JPre.test(x.t)), 'T4-22 スペイン語：.fellows に日本語が残らない', r);
+  ok(/Hoy recorren esta tarjeta \(10 con usted\)/.test(r[0].t) && /Dirige/.test(r[0].t) && /\d+ más/.test(r[0].t), 'T4-22 スペイン語の文', r[0]);
+  ok(/Asignado a|Responsable/.test(r[1].t), 'T4-22 担当の訳', r[1]);
+  await pe.close(); }
+// T4-23 版がそろう
+{ const fs = await import('node:fs'); const rd = f => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
+  const a = (rd('index.html').match(/name="app-version" content="([^"]+)"/) || [])[1], j = (rd('app.js').match(/APP_JS_VER = '([^']+)'/) || [])[1], c = (rd('sw.js').match(/APP_CACHE = 'kuiki-app-v(\d+)'/) || [])[1];
+  ok(a === '2026.13.152' && j === '2026.13.152' && c === '152' && /v: '2026\.13\.152'/.test(rd('app.js')), 'T4-23 版がそろう（152）', { a, j, c }); }
 ok(errs.length === 0, 'ページのエラー0', errs);
 await b.close();
 console.log(ng ? `NG ${ng}` : '全部OK'); process.exit(ng);
