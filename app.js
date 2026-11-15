@@ -16265,10 +16265,15 @@ function bindStatic() {
   $('#adPerf').onclick = () => { toast('測っています…'); setTimeout(runPerfCheck, 50); };
   $('#adLoadLog').onclick = () => openLoadLog();
   document.addEventListener('click', e => { // 「ほか○人」：その行を全員の名前にする（覚えない）
+    /* .fellows の行は、押せる要素（[data-open] [data-awayopen] [data-asgopen] [data-asgok] .topen [data-go]）の中に置かない（ここは document の委譲なので、中に置くと先にそちらが開く） */
     const m = e.target.closest('[data-fellowsmore]'), p = m && m.closest('.fellows'); if (!p) return;
-    e.stopPropagation();
     const c = p.dataset.fc ? D().awayCards.find(x => x.id === p.dataset.fc) : null;
-    p.outerHTML = fellowsHtml(terrById(p.dataset.ft), c || null, true);
+    if (p.dataset.fc && !c) return; // カードが消えていたら、区域の人にすり替えず、行はそのまま
+    const html = fellowsHtml(terrById(p.dataset.ft), c || null, true);
+    if (!html) return;
+    const tp = document.createElement('template'); tp.innerHTML = html;
+    const np = tp.content.firstElementChild; np.tabIndex = -1; // ボタンが消えるので、フォーカスを新しい行に移す
+    p.replaceWith(np); np.focus({ preventScroll: true });
   });
   document.addEventListener('click', e => {
     const o = e.target.closest('[data-asgopen], [data-asgok]'); if (!o) return;

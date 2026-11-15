@@ -193,6 +193,28 @@ await pg.setViewportSize({ width: 375, height: 900 });
   await pg.click('.tcard .fellows [data-fellowsmore]');
   const r = await pg.evaluate(() => ({ w: document.documentElement.scrollWidth, view: currentView, more: !!document.querySelector('.tcard .fellows [data-fellowsmore]') }));
   ok(a <= 375 && r.w <= 375 && r.view === 'cards' && !r.more, 'T3-20 簡単：20人でもはみ出さず、ほか n人で地図は開かない', { a, ...r }); }
+// 最終レビュー M1・M4：カード経由の「ほか n人」（展開・フォーカス・消えたカードでは行を変えない）
+{ const CARD = `const c = { id: 'cx9', terrId: t.id, by: H, group: 'g1', slot: 'sat_am', at: yest, expiresAt: tomorrow, keys: [], helpers: [my, ...ids].map(u => ({ uid: u, until: tomorrow, by: H, at: yest })) }; D().awayCards = (D().awayCards || []).filter(x => !/^cx/.test(x.id)); D().awayCards.push(c); showView('cards'); renderCards(); return 1;`;
+  await run({ names: many(19) }, CARD);
+  const sel = '.tcard.away .fellows[data-fc="cx9"]';
+  const a = await pg.evaluate(s => { const f = document.querySelector(s); return f ? { more: !!f.querySelector('[data-fellowsmore]'), t: f.textContent } : null; }, sel);
+  await pg.click(sel + ' [data-fellowsmore]');
+  const b2 = await pg.evaluate(s => { const f = document.querySelector(s); return f ? { more: !!f.querySelector('[data-fellowsmore]'), n: (f.textContent.match(/さん/g) || []).length, act: document.activeElement === f, tag: document.activeElement.tagName } : null; }, sel);
+  ok(a && a.more && b2 && !b2.more && b2.n === 20, 'M1 カード経由：ほか n人 で全員にひらく', { a, b2 });
+  ok(b2 && b2.act, 'M4 ほか n人 のあと、フォーカスが .fellows の行にある', b2);
+  // 消えたカード：行を変えない（区域の helpers の別の人にすり替えない）
+  await run({ names: many(19) }, CARD);
+  const before = await pg.evaluate(s => document.querySelector(s).outerHTML, sel);
+  await pg.evaluate(() => { D().awayCards = D().awayCards.filter(x => x.id !== 'cx9'); });
+  await pg.click(sel + ' [data-fellowsmore]');
+  const after = await pg.evaluate(s => { const f = document.querySelector(s); return f ? f.outerHTML : null; }, sel);
+  ok(after === before, 'M1 カードが消えたあとに押しても行は変わらない', { before, after });
+  await pg.evaluate(() => { D().awayCards = (D().awayCards || []).filter(x => !/^cx/.test(x.id)); }); }
+// 最終レビュー M2：かんたん表示の区域カードで「今日のあなたの範囲」→ 仲間の行の順
+{ await run(base, `t.parts = [{ id: 'pt1', uids: [my, ids[0]], poly: [[26.18,127.68],[26.181,127.68],[26.181,127.681]], until: tomorrow, at: yest, by: H }]; showView('cards'); renderCards(); return 1;`);
+  const r = await pg.evaluate(() => { const x = [...document.querySelectorAll('.tcard')].find(c => c.querySelector('.fellows') && c.querySelector('.hint-strong')); if (!x) return null; return { partFirst: !!(x.querySelector('.hint-strong').compareDocumentPosition(x.querySelector('.fellows')) & 4) }; });
+  ok(r && r.partFirst, 'M2 かんたん：「今日のあなたの範囲」が仲間の行より先', r);
+  await run(base, `delete t.parts; return 1;`); }
 // T4-22 スペイン語の画面：.fellows に日本語が残らない（名前 data-notr はのぞく）
 { const pe = await ctx.newPage();
   await pe.route('**/*', r => /gsi\.go\.jp|fonts\.g|script\.google|open-meteo/.test(r.request().url()) ? r.abort() : r.continue());
@@ -214,8 +236,8 @@ await pg.setViewportSize({ width: 375, height: 900 });
   });
   const JPre = /[぀-ヿ㐀-鿿]/;
   ok(r.length === 2 && r.every(x => x.lang === 'es' && !JPre.test(x.t)), 'T4-22 スペイン語：.fellows に日本語が残らない', r);
-  ok(/Hoy recorren esta tarjeta \(10 con usted\)/.test(r[0].t) && /Dirige/.test(r[0].t) && /\d+ más/.test(r[0].t), 'T4-22 スペイン語の文', r[0]);
-  ok(/Asignado a|Responsable/.test(r[1].t), 'T4-22 担当の訳', r[1]);
+  ok(/Hoy recorren esta tarjeta \(10 personas, contándolo a usted\)/.test(r[0].t) && /Dirige/.test(r[0].t) && /\d+ más/.test(r[0].t), 'T4-22 スペイン語の文', r[0]);
+  ok(/Asignado a/.test(r[1].t), 'T4-22 担当の訳', r[1]);
   await pe.close(); }
 // T4-23 版がそろう
 { const fs = await import('node:fs'); const rd = f => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');

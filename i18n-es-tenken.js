@@ -300,7 +300,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 // スワイプで出したボタン（2026.13.151）
 "左にスワイプして出した「取り消し」（家の記録）や「編集」「削除」（予定）を押しても、1回では働かないことがあったのを直しました。": "Se corrigió que, a veces, los botones que aparecen al deslizar a la izquierda («Anular» en los registros de una casa, «Editar» y «Borrar» en la agenda) no funcionaban al primer toque.",
 // 今日回る仲間（2026.13.152）
-"今日このカードを回る人（あなたをふくめ{0}人）：": "Hoy recorren esta tarjeta ({0} con usted): ",
+"今日このカードを回る人（あなたをふくめ{0}人）：": "Hoy recorren esta tarjeta ({0} personas, contándolo a usted): ",
 "司会": "Dirige",
 "ほか{0}人": "{0} más",
 "「今日回る人」にえらばれた人の画面にも、同じカードを今日回る人（司会と仲間）が出るようにしました。": "Ahora, en la pantalla de quienes fueron elegidos en «Van hoy», también aparece quién más recorre hoy la misma tarjeta (quien dirige y los compañeros).",
