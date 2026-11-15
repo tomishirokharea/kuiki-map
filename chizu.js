@@ -497,7 +497,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     lmGroup.clearLayers();
     if (!lmOn() || !LM.items.length) return;
     const z = map.getZoom(), b = map.getBounds().pad(0.25), vis = typeof rotVisTest === 'function' ? rotVisTest(0.25) : null;
-    // 名前がはっきり出る大きさ（各自の設定・はじめ16＝今まで）。その0.75段手前から薄く出はじめる（2026.13.145）
+    // 名前がはっきり出る大きさ（各自の設定。初めて使う人は12.5・前から使っている人は16）。その0.75段手前から薄く出はじめる（2026.13.145）
     // 薄く出はじめるのは、値の0.75段手前から。ただし値が16以上のときは16より手前では出さない（はじめの16は今までどおり16からはっきり出る・再監査 Important1）
     const full = typeof lmNameFull === 'function' ? lmNameFull() : 16, FADE = 0.75;
     const start = full >= 16 ? Math.max(16, full - FADE) : full - FADE;
