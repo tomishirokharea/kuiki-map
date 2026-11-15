@@ -1755,11 +1755,14 @@ function todayAsgs() {
   });
   return out;
 }
+/* お知らせに出す「今日回る仲間」の行（区域か留守宅カード） */
+const asgFellows = a => a.card ? fellowsHtml(a.t, activeCards().find(x => x.id === a.card)) : fellowsHtml(a.t);
 function asgNoticeHtml() {
   const seen = asgSeen();
   return todayAsgs().filter(a => a.keys.some(k => !seen.has(k))).map(a => `<div class="notice info asgnote">
     <b>${a.label ? esc(a.label) : `区域${esc(a.t.no)}`}を、今日いっしょに回るように、たのまれました</b><br>
     ${esc(uname(a.by))}さんから${a.p ? `・回る範囲があります（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}${a.p && partRoomsNote(a.p) ? `<br>${esc(partRoomsNote(a.p))}` : ''}
+    ${asgFellows(a)}
     <span class="actions"><button class="btn small primary" data-asgopen="${esc(a.t.id)}"${a.card ? ` data-asgcard="${esc(a.card)}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
       <button class="btn small" data-asgok="${esc(a.keys.join(' '))}">わかりました</button></span></div>`).join('');
 }
@@ -4134,6 +4137,7 @@ function renderLegend() {
     </div>
     ${mp2 ? `<p class="okmsg"><b>今日のあなたの範囲</b>　${esc(partMates(mp2).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と回ります（${mp2.ro ? esc(partRoomsNote(mp2)) : '緑の線の中'}）</p>
       <div class="row"><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=${center(mp2.poly)[0].toFixed(6)},${center(mp2.poly)[1].toFixed(6)}" target="_blank" rel="noopener">Googleマップでこの範囲へ</a></div>` : ''}
+    ${!own && !lead ? fellowsHtml(r.t) : ''}
     ${(own || lead) && ps2.length ? `<p class="muted">今日わたした範囲：${ps2.map(p => esc(partName(p))).join(' ／ ')}</p>` : ''}
     ${body}
     <div class="row">${(own || lead) && r.t.group ? '<button class="btn small" id="lgParts">回る範囲を分ける</button>' : ''}${first ? '<button class="btn small primary" id="lgList">おすすめの一覧</button>' : ''}${own ? '<button class="btn small" id="lgReturn">返す</button>' : ''}${LIVE && (helpers || isHelper(r.t)) ? `<button class="btn small" id="barSync">最新にする</button><span class="muted" id="barAge"></span>` : ''}</div>`;
@@ -8279,6 +8283,7 @@ function cardHtml(t, own, helper) {
     ((own || lead) && partsOf(t).length ? `<p class="muted"><b>今日わたした範囲：</b>${partsOf(t).map(p => esc(partName(p))).join(' ／ ')}</p>` : '') +
     (!own && !lead && myPart(t) ? `<p class="hint-strong">今日のあなたの範囲があります（${esc(partMates(myPart(t)).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）。${partRoomsNote(myPart(t)) ? `<br>${esc(partRoomsNote(myPart(t)))}<br>` : ''}地図をひらくと、その範囲だけが目立ちます。</p>
       <p class="muted"><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=${center(myPart(t).poly)[0].toFixed(6)},${center(myPart(t).poly)[1].toFixed(6)}" target="_blank" rel="noopener">Googleマップでこの範囲へ</a></p>` : '') +
+    (!own && !lead && helper ? fellowsHtml(t) : '') +
     ((own || lead) && hs.length ? `<p class="muted"><b>${t.group ? '今日回る人' : '今日一緒に回る人'}（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : '') +
     ((own || helper) && UI.cReco === 'on' ? roundHint(t) : '') +
     (own && paperHandOf(t) ? '<p class="muted">紙の区域カード（S-13）から引き継いだ区域です。紙で回った家は、アプリの記録には入っていません。返却はこのアプリでしてください。</p>' : '');
@@ -10112,6 +10117,7 @@ function renderCardBar() {
     const r = cardStates(c), cv = cardView(c);
     bar.hidden = false; bar.classList.remove('mini');
     bar.innerHTML = `<p><b>留守宅カード　区域${t ? esc(t.no) : '-'}</b>　${slotText(c.slot)}に訪ねてください</p>
+      ${t ? fellowsHtml(t, c) : ''}
       <p class="keys">${key(' hl', '', `今（${slotShort(r.cur)}）まだの家 ${r.hl}`)}${key(' done', '<u>✓</u>', `訪ねた家 ${p.done}`)}</p>
       ${r.wait ? '<p class="hint-strong">司会者から範囲をわたされるまで、家は出ません。</p>' : ''}
       ${r.tried ? `<p class="muted">${slotShort(r.cur)}は試し済みの家 ${r.tried}軒は、${cv === 'all' ? '薄く出しています' : 'かくしています'}</p>` : ''}
@@ -10157,6 +10163,7 @@ function awayCardHtml(c, kind) {
       <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪ねた割合"><i style="width:${pct}%"></i></div>
       <p class="muted">訪ねた家 ${p.done} / ${p.total}　${endText}</p>
       ${poolLineHtml(c)}
+      ${kind === 'help' ? fellowsHtml(t, c) : ''}
       ${p.total && p.done === p.total ? `<p><b>すべて訪ねました。${kind === 'help' ? '' : '「終える」を押してください。'}</b></p>` : ''}
       ${kind === 'gown' && hs.length ? `<p class="muted"><b>今日回る人（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : ''}
       ${kind === 'gown' && c.group ? `<div class="seg" role="group" aria-label="回り方（分ける・シェア）"><button type="button" data-cmode="share" data-cid="${esc(c.id)}" aria-pressed="${c.mode !== 'split'}">シェア</button><button type="button" data-cmode="split" data-cid="${esc(c.id)}" aria-pressed="${c.mode === 'split'}">分ける</button></div>
@@ -14025,7 +14032,8 @@ function todayTodoHtml(todays) {
   todayAsgs().filter(a => a.keys.some(k => !seen.has(k))).forEach(a => {
     h += `<div class="todo asg"><div class="asgtop"><span class="asgdot">${ICO_OK}</span>
         <div><b>${a.label ? esc(a.label) : `区域${esc(a.t.no)}`}を、今日いっしょに回るように、たのまれました</b>
-        <small>${esc(uname(a.by))}さんから${a.p ? `・回る範囲あり（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}</small></div></div>
+        <small>${esc(uname(a.by))}さんから${a.p ? `・回る範囲あり（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}</small>
+        ${asgFellows(a)}</div></div>
       <div class="row"><button type="button" class="btn primary" data-asgopen="${esc(a.t.id)}"${a.card ? ` data-asgcard="${esc(a.card)}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
         <button type="button" class="btn" data-asgok="${esc(a.keys.join(' '))}">わかりました</button></div></div>`;
   });
