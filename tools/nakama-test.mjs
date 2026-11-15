@@ -30,9 +30,10 @@ const run = (opt, fn) => pg.evaluate(([opt, src]) => {
 const base = { };
 
 // 1
-{ const r = await run(base, `const f = fellowsOf(t, null), h = fellowsHtml(t, null); return { f, h };`);
-  ok(r.f.n === 4 && r.f.host === 'u_H' && r.f.others.length === 2 && !r.f.others.includes('me'), '1 自分を出さない・人数に入れる', r.f);
+{ const r = await run(base, `const f = fellowsOf(t, null), h = fellowsHtml(t, null); return { f, h, my, myName: userById(my).name };`);
+  ok(r.f.n === 4 && r.f.host === 'u_H' && r.f.others.length === 2 && !r.f.others.includes(r.my) && r.f.host !== r.my, '1 自分を出さない・人数に入れる', r.f);
   ok(['あなたをふくめ4人', '司会', 'ハナさん', 'アキさん', 'ボブさん'].every(s => r.h.includes(s)), '1 HTML', r.h);
+  ok(!r.h.includes(r.myName + 'さん'), '1 自分の名前がHTMLにない', r.myName);
   ok(r.h.indexOf('ハナさん') < r.h.indexOf('アキさん'), '1 司会が先', r.h); }
 // 2
 { const r = await run(base, `t.lead = { uid: L, h: H, until: tomorrow, by: H, at: yest }; return { f: fellowsOf(t, null), h: fellowsHtml(t, null) };`);
@@ -66,7 +67,7 @@ const base = { };
   ok(r.f.host === 'u_H' && r.h.includes('司会') && r.h.includes('アキさん') && r.h.includes('あなたをふくめ3人') && r.h.includes('data-fc="cx1"'), '10 留守宅カード', r); }
 // 11
 { const r = await run(base, `KI.lang = 'es'; const h = fellowsHtml(t, null); KI.lang = 'ja'; return h;`);
-  ok(!r.includes('さん') || !/data-notr>[^<]*さん/.test(r), '11 スペイン語：さんなし', r);
+  ok(!/data-notr>[^<]*さん/.test(r), '11 スペイン語：さんなし', r);
   ok(r.includes('ハナ, アキ, ボブ'), '11 スペイン語：", " でつなぐ', r); }
 // 12 ［ほか］を押す
 { await run({ names: ['あ1', 'あ2', 'あ3', 'あ4', 'あ5', 'あ6', 'あ7', 'あ8', 'あ9'] }, `const d = document.createElement('div'); d.id = 'fx'; d.innerHTML = fellowsHtml(t, null); document.body.appendChild(d); return 1;`);
