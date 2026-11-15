@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.152';
+var APP_JS_VER = '2026.13.153';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2813,6 +2813,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.153', items: [
+    ['地', '「司会だけする」の一覧に「地図で見る」を付けました。ほかの監督・司会者のカードを、司会を引き受けずに地図で確かめられます。']
+  ] },
   { v: '2026.13.152', items: [
     ['人', '「今日回る人」にえらばれた人の画面にも、同じカードを今日回る人（司会と仲間）が出るようにしました。']
   ] },
@@ -8541,12 +8544,14 @@ function openLeadPick() {
     const btn = mine ? '<span class="leadtag">今日の司会</span>'
       : l ? `<span class="muted leadbusy">今日は${esc(uname(l.uid))}さんが司会</span>`
       : `<button class="btn small primary" data-leadtake="${esc(t.id)}">この区域で司会する</button>`;
+    // 司会を引き受けずに、地図で見るだけ（こまったこと sk6v5k・2026.13.153）
+    const view = `<button class="btn small" data-leadview="${esc(t.id)}">地図で見る</button>`;
     return `${head}<article class="pick" data-lq="${esc([t.no, t.name, uname(t.holder)].join(' '))}">
       <span class="stamp sm${noCls(t.no)} grp">${esc(t.no)}</span>
       <div><b>${esc(t.name)}</b>
         <p class="muted">担当：${esc(uname(t.holder))}さん</p>
         <p class="muted">訪問した家 ${s.visited} / ${s.n}${due ? `　返却の目安 ${fmtDay(due)}` : ''}</p></div>
-      ${btn}</article>`;
+      <div class="leadbtns">${btn}${view}</div></article>`;
   }).join('');
   setSheet(headHtml(null, '司会だけする', '今日だけ・カードは担当者のまま') + `
     <p class="hint">ほかの監督・司会者が持っている「集まりで使う区域」で、今日だけ司会ができます。カードの担当者、返却の日、S-13の記録は変わりません。あなたが持てる枚数にも数えません。</p>
@@ -8566,6 +8571,14 @@ function openLeadPick() {
   };
   if ($('#leadQ')) { $('#leadQ').oninput = e => { leadQ = e.target.value.trim(); filt(); }; filt(); }
   $$('[data-leadtake]', S).forEach(x => x.onclick = () => takeLead(x.dataset.leadtake));
+  $$('[data-leadview]', S).forEach(x => x.onclick = () => viewLeadTerr(x.dataset.leadview));
+}
+/* 「司会だけする」の一覧から、司会を引き受けずに地図で見る。今日の司会・担当者・S-13 は何も変わらない（見るだけ） */
+function viewLeadTerr(id) {
+  const t = terrById(id); if (!t) return;
+  closeSheet(); showView('map');
+  selectTerr(id, { fit: true });
+  toast(`区域${t.no}を地図で出しました（見るだけです。司会はしていません）`);
 }
 async function takeLead(id) {
   let t = terrById(id);

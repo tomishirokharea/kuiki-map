@@ -62,5 +62,8 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "いつまでの日を、日にちと同じか後にしてください。": "Ponga la fecha «Hasta» igual o posterior a la fecha de inicio.",
 "いつまでの日を、日にちと同じか後にしてください": "Ponga la fecha «Hasta» igual o posterior a la fecha de inicio",
 "集まりの予定は、ホームのカレンダーの下の「＋ 集まりの予定を入れる」で入れます（グループの予定は監督、全体の予定は監督と司会者）。予定を押すと「この集まりに合う区域」も出せます。": "Las reuniones se agregan con «＋ Agregar reunión para la predicación», debajo del calendario de Inicio (las del grupo, el superintendente; las generales, el superintendente y el conductor). Al pulsar una reunión también se pueden ver los «Territorios para esta reunión».",
-"監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。グループの集まりの予定を入れられるのは監督だけです。全体の集まりの予定は、監督と司会者が入れられます。": "El superintendente y el conductor reciben territorios de grupo y eligen quién sale ese día. Solo el superintendente puede poner reuniones del grupo. Las reuniones generales las pueden poner el superintendente y el conductor."
+"監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。グループの集まりの予定を入れられるのは監督だけです。全体の集まりの予定は、監督と司会者が入れられます。": "El superintendente y el conductor reciben territorios de grupo y eligen quién sale ese día. Solo el superintendente puede poner reuniones del grupo. Las reuniones generales las pueden poner el superintendente y el conductor.",
+// 「司会だけする」の一覧から地図で見る（2026.13.153）
+"区域{0}を地図で出しました（見るだけです。司会はしていません）": "Se muestra el territorio {0} en el mapa (solo para ver; usted no está dirigiendo).",
+"「司会だけする」の一覧に「地図で見る」を付けました。ほかの監督・司会者のカードを、司会を引き受けずに地図で確かめられます。": "Se agregó «Ver en el mapa» a la lista de «Solo dirigir». Puede ver en el mapa la tarjeta de otro superintendente o conductor sin encargarse de dirigir.",
 });
