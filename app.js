@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.153';
+var APP_JS_VER = '2026.13.154';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2813,6 +2813,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.154', items: [
+    ['地', '初めて使う人の地図を、見やすい設定から始めるようにしました（区域の線は赤く細く薄く、マンション・学校などの名前と目印の名前を出す）。今まで使っているスマホの地図は変わりません。同じようにしたいときは、歯車（設定）で「くわしく」をえらび、「地図」で変えられます。']
+  ] },
   { v: '2026.13.153', items: [
     ['地', '「司会だけする」の一覧に「地図で見る」を付けました。ほかの監督・司会者のカードを、司会を引き受けずに地図で確かめられます。']
   ] },
@@ -10658,7 +10661,7 @@ function nameZoomSlider(key) {
     <input type="range" class="nzrange" data-nz="${key}" min="-2" max="3" step="0.5" value="${v}" aria-label="名前を出す大きさ">
     <p class="nzends"><span>← 縮めても出す</span><span>拡大したときだけ →</span></p></div>`;
 }
-/* 目印（会館・学校など）の名前が、はっきり出る地図の大きさ（各自・はじめ16＝今まで）。その少し手前（0.75段）から薄く出はじめる（2026.13.145）
+/* 目印（会館・学校など）の名前が、はっきり出る地図の大きさ（各自。初めて使う人は12.5・前から使っている人は16＝2026.13.153まで・UI_MAP_OLD）。その少し手前（0.75段）から薄く出はじめる（2026.13.145）
    地図の場所を見つけるためのものなので、いちばん左は地域の全体が見えているときから出せる */
 const lmNameFull = () => { const v = Number(UI.lmNameZ); return isFinite(v) && v > 0 ? Math.max(11, Math.min(19, v)) : 16; };
 function lmNameZText(v) {
@@ -10672,7 +10675,10 @@ function lmNameSlider() {
     <p class="nzends"><span>← 全体でも出す</span><span>拡大したときだけ →</span></p></div>`;
 }
 const ICONS = ['区', '家', '図', '心', '🏠', '🗺️', '📖', '🚪', '✅', '⭐', '🚶', '☀️'];
-const UI_DEFAULT = { fTime: 'off', fTimer: 'on', hello: 'on', fFollow: 'off', todayOn: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, calList: 'upcoming', terrColor: 'theme', terrWidth: 'normal', labOp: 40, lineOp: 35, lmNameZ: 16, mapRot: 'on', mode: 'simple', size: 'normal', pct: 0, icon: '区', iconText: '', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
+/* 地図の見やすさ（区域の線と番号・建物の名前・目印の名前）の初期値は、初めて開く人のもの（R A さんの設定・2026.13.154）。
+   前から使っている人（この端末に設定が保存されている人）は、保存していない項目も今までの初期値（UI_MAP_OLD）のままにして、地図の見え方を変えない */
+const UI_MAP_OLD = { aptName: 'off', fcName: 'off', nameScope: 'sel', aptZoom: 0, fcZoom: 0, terrColor: 'theme', terrWidth: 'normal', lineOp: 35, lmNameZ: 16 };
+const UI_DEFAULT = { fTime: 'off', fTimer: 'on', hello: 'on', fFollow: 'off', todayOn: 'off', cProg: 'off', cReco: 'off', cSlot: 'on', aptName: 'on', fcName: 'on', nameScope: 'all', aptZoom: -1, fcZoom: -2, calList: 'upcoming', terrColor: 'red', terrWidth: 'thin', labOp: 40, lineOp: 15, lmNameZ: 12.5, mapRot: 'on', mode: 'simple', size: 'normal', pct: 0, icon: '区', iconText: '', appName: '区域マップ', splash: 'on', splashSec: 1.8, guide: 'auto', font: 'ud', theme: 'standard', custom: '', contrast: 'normal', density: 'normal', hints: 'show', start: 'home', pin: 'normal', base: 'pale' };
 /* [濃い色（上の帯・主なボタン）, アクセント（線・区域番号など）, うすい色（選んでいる背景）, 名前] */
 const THEMES = {
   standard: ['#17324D', '#0E7C66', '#E5F2EE', '標準'],
@@ -10791,7 +10797,7 @@ const uiKey = () => 'kuiki_ui_' + (Store.data ? me().id : 'guest');
 function uiLoad() {
   let saved = {};
   try { saved = JSON.parse(lsGet(uiKey()) || '{}') || {}; } catch (e) { saved = {}; }
-  UI = Object.assign({}, UI_DEFAULT, saved);
+  UI = Object.assign({}, UI_DEFAULT, Object.keys(saved).length ? UI_MAP_OLD : {}, saved); // 前から使っている人の地図は変えない（2026.13.154）
   // この更新の前から使っていた人は、使っていた機能がいきなり消えないように「使う」にしておく
   if (Store.data && (!('fFollow' in saved) || !('fTime' in saved))) {
     if (!('fFollow' in saved)) UI.fFollow = Object.values(D().follows || {}).some(f => f.by === me().id) ? 'on' : 'off';
@@ -11121,7 +11127,7 @@ function openUiSheet() {
         <p class="q">区域の線の太さ</p>${seg('terrWidth', [['thin', '細い'], ['normal', 'ふつう'], ['thick', '太い']], UI.terrWidth || 'normal')}
         ${S_NOUDO}
         <h3 class="sub">建物の名前</h3>
-        <div class="featrow"><p><b>マンション・アパートの名前</b><small>はじめは、区域カードから地図を開いたときの大きさから出ます</small></p>${seg('aptName', [['off', '出さない'], ['on', '出す']])}
+        <div class="featrow"><p><b>マンション・アパートの名前</b><small>区域カードから地図を開いたときの大きさをもとに、出す大きさを決めます</small></p>${seg('aptName', [['off', '出さない'], ['on', '出す']])}
           ${UI.aptName === 'on' ? nameZoomSlider('aptZoom') : ''}</div>
         <div class="featrow"><p><b>学校・役所・お店などの名前</b><small>家の種別をえらんで、名前を入れた建物です</small></p>${seg('fcName', [['off', '出さない'], ['on', '出す']])}
           ${UI.fcName === 'on' ? nameZoomSlider('fcZoom') : ''}</div>
@@ -11230,7 +11236,7 @@ function openUiSheet() {
     });
     const rs = $('#uiReset');
     if (rs) rs.onclick = async () => {
-      if (!await ask('画面の見え方を、最初の状態にもどします（「使う機能」はそのままです）。よろしいですか？')) return;
+      if (!await ask('画面の見え方を、最初の状態にもどします（「使う機能」はそのままです）。地図の線の色や建物の名前も、最初の状態（見やすい設定）になります。よろしいですか？')) return;
       UI = Object.assign({}, UI_DEFAULT, { fTime: UI.fTime, fTimer: UI.fTimer, hello: UI.hello, fFollow: UI.fFollow, cProg: UI.cProg, cReco: UI.cReco, todayOn: UI.todayOn, icon: UI.icon, iconText: UI.iconText, appName: UI.appName }); uiSave(); applyUi(); setBase('pale'); applyRotSetting(); // 使う機能・区域カードに出すもの・ホーム画面のアイコンはそのまま
       toast('表示の設定を最初にもどしました');
       page = 'top';

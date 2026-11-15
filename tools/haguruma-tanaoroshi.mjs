@@ -30,10 +30,11 @@ const MODES = ['simple', 'detail'];
 const TABS = ['home', 'cards', 'map', 'reco', 'follow'];
 const LANGS = ['ja', 'es'];
 const PROFILES = {
+  // 名前の大きさ（aptZoom・fcZoom）は場面の中で決める。初期値が変わっても（2026.13.154）、スライダーの今の値の文字で部品が「無くなった」と出ないように
   off: { ui: { fTime: 'off', fFollow: 'off', aptName: 'off', fcName: 'off', theme: 'standard', splash: 'off' }, recoOn: 0 },
   // douga：使い方の動画を「用意できた」ことにする（今は動画がまだ無く、行が出ないため。差しこみ口を確かめる）
-  on: { ui: { fTime: 'on', fFollow: 'on', aptName: 'on', fcName: 'on', theme: 'custom', custom: '200,70,35', splash: 'on' }, recoOn: 1, douga: true },
-  onNoReco: { ui: { fTime: 'on', fFollow: 'on', aptName: 'on', fcName: 'on', theme: 'custom', custom: '200,70,35', splash: 'on' }, recoOn: 0, douga: true }
+  on: { ui: { fTime: 'on', fFollow: 'on', aptName: 'on', fcName: 'on', aptZoom: 0, fcZoom: 0, theme: 'custom', custom: '200,70,35', splash: 'on' }, recoOn: 1, douga: true },
+  onNoReco: { ui: { fTime: 'on', fFollow: 'on', aptName: 'on', fcName: 'on', aptZoom: 0, fcZoom: 0, theme: 'custom', custom: '200,70,35', splash: 'on' }, recoOn: 0, douga: true }
 };
 const USERS = ['u1', 'u3']; // 伝道者・区域係（試作のデータ）
 
