@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.151';
+var APP_JS_VER = '2026.13.152';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -1755,11 +1755,14 @@ function todayAsgs() {
   });
   return out;
 }
+/* お知らせに出す「今日回る仲間」の行（区域か留守宅カード） */
+const asgFellows = a => a.card ? fellowsHtml(a.t, activeCards().find(x => x.id === a.card)) : fellowsHtml(a.t);
 function asgNoticeHtml() {
   const seen = asgSeen();
   return todayAsgs().filter(a => a.keys.some(k => !seen.has(k))).map(a => `<div class="notice info asgnote">
     <b>${a.label ? esc(a.label) : `区域${esc(a.t.no)}`}を、今日いっしょに回るように、たのまれました</b><br>
     ${esc(uname(a.by))}さんから${a.p ? `・回る範囲があります（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}${a.p && partRoomsNote(a.p) ? `<br>${esc(partRoomsNote(a.p))}` : ''}
+    ${asgFellows(a)}
     <span class="actions"><button class="btn small primary" data-asgopen="${esc(a.t.id)}"${a.card ? ` data-asgcard="${esc(a.card)}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
       <button class="btn small" data-asgok="${esc(a.keys.join(' '))}">わかりました</button></span></div>`).join('');
 }
@@ -2810,6 +2813,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.152', items: [
+    ['人', '「今日回る人」にえらばれた人の画面にも、同じカードを今日回る人（司会と仲間）が出るようにしました。']
+  ] },
   { v: '2026.13.151', items: [
     ['直', '左にスワイプして出した「取り消し」（家の記録）や「編集」「削除」（予定）を押しても、1回では働かないことがあったのを直しました。']
   ] },
@@ -4134,6 +4140,7 @@ function renderLegend() {
     </div>
     ${mp2 ? `<p class="okmsg"><b>今日のあなたの範囲</b>　${esc(partMates(mp2).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と回ります（${mp2.ro ? esc(partRoomsNote(mp2)) : '緑の線の中'}）</p>
       <div class="row"><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=${center(mp2.poly)[0].toFixed(6)},${center(mp2.poly)[1].toFixed(6)}" target="_blank" rel="noopener">Googleマップでこの範囲へ</a></div>` : ''}
+    ${!own && !lead ? fellowsHtml(r.t) : ''}
     ${(own || lead) && ps2.length ? `<p class="muted">今日わたした範囲：${ps2.map(p => esc(partName(p))).join(' ／ ')}</p>` : ''}
     ${body}
     <div class="row">${(own || lead) && r.t.group ? '<button class="btn small" id="lgParts">回る範囲を分ける</button>' : ''}${first ? '<button class="btn small primary" id="lgList">おすすめの一覧</button>' : ''}${own ? '<button class="btn small" id="lgReturn">返す</button>' : ''}${LIVE && (helpers || isHelper(r.t)) ? `<button class="btn small" id="barSync">最新にする</button><span class="muted" id="barAge"></span>` : ''}</div>`;
@@ -8279,6 +8286,7 @@ function cardHtml(t, own, helper) {
     ((own || lead) && partsOf(t).length ? `<p class="muted"><b>今日わたした範囲：</b>${partsOf(t).map(p => esc(partName(p))).join(' ／ ')}</p>` : '') +
     (!own && !lead && myPart(t) ? `<p class="hint-strong">今日のあなたの範囲があります（${esc(partMates(myPart(t)).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）。${partRoomsNote(myPart(t)) ? `<br>${esc(partRoomsNote(myPart(t)))}<br>` : ''}地図をひらくと、その範囲だけが目立ちます。</p>
       <p class="muted"><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=${center(myPart(t).poly)[0].toFixed(6)},${center(myPart(t).poly)[1].toFixed(6)}" target="_blank" rel="noopener">Googleマップでこの範囲へ</a></p>` : '') +
+    (!own && !lead && helper ? fellowsHtml(t) : '') +
     ((own || lead) && hs.length ? `<p class="muted"><b>${t.group ? '今日回る人' : '今日一緒に回る人'}（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : '') +
     ((own || helper) && UI.cReco === 'on' ? roundHint(t) : '') +
     (own && paperHandOf(t) ? '<p class="muted">紙の区域カード（S-13）から引き継いだ区域です。紙で回った家は、アプリの記録には入っていません。返却はこのアプリでしてください。</p>' : '');
@@ -9409,6 +9417,28 @@ const activeCards = () => { const now = Date.now(); return D().awayCards.filter(
 /* グループで回る留守宅カード：c.group（グループ名）と c.helpers（今日回る人。区域の helpers と同じ形）を持つ */
 const cardHelpers = c => { if (!c || !c.group || D().settings.groupOn === 0) return []; const now = Date.now(); return (c.helpers || []).filter(h => Date.parse(h.until) > now); };
 const isCardHelper = c => cardHelpers(c).some(h => h.uid === me().id);
+/* 仲間が分かる（2026-11-15）：えらばれた人が、カードを開いたときに「今日いっしょに回る人」を見られるようにする。
+   host＝司会（グループ）か担当、others＝ほかの仲間。自分は名前に出さず、人数 n にだけ入れる。名簿にいない人（転出・止めた人）は「不明さん」にせず、名前にも人数にも入れない。 */
+function fellowsOf(t, c) {
+  const my = me().id;
+  const host0 = c ? c.by : ((leadOf(t) || {}).uid || t.holder);
+  const hs = c ? cardHelpers(c) : helpersOf(t);
+  const ok = u => !!u && u !== my && !!userById(u);
+  const host = ok(host0) ? host0 : null;
+  const others = [];
+  hs.forEach(h => { if (ok(h.uid) && h.uid !== host && !others.includes(h.uid)) others.push(h.uid); });
+  return { host, hostRole: c || t.group ? '司会' : '担当', others, n: 1 + (host ? 1 : 0) + others.length };
+}
+function fellowsHtml(t, c, all) {
+  if (!t && !c) return '';
+  if (c ? (c.by === me().id || !isCardHelper(c)) : (t.holder === me().id || isLead(t) || !isHelper(t))) return '';
+  const f = fellowsOf(t, c), names = (f.host ? [f.host] : []).concat(f.others);
+  if (!names.length) return '';
+  const es = !!(window.KI && window.KI.lang === 'es'), more = !all && names.length > 6 ? names.length - 5 : 0;
+  const shown = more ? names.slice(0, 5) : names;
+  const list = shown.map(u => esc(uname(u)) + (es ? '' : 'さん')).join(es ? ', ' : '、');
+  return `<p class="muted fellows" data-ft="${esc((t || {}).id || '')}" data-fc="${esc((c || {}).id || '')}"><b>今日このカードを回る人（あなたをふくめ${f.n}人）：</b>${f.host ? `<span>${f.hostRole}</span> ` : ''}<span data-notr>${list}</span>${more ? ` <button type="button" class="btn small" data-fellowsmore>ほか${more}人</button>` : ''}</p>`;
+}
 const myAwayCount = g => activeCards().filter(c => c.by === me().id && !!c.group === !!g).length; // 個人とグループは別々に数える
 let awayGroupSlot = null, awayGroupMode = 'share'; // グループの留守宅カードの回り方：'share'（シェア）／'split'（分ける）
 /* グループの次の集まり（2週間以内）の時間帯。なければ今の時間帯 */
@@ -10090,6 +10120,7 @@ function renderCardBar() {
     const r = cardStates(c), cv = cardView(c);
     bar.hidden = false; bar.classList.remove('mini');
     bar.innerHTML = `<p><b>留守宅カード　区域${t ? esc(t.no) : '-'}</b>　${slotText(c.slot)}に訪ねてください</p>
+      ${t ? fellowsHtml(t, c) : ''}
       <p class="keys">${key(' hl', '', `今（${slotShort(r.cur)}）まだの家 ${r.hl}`)}${key(' done', '<u>✓</u>', `訪ねた家 ${p.done}`)}</p>
       ${r.wait ? '<p class="hint-strong">司会者から範囲をわたされるまで、家は出ません。</p>' : ''}
       ${r.tried ? `<p class="muted">${slotShort(r.cur)}は試し済みの家 ${r.tried}軒は、${cv === 'all' ? '薄く出しています' : 'かくしています'}</p>` : ''}
@@ -10135,6 +10166,7 @@ function awayCardHtml(c, kind) {
       <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="訪ねた割合"><i style="width:${pct}%"></i></div>
       <p class="muted">訪ねた家 ${p.done} / ${p.total}　${endText}</p>
       ${poolLineHtml(c)}
+      ${kind === 'help' ? fellowsHtml(t, c) : ''}
       ${p.total && p.done === p.total ? `<p><b>すべて訪ねました。${kind === 'help' ? '' : '「終える」を押してください。'}</b></p>` : ''}
       ${kind === 'gown' && hs.length ? `<p class="muted"><b>今日回る人（${hs.length}人）：</b>${hs.map(h => esc(uname(h.uid)) + 'さん').join('、')}</p>` : ''}
       ${kind === 'gown' && c.group ? `<div class="seg" role="group" aria-label="回り方（分ける・シェア）"><button type="button" data-cmode="share" data-cid="${esc(c.id)}" aria-pressed="${c.mode !== 'split'}">シェア</button><button type="button" data-cmode="split" data-cid="${esc(c.id)}" aria-pressed="${c.mode === 'split'}">分ける</button></div>
@@ -14003,7 +14035,8 @@ function todayTodoHtml(todays) {
   todayAsgs().filter(a => a.keys.some(k => !seen.has(k))).forEach(a => {
     h += `<div class="todo asg"><div class="asgtop"><span class="asgdot">${ICO_OK}</span>
         <div><b>${a.label ? esc(a.label) : `区域${esc(a.t.no)}`}を、今日いっしょに回るように、たのまれました</b>
-        <small>${esc(uname(a.by))}さんから${a.p ? `・回る範囲あり（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}</small></div></div>
+        <small>${esc(uname(a.by))}さんから${a.p ? `・回る範囲あり（${esc(partMates(a.p).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）` : ''}</small>
+        ${asgFellows(a)}</div></div>
       <div class="row"><button type="button" class="btn primary" data-asgopen="${esc(a.t.id)}"${a.card ? ` data-asgcard="${esc(a.card)}"` : ''} data-asgkeys="${esc(a.keys.join(' '))}">地図をひらく</button>
         <button type="button" class="btn" data-asgok="${esc(a.keys.join(' '))}">わかりました</button></div></div>`;
   });
@@ -16231,6 +16264,17 @@ function bindStatic() {
   $('#adS12').onclick = () => openS12();
   $('#adPerf').onclick = () => { toast('測っています…'); setTimeout(runPerfCheck, 50); };
   $('#adLoadLog').onclick = () => openLoadLog();
+  document.addEventListener('click', e => { // 「ほか○人」：その行を全員の名前にする（覚えない）
+    /* .fellows の行は、押せる要素（[data-open] [data-awayopen] [data-asgopen] [data-asgok] .topen [data-go]）の中に置かない（ここは document の委譲なので、中に置くと先にそちらが開く） */
+    const m = e.target.closest('[data-fellowsmore]'), p = m && m.closest('.fellows'); if (!p) return;
+    const c = p.dataset.fc ? D().awayCards.find(x => x.id === p.dataset.fc) : null;
+    if (p.dataset.fc && !c) return; // カードが消えていたら、区域の人にすり替えず、行はそのまま
+    const html = fellowsHtml(terrById(p.dataset.ft), c || null, true);
+    if (!html) return;
+    const tp = document.createElement('template'); tp.innerHTML = html;
+    const np = tp.content.firstElementChild; np.tabIndex = -1; // ボタンが消えるので、フォーカスを新しい行に移す
+    p.replaceWith(np); np.focus({ preventScroll: true });
+  });
   document.addEventListener('click', e => {
     const o = e.target.closest('[data-asgopen], [data-asgok]'); if (!o) return;
     asgMarkSeen(String(o.dataset.asgkeys || o.dataset.asgok || '').split(' ').filter(Boolean));

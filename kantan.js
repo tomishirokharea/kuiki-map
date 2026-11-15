@@ -203,6 +203,7 @@
       <div class="tbody">${left != null ? `<p class="kleft">あと <b>${left}</b> 軒</p>` : ''}
         ${own && typeof paperHandOf === 'function' && paperHandOf(t) ? '<p class="muted">紙のカードから引き継いだ区域です（紙で回った家は、数に入っていません）</p>' : ''}
         ${mp ? `<p class="hint-strong">今日のあなたの範囲があります（${esc(partMates(mp).map(u => uname(u) + 'さん').join('・') || 'ひとり')}と）${partRoomsNote(mp) ? `<br>${esc(partRoomsNote(mp))}` : ''}</p>` : ''}
+        ${!own && !lead ? fellowsHtml(t) : ''}
         ${ld ? `<div class="leadline"><p><span class="leadtag">今日の司会</span><b>${esc(uname(ld.uid))}さん</b></p><button type="button" class="btn small" data-leadoff="${esc(t.id)}">司会を外す</button></div>` : ''}</div>
       ${own ? `<div class="actions"><button class="btn primary" data-open="${esc(t.id)}">地図をひらく</button><button class="btn" data-return="${esc(t.id)}">返す</button><button class="btn" data-mapsend="${esc(t.id)}">印刷</button></div>` : `<div class="actions"><button class="btn" data-mapsend="${esc(t.id)}">印刷</button></div>`}
       ${grpRow}
@@ -221,7 +222,8 @@
         slotText(c.slot), (c.group ? `<span class="gbadge">${esc(useName(c))}</span> ` : '') + `区域${t ? esc(t.no) : '-'}　${t ? esc(t.name) : ''}` +
           (hh ? `<br>${esc(uname(hh.by))}さんの留守宅カードを、今日回ります` : ''))}
       <div class="tbody"><p class="kleft">あと <b>${left}</b> 軒</p>
-        <p class="muted">${c.day ? '今日の終わりに自動で終わります' : fmtDay(c.expiresAt) + 'まで'}</p></div>
+        <p class="muted">${c.day ? '今日の終わりに自動で終わります' : fmtDay(c.expiresAt) + 'まで'}</p>
+        ${kind === 'help' ? fellowsHtml(t, c) : ''}</div>
       <div class="actions"><button class="btn primary" data-awayopen="${esc(c.id)}">地図をひらく</button>${kind === 'help' ? '' : `<button class="btn" data-awayend="${esc(c.id)}">返す</button>`}</div>
       ${kind === 'gown' && D().settings.groupOn !== 0 ? `<div class="actions"><button class="btn small" data-chelpers="${esc(c.id)}">今日回る人をえらぶ</button></div>` : ''}
     </article>`;
@@ -445,13 +447,14 @@
     if (!r) { box.innerHTML = keys; return; }
     const n = r.c, own = r.t.holder === me().id, lead = !own && typeof isLead === 'function' && isLead(r.t);
     // ほかの部品が足した行（前の人の続き・今日のあなたの範囲）は残す
-    const cont = [...box.querySelectorAll('p.muted')].find(p => /前の人/.test(p.textContent));
+    const cont = [...box.querySelectorAll('p.muted:not(.fellows)')].find(p => /前の人/.test(p.textContent));
     const part = [...box.querySelectorAll('.okmsg')].find(p => /今日のあなたの範囲/.test(p.textContent));
     const nm = nameOf(r.t);
     box.innerHTML = `<p class="lgtitle"><b><span>区域${esc(r.t.no)}</span>${nm ? ` <span>${esc(nm)}</span>` : ''}</b>${own ? '' : lead ? '（今日の司会）' : '（一緒に回る）'}</p>
       ${n.todo ? `<p class="kleft">あと <b>${n.todo}</b> 軒</p>` : '<p class="okmsg"><b>すべての家に緑のチェックがつきました。</b>区域を回り終えました。</p>'}
       <div class="progress big" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="回った割合"><i style="width:${r.pct}%"></i></div>
       <div id="kLgKeep"></div>
+      ${!own && !lead ? fellowsHtml(r.t) : ''}
       ${keys}
       <div class="row">${(own || lead) && r.t.group && D().settings.groupOn !== 0 ? '<button type="button" class="btn small" id="lgParts">回る範囲を分ける</button>' : ''}${own ? '<button type="button" class="btn" id="lgReturn">返す</button>' : ''}</div>`;
     const keep = document.getElementById('kLgKeep');
