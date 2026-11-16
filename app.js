@@ -48,9 +48,9 @@ const recIntOn = () => false;
 function metNext(st, k, save) {
   if (!featFollow()) { save('met', {}); return false; } // かんたんな記録：会えた、だけを残す
   const f = fol(k);
-  if (f && f.by !== me().id && followActive(f)) { save('met', {}); return false; } // ほかの人が再訪問している家（普通の家として扱う日数を過ぎた家は、普通の家と同じく再訪問にできる）
-  if (f) { st.step = 'memo'; return true; }                      // 自分の再訪問：メモを書き足す
-  st.step = 'follow'; return true;                                // また訪ねるかをえらぶ
+  if (f && f.by === me().id) { st.step = 'memo'; return true; }   // 自分の再訪問：メモを書き足す
+  if (f && followActive(f)) { save('met', {}); return false; }    // ほかの人が再訪問している家
+  st.step = 'follow'; return true;                                // また訪ねるかをえらぶ（普通の家として扱う日数を過ぎた、ほかの人の再訪問の家もここ。監査3 High）
 }
 /* 会えたあと：また訪ねるか */
 const followAskHtml = () => `<p class="q">会えた方を、また訪ねますか？</p>
@@ -2374,6 +2374,16 @@ function autoFreeLine(f) {
   return n <= 0
     ? '<p class="autofree"><span>今は普通の家として扱われています</span><span>（ほかの人も区域カードなどで訪ね、会えた人が再訪問にすることもあります。それまでは、あなたの再訪問とメモは残り、今までどおり訪ねられます。訪ねて記録すると（留守でも）、再訪問の家にもどります）</span></p>'
     : `<p class="autofree"><span>${n === 1 ? '明日から普通の家として扱われます' : `あと${n}日で普通の家として扱われます`}</span><span>（ほかの人も区域カードなどで訪ね、再訪問にもできるようになります。訪ねて記録すると（留守でも）延びます）</span></p>`;
+}
+/* 自分の再訪問が、ほかの人の再訪問になったとき（日数を過ぎた家で、ほかの人が会えて再訪問にした）、一度だけ知らせる（監査3 M3）。
+   このスマホに、前に見た自分の再訪問の一覧を覚えておき、くらべる */
+function checkTakenFollows() {
+  if (!Store.data || !featFollow() || (LIVE && !Store.pulled)) return;
+  const key = 'kuiki_myfol_' + me().id, mine = Object.keys(D().follows).filter(k => D().follows[k] && D().follows[k].by === me().id);
+  let prev = []; try { prev = JSON.parse(lsGet(key) || '[]'); } catch (e) { prev = []; }
+  const taken = (Array.isArray(prev) ? prev : []).filter(k => D().follows[k] && D().follows[k].by !== me().id);
+  try { lsSet(key, JSON.stringify(mine)); } catch (e) { /* 覚えられなくても、次にくらべるだけ */ }
+  if (taken.length) toast(`しばらく訪問のなかった再訪問の家 ${taken.length}件が、会えたほかの人の再訪問になりました`);
 }
 function followStage(f) { const d = followIdle(f), s = D().settings; return d >= s.escalateDays ? 2 : d >= s.remindDays ? 1 : 0; }
 function parseKey(k) { const i = k.indexOf('|'); return [k.slice(0, i), k.slice(i + 1)]; }
@@ -8381,6 +8391,7 @@ function togglePin(k) {
 let followQ = '';
 const FSORT = [['idle', 'しばらく訪問していない順'], ['near', '近い順'], ['recent', '最後に訪問した順'], ['metold', '前回会えた日が古い順'], ['terr', '区域番号順']];
 function renderFollowList() {
+  try { checkTakenFollows(); } catch (e) { console.error(e); }
   const box = $('#myFollows'); if (!box) return;
   const fw = $('#followWhere');
   if (fw) fw.textContent = memoSyncOn() ? 'メモは本人の端末（スマホ・iPadなど）だけで見られます。' : 'メモはこのスマホの中だけに残ります。';
@@ -14107,6 +14118,7 @@ function todayTodoHtml(todays) {
 }
 
 function renderHome() {
+  try { checkTakenFollows(); } catch (e) { console.error(e); }
   const box = $('#view-home'); if (!box || box.hidden) return;
   const o = myData(), t = o.timer, h = new Date().getHours();
   const hi = h < 5 ? 'こんばんは' : h < 10 ? 'おはようございます' : h < 17 ? 'こんにちは' : 'こんばんは';
