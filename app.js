@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.154';
+var APP_JS_VER = '2026.13.155';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -573,7 +573,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {}; d.caution = d.caution || {}; d.langs = d.langs || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, wxOn: 1, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7, recoLeft: 1 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, wxOn: 1, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, followFreeDays: 0, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7, recoLeft: 1 }, d.settings || {});
     d.s13 = d.s13 || [];
     d.agedata = d.agedata || [];
     d.holds = d.holds || [];
@@ -1932,7 +1932,7 @@ async function flush(force) {
     flushing = false; updateSyncBadge();
   }
   if (rejected) {
-    const NAME = { requests: '区域カードの申し込み', territories: '区域', houses: '家', visits: '訪問の記録', follows: '再訪問の受け持ち', awayCards: '留守宅カード', settings: '設定',
+    const NAME = { requests: '区域カードの申し込み', territories: '区域', houses: '家', visits: '訪問の記録', follows: '再訪問の家', awayCards: '留守宅カード', settings: '設定',
       returns: '返却の記録', dnc: '拒否の印', caution: '注意の印', released: '再訪問の引き継ぎ', schedules: '集まりの予定', s13: '区域割り当ての記録（S-13）', agedata: '年齢のデータ', users: '使う人', holds: 'おすすめの押さえ' }; // 名前のない種類も英語のまま出さない（点検②V2）
     const kinds = [...new Set(rejectedList.map(r => NAME[r.c] || 'ほかの変更'))];
     toast(fixed ? `${kinds.join('・')}は受け付けられませんでした。元の状態にもどしました`
@@ -2353,9 +2353,18 @@ function statusOf(k) {
   const v = visitsOf(k)[0];
   return v ? v.result : 'new';
 }
-/* 再訪問の受け持ち */
+/* 再訪問 */
 const fol = k => D().follows[k] || null;
 const followIdle = f => daysSince(f.touchedAt);
+/* 再訪問を自動で外すまでの日数（係の設定 followFreeDays。0＝使わない・2026-11-17）。
+   「係に知らせるまで」（escalateDays）より、いつも1週間以上長くする（設定がずれていても、知らせる前に外さない） */
+function followFreeDays() { const s = D().settings, v = Number(s.followFreeDays) || 0; return v > 0 ? Math.min(182, Math.max(v, (Number(s.escalateDays) || 42) + 7)) : 0; }
+const followLeft = f => { const n = followFreeDays(); return n ? n - followIdle(f) : null; }; // 外れるまでの日数（使わないときは null）
+/* 本人の再訪問の行に出す「あと○日で自動で外れます」（2週間を切ったときだけ） */
+function autoFreeLine(f) {
+  const n = followLeft(f); if (n == null || n > 14) return '';
+  return `<p class="autofree"><span>${n <= 0 ? 'もうすぐ自動で外れます' : `あと${n}日で自動で外れます`}</span><span>（記録するか「続ける」を押すと延びます）</span></p>`;
+}
 function followStage(f) { const d = followIdle(f), s = D().settings; return d >= s.escalateDays ? 2 : d >= s.remindDays ? 1 : 0; }
 function parseKey(k) { const i = k.indexOf('|'); return [k.slice(0, i), k.slice(i + 1)]; }
 /* ---------- 拒否の印（D().dnc） ----------
@@ -2467,10 +2476,10 @@ function canSeeDetail(k, house) {
 const seeV = (v, k, house) => v.by === me().id || canSeeDetail(k, house);
 /* 再訪問のリストから「外した」家（もう訪ねない）：外したときより前の★は数えない */
 const closedAt = k => { const r = D().released[k]; return r && r.reason === 'closed' ? r.at : null; };
-/* 引き継ぎを待っている家（「外した」家はふくめない）
-   「会えた」記録のない家の印は、引き継ぎとして扱わない（一覧・おすすめ・留守宅カードの除外のどれにも使わない）。
-   リセットや記録の取り消しで、印だけが残ることがあったため（2026-11-12。残った印は係の「保守」で消せる：relOrphans） */
-const relOf = k => { const r = D().released[k]; return r && r.reason !== 'closed' && sum(k).met ? r : null; };
+/* 引き継ぎ待ち（released の 'handoff'）は 2026-11-17 に廃止した（R A さんの決定）。
+   古い画面が作った印や、前に付いた印が残っていても、引き継ぎ待ちとしては扱わない（普通の家）。
+   呼び出し（一覧・おすすめ・留守宅カードの除外など）は残し、いつも null を返す。サーバーでも、印では受け持てない（auto followOk_） */
+const relOf = () => null;
 function lastInterest(k) {
   const m = sum(k).met;
   if (!(m && seeV(m, k) && INTERESTED.has(m.interest))) return null;
@@ -2813,6 +2822,12 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.155', items: [
+    ['再', '「引き継ぎを待っている家」をなくしました。再訪問をやめるときは「リストから外す」を押してください。'],
+    ['再', '画面の「受け持ち」という言葉を「再訪問」にそろえました。'],
+    ['再', '区域係が決めたときは、しばらく訪問のない再訪問が自動で外れるようになりました。外れる2週間前から「あと○日で自動で外れます」と出ます（記録するか「続ける」を押すと延びます）。'],
+    ['係', '設定の「貸し出しと返却」に「再訪問を自動で外すまで」を足しました（はじめは「使わない」）。']
+  ] },
   { v: '2026.13.154', items: [
     ['地', '初めて使う人の地図を、見やすい設定から始めるようにしました（区域の線は赤く細く薄く、マンション・学校などの名前と目印の名前を出す）。今まで使っているスマホの地図は変わりません。同じようにしたいときは、歯車（設定）で「くわしく」をえらび、「地図」で変えられます。']
   ] },
@@ -4993,7 +5008,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     if ($('#shAssign')) $('#shAssign').onchange = e => {
       const v = e.target.value;
       if (!v || v === f.by) return;
-      commitIn([hid], `受け持ちを${uname(v)}さんに変えました`, () => startFollow(k, v));
+      commitIn([hid], `再訪問する人を${uname(v)}さんに変えました`, () => startFollow(k, v));
       paint();
     };
     on('provDrop', () => dropProvHouse(hid));
@@ -5208,7 +5223,7 @@ function houseRecText(h) {
   const c = houseRecCounts(h);
   if (!c.v && !c.dnc && !c.cau && !c.fol && !c.rel) return '';
   // 文の形はいつも同じにする（スペイン語の辞書で1つの形で訳せるように）
-  return `一緒に消えるもの：訪問の記録 ${c.v}件、拒否 ${c.dnc}件、注意 ${c.cau}件、再訪問の受け持ち ${c.fol + c.rel}件。${c.dnc ? '拒否は、場所だけの印として残します。' : ''}`;
+  return `一緒に消えるもの：訪問の記録 ${c.v}件、拒否 ${c.dnc}件、注意 ${c.cau}件、再訪問 ${c.fol + c.rel}件。${c.dnc ? '拒否は、場所だけの印として残します。' : ''}`;
 }
 /* 仮の家を、その場で消す（地図に出ているだけで、実際には家がないとき） */
 function dropProvHouse(hid, inMode) {
@@ -5251,9 +5266,9 @@ function saveVisit(hid, unit, result, extra, keepOpen, onUndo) {
   const k = K(hid, unit), cur = fol(k);
   let msg = `${unit ? `${unitTitle(houseById(hid), unit)}を` : ''}「${RESULT_LABEL[result]}」で記録しました`;
   let follow = !!extra.follow;
-  if (follow && cur) { follow = false; if (cur.by !== me().id) msg += '（再訪問はすでに受け持ちがあります）'; }
+  if (follow && cur) { follow = false; if (cur.by !== me().id) msg += '（この家は、すでにほかの人が再訪問しています）'; }
   else if (follow) msg += '。再訪問のタブに入れました';
-  if (extra.dnc && cur) msg += '。受け持ちも解除しました';
+  if (extra.dnc && cur) msg += '。再訪問も解除しました';
   // ふつうの記録（会えた・留守）は、すぐ画面に出して、うしろで送る
   if (!follow && !extra.dnc && !(cur && cur.by === me().id)) { quickVisit(hid, unit, result, extra, msg, onUndo, keepOpen); return; }
   commit(msg, () => {
@@ -5603,7 +5618,7 @@ function openMemo(k, back) {
   const [hid, unit] = parseKey(k);
   const h = houseById(hid); if (!h) return;
   const f = fol(k);
-  if (!f || f.by !== me().id) { toast('メモは、自分が受け持っている再訪問にだけ書けます'); return; }
+  if (!f || f.by !== me().id) { toast('メモは、自分の再訪問にだけ書けます'); return; }
   const m = memoOf(k), met = sum(k).met, last = sum(k).last;
   const done = () => { MemoSync.editing = null; if (back) back(); else { closeSheet(); renderAll(); } };
   let openedText = m ? m.text : ''; // 開いたときのメモ（開いているあいだに、ほかの端末の内容が届いたかを見分ける）
@@ -5639,7 +5654,7 @@ function openMemo(k, back) {
       ${m ? shareButtonsHtml(true) : ''}
       ${m ? '<button class="btn danger block" id="memoDel">メモを消す</button>' : ''}
     </details>
-    <p class="hint">${memoPrivacyNote()}住んでいる人の名前・電話番号は書かないでください。受け持ちが終わると、メモも自動で消えます。</p>
+    <p class="hint">${memoPrivacyNote()}住んでいる人の名前・電話番号は書かないでください。再訪問が終わると、メモも自動で消えます。</p>
     <button class="btn block" id="memoBack">もどる</button>`);
   $$('[data-stamp]', $('#sheet')).forEach(b => b.onclick = () => {
     const nx = readNext('memoNext'), o = memoAll();
@@ -5698,7 +5713,7 @@ function shareMemo(k, how, back) {
   const okKey = 'kuiki_share_ok_' + me().id;
   if (!lsGet(okKey)) { // はじめての1回だけ、注意を読んでもらう
     setSheet(headHtml(null, 'メモをアプリの外に残す前に', '') + `
-      <div class="notice warn"><b>外に残したメモは、受け持ちが終わっても自動では消えません。</b>いらなくなったら、自分で消してください。</div>
+      <div class="notice warn"><b>外に残したメモは、再訪問が終わっても自動では消えません。</b>いらなくなったら、自分で消してください。</div>
       <p>・住んでいる人の名前・電話番号・家族のことは書かないでください。</p>
       <p>・LINEで送るときは、<b>自分だけのトーク（Keepメモ）</b>をえらび、ほかの人に送らないでください。</p>
       <p>・スマホには画面ロックを設定しておいてください。</p>
@@ -6003,11 +6018,11 @@ function checkRestore(b) {
   const other = keys.length - mine.length - free.length;
   setSheet(headHtml(null, 'バックアップから戻す', `${b.at ? fmtDate(b.at) + 'のバックアップ' : ''}`) + `
     <div class="schedbox"><p>バックアップ：<b>${bkSummary(b)}</b></p><p>今のスマホ：<b>${bkSummary(backupPayload())}</b></p></div>
-    <p>今も受け持っている家：<b>${mine.length}件</b>（メモ・約束・📌を戻します。今のメモも消さずに合わせます）</p>
-    ${!mine.length && !free.length ? '<div class="notice warn">戻せる家がありません。ほかの人が受け持っているか、家がなくなっています。</div>' : ''}
-    ${free.length ? `<label class="check"><input type="checkbox" id="rsRevive" checked>受け持ちが外れている家 ${free.length}件も、再訪問にもどす</label>
-      <p class="hint">だれも受け持っていない家だけです。もどすと、ほかの人にも「再訪問している家」として伝わります。</p>` : ''}
-    ${other ? `<p class="muted">ほかの人が受け持っている家・もうない家 ${other}件は、戻しません。</p>` : ''}
+    <p>今も再訪問している家：<b>${mine.length}件</b>（メモ・約束・📌を戻します。今のメモも消さずに合わせます）</p>
+    ${!mine.length && !free.length ? '<div class="notice warn">戻せる家がありません。ほかの人が再訪問しているか、家がなくなっています。</div>' : ''}
+    ${free.length ? `<label class="check"><input type="checkbox" id="rsRevive" checked>再訪問から外れている家 ${free.length}件も、再訪問にもどす</label>
+      <p class="hint">だれも再訪問していない家だけです。もどすと、ほかの人にも「再訪問している家」として伝わります。</p>` : ''}
+    ${other ? `<p class="muted">ほかの人が再訪問している家・もうない家 ${other}件は、戻しません。</p>` : ''}
     <button class="btn primary block" id="rsApply">戻す</button><button class="btn block" data-close>やめる</button>`);
   $('#rsApply').onclick = () => {
     const revive = $('#rsRevive') && $('#rsRevive').checked ? free : [];
@@ -6052,28 +6067,31 @@ function dropOldGpins() {
 }
 
 /* ---------- 再訪問の受け持ちの操作 ---------- */
-const RELEASE_MSG = { handoff: '引き継ぎを待つ家にしました', lost: '再訪問のリストから外しました', gone: '再訪問のリストから外しました', admin: '受け持ちを解除しました' };
+const RELEASE_MSG = { lost: '再訪問のリストから外しました', gone: '再訪問のリストから外しました', admin: '再訪問を解除しました' };
 function startFollow(k, by) {
   const now = new Date().toISOString();
   D().follows[k] = { by, since: now, touchedAt: now };
   delete D().released[k];
 }
+/* 期限を過ぎた再訪問を外して、普通の家にもどす（区域係のスマホ・最新のデータを受け取ったあとだけ。印は付けない） */
+function expireFollows() {
+  if (!isAdmin() || !relCleanReady()) return;
+  const n = followFreeDays(); if (!n) return;
+  const ks = Object.keys(D().follows).filter(k => { const f = D().follows[k]; return f && f.touchedAt && houseById(parseKey(k)[0]) && followIdle(f) >= n; });
+  if (!ks.length) return;
+  commit(`しばらく訪問のない再訪問を${ks.length}件、自動で外しました`, () => { ks.forEach(k => { delete D().follows[k]; }); });
+}
 function releaseFollow(k, reason) {
   delete D().follows[k];
-  if (reason === 'handoff') D().released[k] = { at: new Date().toISOString(), reason };
   // 本人が「リストから外した」家は、係の「取り残し」やほかの人の案内に出さない（あとでまた★が付けば、また出る）
-  else if (reason === 'lost' || reason === 'gone') D().released[k] = { at: new Date().toISOString(), reason: 'closed' };
+  if (reason === 'lost' || reason === 'gone') D().released[k] = { at: new Date().toISOString(), reason: 'closed' };
   else delete D().released[k];
 }
 async function followAction(act, k) {
   switch (act) {
     case 'continue':
       if (!fol(k)) return;
-      commitIn([], '受け持ちを続けます。期限を延ばしました', () => { D().follows[k].touchedAt = new Date().toISOString(); });
-      break;
-    case 'handoff':
-      if (!await ask('この再訪問をほかの人に引き継ぎます。よろしいですか？')) return;
-      commitIn([], RELEASE_MSG.handoff, () => releaseFollow(k, 'handoff'));
+      commitIn([], '再訪問を続けます。期限を延ばしました', () => { D().follows[k].touchedAt = new Date().toISOString(); });
       break;
     case 'stop':
       openReleaseSheet(k, true);
@@ -6082,7 +6100,7 @@ async function followAction(act, k) {
       openReleaseSheet(k, false);
       break;
     case 'release':
-      if (!await ask('この受け持ちを解除します。よろしいですか？')) return;
+      if (!await ask('この再訪問を解除します。よろしいですか？')) return;
       commitIn([], RELEASE_MSG.admin, () => releaseFollow(k, 'admin'));
       break;
     case 'memo':
@@ -6094,8 +6112,8 @@ async function followAction(act, k) {
       break;
     }
     case 'take':
-      if (fol(k)) { toast('すでに受け持ちがあります'); return; }
-      commitIn([], '再訪問を受け持ちます', () => startFollow(k, me().id));
+      if (fol(k)) { toast('すでにほかの人が再訪問しています'); return; }
+      commitIn([], '再訪問します', () => startFollow(k, me().id));
       break;
   }
 }
@@ -6106,9 +6124,8 @@ function openReleaseSheet(k, onlyStop) {
   setSheet(headHtml(terrById(h.terrId), 'リストから外します', targetName(h, unit)) + `
     <div class="choices">
       <button class="choice wide" data-rel="lost">リストから外す<small>もう訪ねない（関心がない・引っ越した など）</small></button>
-      ${onlyStop ? '' : '<button class="choice wide" data-rel="handoff">ほかの人に引き継ぐ<small>「引き継ぎを待っている家」として、ほかの人に表示されます</small></button>'}
     </div>
-    ${memoOf(k) ? '<p class="hint">メモも消えます（メモは引き継がれません）。</p>' : ''}
+    ${memoOf(k) ? '<p class="hint">メモも消えます。</p>' : ''}
     <button class="btn block" data-close>もどる（外さない）</button>`);
   $$('[data-rel]', $('#sheet')).forEach(x => x.onclick = () => {
     const rel = x.dataset.rel;
@@ -6134,13 +6151,13 @@ function followItem(k, f, mode) {
     if (stg >= 1) acts += A('continue', '続ける', 'primary');
     acts += A('remove', 'リストから外す', 'danger');
   } else {
-    acts = A('continue', '延長する') + A('handoff', '引き継ぎ待ちにする') + A('release', '解除する', 'danger') +
+    acts = A('continue', '延長する') + A('release', '解除する', 'danger') +
       `<label>変更 <select data-reassign="${esc(k)}">${userOptions(f.by)}</select></label>`;
   }
   return `<article class="ritem f-s${stg}"><div>
       <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(h, unit)}</p>
       ${met ? `<p class="metline">前回 会えた日：${fmtDate(met.at)}（${slotShort(slotOf(new Date(met.at)))}）</p>` : '<p class="muted">まだ会えた記録はありません</p>'}
-      <p class="muted">${mode === 'admin' ? `受け持ち：${esc(uname(f.by))}さん　` : ''}最後の記録から ${d}日${state}</p>
+      <p class="muted">${mode === 'admin' ? `再訪問する人：${esc(uname(f.by))}さん　` : ''}最後の記録から ${d}日${state}</p>${autoFreeLine(f)}
       ${m ? `<p class="muted">★${YOUNG.has(m.age) ? '・若い世代' : ''}${bs ? `　会えた時間帯：${bs}` : ''}</p>` : ''}
       ${memo ? `<p class="memoline">メモ：${esc(memoShort(memo))}</p>` : ''}
     </div><button class="btn small" data-go="${esc(hid)}" data-unit="${esc(unit)}" data-route="1">地図で見る</button>
@@ -6531,7 +6548,7 @@ function openAptSeq(hid, startUnit) {
       if (dncSkip(k)) b += skipNoteHtml('部屋', false).replace('ほかは訪ねられます。', '次の部屋へ進んでください。');
       else if (!D().dnc[k] && langNo(k)) b += langNoteHtml('部屋', k).replace('</div>', '次の部屋へ進んでください。</div>');
       else if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の部屋です。</b>訪問しないで、次の部屋へ進んでください。</div>`;
-      else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="seqOverride">それでも記録する</button></span></div>`;
+      else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>この家を再訪問している人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="seqOverride">それでも記録する</button></span></div>`;
       else b += seqStepsHtml(st, k);
       b += `<div class="seqnav">
           <button class="btn" id="seqPrev"${idx === 0 ? ' disabled' : ''}>← 前の部屋</button>
@@ -8399,7 +8416,7 @@ function renderFollowList() {
   list.sort((a, b) => (pins.has(b[0]) ? 1 : 0) - (pins.has(a[0]) ? 1 : 0) || (cmp[sort] || cmp.idle)(a, b)); // ピン留めはいつも上
   box.innerHTML = (list.length ? list.map(([k, f]) => followCard(k, f, pins.has(k))).join('')
     : (followQ ? '<div class="empty">見つかりませんでした。</div>'
-      : '<div class="empty">受け持っている再訪問はありません。<br>また訪ねたい方に会えたら、記録のときに「私が再訪問します」を選べます。</div>')) + (followQ ? '' : handoffHtml());
+      : '<div class="empty">再訪問している家はありません。<br>また訪ねたい方に会えたら、記録のときに「私が再訪問します」を選べます。</div>'));
   paintFollowBk();
 }
 function followCard(k, f, pinned) {
@@ -8415,7 +8432,7 @@ function followCard(k, f, pinned) {
     <div class="fhead"><button type="button" class="pinbtn" data-pin="${esc(k)}" aria-pressed="${pinned}" aria-label="${pinned ? 'ピン留めを外す' : 'いつも上に表示する'}">📌</button>
       <span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span><b>${targetName(h, unit)}</b></div>
     ${met ? `<p class="metline">前回 会えた日：${fmtDate(met.at)}（${slotShort(slotOf(new Date(met.at)))}）</p>` : '<p class="muted">まだ会えた記録はありません</p>'}
-    <p class="muted">最後の記録から ${d}日${state}${myPos ? `　ここから約${fmtDist(distM(myPos, [h.lat, h.lng]))}` : ''}</p>
+    <p class="muted">最後の記録から ${d}日${state}${myPos ? `　ここから約${fmtDist(distM(myPos, [h.lat, h.lng]))}` : ''}</p>${autoFreeLine(f)}
     <div class="stamps"><button type="button" class="choice c-met" data-fstamp="met" data-key="${esc(k)}"><i class="pin mini st-met">会</i>会えた</button>
       <button type="button" class="choice c-away" data-fstamp="away" data-key="${esc(k)}"><i class="pin mini st-away">留</i>留守</button></div>
     ${memo && memo.next ? `<p class="nextline">次の約束：${esc(fmtNext(memo.next))}</p>` : ''}
@@ -8760,7 +8777,7 @@ function delReqHtml() {
         <p class="who">${esc(uname(r.by))}さん</p>
         <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> 区域${t ? esc(t.no) : '-'}　${name}</p>
         <p class="muted">理由：${esc(r.reason || '—')}　${fmtDate(r.at)}に申請</p>
-        ${h ? `<p class="muted">訪問の記録 ${n}件${hasF ? '・<b>再訪問の受け持ちあり</b>' : ''}${h.createdBy ? `　この家を追加した人：${h.createdBy === r.by ? '申請した本人' : esc(uname(h.createdBy)) + 'さん'}` : ''}</p>`
+        ${h ? `<p class="muted">訪問の記録 ${n}件${hasF ? '・<b>再訪問あり</b>' : ''}${h.createdBy ? `　この家を追加した人：${h.createdBy === r.by ? '申請した本人' : esc(uname(h.createdBy)) + 'さん'}` : ''}</p>`
           : '<p class="tag-warn">この家は、すでにありません</p>'}
       </div>${h ? `<button class="btn small" data-go="${esc(h.id)}" data-unit="">地図で見る</button>` : '<span></span>'}
       <div class="actions span">${h ? `<button class="btn small danger" data-delok="${esc(r.id)}">削除する</button>` : ''}<button class="btn small" data-delno="${esc(r.id)}">${h ? '見送る' : '閉じる'}</button></div></article>`;
@@ -8824,6 +8841,11 @@ function renderInbox() {
       <div class="stepper"><button type="button" data-kset="skipDays" data-d="-10" aria-label="期間を短くする">−</button>
         <output class="wide">${st.skipDays ? st.skipDays + '日' : '使わない'}</output>
         <button type="button" data-kset="skipDays" data-d="10" aria-label="期間を長くする">＋</button></div></div>`,
+    followFreeDays: `<div class="setrow">
+      <span>再訪問を自動で外すまで<br><small class="hint">この期間、訪問の記録も「続ける」もない再訪問は、自動で外れて普通の家にもどります（区域係のスマホが開いたとき）</small></span>
+      <div class="stepper"><button type="button" data-kset="followFreeDays" data-d="-7" aria-label="期間を短くする">−</button>
+        <output class="wide">${followFreeDays() ? `<span>${followFreeDays() / 7}週間</span>` : '使わない'}</output>
+        <button type="button" data-kset="followFreeDays" data-d="7" aria-label="期間を長くする">＋</button></div></div>`,
     followSkipDays: `<div class="setrow">
       <span>再訪問の家を、区域カードで「最近会えた家（とばしてよい）」にする期間<br><small class="hint">再訪問をしている人が最後に会えた日から数えます。この期間がすぎると、区域カードを回る人も訪ねてよい家になります（0＝使わない）</small></span>
       <div class="stepper"><button type="button" data-kset="followSkipDays" data-d="-10" aria-label="期間を短くする">−</button>
@@ -8881,7 +8903,7 @@ function renderInbox() {
   };
   // 区域の決まり（設定タブ）の箱。よく調整する行（返却の目安など）は、kimari.js が「よく調整する」に移す
   const lendBox = $('#krLend'), takeBox = $('#krTake'), etcBox = $('#krTipsEtc');
-  if (lendBox) lendBox.innerHTML = ['lendDays', 'donePct', 'awayRetPct', 'awayAgainSlot', 'lowOn', 'lowWait', 'autoFree', 'freeAfterDays', 'skipDays', 'followSkipDays', 'skipDone'].map(k => R[k]).join('');
+  if (lendBox) lendBox.innerHTML = ['lendDays', 'donePct', 'awayRetPct', 'awayAgainSlot', 'lowOn', 'lowWait', 'autoFree', 'freeAfterDays', 'skipDays', 'followSkipDays', 'followFreeDays', 'skipDone'].map(k => R[k]).join('');
   if (takeBox) takeBox.innerHTML = ['selfTakeMax', 'holdMaxPersonal', 'holdMaxGroup', 'reqMaxPersonal', 'reqMaxGroup'].map(k => R[k]).join('');
   if (etcBox) etcBox.innerHTML = ['groupOn', 'groupMax', 'lockOthers', 'memoSync'].map(k => R[k]).join('');
 }
@@ -10429,7 +10451,7 @@ function renderAwayAdmin() {
 /* ---------- おすすめ画面 ---------- */
 let recoFilter = 'all';
 const RECO_KINDS = [
-  ['all', 'すべて'], ['handoff', '引き継ぎを待っている家'], ['interest', '★ また訪ねたい家'], ['young', '若い世代']
+  ['all', 'すべて'], ['interest', '★ また訪ねたい家'], ['young', '若い世代']
 ];
 function computeReco() {
   const now = new Date(), slot = slotOf(now), onlyMine = $('#recoMine').checked;
@@ -10493,7 +10515,7 @@ function fitFollowMap() {
   if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [70, 70], maxZoom: 18 });
 }
 function openFollowMap() {
-  if (!myFollowKeys().length) { toast('受け持っている再訪問はありません'); return; }
+  if (!myFollowKeys().length) { toast('再訪問している家はありません'); return; }
   clearTarget();
   focusCard = null; roundTerr = null; curTerr = null; firstMapShow = false;
   followMap = true;
@@ -11215,7 +11237,7 @@ function openUiSheet() {
       if (k === 'round') { me().roundMode = v; Store.save(); renderHouses(); paint(true); return; }
       if (k === 'fFollow' && v === 'off' && featFollow()) {
         const n = Object.values(D().follows).filter(f => f.by === me().id).length;
-        if (n && !await ask(`受け持っている再訪問が${n}件あります。\n「使わない」にするとリストは見えなくなりますが、受け持ちは残ります（ほかの人は訪問を控えたままです）。\n受け持ちをやめる場合は、先にリストから外してください。\n「使わない」にしますか？`)) return;
+        if (n && !await ask(`再訪問している家が${n}件あります。\n「使わない」にするとリストは見えなくなりますが、再訪問は残ります（ほかの人は訪問を控えたままです）。\n再訪問をやめる場合は、先にリストから外してください。\n「使わない」にしますか？`)) return;
       }
       if (k === 'fTime' || k === 'fFollow') {
         UI[k] = v; uiSave(); applyUi(); updateTabs(); renderAll(); paint(true);
@@ -11364,9 +11386,9 @@ function createDummy(testers) {
       { l: '検証05 作ったときの時間帯に会えた', v: [['met', dateAtSlot(cur, 50), once]] },
       { l: '検証06 ★また訪ねたい', v: [['met', dateAtSlot(o1, 40), { age: '若い世代', interest: '再訪問したい' }]] },
       { l: '検証07 若い世代', v: [['met', dateAtSlot(o2, 70), { age: '若い世代', interest: '再訪問しない' }]] },
-      { l: '検証08 引き継ぎ待ち', v: [['met', dateAtSlot(o1, 32), Object.assign({ by: other }, star)]], released: true },
-      { l: '検証09 自分の受け持ち3週間', v: [['met', iso(now - 35 * DAY), star]], follow: 25 },
-      { l: '検証10 自分の受け持ち6週間', v: [['met', iso(now - 45 * DAY), star]], follow: 45 },
+      { l: '検証08 古い引き継ぎ待ちの印（普通の家）', v: [['met', dateAtSlot(o1, 32), Object.assign({ by: other }, star)]], released: true },
+      { l: '検証09 自分の再訪問3週間', v: [['met', iso(now - 35 * DAY), star]], follow: 25 },
+      { l: '検証10 自分の再訪問6週間', v: [['met', iso(now - 45 * DAY), star]], follow: 45 },
       { l: '検証11 最近会えた（青）', v: [['met', iso(now - 25 * DAY), once]] },
       { l: '検証12 今回会えた（緑）', v: [['met', iso(now - 5 * DAY), once]] },
       { l: '検証13 今回留守（緑）', v: [['away', iso(now - 3 * DAY - 3600000)]] },
@@ -11434,13 +11456,13 @@ function openDummyGuide(tid) {
     <div class="notice info">${mineT ? `あなたの検証用の区域は<b>区域${esc(mineT.no)}</b>です（20日前に受け取った区域として入れてあります）。` : 'あなたの検証用の区域はありません。共通の区域Z0で留守宅カードを確かめられます。'}家の目印に「検証01」などの番号が付いています。</div>
     <h3 class="sub">おすすめ画面</h3>
     <p>・留守宅カード：<b>どの時間帯でも</b>、自分の区域と区域Z0のカードが出ます（行ける時間を全部にすると、時間帯ごとに並びます）。受け取れるのは2枚までで、見本が1枚入っています。</p>
-    <p>・引き継ぎを待っている家：各区域の08（だれにでも表示）<br>・★ また訪ねたい家：自分の区域の06・アパート203<br>・若い世代：自分の区域の07<br>
+    <p>・★ また訪ねたい家：自分の区域の06・アパート203<br>・若い世代：自分の区域の07<br>
       <span class="muted">★や年代は、区域の担当者にしか見えません。ほかの人の区域の06・07は、ほかの人には出ません。</span></p>
     <h3 class="sub">地図（自分の区域をひらく）</h3>
     <p>・白い丸：01・02ほか　・緑のチェック：12・13・16（今回訪ねた家）<br>・青いチェック：11　・赤い「拒」：14　・「再」の札：09・10<br>・16をタップすると「10分前に、ほかの人が記録しています」と出ます${LIVE && isAdmin() ? '（区域係が作った記録なので、区域係本人には出ません）' : ''}。</p>
     <h3 class="sub">区域カード画面</h3>
     <p>・あなたの再訪問：09（しばらく訪問なし）・10（確認が必要）。「地図で見る」で、目印の動きと、記録とメモの確認画面を確かめられます。</p>
-    ${isAdmin() ? `<h3 class="sub">係の画面</h3><p>・なかなか会えない家：各区域の15<br>・取り残し：06・08・アパート203<br>・確認が必要な受け持ち：各区域の10<br>・留守宅の状況：区域ごとの「使用中のカード」</p>
+    ${isAdmin() ? `<h3 class="sub">係の画面</h3><p>・なかなか会えない家：各区域の15<br>・取り残し：06・08・アパート203<br>・確認が必要な再訪問：各区域の10<br>・留守宅の状況：区域ごとの「使用中のカード」</p>
       <p class="hint">確かめ終わったら、係の画面の「データ」にある「ダミーを消す」で、検証用の区域・家・記録・留守宅カードをまとめて消せます。</p>` : ''}
     <div class="actions">${mineT ? `<button class="btn primary" id="dgMap">区域${esc(mineT.no)}の地図をひらく</button>` : ''}<button class="btn" id="dgReco">おすすめを見る</button></div>
     <button class="btn block" data-close>閉じる</button>`);
@@ -12396,7 +12418,7 @@ let poolSweepAt = 0;
    回り終えた区域を途中の返却にしないため。受け取ったときに係の画面を開いていれば applyInbox が呼ぶ。第3回監査 P6・2026-10-29） */
 function adminSweepSoon() {
   if (!isAdmin() || (LIVE && !Store.pulled)) return;
-  if (Date.now() - poolSweepAt > 300000) { poolSweepAt = Date.now(); setTimeout(() => { finalizePools(); fromFill(); lowSweep(); recLessFill(); }, 400); } // fromFill は lowSweep の前（古い続きからの記録に回りはじめた日を補ってから数える。N-7）
+  if (Date.now() - poolSweepAt > 300000) { poolSweepAt = Date.now(); setTimeout(() => { finalizePools(); fromFill(); lowSweep(); recLessFill(); expireFollows(); }, 400); } // fromFill は lowSweep の前（古い続きからの記録に回りはじめた日を補ってから数える。N-7）
 }
 function renderAdmin() {
   setAdPane(adPane);
@@ -12637,9 +12659,9 @@ function renderFollowAdmin() {
   const check = entries.filter(([, f]) => followStage(f) === 2).sort((a, b) => followIdle(b[1]) - followIdle(a[1]));
   const left = leftItems();
   $('#adFollowTiles').innerHTML = `
-    <div class="tile"><b>${entries.length}</b>受け持ち中の再訪問</div>
-    <div class="tile${check.length ? ' alert' : ''}"><b>${check.length}</b>確認が必要な受け持ち</div>
-    <div class="tile${left.length ? ' alert' : ''}"><b>${left.length}</b>取り残し（受け持ちなし）</div>`;
+    <div class="tile"><b>${entries.length}</b>再訪問している家</div>
+    <div class="tile${check.length ? ' alert' : ''}"><b>${check.length}</b>確認が必要な再訪問</div>
+    <div class="tile${left.length ? ' alert' : ''}"><b>${left.length}</b>取り残し（再訪問する人なし）</div>`;
 
   const wk = d => `${d / 7}週間`;
   const stepper = (key, label) => `<div class="setrow"><span>${label}</span><div class="stepper">
@@ -12655,12 +12677,12 @@ function renderFollowAdmin() {
   });
   const ids = Object.keys(by);
   $('#adFollowUsers').innerHTML = ids.length
-    ? `<table class="slots narrow"><tr><th>名前</th><th>受け持ち</th><th>しばらく訪問なし</th><th>確認が必要</th></tr>${ids.map(id =>
+    ? `<table class="slots narrow"><tr><th>名前</th><th>再訪問</th><th>しばらく訪問なし</th><th>確認が必要</th></tr>${ids.map(id =>
         `<tr><th>${esc(uname(id))}</th><td>${by[id].n}</td><td>${by[id].s1}</td><td class="${by[id].s2 ? 'warncell' : ''}">${by[id].s2}</td></tr>`).join('')}</table>`
-    : '<p class="muted">受け持ちはまだありません。</p>';
+    : '<p class="muted">再訪問はまだありません。</p>';
 
   $('#adFollowCheck').innerHTML = check.length ? check.map(([k, f]) => followItem(k, f, 'admin')).join('')
-    : '<div class="empty">確認が必要な受け持ちはありません。</div>';
+    : '<div class="empty">確認が必要な再訪問はありません。</div>';
 
   $('#adLeft').innerHTML = left.length ? left.slice(0, 30).map(i => {
     const t = terrById(i.h.terrId), bs = bestSlot(i.k);
@@ -12668,13 +12690,13 @@ function renderFollowAdmin() {
       <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(i.h, i.unit)}</p>
       <p class="muted">${i.rel ? '<b>引き継ぎ待ち</b>　' : ''}★${YOUNG.has(i.m.age) ? '・若い世代' : ''}　最後の記録から ${i.idle}日${bs ? `　会えた時間帯：${bs}` : ''}</p>
     </div><button class="btn small" data-go="${esc(i.h.id)}" data-unit="${esc(i.unit)}">地図で見る</button>
-    <div class="actions span"><label>受け持つ人 <select data-assign="${esc(i.k)}">${userOptions('', '選んでください')}</select></label></div></article>`;
+    <div class="actions span"><label>再訪問する人 <select data-assign="${esc(i.k)}">${userOptions('', '選んでください')}</select></label></div></article>`;
   }).join('') + (left.length > 30 ? `<p class="muted">ほか ${left.length - 30}件</p>` : '')
     : '<div class="empty">取り残されている家はありません。</div>';
 
   $('#adBulk').innerHTML = `
     <label>だれから <select id="bkFrom"><option value="">選んでください</option>${ids.map(id => `<option value="${esc(id)}">${esc(uname(id))}（${by[id].n}件）</option>`).join('')}</select></label>
-    <label>だれへ <select id="bkTo">${userOptions('', '引き継ぎ待ちにする')}</select></label>
+    <label>だれへ <select id="bkTo">${userOptions('', '選んでください')}</select></label>
     <button class="btn" id="bkGo">まとめて移す</button>`;
 }
 function changeSetting(key, d) {
@@ -12690,12 +12712,13 @@ function changeSetting(key, d) {
 async function bulkMove() {
   const from = $('#bkFrom').value, to = $('#bkTo').value;
   if (!from) { toast('「だれから」を選んでください'); return; }
+  if (!to) { toast('「だれへ」を選んでください'); return; } // 引き継ぎ待ちは 2026-11-17 に廃止
   if (from === to) { toast('同じ人は選べません'); return; }
   const keys = Object.keys(D().follows).filter(k => D().follows[k].by === from);
-  const toLabel = to ? `${uname(to)}さん` : '引き継ぎ待ち';
-  if (!await ask(`${uname(from)}さんの受け持ち ${keys.length}件を「${toLabel}」に移します。よろしいですか？`)) return;
+  const toLabel = `${uname(to)}さん`;
+  if (!await ask(`${uname(from)}さんの再訪問 ${keys.length}件を「${toLabel}」に移します。よろしいですか？`)) return;
   commit(`${keys.length}件を${toLabel}に移しました`, () => {
-    keys.forEach(k => { if (to) startFollow(k, to); else releaseFollow(k, 'handoff'); });
+    keys.forEach(k => startFollow(k, to));
   });
 }
 function exportCsv() {
@@ -14729,28 +14752,13 @@ function openEditUser(id) {
     if ($('#euOff')) $('#euOff').onclick = async () => {
       const u = userById(id); if (!u) return;
       if (!await ask('', { title: `${u.name}さんが区域マップを使うのをやめますか？`,
-        body: 'この人のスマホでは、次に開いたときに区域の情報が消えます。\n再訪問のメモ（次の約束・📌）も消え、あとで使えるようにしても元にもどりません（本人がバックアップを保存していれば、もどせます）。\n受け持ちの家のリストと、会えた記録は残ります。',
+        body: 'この人のスマホでは、次に開いたときに区域の情報が消えます。\n再訪問のメモ（次の約束・📌）も消え、あとで使えるようにしても元にもどりません（本人がバックアップを保存していれば、もどせます）。\n再訪問の家のリストと、会えた記録は残ります。',
         ok: '使うのをやめる', cancel: 'このまま使う', danger: true })) return;
       closeSheet();
       setUserGroup(u, u.group || '', !!u.overseer, !!u.leader, u.role, false);
     };
   };
   paint();
-}
-
-/* ---- 引き継ぎを待っている家（再訪問の一覧の下に出す） ---- */
-function handoffHtml() {
-  const items = Object.keys(D().released).filter(k => { const [hid] = parseKey(k); return relOf(k) && houseById(hid) && !D().dnc[k] && !D().follows[k]; });
-  if (!items.length) return '';
-  return `<h2 class="sec">引き継ぎを待っている家（${items.length}件）</h2><p class="hint">受け持てる方は「私が受け持つ」を押してください。</p>` +
-    items.slice(0, 20).map(k => {
-      const [hid, unit] = parseKey(k), h = houseById(hid), t = terrById(h.terrId), m = sum(k).met;
-      return `<article class="ritem k-handoff"><div>
-        <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(h, unit)}</p>
-        ${m ? `<p class="muted">前回 会えた日：${fmtDate(m.at)}</p>` : ''}</div>
-        <button class="btn small" data-go="${esc(hid)}" data-unit="${esc(unit)}">地図で見る</button>
-        <div class="actions span"><button class="btn small primary" data-fact="take" data-key="${esc(k)}">私が受け持つ</button></div></article>`;
-    }).join('');
 }
 
 /* ---- 残った再訪問の印の掃除（区域係だけ・2026-11-12） ----
@@ -14778,7 +14786,7 @@ const relCleanReady = () => !LIVE || (!!Store.fp && Store.pulled && !Store.needF
 function renderRelClean() {
   const el = $('#adRelClean'); if (!el) return;
   const n = isAdmin() && relCleanReady() ? relOrphans().length : 0;
-  el.innerHTML = n ? `<div class="setrow"><span>残っている再訪問の印<br><small class="hint">会えた記録も受け持ちもないのに、再訪問の印だけが残っている家です。消しても、家・訪問の記録・拒否・注意は変わりません。</small></span>
+  el.innerHTML = n ? `<div class="setrow"><span>残っている再訪問の印<br><small class="hint">会えた記録も再訪問もないのに、再訪問の印だけが残っている家です。消しても、家・訪問の記録・拒否・注意は変わりません。</small></span>
     <div class="actions"><button type="button" class="btn small" data-relclean>確かめて消す（${n}件）</button></div></div>` : '';
 }
 function openRelClean() {
@@ -14794,7 +14802,7 @@ function openRelClean() {
     return `<li><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span><span>${what}<br><small class="muted">${kind}${x.r && x.r.at ? `・${fmtDate(x.r.at)}` : ''}</small></span></li>`;
   };
   setSheet(headHtml(null, '残っている再訪問の印', `${list.length}件`) + `
-    <p>次の${list.length}件の印を消します。会えた記録も受け持ちもない家（または、もうない家）の印です。</p>
+    <p>次の${list.length}件の印を消します。会えた記録も再訪問もない家（または、もうない家）の印です。</p>
     <ul class="history">${list.slice(0, MAX).map(line).join('')}</ul>
     ${list.length > MAX ? `<p class="muted">ほか ${list.length - MAX}件</p>` : ''}
     <p class="hint">家・訪問の記録・拒否・注意は消えません。消したあとに出る「取り消す」で、もとにもどせます。</p>
@@ -16446,15 +16454,21 @@ function bindStatic() {
     }
     else if ((x = q('[data-kset]'))) {
       const st = D().settings, key = x.dataset.kset;
-      const lim = RECO_LIM[key] || (key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 180] : key === 'followSkipDays' ? [0, 365] : key === 'groupMax' ? [1, 10]
-        : key === 'syncGroupSec' ? [5, 30] : key === 'syncNormalSec' ? [10, 120]
-        : key === 'reqMaxPersonal' || key === 'reqMaxGroup' ? [1, 5]
-        : key === 'holdMaxPersonal' ? [1, 10] : key === 'holdMaxGroup' ? [1, 40] // グループ：フェーズ1の過渡期は枝番ごとに数えるので40まで
-        : key === 'lowWait' ? [3, 30]
-        : key === 'freeAfterDays' ? [0, 365] : [5, 60]);
-      const cv = st[key] == null || st[key] === '' ? NaN : Number(st[key]);
-      st[key] = Math.min(lim[1], Math.max(lim[0], (isFinite(cv) ? cv : 2) + Number(x.dataset.d)));
-      Store.save(); renderAll(); toast('設定を変えました');
+      if (key === 'followFreeDays') { // 0（使わない）か、「係に知らせるまで」＋7日〜182日。7日きざみ（2026-11-17）
+        const min = (Number(st.escalateDays) || 42) + 7, cur = followFreeDays(), d = Number(x.dataset.d);
+        st.followFreeDays = d > 0 ? Math.min(182, cur ? cur + d : min) : (cur + d < min ? 0 : cur + d);
+        Store.save(); renderAll(); toast('設定を変えました');
+      } else {
+        const lim = RECO_LIM[key] || (key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 180] : key === 'followSkipDays' ? [0, 365] : key === 'groupMax' ? [1, 10]
+          : key === 'syncGroupSec' ? [5, 30] : key === 'syncNormalSec' ? [10, 120]
+          : key === 'reqMaxPersonal' || key === 'reqMaxGroup' ? [1, 5]
+          : key === 'holdMaxPersonal' ? [1, 10] : key === 'holdMaxGroup' ? [1, 40] // グループ：フェーズ1の過渡期は枝番ごとに数えるので40まで
+          : key === 'lowWait' ? [3, 30]
+          : key === 'freeAfterDays' ? [0, 365] : [5, 60]);
+        const cv = st[key] == null || st[key] === '' ? NaN : Number(st[key]);
+        st[key] = Math.min(lim[1], Math.max(lim[0], (isFinite(cv) ? cv : 2) + Number(x.dataset.d)));
+        Store.save(); renderAll(); toast('設定を変えました');
+      }
     }
     else if ((x = q('[data-donepct]'))) {
       const st = D().settings;
@@ -16485,7 +16499,7 @@ function bindStatic() {
     const cur = fol(k);
     if (cur && cur.by === s.value) return;
     const v = s.value;
-    commitIn([], `${uname(v)}さんが再訪問を受け持ちます`, () => startFollow(k, v));
+    commitIn([], `${uname(v)}さんが再訪問します`, () => startFollow(k, v));
   });
 }
 

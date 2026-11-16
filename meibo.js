@@ -242,7 +242,7 @@
         ps.map(p => `<label class="check"><input type="checkbox" data-mbadd="${esc(p.k)}"${st.addOff.has(p.k) ? '' : ' checked'}>${nm(p.name)}${p.overseer ? ' <span class="gbadge">監督</span>' : ''}${p.leader ? ' <span class="gbadge">司会者</span>' : ''}</label>`).join('') : ''; }).join('')}` : '';
     const chLine = x => `<li>${nm(x.rename ? `${x.u.name} → ${x.p.name}` : x.p.name)}　${[x.group ? `グループ ${esc(x.u.group || 'なし')} → ${esc(x.p.group)}` : '', x.role ? `${x.p.overseer ? '監督' : x.p.leader ? '司会者' : '監督・司会者ではなくなる'}` : ''].filter(Boolean).join('・')}</li>`;
     const upHtml = P.ups.length ? `<details class="dueset"><summary>名前・グループなどが変わる人（${P.ups.length}人）</summary><ul style="padding-left:20px">${P.ups.map(chLine).join('')}</ul></details>` : '';
-    const onHtml = P.ons.length ? `<h3 class="sub">もう一度使えるようにする人（${P.ons.length}人）</h3><p class="hint">前に「使うのをやめる」にした人です。同じ人として戻すので、受け持ちの家と記録が戻ります（消えた再訪問のメモは戻りません）。</p><ul style="padding-left:20px">${P.ons.map(chLine).join('')}</ul>` : '';
+    const onHtml = P.ons.length ? `<h3 class="sub">もう一度使えるようにする人（${P.ons.length}人）</h3><p class="hint">前に「使うのをやめる」にした人です。同じ人として戻すので、再訪問の家と記録が戻ります（消えた再訪問のメモは戻りません）。</p><ul style="padding-left:20px">${P.ons.map(chLine).join('')}</ul>` : '';
     const groupsHtml = `<table class="slots narrow"><tr><th>グループ</th><th>監督</th><th>司会者</th><th>人数</th></tr>${R.groups.map(g => {
       const ps = byGroup(g);
       return `<tr><th>${esc(g)}</th><td data-notr>${esc(ps.filter(p => p.overseer).map(p => p.name).join('、') || '—')}</td><td data-notr>${esc(ps.filter(p => p.leader).map(p => p.name).join('、') || '—')}</td><td>${ps.length}人</td></tr>`;
@@ -283,7 +283,7 @@
     lines.push(T('今の登録の人は、同じ人のまま直すので、再訪問のメモや記録は消えません。'));
     if (!await ask('', { title: T('名簿の内容で更新しますか？'), body: lines.join('\n'), ok: '更新する', danger: false })) return;
     if (P.offs.length && !await ask('', { title: T(`${P.offs.length}人のデータを消していいですか？`),
-      body: `${P.offs.map(u => u.name).join('、')}\n` + T('この人たちは区域マップを使えなくなり、スマホでは、次に開いたときに区域の情報が消えます。再訪問のメモ（次の約束・📌）も消え、元にもどせません（本人がバックアップを保存していれば、もどせます）。受け持ちの家と会えた記録は残ります。'),
+      body: `${P.offs.map(u => u.name).join('、')}\n` + T('この人たちは区域マップを使えなくなり、スマホでは、次に開いたときに区域の情報が消えます。再訪問のメモ（次の約束・📌）も消え、元にもどせません（本人がバックアップを保存していれば、もどせます）。再訪問の家と会えた記録は残ります。'),
       ok: '消して、使うのをやめる', cancel: 'この人たちは残す', danger: true })) {
       P.offs.forEach(u => { st.link[u.id] = ''; });
       review(st);

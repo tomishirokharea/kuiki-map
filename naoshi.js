@@ -399,7 +399,7 @@
         if (dncSkip(k)) b += skipNoteHtml('世帯', false);
         else if (!D().dnc[k] && langNo(k)) b += langNoteHtml('世帯', k);
         else if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の世帯です。</b>訪問しないでください。${h.units.length > 1 ? 'ほかの世帯は訪ねられます。' : ''}</div>`;
-        else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="duOverride">それでも記録する</button></span></div>`;
+        else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>この家を再訪問している人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="duOverride">それでも記録する</button></span></div>`;
         else b += st.step === 'result' ? resultChoicesHtml('') : seqStepsHtml(st, k);
         b += '<button class="btn block" data-close>閉じる</button>';
       }

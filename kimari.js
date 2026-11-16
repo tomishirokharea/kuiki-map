@@ -101,7 +101,7 @@
      krTop＝よく調整する（開いて置く）。6項目は下のまとまりには重ねて出さない */
   const PLACE = {
     krTop: ['lendDays', 'donePct', 'awayRetPct', 'autoFree', 'holdMaxPersonal', 'awayCap'],
-    krLend: ['awayAgainSlot', 'lowOn', 'lowWait', 'freeAfterDays', 'skipDays', 'followSkipDays', 'skipDone', 'contDays'],
+    krLend: ['awayAgainSlot', 'lowOn', 'lowWait', 'freeAfterDays', 'skipDays', 'followSkipDays', 'followFreeDays', 'skipDone', 'contDays'],
     krExt: ['recoOn', 'wxOn'],
     krTake: ['selfTakeMax', 'holdMaxGroup', 'reqMaxPersonal', 'reqMaxGroup'],
     krTips: ['youngW', 'awayTries', 'nightOn', 'offDays', 'groupOn', 'groupMax', 'lockOthers', 'memoSync']
