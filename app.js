@@ -49,8 +49,7 @@ function metNext(st, k, save) {
   if (!featFollow()) { save('met', {}); return false; } // かんたんな記録：会えた、だけを残す
   const f = fol(k);
   if (f && f.by === me().id) { st.step = 'memo'; return true; }   // 自分の再訪問：メモを書き足す
-  if (f && followActive(f)) { save('met', {}); return false; }    // ほかの人が再訪問している家
-  st.step = 'follow'; return true;                                // また訪ねるかをえらぶ（普通の家として扱う日数を過ぎた、ほかの人の再訪問の家もここ。監査3 High）
+  st.step = 'follow'; return true;                                // また訪ねるかをえらぶ（ほかの人の再訪問があっても、自分の再訪問にできる・2026-11-17）
 }
 /* 会えたあと：また訪ねるか */
 const followAskHtml = () => `<p class="q">会えた方を、また訪ねますか？</p>
@@ -573,7 +572,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {}; d.caution = d.caution || {}; d.langs = d.langs || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, wxOn: 1, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, followFreeDays: 0, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7, recoLeft: 1 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, wxOn: 1, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7, recoLeft: 1 }, d.settings || {});
     d.s13 = d.s13 || [];
     d.agedata = d.agedata || [];
     d.holds = d.holds || [];
@@ -2140,7 +2139,7 @@ const skipDays = () => Number(D().settings.skipDays || 0);
 const followSkipDays = () => Number(D().settings.followSkipDays || 0);
 function recentMet(k) {
   // 再訪問の家は「再訪問として最後に会えた日から○日」（係の設定）。それ以外は「最近会えた家」の日数
-  const d = liveFol(k) ? followSkipDays() : skipDays();
+  const d = D().follows[k] ? followSkipDays() : skipDays();
   if (!d || dncAt(k)) return false;
   const m = sum(k).met;
   return !!m && Date.now() - Date.parse(m.at) <= d * DAY;
@@ -2356,35 +2355,9 @@ function statusOf(k) {
 /* 再訪問 */
 const fol = k => D().follows[k] || null;
 const followIdle = f => daysSince(f.touchedAt);
-/* 再訪問を「普通の家として扱う」までの日数（係の設定 followFreeDays。0＝使わない・2026-11-17）。
-   この日数、本人の訪問の記録（留守もふくむ）がない再訪問は、ほかの人から見て普通の家として扱う（区域カード・留守宅カード・おすすめ・「最近会えた家」の判定・案内）。
-   ほかの人が訪ねて会えたら、普通の家と同じく再訪問にできる（そのときは、その人の再訪問になる。サーバーの ruleFollow_）。それまでは本人の再訪問（データ・一覧・メモ）は消さない。
-   本人が訪ねて記録すると（留守でも）、また再訪問の家にもどる。「続ける」では延びない。
-   「係に知らせるまで」（escalateDays）より、いつも1週間以上長くする（設定がずれていても、知らせる前にはそうしない） */
-function followFreeDays() { const s = D().settings, v = Number(s.followFreeDays) || 0; return v > 0 ? Math.min(182, Math.max(v, (Number(s.escalateDays) || 42) + 7)) : 0; }
-const followLeft = f => { const n = followFreeDays(); return n && f && f.touchedAt ? n - followIdle(f) : null; }; // 普通の家として扱うまでの日数（使わないときは null）
-const followActive = f => { const n = followLeft(f); return n == null || n > 0; };
-/* 再訪問の家として扱う再訪問（普通の家として扱う日数を過ぎたものは null）。ほかの人から見た判定に使う。本人のデータや一覧には fol を使う */
-const liveFol = k => { const f = D().follows[k]; return f && followActive(f) ? f : null; };
-/* 自分が新しく再訪問にできる家か（再訪問がない家・ほかの人の再訪問で、普通の家として扱う日数を過ぎた家。サーバーの ruleFollow_ と同じ） */
-const canFollow = k => { const f = D().follows[k]; return !f || (f.by !== me().id && !followActive(f)); };
-/* 本人の再訪問の行に出す案内（普通の家として扱う2週間前から）。延びるのは、訪ねて記録したときだけ（留守もふくむ。「続ける」では延びない） */
-function autoFreeLine(f) {
-  const n = followLeft(f); if (n == null || n > 14) return '';
-  return n <= 0
-    ? '<p class="autofree"><span>今は普通の家として扱われています</span><span>（ほかの人も区域カードなどで訪ね、会えた人が再訪問にすることもあります。それまでは、あなたの再訪問とメモは残り、今までどおり訪ねられます。訪ねて記録すると（留守でも）、再訪問の家にもどります）</span></p>'
-    : `<p class="autofree"><span>${n === 1 ? '明日から普通の家として扱われます' : `あと${n}日で普通の家として扱われます`}</span><span>（ほかの人も区域カードなどで訪ね、再訪問にもできるようになります。訪ねて記録すると（留守でも）延びます）</span></p>`;
-}
-/* 自分の再訪問が、ほかの人の再訪問になったとき（日数を過ぎた家で、ほかの人が会えて再訪問にした）、一度だけ知らせる（監査3 M3）。
-   このスマホに、前に見た自分の再訪問の一覧を覚えておき、くらべる */
-function checkTakenFollows() {
-  if (!Store.data || !featFollow() || (LIVE && !Store.pulled)) return;
-  const key = 'kuiki_myfol_' + me().id, mine = Object.keys(D().follows).filter(k => D().follows[k] && D().follows[k].by === me().id);
-  let prev = []; try { prev = JSON.parse(lsGet(key) || '[]'); } catch (e) { prev = []; }
-  const taken = (Array.isArray(prev) ? prev : []).filter(k => D().follows[k] && D().follows[k].by !== me().id);
-  try { lsSet(key, JSON.stringify(mine)); } catch (e) { /* 覚えられなくても、次にくらべるだけ */ }
-  if (taken.length) toast(`しばらく訪問のなかった再訪問の家 ${taken.length}件が、会えたほかの人の再訪問になりました`);
-}
+/* 自分が新しく再訪問にできる家か（自分の再訪問がまだない家。ほかの人の再訪問があってもよい・2026-11-17 本人だけのリスト。サーバーの ruleFollow_ と同じ）
+   ほかの人の再訪問は { by: 'x' }（だれかが再訪問している）としか届かない。ほかの人の画面への影響は「最近会えた家」の期間（followSkipDays）だけ */
+const canFollow = k => { const f = D().follows[k]; return !f || f.by !== me().id; };
 function followStage(f) { const d = followIdle(f), s = D().settings; return d >= s.escalateDays ? 2 : d >= s.remindDays ? 1 : 0; }
 function parseKey(k) { const i = k.indexOf('|'); return [k.slice(0, i), k.slice(i + 1)]; }
 /* ---------- 拒否の印（D().dnc） ----------
@@ -2843,11 +2816,11 @@ function terrStats(t, sinceMs) {
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
   { v: '2026.13.155', items: [
+    ['再', '再訪問は、あなただけのリストになりました。ほかの人が同じ家を再訪問していても、自分の再訪問にできます。あなたの再訪問とメモは、ほかの人には見えません（区域係にも見えません）。'],
+    ['再', '留守だった家も、再訪問のリストに入れられるようになりました（「留守」で記録したあとの「再訪問に入れる」か、家の画面の「再訪問のリストに入れる」）。リストでは「留守のまま」と出ます。'],
+    ['再', 'ほかの人が再訪問している家でも、記録を止めず、「ほかの人が再訪問している家です」も出さないようにしました（最近会えた家は、今までどおり「最近会えた家」と出ます）。'],
     ['再', '「引き継ぎを待っている家」をなくしました。再訪問をやめるときは「リストから外す」を押してください。'],
-    ['再', '画面の「受け持ち」という言葉を「再訪問」にそろえました。'],
-    ['再', '区域係が決めたときは、しばらく訪問のない再訪問を、普通の家として扱うようになりました（ほかの人も区域カードなどで訪ね、会えた人は再訪問にもできます）。それまでは、あなたの再訪問とメモは残り、今までどおり訪ねられます。2週間前から「あと○日で普通の家として扱われます」と出ます。訪ねて記録すると（留守でも）延びます。'],
-    ['再', '再訪問の一覧の「続ける」をなくしました。再訪問を続けるときは、訪ねて記録してください（留守でもかまいません）。'],
-    ['係', '設定の「貸し出しと返却」に「再訪問を普通の家として扱うまで」を足しました（はじめは「使わない」）。']
+    ['再', '画面の「受け持ち」という言葉を「再訪問」にそろえました。']
   ] },
   { v: '2026.13.154', items: [
     ['地', '初めて使う人の地図を、見やすい設定から始めるようにしました（区域の線は赤く細く薄く、マンション・学校などの名前と目印の名前を出す）。今まで使っているスマホの地図は変わりません。同じようにしたいときは、歯車（設定）で「くわしく」をえらび、「地図」で変えられます。']
@@ -3280,14 +3253,15 @@ function splashGreeting() {
 let toastTimer = null;
 function toast(msg, undoFn, action, opt) {
   const el = $('#toast');
-  const act = action || (undoFn ? { label: '取り消す', fn: undoFn } : null);
-  el.innerHTML = `<span>${esc(msg)}</span>` + (act ? `<button type="button">${esc(act.label)}</button>` : '');
+  const act = action || (undoFn ? { label: '取り消す', fn: undoFn } : null), ex = opt && opt.extra; // ex：2つめのボタン（「留守」のあとの「再訪問に入れる」・2026-11-17）
+  el.innerHTML = `<span>${esc(msg)}</span>` + (act ? `<button type="button" class="tact">${esc(act.label)}</button>` : '') + (ex ? `<button type="button" class="tex">${esc(ex.label)}</button>` : '');
   // opt.below：その部品のすぐ下に出す（地図の案内で、右下の「現在地」ボタンを隠さないため・点検④U12）。ふだんは下のタブの上
   const bel = opt && opt.below ? $(opt.below) : null, br = bel ? bel.getBoundingClientRect() : null;
   if (br && br.height > 0) { el.style.top = Math.round(br.bottom + 8) + 'px'; el.style.bottom = 'auto'; }
   else { el.style.top = ''; el.style.bottom = ''; }
   el.hidden = false;
-  if (act) el.querySelector('button').onclick = () => { clearTimeout(toastTimer); el.hidden = true; act.fn(); };
+  if (act) el.querySelector('button.tact').onclick = () => { clearTimeout(toastTimer); el.hidden = true; act.fn(); };
+  if (ex) el.querySelector('button.tex').onclick = () => { clearTimeout(toastTimer); el.hidden = true; ex.fn(); };
   // 「取り消す」などのボタン以外のところ（文字など）をさわると、すぐ消す
   el.onclick = e => { if (e.target.closest('button')) return; clearTimeout(toastTimer); el.hidden = true; };
   clearTimeout(toastTimer);
@@ -4919,9 +4893,9 @@ function openTarget(hid, unit, fromBuilding, review) {
   const paint = () => {
     const vs = visitsOf(k), dnc = dncAt(k);
     const f = fol(k), rel = relOf(k);
-    const mine = !!f && f.by === me().id, other = !!liveFol(k) && !mine; // 普通の家として扱う日数を過ぎた、ほかの人の再訪問は、普通の家と同じ（2026-11-17）
-    // ほかの人の再訪問の家は、係が決めた日数のあいだだけ訪問を控える
-    const blocked = (dnc && !isAdmin()) || (other && !isAdmin() && !st.override && recentMet(k));
+    const mine = !!f && f.by === me().id;
+    // ほかの人の再訪問は、ほかの人の画面には出さない・記録も止めない（再訪問は本人だけのリスト・2026-11-17）。最近会えた家は、下の「最近会えた家です」で知らせる
+    const blocked = dnc && !isAdmin();
     let b = headHtml(t, title, sub);
     if (fromBuilding) b += `<button class="btn small" id="backBld">← 建物の編集にもどる</button>`;
     if (dnc && dnc.lg) b += langNoteHtml(unit ? '部屋' : '家', k);
@@ -4930,7 +4904,6 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (h.ban) b += banNotice(h);
     if (unit) b += bldMemoHtml(h);
     if (window.chuiNotice) b += window.chuiNotice(h, unit); // 注意（！）。特別区域で回る家のお知らせも、ここに続けて出す（tokubetsu.js）
-    if (!dnc && other) b += `<div class="notice warn"><b>ほかの人が再訪問している${unit ? '部屋' : '家'}です。</b>${recentMet(k) ? '最近会えているので、訪問は控えてください。' : 'しばらく会えていないので、訪ねてもかまいません。'}${blocked ? '<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
 
 
     if (!blocked) {
@@ -4979,6 +4952,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (st.step === 'review' && !blocked) b += `<button class="btn primary block review-rec" id="shRecord">訪問の結果を記録する</button>`;
 
     b += navLink(h);
+    if (canAddAwayFollow(k) && !sum(k).met) b += `<button class="btn block" id="shAddFol">再訪問のリストに入れる</button>`; // 留守の家を再訪問に（会えた家は「会えた」のあとの「また訪ねますか？」から・2026-11-17）
     if (unit) {
       b += `<details class="more"${st.editOpen || (st.mk && st.mk.kind) ? ' open' : ''}><summary>この部屋の編集</summary>
         ${window.chuiMark ? window.chuiMark.html(k, st.mk || (st.mk = {})) + '<button class="btn block" id="mkSave">この部屋の印を保存する</button>' : ''}
@@ -5040,6 +5014,7 @@ function openTarget(hid, unit, fromBuilding, review) {
       closeSheet(); deleteHouse(hid);
     });
     on('fEditHouse', () => openAddForm(null, null, hid));
+    on('shAddFol', () => addMyFollow(k));
     on('fMove', () => startMoveHouse(hid));
     on('fHNameSave', () => {
       const v = $('#fHName').value.trim();
@@ -5123,7 +5098,22 @@ function quickVisit(hid, unit, result, extra, msg, onUndo, keepOpen) {
   };
   // 地図で記録したときは、「取り消す」と「次のおすすめの家」を下に出す（アパートを続けて入力しているときは出さない）
   if (!keepOpen && map && currentView === 'map' && mode === 'normal' && showNextPanel(hid, unit, result, undo)) return;
-  toast(msg, undo);
+  const k = K(hid, unit);
+  toast(msg, undo, null, result === 'away' && canAddAwayFollow(k) ? { extra: { label: '再訪問に入れる', fn: () => addMyFollow(k) } } : undefined);
+}
+/* 留守の家を、自分の再訪問のリストに入れられるか（再訪問の機能を使う人・まだ自分の再訪問でない家・拒否／訪問しないでない家・
+   自分が訪ねた家か自分の区域の家。サーバーの L16 と同じ）。ほかの人の再訪問があってもよい（本人だけのリスト・2026-11-17） */
+function canAddAwayFollow(k) {
+  if (!featFollow() || !canFollow(k) || dncAt(k)) return false;
+  const h = houseById(parseKey(k)[0]); if (!h) return false;
+  const t = terrById(h.terrId);
+  return visitsOf(k).some(v => v.by === me().id) || !!(t && t.holder === me().id);
+}
+/* 自分の再訪問のリストに入れて、メモの画面を開く（メモは「あとで」で閉じられる） */
+function addMyFollow(k) {
+  if (!canFollow(k)) { toast('この家は、もう再訪問のリストに入っています'); return; }
+  commitIn([], '再訪問のリストに入れました', () => startFollow(k, me().id));
+  setTimeout(() => { try { openMemo(k); } catch (e) { console.error(e); } }, 50);
 }
 
 /* ---------- 記録のあと：「取り消す」と「次のおすすめの家」 ----------
@@ -5301,7 +5291,7 @@ function saveVisit(hid, unit, result, extra, keepOpen, onUndo) {
     } else if (result === 'refused' && extra.age) v.age = extra.age;
     D().visits.push(v);
     const f = D().follows[k];
-    if (f && f.by === me().id) f.touchedAt = now; // 本人が訪ねた記録（留守もふくむ）で、最後に訪ねた日を新しくする。「続ける」では延びない（サーバーも同じ・2026-11-17）
+    if (f && f.by === me().id) f.touchedAt = now; // 本人の記録で期限を延ばす
     if (follow) startFollow(k, me().id);
     if (extra.dnc) { D().dnc[k] = D().dnc[k] && !isSkipV(D().dnc[k]) ? D().dnc[k] : true; delete D().follows[k]; delete D().released[k]; } // 係が入れた住所は残す。訪問しないの家で「拒否」と記録したら拒否にする
     const hp = houseById(hid); if (hp && hp.prov) delete hp.prov; // 拒否・再訪問つきの記録でも、仮の家は「ある家」になる（H8。会えた・留守と同じ）
@@ -6035,20 +6025,20 @@ function checkRestore(b) {
   const fs = D().follows || {};
   const keys = Object.keys(b.memos || {}).concat(b.pins || [], b.follows || []).filter((k, i, a) => a.indexOf(k) === i);
   const mine = keys.filter(k => fs[k] && fs[k].by === me().id);
-  const free = keys.filter(k => !fs[k] && houseById(parseKey(k)[0]) && !D().dnc[k]); // だれも受け持っていない家
+  const free = keys.filter(k => !(fs[k] && fs[k].by === me().id) && houseById(parseKey(k)[0]) && !D().dnc[k]); // 自分の再訪問から外れている家（ほかの人の再訪問があってもよい・2026-11-17）
   const other = keys.length - mine.length - free.length;
   setSheet(headHtml(null, 'バックアップから戻す', `${b.at ? fmtDate(b.at) + 'のバックアップ' : ''}`) + `
     <div class="schedbox"><p>バックアップ：<b>${bkSummary(b)}</b></p><p>今のスマホ：<b>${bkSummary(backupPayload())}</b></p></div>
     <p>今も再訪問している家：<b>${mine.length}件</b>（メモ・約束・📌を戻します。今のメモも消さずに合わせます）</p>
-    ${!mine.length && !free.length ? '<div class="notice warn">戻せる家がありません。ほかの人が再訪問しているか、家がなくなっています。</div>' : ''}
+    ${!mine.length && !free.length ? '<div class="notice warn">戻せる家がありません。家がなくなっているか、拒否の家です。</div>' : ''}
     ${free.length ? `<label class="check"><input type="checkbox" id="rsRevive" checked>再訪問から外れている家 ${free.length}件も、再訪問にもどす</label>
-      <p class="hint">だれも再訪問していない家だけです。もどすと、ほかの人にも「再訪問している家」として伝わります。</p>` : ''}
-    ${other ? `<p class="muted">ほかの人が再訪問している家・もうない家 ${other}件は、戻しません。</p>` : ''}
+      <p class="hint">もどしても、ほかの人には「最近会えた家」の期間が変わるだけで、あなたの再訪問は見えません。</p>` : ''}
+    ${other ? `<p class="muted">もうない家・拒否の家 ${other}件は、戻しません。</p>` : ''}
     <button class="btn primary block" id="rsApply">戻す</button><button class="btn block" data-close>やめる</button>`);
   $('#rsApply').onclick = () => {
     const revive = $('#rsRevive') && $('#rsRevive').checked ? free : [];
     closeSheet();
-    if (revive.length) commitIn([], `再訪問を${revive.length}件もどしました`, () => { revive.forEach(k => { if (!D().follows[k]) startFollow(k, me().id); }); });
+    if (revive.length) commitIn([], `再訪問を${revive.length}件もどしました`, () => { revive.forEach(k => { if (canFollow(k)) startFollow(k, me().id); }); });
     const f2 = D().follows || {}, ok = new Set(Object.keys(f2).filter(k => f2[k] && f2[k].by === me().id));
     const o = memoAll(), p = pinsAll();
     let n = 0;
@@ -6092,13 +6082,10 @@ const RELEASE_MSG = { lost: '再訪問のリストから外しました', gone: 
 function startFollow(k, by) {
   const now = new Date().toISOString();
   D().follows[k] = { by, since: now, touchedAt: now };
-  delete D().released[k];
 }
 function releaseFollow(k, reason) {
+  // 自分の再訪問だけを外す（サーバーも、ほかの人の分は残す）。家ごとの印（released）は書かない：ほかの人の★の見え方を変えないため（2026-11-17）
   delete D().follows[k];
-  // 本人が「リストから外した」家は、係の「取り残し」やほかの人の案内に出さない（あとでまた★が付けば、また出る）
-  if (reason === 'lost' || reason === 'gone') D().released[k] = { at: new Date().toISOString(), reason: 'closed' };
-  else delete D().released[k];
 }
 async function followAction(act, k) {
   switch (act) {
@@ -6161,6 +6148,7 @@ function followItem(k, f, mode) {
   const memo = mode === 'mine' ? memoOf(k) : null;
   if (mode === 'mine') {
     acts += A('record', 'ここで記録する', 'primary') + A('memo', memo ? 'メモ・記録を開く' : 'メモを書く');
+    if (stg >= 1) acts += A('continue', '続ける', 'primary');
     acts += A('remove', 'リストから外す', 'danger');
   } else {
     acts = A('continue', '延長する') + A('release', '解除する', 'danger') +
@@ -6169,7 +6157,7 @@ function followItem(k, f, mode) {
   return `<article class="ritem f-s${stg}"><div>
       <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(h, unit)}</p>
       ${met ? `<p class="metline">前回 会えた日：${fmtDate(met.at)}（${slotShort(slotOf(new Date(met.at)))}）</p>` : '<p class="muted">まだ会えた記録はありません</p>'}
-      <p class="muted">${mode === 'admin' ? `再訪問する人：${esc(uname(f.by))}さん　` : ''}最後の記録から ${d}日${state}</p>${autoFreeLine(f)}
+      <p class="muted">${mode === 'admin' ? `再訪問する人：${esc(uname(f.by))}さん　` : ''}最後の記録から ${d}日${state}</p>
       ${m ? `<p class="muted">★${YOUNG.has(m.age) ? '・若い世代' : ''}${bs ? `　会えた時間帯：${bs}` : ''}</p>` : ''}
       ${memo ? `<p class="memoline">メモ：${esc(memoShort(memo))}</p>` : ''}
     </div><button class="btn small" data-go="${esc(hid)}" data-unit="${esc(unit)}" data-route="1">地図で見る</button>
@@ -6550,8 +6538,7 @@ function openAptSeq(hid, startUnit) {
         <button class="btn primary block" data-close>閉じる</button>
         ${isSimple() ? '' : '<button class="btn block" id="seqBack">建物の編集</button>'}`;
     } else {
-      const u = h.units[idx], k = K(hid, u), f = liveFol(k), last = visitsOf(k)[0];
-      const other = !!f && f.by !== me().id; // 普通の家として扱う日数を過ぎた再訪問は、普通の家と同じ
+      const u = h.units[idx], k = K(hid, u), last = visitsOf(k)[0];
       const uk2 = dispUnitKind(h, u);
       b += `<p class="seqroom"><b>${esc(uName(h, u))}</b>${/\d$/.test(uName(h, u)) ? '号室' : ''}${uk2 !== 'home' ? ` <span class="kindtag">${kindBadge(uk2, K(hid, u))}${kindName(uk2)}</span>` : ''} <span class="muted">（${idx + 1} / ${n}）</span></p>`;
       b += `<p class="muted">${last ? `前回：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}` : 'はじめて訪ねる部屋'}</p>`;
@@ -6560,7 +6547,6 @@ function openAptSeq(hid, startUnit) {
       if (dncSkip(k)) b += skipNoteHtml('部屋', false).replace('ほかは訪ねられます。', '次の部屋へ進んでください。');
       else if (!D().dnc[k] && langNo(k)) b += langNoteHtml('部屋', k).replace('</div>', '次の部屋へ進んでください。</div>');
       else if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の部屋です。</b>訪問しないで、次の部屋へ進んでください。</div>`;
-      else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>この家を再訪問している人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="seqOverride">それでも記録する</button></span></div>`;
       else b += seqStepsHtml(st, k);
       b += `<div class="seqnav">
           <button class="btn" id="seqPrev"${idx === 0 ? ' disabled' : ''}>← 前の部屋</button>
@@ -8391,7 +8377,6 @@ function togglePin(k) {
 let followQ = '';
 const FSORT = [['idle', 'しばらく訪問していない順'], ['near', '近い順'], ['recent', '最後に訪問した順'], ['metold', '前回会えた日が古い順'], ['terr', '区域番号順']];
 function renderFollowList() {
-  try { checkTakenFollows(); } catch (e) { console.error(e); }
   const box = $('#myFollows'); if (!box) return;
   const fw = $('#followWhere');
   if (fw) fw.textContent = memoSyncOn() ? 'メモは本人の端末（スマホ・iPadなど）だけで見られます。' : 'メモはこのスマホの中だけに残ります。';
@@ -8438,13 +8423,14 @@ function followCard(k, f, pinned) {
   const state = stg === 2 ? '（確認が必要）' : stg === 1 ? '（しばらく訪問なし）' : '';
   const A = (act, label, cls) => `<button class="btn small ${cls || ''}" data-fact="${act}" data-key="${esc(k)}">${label}</button>`;
   let acts = A('memo', 'メモ・記録を開く', 'primary') + `<button class="btn small" data-go="${esc(hid)}" data-unit="${esc(unit)}" data-route="1">地図で見る</button>`;
+  if (stg >= 1) acts += A('continue', '続ける');
   acts += A('remove', 'リストから外す', 'danger');
   const memoLines = memo ? memo.text.split('\n').slice(0, 3).join('\n') : '';
   return `<article class="fcard f-s${stg}${pinned ? ' pinned' : ''}">
     <div class="fhead"><button type="button" class="pinbtn" data-pin="${esc(k)}" aria-pressed="${pinned}" aria-label="${pinned ? 'ピン留めを外す' : 'いつも上に表示する'}">📌</button>
-      <span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span><b>${targetName(h, unit)}</b></div>
+      <span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span><b>${targetName(h, unit)}</b>${met ? '' : '<span class="rusubadge">留守のまま</span>'}</div>
     ${met ? `<p class="metline">前回 会えた日：${fmtDate(met.at)}（${slotShort(slotOf(new Date(met.at)))}）</p>` : '<p class="muted">まだ会えた記録はありません</p>'}
-    <p class="muted">最後の記録から ${d}日${state}${myPos ? `　ここから約${fmtDist(distM(myPos, [h.lat, h.lng]))}` : ''}</p>${autoFreeLine(f)}
+    <p class="muted">最後の記録から ${d}日${state}${myPos ? `　ここから約${fmtDist(distM(myPos, [h.lat, h.lng]))}` : ''}</p>
     <div class="stamps"><button type="button" class="choice c-met" data-fstamp="met" data-key="${esc(k)}"><i class="pin mini st-met">会</i>会えた</button>
       <button type="button" class="choice c-away" data-fstamp="away" data-key="${esc(k)}"><i class="pin mini st-away">留</i>留守</button></div>
     ${memo && memo.next ? `<p class="nextline">次の約束：${esc(fmtNext(memo.next))}</p>` : ''}
@@ -8853,11 +8839,6 @@ function renderInbox() {
       <div class="stepper"><button type="button" data-kset="skipDays" data-d="-10" aria-label="期間を短くする">−</button>
         <output class="wide">${st.skipDays ? st.skipDays + '日' : '使わない'}</output>
         <button type="button" data-kset="skipDays" data-d="10" aria-label="期間を長くする">＋</button></div></div>`,
-    followFreeDays: `<div class="setrow">
-      <span>再訪問を普通の家として扱うまで<br><small class="hint">この期間、本人の訪問の記録（留守もふくむ）がない再訪問は、普通の家として扱います（ほかの人も区域カードなどで訪ね、会えた人は再訪問にもできます）。それまでは、本人の再訪問の一覧とメモは残ります</small></span>
-      <div class="stepper"><button type="button" data-kset="followFreeDays" data-d="-7" aria-label="期間を短くする">−</button>
-        <output class="wide">${followFreeDays() ? `<span>${followFreeDays() % 7 ? followFreeDays() + '日' : followFreeDays() / 7 + '週間'}</span>` : '使わない'}</output>
-        <button type="button" data-kset="followFreeDays" data-d="7" aria-label="期間を長くする">＋</button></div></div>`,
     followSkipDays: `<div class="setrow">
       <span>再訪問の家を、区域カードで「最近会えた家（とばしてよい）」にする期間<br><small class="hint">再訪問をしている人が最後に会えた日から数えます。この期間がすぎると、区域カードを回る人も訪ねてよい家になります（0＝使わない）</small></span>
       <div class="stepper"><button type="button" data-kset="followSkipDays" data-d="-10" aria-label="期間を短くする">−</button>
@@ -8915,7 +8896,7 @@ function renderInbox() {
   };
   // 区域の決まり（設定タブ）の箱。よく調整する行（返却の目安など）は、kimari.js が「よく調整する」に移す
   const lendBox = $('#krLend'), takeBox = $('#krTake'), etcBox = $('#krTipsEtc');
-  if (lendBox) lendBox.innerHTML = ['lendDays', 'donePct', 'awayRetPct', 'awayAgainSlot', 'lowOn', 'lowWait', 'autoFree', 'freeAfterDays', 'skipDays', 'followSkipDays', 'followFreeDays', 'skipDone'].map(k => R[k]).join('');
+  if (lendBox) lendBox.innerHTML = ['lendDays', 'donePct', 'awayRetPct', 'awayAgainSlot', 'lowOn', 'lowWait', 'autoFree', 'freeAfterDays', 'skipDays', 'followSkipDays', 'skipDone'].map(k => R[k]).join('');
   if (takeBox) takeBox.innerHTML = ['selfTakeMax', 'holdMaxPersonal', 'holdMaxGroup', 'reqMaxPersonal', 'reqMaxGroup'].map(k => R[k]).join('');
   if (etcBox) etcBox.innerHTML = ['groupOn', 'groupMax', 'lockOthers', 'memoSync'].map(k => R[k]).join('');
 }
@@ -9231,7 +9212,7 @@ function coverAt(t, since, until, adopt) {
       const vs = visitsOf(k);
       if (aptIn && !vs.length) continue;
       if (vs.some(v => v.at >= since && v.at <= until)) { done++; total++; continue; }
-      const d = liveFol(k) ? followSkipDays() : skipDays();
+      const d = D().follows[k] ? followSkipDays() : skipDays();
       const m = d ? vs.find(v => v.result === 'met' && v.at < since) : null; // 新しい順なので、最初に見つかったものが一番新しい
       if (m && s0 - Date.parse(m.at) <= d * DAY) { if (inc) { done++; total++; } continue; }
       total++;
@@ -9657,7 +9638,7 @@ function unmetIndex(onlyTid, rlOv) {
     if (!h.terrId) continue;
     for (const u of targets(h)) {
       const k = K(h.id, u);
-      if (dncAt(k) || liveFol(k) || relOf(k)) continue;
+      if (dncAt(k) || relOf(k)) continue; // 再訪問の家も入れる（再訪問は本人だけのリスト・ほかの人の画面には影響しない・2026-11-17）
       if (coveredBySpecial(h, u)) continue; // 特別区域（コンビニなど）で回る家は、ふつうの区域の留守宅カードに入れない（2回訪ねないように）
       let b = bm.get(h.terrId); if (!b) { b = roundBounds(h.terrId); bm.set(h.terrId, b); }
       const x = umItem(k, h, u, b, rl, now, gapMs);
@@ -9681,7 +9662,7 @@ function leftOf(t) {
     for (const u of (sp ? specialTargets(h, t) : targets(h))) {
       if (!sp && coveredBySpecial(h, u)) continue;
       const k = K(h.id, u);
-      if (dncAt(k) || liveFol(k) || relOf(k)) continue;
+      if (dncAt(k) || relOf(k)) continue; // 再訪問の家も入れる（再訪問は本人だけのリスト・ほかの人の画面には影響しない・2026-11-17）
       const s = sum(k);
       if (s.last && s.last.at >= st0) continue; // 巡回の中で訪ねた家（留守宅・会えた家）
       if (s.met && start && skip && Date.parse(s.met.at) >= start - skip) continue; // 区域を受け取る前に最近会えていた家（とばしてよかった家）
@@ -9698,7 +9679,7 @@ function unmetOfSpecial(t, rlOv) {
   for (const h of housesOf(t.id)) {
     for (const u of specialTargets(h, t)) {
       const k = K(h.id, u);
-      if (dncAt(k) || liveFol(k) || relOf(k)) continue;
+      if (dncAt(k) || relOf(k)) continue; // 再訪問の家も入れる（再訪問は本人だけのリスト・ほかの人の画面には影響しない・2026-11-17）
       const x = umItem(k, h, u, b, rl, now, gapMs);
       if (x) out.push(x);
     }
@@ -10473,7 +10454,7 @@ function computeReco() {
     const othersTerr = onlyMine && t.holder && t.holder !== me().id;
     for (const unit of targets(h)) {
       const k = K(h.id, unit);
-      if (dncAt(k) || liveFol(k) || (fol(k) && fol(k).by === me().id)) continue; // 再訪問の家は出さない（ほかの人の再訪問で、普通の家として扱う日数を過ぎたものは出す。自分の再訪問は今までどおり出さない）
+      if (dncAt(k) || (fol(k) && fol(k).by === me().id)) continue; // 自分の再訪問の家は出さない（ほかの人の再訪問の家は普通の家と同じ）
       const rel = relOf(k);
       if (othersTerr && !rel) continue;            // 引き継ぎ待ちはだれにでも見せる
       const s2 = sum(k), last = s2.last;
@@ -13562,8 +13543,7 @@ function myUnmetNow(n) {
   const cur = slotOf(new Date()), seen = new Set(), list = [];
   const consider = (h, u, t, tag) => {
     const k = K(h.id, u); if (seen.has(k)) return; seen.add(k);
-    const f = liveFol(k);
-    if (dncAt(k) || (f && f.by !== me().id) || recentMet(k)) return;
+    if (dncAt(k) || recentMet(k)) return; // ほかの人の再訪問の家も、普通の家と同じ（最近会えた家はとばす）
     const s = sum(k);
     if (!(s.n > 0 && s.unmet) || hasSlot(s.slots, cur)) return;
     list.push({ hid: h.id, u, rk: '', no: t ? t.no : '', name: targetName(h, u), why: `留守${s.awayN}回・${slotShort(cur)}はまだ訪ねていない`, tag, sc: s.awayN });
@@ -13933,7 +13913,7 @@ function computeHomeReco() {
     const d = myPos ? distM(myPos, [h.lat, h.lng]) : null;
     for (const u of targets(h)) {
       const k = K(h.id, u);
-      if (dncAt(k) || liveFol(k) || (fol(k) && fol(k).by === me().id) || relOf(k) || recentMet(k)) continue; // 自分の再訪問は今までどおり出さない
+      if (dncAt(k) || (fol(k) && fol(k).by === me().id) || relOf(k) || recentMet(k)) continue; // 自分の再訪問は出さない（ほかの人の再訪問の家は普通の家と同じ）
       if (cardOut && othersCard.has(k)) continue;
       if (coveredBySpecial(h, u)) continue; // 特別区域（コンビニなど）で回る家は、おすすめに出さない
       const s = sum(k);
@@ -14118,7 +14098,6 @@ function todayTodoHtml(todays) {
 }
 
 function renderHome() {
-  try { checkTakenFollows(); } catch (e) { console.error(e); }
   const box = $('#view-home'); if (!box || box.hidden) return;
   const o = myData(), t = o.timer, h = new Date().getHours();
   const hi = h < 5 ? 'こんばんは' : h < 10 ? 'おはようございます' : h < 17 ? 'こんにちは' : 'こんばんは';
@@ -16467,21 +16446,15 @@ function bindStatic() {
     }
     else if ((x = q('[data-kset]'))) {
       const st = D().settings, key = x.dataset.kset;
-      if (key === 'followFreeDays') { // 0（使わない）か、「係に知らせるまで」＋7日〜182日。7日きざみ（2026-11-17）
-        const min = (Number(st.escalateDays) || 42) + 7, cur = followFreeDays(), d = Number(x.dataset.d);
-        st.followFreeDays = d > 0 ? Math.min(182, cur ? cur + d : min) : (cur + d < min ? 0 : cur + d);
-        Store.save(); renderAll(); toast('設定を変えました');
-      } else {
-        const lim = RECO_LIM[key] || (key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 180] : key === 'followSkipDays' ? [0, 365] : key === 'groupMax' ? [1, 10]
-          : key === 'syncGroupSec' ? [5, 30] : key === 'syncNormalSec' ? [10, 120]
-          : key === 'reqMaxPersonal' || key === 'reqMaxGroup' ? [1, 5]
-          : key === 'holdMaxPersonal' ? [1, 10] : key === 'holdMaxGroup' ? [1, 40] // グループ：フェーズ1の過渡期は枝番ごとに数えるので40まで
-          : key === 'lowWait' ? [3, 30]
-          : key === 'freeAfterDays' ? [0, 365] : [5, 60]);
-        const cv = st[key] == null || st[key] === '' ? NaN : Number(st[key]);
-        st[key] = Math.min(lim[1], Math.max(lim[0], (isFinite(cv) ? cv : 2) + Number(x.dataset.d)));
-        Store.save(); renderAll(); toast('設定を変えました');
-      }
+      const lim = RECO_LIM[key] || (key === 'keepMonths' ? [6, 36] : key === 'skipDays' ? [0, 180] : key === 'followSkipDays' ? [0, 365] : key === 'groupMax' ? [1, 10]
+        : key === 'syncGroupSec' ? [5, 30] : key === 'syncNormalSec' ? [10, 120]
+        : key === 'reqMaxPersonal' || key === 'reqMaxGroup' ? [1, 5]
+        : key === 'holdMaxPersonal' ? [1, 10] : key === 'holdMaxGroup' ? [1, 40] // グループ：フェーズ1の過渡期は枝番ごとに数えるので40まで
+        : key === 'lowWait' ? [3, 30]
+        : key === 'freeAfterDays' ? [0, 365] : [5, 60]);
+      const cv = st[key] == null || st[key] === '' ? NaN : Number(st[key]);
+      st[key] = Math.min(lim[1], Math.max(lim[0], (isFinite(cv) ? cv : 2) + Number(x.dataset.d)));
+      Store.save(); renderAll(); toast('設定を変えました');
     }
     else if ((x = q('[data-donepct]'))) {
       const st = D().settings;

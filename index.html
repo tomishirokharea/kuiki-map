@@ -1240,6 +1240,8 @@ nav.tabs{grid-template-columns:repeat(var(--tabs,4),minmax(0,1fr))}
 .hother>summary{cursor:pointer;min-height:48px;display:flex;align-items:center}
 .hgrp.hsub{background:transparent;border-bottom:1px solid var(--line);border-radius:0;padding:6px 2px;margin:12px 0 4px}
 #toast button{min-height:46px;border-radius:10px;border:2px solid #fff;background:transparent;color:#fff;font-weight:700;padding:0 14px;flex:none}
+#toast:has(.tex){flex-wrap:wrap;justify-content:flex-end} /* ボタンが2つのとき（「留守」のあとの「再訪問に入れる」）は折り返す */
+.rusubadge{display:inline-block;margin-left:6px;font-size:13px;font-weight:400;border-radius:9px;padding:0 8px;background:#FFF3D6;color:#7A4B00;vertical-align:1px} /* 再訪問の一覧：会えた記録のない再訪問 */
 @media (max-width:420px){ body{font-size:17px} .choice{font-size:17px} }
 
 /* =========================================================
