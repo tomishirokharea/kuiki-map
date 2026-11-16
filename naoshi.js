@@ -425,7 +425,7 @@
       $$('[data-int]', S).forEach(x => x.onclick = () => {
         const it = x.dataset.int;
         if (it === '拒否') { st.step = 'dnc'; paint(); }
-        else if (INTERESTED.has(it) && !fol(k)) { st.interest = it; st.step = 'follow'; paint(); }
+        else if (INTERESTED.has(it) && (typeof canFollow === 'function' ? canFollow(k) : !fol(k))) { st.interest = it; st.step = 'follow'; paint(); }
         else save('met', { age: st.age, interest: it });
       });
       $$('[data-fol]', S).forEach(x => x.onclick = () => { if (x.dataset.fol === '1') { st.step = 'memo'; paint(); } else save('met', {}); });
