@@ -273,7 +273,7 @@
     const sub = t ? `区域${esc(t.no)}　${esc(t.name || '')}` : '区域の線の外';
     const what = unit ? '部屋' : '家';
     const paint = () => {
-      const dnc = typeof dncAt === 'function' ? dncAt(k) : D().dnc[k], f = fol(k), mineF = !!f && f.by === me().id, other = !!f && !mineF;
+      const dnc = typeof dncAt === 'function' ? dncAt(k) : D().dnc[k], f = fol(k), mineF = !!f && f.by === me().id, other = !!(typeof liveFol === 'function' ? liveFol(k) : f) && !mineF; // 普通の家として扱う日数を過ぎた、ほかの人の再訪問は普通の家と同じ
       const blocked = (dnc && !isAdmin()) || (other && !isAdmin() && !st.override && recentMet(k));
       let b = headHtml(t, title, sub);
       if (fromBuilding) b += '<button class="btn small" id="backBld">← 部屋の入力にもどる</button>';

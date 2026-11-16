@@ -4905,7 +4905,7 @@ function openTarget(hid, unit, fromBuilding, review) {
   const paint = () => {
     const vs = visitsOf(k), dnc = dncAt(k);
     const f = fol(k), rel = relOf(k);
-    const mine = !!f && f.by === me().id, other = !!f && !mine;
+    const mine = !!f && f.by === me().id, other = !!liveFol(k) && !mine; // 普通の家として扱う日数を過ぎた、ほかの人の再訪問は、普通の家と同じ（2026-11-17）
     // ほかの人の再訪問の家は、係が決めた日数のあいだだけ訪問を控える
     const blocked = (dnc && !isAdmin()) || (other && !isAdmin() && !st.override && recentMet(k));
     let b = headHtml(t, title, sub);
@@ -6537,8 +6537,8 @@ function openAptSeq(hid, startUnit) {
         <button class="btn primary block" data-close>閉じる</button>
         ${isSimple() ? '' : '<button class="btn block" id="seqBack">建物の編集</button>'}`;
     } else {
-      const u = h.units[idx], k = K(hid, u), f = fol(k), last = visitsOf(k)[0];
-      const other = !!f && f.by !== me().id;
+      const u = h.units[idx], k = K(hid, u), f = liveFol(k), last = visitsOf(k)[0];
+      const other = !!f && f.by !== me().id; // 普通の家として扱う日数を過ぎた再訪問は、普通の家と同じ
       const uk2 = dispUnitKind(h, u);
       b += `<p class="seqroom"><b>${esc(uName(h, u))}</b>${/\d$/.test(uName(h, u)) ? '号室' : ''}${uk2 !== 'home' ? ` <span class="kindtag">${kindBadge(uk2, K(hid, u))}${kindName(uk2)}</span>` : ''} <span class="muted">（${idx + 1} / ${n}）</span></p>`;
       b += `<p class="muted">${last ? `前回：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}` : 'はじめて訪ねる部屋'}</p>`;
@@ -10460,7 +10460,7 @@ function computeReco() {
     const othersTerr = onlyMine && t.holder && t.holder !== me().id;
     for (const unit of targets(h)) {
       const k = K(h.id, unit);
-      if (dncAt(k) || liveFol(k)) continue; // 再訪問の家は出さない（普通の家として扱う日数を過ぎたものは出す）
+      if (dncAt(k) || liveFol(k) || (fol(k) && fol(k).by === me().id)) continue; // 再訪問の家は出さない（ほかの人の再訪問で、普通の家として扱う日数を過ぎたものは出す。自分の再訪問は今までどおり出さない）
       const rel = relOf(k);
       if (othersTerr && !rel) continue;            // 引き継ぎ待ちはだれにでも見せる
       const s2 = sum(k), last = s2.last;
@@ -13920,7 +13920,7 @@ function computeHomeReco() {
     const d = myPos ? distM(myPos, [h.lat, h.lng]) : null;
     for (const u of targets(h)) {
       const k = K(h.id, u);
-      if (dncAt(k) || liveFol(k) || relOf(k) || recentMet(k)) continue;
+      if (dncAt(k) || liveFol(k) || (fol(k) && fol(k).by === me().id) || relOf(k) || recentMet(k)) continue; // 自分の再訪問は今までどおり出さない
       if (cardOut && othersCard.has(k)) continue;
       if (coveredBySpecial(h, u)) continue; // 特別区域（コンビニなど）で回る家は、おすすめに出さない
       const s = sum(k);

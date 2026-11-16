@@ -389,8 +389,8 @@
         b += `<div class="okmsg"><b>${all ? 'すべての世帯を訪ねました。' : '世帯を押すと、その世帯を記録できます。'}</b></div>
           <button class="btn primary block" data-close>閉じる</button>`;
       } else {
-        const u = st.unit, k = K(hid, u), f = fol(k), last = visitsOf(k)[0];
-        const other = !!f && f.by !== me().id;
+        const u = st.unit, k = K(hid, u), f = (typeof liveFol === 'function' ? liveFol(k) : fol(k)), last = visitsOf(k)[0];
+        const other = !!f && f.by !== me().id; // 普通の家として扱う日数を過ぎた再訪問は、普通の家と同じ（2026-11-17）
         b += `<p class="seqroom"><b>${esc(sideName(u))}</b></p>`;
         b += `<p class="muted">${last ? `前回：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}` : 'はじめて訪ねる世帯'}</p>`;
         b += fixLineHtml(k);
