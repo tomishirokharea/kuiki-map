@@ -12,7 +12,7 @@ const ok = (c, name, got) => { if (!c) ng++; console.log((c ? 'OK  ' : 'NG  ') +
 const N_TERR = 30, N_AWAY = 24;
 
 // 場面：試作のデータ（区域4枚）に写しを足し、空いている区域を N_TERR 枚にする。留守宅カードの候補は N_AWAY 件にする
-async function page(w, simple, lang = 'ja') {
+async function page(w, simple, lang = 'ja', real = false) {
   const ctx = await b.newContext({ viewport: { width: w, height: w > 800 ? 1180 : 844 } });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', e => errs.push(String(e)));
@@ -20,7 +20,7 @@ async function page(w, simple, lang = 'ja') {
   await pg.route('**/config.js', r => r.fulfill({ status: 200, contentType: 'application/javascript', body: cfg(lang) }));
   await pg.goto(`http://localhost:${port}/index.html`);
   await pg.waitForFunction(() => typeof openRequestSheet === 'function' && typeof openAwayPick === 'function' && typeof Store !== 'undefined' && Store.data);
-  await pg.evaluate(({ simple, N_TERR, N_AWAY }) => {
+  await pg.evaluate(({ simple, N_TERR, N_AWAY, real }) => {
     const s = document.getElementById('splash'); if (s) s.remove();
     UI.mode = simple ? 'simple' : 'detail'; UI.hello = 'off'; applyUi(); // 毎日のひと言（#hello）は試験のじゃまになるので出さない
     const hl = document.getElementById('hello'); if (hl) hl.remove();
@@ -33,7 +33,8 @@ async function page(w, simple, lang = 'ja') {
     }
     D().territories.forEach(t => { if (!t.holder && !t.dummy) t.lend = 'open'; });
     Store.save();
-    // 留守宅カードの候補（試作のデータには、留守の家がほとんどないため、候補の作り方だけ差しかえる）
+    // 留守宅カードの候補（試作のデータには、留守の家がほとんどないため、候補の作り方だけ差しかえる）。real のときは本物の候補（行ける時間を全部にする）
+    if (real) { me().slots = SLOTS.slice(); Store.save(); renderAll(); return; }
     window.awaySuggestions = function () {
       const ts = freeTerrs();
       const H = D().territories.flatMap(t => housesOf(t.id)).filter(h => h.lat != null); // 家の場所（地図の点）は、試作のデータの家を使う
@@ -41,7 +42,7 @@ async function page(w, simple, lang = 'ja') {
         keys: H.length ? [H[i % H.length].id + '|', H[(i + 1) % H.length].id + '|'] : ['k' + i + 'a', 'k' + i + 'b'], focus: false, ext: false, dist: null }));
     };
     renderAll();
-  }, { simple: !!simple, N_TERR, N_AWAY });
+  }, { simple: !!simple, N_TERR, N_AWAY, real });
   return { pg, ctx, errs };
 }
 const reqRows = pg => pg.evaluate(() => document.querySelectorAll('#sheet article.pick').length);
@@ -215,6 +216,36 @@ for (const simple of [false, true]) {
   const r = await pg.evaluate(() => ({ bar: !document.querySelector('#peekBar').hidden, take: !!document.querySelector('#peekBar [data-pk="take"]'), back: !!document.querySelector('#peekBar [data-pk="back"]') }));
   ok(dis && r.bar && !r.take && r.back, `${simple ? 'かんたん' : 'くわしい'}：持てる枚数に届いているときは、地図の帯に「受け取る」を出さない`, [dis, r]);
   ok(!errs.length, `${simple ? 'かんたん' : 'くわしい'}：JS のエラーなし（持てる枚数に届いている）`, errs);
+  await ctx.close();
+}
+
+// 本物の候補・本物の受け取り（監査 L1）：地図の帯の「受け取る」で、押した行と同じ区域・時間帯・グループ・全体の集まりのカードができる
+for (const simple of [false, true]) for (const who of ['p', 'grp', 'all']) {
+  const tag = `${simple ? 'かんたん' : 'くわしい'}・${{ p: '個人', grp: 'グループ奉仕', all: '全体の集まり' }[who]}`;
+  const { pg, ctx, errs } = await page(390, simple, 'ja', true);
+  await pg.evaluate(who => {
+    if (who === 'p') { openAwayPick(false); return; }
+    openRequestSheet(true); if (who === 'all') document.querySelector('#sheet [data-ruse="all"]').click();
+    document.querySelector('#sheet [data-gaway]').click();
+  }, who);
+  await pg.waitForTimeout(300);
+  const row = await pg.evaluate(() => { const b = document.querySelector('#sheet [data-apeek="0"]'); const a = b && b.closest('article'); const t = a && a.querySelector('[data-slot]');
+    return t ? { tid: t.dataset.awaytake2, slot: t.dataset.slot, n: document.querySelectorAll('#sheet [data-apeek]').length } : null; });
+  ok(!!row, `${tag}：本物の候補で、留守宅カードの行と「地図」が出る`, row);
+  if (row) {
+    const n0 = await pg.evaluate(() => D().awayCards.length);
+    await clk(pg, '#sheet [data-apeek="0"]');
+    await pg.waitForTimeout(400);
+    const pts = await pg.evaluate(() => document.querySelectorAll('.pk-pt').length);
+    await clk(pg, '#peekBar [data-pk="take"]');
+    await pg.waitForTimeout(300);
+    const c = await pg.evaluate(() => { const c = D().awayCards[D().awayCards.length - 1]; return c && { tid: c.terrId, slot: c.slot, group: c.group || null, use: c.use || null, n: c.keys.length }; });
+    const n1 = await pg.evaluate(() => D().awayCards.length);
+    const gOk = who === 'p' ? c && c.group === null && c.use === null : who === 'grp' ? c && !!c.group && c.use === null : c && !!c.group && c.use === 'all';
+    ok(n1 === n0 + 1 && c && c.tid === row.tid && c.slot === row.slot && gOk, `${tag}：帯の「受け取る」で、同じ区域・時間帯・集まりのカードができる`, [row, c]);
+    ok(pts >= 1 && pts <= c.n, `${tag}：カードの家に点が出る（${pts}）`, [pts, c && c.n]);
+  }
+  ok(!errs.length, `${tag}：JS のエラーなし`, errs);
   await ctx.close();
 }
 

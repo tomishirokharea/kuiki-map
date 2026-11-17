@@ -1160,7 +1160,7 @@ button.ktag{cursor:pointer}
           const U0 = reqUse, slot0 = awayGroupSlot, y0 = S.scrollTop, seen = new Set();
           const pts = x.keys.map(k => houseById(parseKey(k)[0])).filter(h => h && h.lat != null && h.lng != null && !seen.has(h.id) && seen.add(h.id)).map(h => [h.lat, h.lng]);
           window.nozoku.peek(x.t.id, { pts, title: '留守宅カード',
-            sub: `${slotText(x.slot)}・${x.keys.length}軒（オレンジの点）`,
+            sub: `${slotText(x.slot)}・${x.keys.length}軒${pts.length ? '（オレンジの点）' : ''}`, // 家の場所がわからないときは、点のことを書かない（監査 L4）
             back: () => { reqUse = U0; awayGroupSlot = slot0; window.openAwayPick(G, true); sheetTo(y0); },
             take: full ? null : () => { reqUse = U0; awayGroupSlot = slot0; takeAwayCard(x.t.id, x.slot, G); } }); // 持てる枚数に届いているときは「受け取る」を出さない
         });
