@@ -642,9 +642,10 @@ button.ktag{cursor:pointer}
 .krain{margin:6px 0 4px;font-size:17px;color:#1E3A8A}
 .krain small{margin-left:8px;font-size:14px;color:var(--ink2);white-space:nowrap}`;
   document.head.appendChild(cssK);
-  // 簡単モード：はじめは5件と「もっと見る」（10/09 の指示書3.4・改善案A2）。並べ方を変えたとき・地図で見てもどったときは、開いたまま
-  const REQ_FIRST = 5;
-  let reqMore = false;
+  // はじめは5件と「もっと見る」（10/09 の指示書3.4・改善案A2。2026.13.156 からは、くわしい表示も同じ・留守宅カードも同じ件数）。
+  // 並べ方を変えたとき・地図で見てもどったとき・集まりを切りかえたときは、開いたまま。開き直したとき・区域カード⇔留守宅カードを切りかえたときは5件から
+  const REQ_FIRST = 5, AWAY_MAX = 20;
+  let reqMore = false, awayMore = false;
   /* 「区域をもらう」一覧の1区域分の中身。一覧と、地図で区域をタップしたときの画面（openTerrPick）で同じものを使う（2026-11-08） */
   function reqInfoCore(x, showD, back) {
     const { t, last, n, dist, yg } = x;
@@ -669,7 +670,7 @@ button.ktag{cursor:pointer}
     return tags.length ? `<p class="ktags">${tags.join('')}</p>` : '';
   }
   window.openRequestSheet = function (g) {
-    if (g !== undefined) { reqForGroup = !!g; reqUse = 'grp'; reqMore = false; } // 開き直したときは、グループ奉仕から（簡単モードは、はじめの5件から）
+    if (g !== undefined) { reqForGroup = !!g; reqUse = 'grp'; reqMore = false; } // 開き直したときは、グループ奉仕から（はじめの5件から）
     if (!canGroupTerr()) reqForGroup = false;
     const G = reqForGroup, canTake = canTakeFree(G), free = freeTerrs();
     // 持てる枚数に届いている（full）・係への申し込みの件数に届いている（!askOk）ときは、押しても断られるボタンを出さない（点検④U8）
@@ -716,9 +717,9 @@ button.ktag{cursor:pointer}
         ${btnsHtml(x)}
         <details class="kp-more"><summary>くわしく</summary>${infoHtml(x)}</details>
       </article>`;
-    // 簡単モードは、受け取れる区域から順に5件だけ作る（残りは「もっと見る」を押したときに作る。会いやすさなどの計算も、見せる分だけ）
+    // 受け取れる区域から順に5件だけ作る（残りは「もっと見る」を押したときに作る。会いやすさなどの計算も、見せる分だけ）。かんたん・くわしいとも同じ（2026.13.156）
     const canL = list.filter(canGet), askL = list.filter(x => !canGet(x));
-    const cut = SIMPLE && !reqMore && canL.length + askL.length > REQ_FIRST;
+    const cut = !reqMore && canL.length + askL.length > REQ_FIRST;
     const canV = cut ? canL.slice(0, REQ_FIRST) : canL, askV = cut ? askL.slice(0, Math.max(0, REQ_FIRST - canV.length)) : askL;
     const restN = canL.length + askL.length - canV.length - askV.length;
     const rowsCan = canV.map(rowHtml).join(''), rowsAsk = askV.map(rowHtml).join('');
@@ -776,7 +777,7 @@ button.ktag{cursor:pointer}
       if (reqSort === 'near' && !myPos && !GRP) { locate(window.openRequestSheet); return; }
       window.openRequestSheet();
     });
-    if ($('[data-gaway]', S)) $('[data-gaway]', S).onclick = () => openAwayPick(true);
+    if ($('[data-gaway]', S)) $('[data-gaway]', S).onclick = () => openAwayPick(true); // 留守宅カードに切りかえると、5件から
     $$('[data-ruse]', S).forEach(b => b.onclick = () => { reqUse = b.dataset.ruse === 'all' ? 'all' : 'grp'; window.openRequestSheet(); });
     $$('[data-take]', S).forEach(x => x.onclick = () => takeTerr(x.dataset.take));
     $$('[data-ask]', S).forEach(x => x.onclick = () => askTerr(x.dataset.ask || null));
@@ -968,7 +969,7 @@ button.ktag{cursor:pointer}
       <button class="btn block" id="profBack">${back ? 'もどる' : '閉じる'}</button>`);
     $('#profBack').onclick = () => {
       if (back === 'req') window.openRequestSheet();
-      else if (back === 'away') window.openAwayPick(awayG);
+      else if (back === 'away') window.openAwayPick(awayG, true); // 「もっと見る」で開いていたら、開いたまま
       else if (back && back.indexOf('tinfo:') === 0 && window.openTerrPick) window.openTerrPick(back.slice(6));
       else if (back && back.indexOf('karte:') === 0) openKarte(back.slice(6));
       else closeSheet();
@@ -1084,15 +1085,15 @@ button.ktag{cursor:pointer}
     };
   }
   if (typeof openAwayPick === 'function') {
-    window.openAwayPick = function (grp) {
+    window.openAwayPick = function (grp, keep) { // keep：地域のようすからもどるときは、「もっと見る」を開いたまま
       const G = !!grp && canGroupTerr();
       awayG = G;
       const u = me(), reg = !!(u.slots && u.slots.length), cur = slotOf(new Date());
       if (G && !awayGroupSlot) awayGroupSlot = nextGroupSlot(reqUse === 'all');
       const key = 'kuiki_awaysort_' + u.id, ageOn = !!(AGE_ON && ageMap());
-      // 簡単モード（指示書3.5）：並び順のボタン・会える見込みの％・地域のようす・説明文は出さない。並びは「会いやすい順」で固定。はじめは3件
+      // 簡単モード（指示書3.5）：並び順のボタン・会える見込みの％・地域のようす・説明文は出さない。並びは「会いやすい順」で固定（はじめの件数は、くわしい表示と同じ5件）
       const SIMPLE = typeof isSimple === 'function' && isSimple();
-      let more = false;
+      if (!keep) awayMore = false; // はじめは5件（かんたん・くわしいとも。2026.13.156）
       const paint = () => {
         const slots = G ? [awayGroupSlot] : reg ? u.slots.slice().sort(bySlot) : [cur];
         let sort = SIMPLE ? 'easy' : lsGet(key) || 'long';
@@ -1118,7 +1119,7 @@ button.ktag{cursor:pointer}
         const kAway = x => `<article class="pick kpick"><div class="kp-head"><b>区域${esc(x.t.no)}</b><span class="kp-n">${x.keys.length}軒</span></div>
             <p class="kp-st">${slotText(x.slot)}</p>
             <div class="pickbtns"><button class="btn small primary" data-awaytake2="${esc(x.t.id)}" data-slot="${esc(x.slot)}"${full ? ' disabled' : ''}>受け取る</button></div></article>`;
-        const shown = SIMPLE && !more ? 3 : 20;
+        const shown = awayMore ? AWAY_MAX : REQ_FIRST;
         setSheet(headHtml(null, G ? (ALL ? '全体の集まりで回る留守宅カード' : `${esc(myGroup())}グループで回る留守宅カード`) : '留守宅カードをえらぶ',
             G ? `持てるのは${D().settings.awayMax}枚まで（今 ${myAwayCount(true)}枚）` : reg ? `行ける時間：${slots.map(slotShort).join('、')}` : `今の時間帯：${slotShort(cur)}`) + `
           ${offToday() ? OFF_NOTE : ''}
@@ -1132,16 +1133,16 @@ button.ktag{cursor:pointer}
           ${G ? '' : `<div class="row"><button class="btn small" id="apSlots">${reg ? '行ける時間を変える' : '行ける時間を登録する'}</button></div>`}
           ${full ? `<div class="notice warn">${G ? 'グループの' : ''}留守宅カードは${D().settings.awayMax}枚まで持てます。受け取り中のカードを終えると、受け取れます。</div>` : ''}
           ${list.length ? list.slice(0, shown).map(x => (SIMPLE ? kAway(x) : awayItem(x, cur, full, 'data-awaytake2'))).join('') +
-              (SIMPLE && !more && list.length > shown ? `<button type="button" class="btn block" id="apMore">もっと見る（あと${Math.min(list.length, 20) - shown}件）</button>` : '')
+              (!awayMore && list.length > shown ? `<button type="button" class="btn block" id="apMore">もっと見る（あと${Math.min(list.length, AWAY_MAX) - shown}件）</button>` : '')
             : `<div class="empty">今、合う留守宅カードはありません。${G ? '<br>集まりの時間帯を変えると、ほかのカードが見つかることがあります。' : reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`}
           ${SIMPLE ? '' : `<p class="hint">${awayExpText()}回り終えたら「返す」を押します。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>`}
           <button class="btn block" data-close>閉じる</button>`);
         const S = $('#sheet');
         $$('[data-asort]', S).forEach(b => b.onclick = () => { lsSet(key, b.dataset.asort); paint(); });
         if ($('#apSlots')) $('#apSlots').onclick = openSlotSheet;
-        if ($('#apMore')) $('#apMore').onclick = () => { more = true; paint(); };
+        if ($('#apMore')) $('#apMore').onclick = () => { awayMore = true; const y = S.scrollTop; paint(); $('#sheet').scrollTop = y; };
         if ($('#apGSlot')) $('#apGSlot').onchange = e => { awayGroupSlot = e.target.value; paint(); };
-        if ($('[data-gterr]', S)) $('[data-gterr]', S).onclick = () => { reqForGroup = true; window.openRequestSheet(); }; // 使う集まり（グループ／全体）はそのまま
+        if ($('[data-gterr]', S)) $('[data-gterr]', S).onclick = () => { reqForGroup = true; reqMore = false; window.openRequestSheet(); }; // 使う集まり（グループ／全体）はそのまま。区域カードは5件から
         $$('[data-ause]', S).forEach(b => b.onclick = () => {
           const nu = b.dataset.ause === 'all' ? 'all' : 'grp';
           if (nu === reqUse) return;
