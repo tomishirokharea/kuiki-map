@@ -193,5 +193,5 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "出していない": "No se muestra",
 "区域{0}を、おすすめに出すようにしました": "El territorio {0} ahora sale en recomendaciones",
 "区域{0}を、おすすめに出さないようにしました": "El territorio {0} ya no sale en recomendaciones",
-"区域ごとに止めるときは、状況の「留守宅の状況」の「区域ごと」の表の「おすすめ」の欄で「止める」を押します（苦情のあった地域など）。": "Para detener un territorio, pulse «Detener» en la columna «Recomendadas» de la tabla «Por territorio» en «Situación de ausentes» (por ejemplo, zonas con quejas)."
+"区域ごとに止めるときは、状況の「留守宅の状況」の「区域ごと」の表の「おすすめ」の欄で「止める」を押します（苦情のあった地域など）。止めた区域は、「出す」を押すまで、次の巡回でも止まったままです。": "Para detener un territorio, pulse «Detener» en la columna «Recomendadas» de la tabla «Por territorio» en «Situación de ausentes» (por ejemplo, zonas con quejas). Un territorio detenido sigue detenido en la siguiente vuelta hasta que pulse «Mostrar»."
 });

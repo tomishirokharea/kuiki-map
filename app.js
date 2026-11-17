@@ -10372,7 +10372,7 @@ function extSetHtml(rrow, stpd) {
   const lockOn = Number(st.recoLock) === 1, leftOn = Number(st.recoLeft) !== 0;
   const set = `<p class="hint">留守宅カードにして返した区域（だれも持っていない区域）で、まだ訪ねていない家と、まだ会えていない家を、全員の「おすすめ」タブに近くの数軒ずつ出します。区域をまたいでまとめます。</p>
     <p class="hint">1回目が目安（${th}%）に届かずに返した区域・だれかが留守宅カードを受け取っている区域・特別区域・試験用の区域は出しません。完了した区域も出しません（残りの家は、次に区域カードとして受け取った人が回ります）。</p>
-    <p class="hint">区域ごとに止めるときは、状況の「留守宅の状況」の「区域ごと」の表の「おすすめ」の欄で「止める」を押します（苦情のあった地域など）。</p>` +
+    <p class="hint">区域ごとに止めるときは、状況の「留守宅の状況」の「区域ごと」の表の「おすすめ」の欄で「止める」を押します（苦情のあった地域など）。止めた区域は、「出す」を押すまで、次の巡回でも止まったままです。</p>` +
     `<div class="setrow"><span>1つのおすすめに入れる家の数<br><small class="hint">近い家どうしを、この軒数ずつまとめて出します</small></span><div class="stepper">
       <button type="button" data-kset="recoCount" data-d="-1" aria-label="家の数を減らす">−</button><output class="wide">${rc}軒まで</output>
       <button type="button" data-kset="recoCount" data-d="1" aria-label="家の数を増やす">＋</button></div></div>` +
