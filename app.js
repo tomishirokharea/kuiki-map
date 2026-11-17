@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.157';
+var APP_JS_VER = '2026.13.158';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -571,7 +571,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {}; d.caution = d.caution || {}; d.langs = d.langs || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, wxOn: 1, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7, recoLeft: 1 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, wxOn: 1, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7, recoLeft: 1, obiOn: 1 }, d.settings || {});
     d.s13 = d.s13 || [];
     d.agedata = d.agedata || [];
     d.holds = d.holds || [];
@@ -2817,6 +2817,12 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.158', items: [
+    ['言', '毎日はじめのひと言に、会衆のみんなの奉仕の記録から、ひと言が出る日があります。']
+  ] },
+  { v: '2026.13.158', role: 'admin', items: [
+    ['係', '設定にみんなの奉仕のひと言（使う／使わない）。']
+  ] },
   { v: '2026.13.157', items: [
     ['記', '訪問の記録に、年代と★（また訪ねたい）を残さないようにしました。前の記録に残っていた年代と★も、区域係が消します。'],
     ['係', '「区域をもらう」の「若い世代が多い順」は、市の年齢データだけで並べるようにしました（記録の年代は使いません）。記録の書き出し（CSV）から、年代と再訪問の列をなくしました。']
@@ -8901,6 +8907,11 @@ function renderInbox() {
       <div class="seg" role="group" aria-label="自分の区域以外を選べないようにする">
         <button type="button" data-sset="lockOthers" data-v="1" aria-pressed="${st.lockOthers !== 0}">オン</button>
         <button type="button" data-sset="lockOthers" data-v="0" aria-pressed="${st.lockOthers === 0}">オフ</button></div></div>`,
+    obiOn: `<div class="setrow">
+      <span>みんなの奉仕のひと言<br><small class="hint">毎日はじめのひと言に、会衆のみんなの奉仕の記録から出る文を出すかどうかです。出さないにすると、いつものひと言だけになります</small></span>
+      <div class="seg" role="group" aria-label="みんなの奉仕のひと言">
+        <button type="button" data-sset="obiOn" data-v="1" aria-pressed="${st.obiOn !== 0}">使う</button>
+        <button type="button" data-sset="obiOn" data-v="0" aria-pressed="${st.obiOn === 0}">使わない</button></div></div>`,
     memoSync: `<div class="setrow">
       <span>再訪問のメモを、同じ人のほかの端末（iPadなど）でも使えるようにする<br><small class="hint">メモは各自の端末の中で暗号化してから保管するので、係の画面やシートでは読めません。「使わない」にすると、保管しているメモをサーバーから消し、これまでどおり各自のスマホの中だけになります（スマホの中のメモは消えません）</small></span>
       <div class="seg" role="group" aria-label="再訪問のメモをほかの端末でも使う">
@@ -8911,7 +8922,7 @@ function renderInbox() {
   const lendBox = $('#krLend'), takeBox = $('#krTake'), etcBox = $('#krTipsEtc');
   if (lendBox) lendBox.innerHTML = ['lendDays', 'donePct', 'awayRetPct', 'awayAgainSlot', 'lowOn', 'lowWait', 'autoFree', 'freeAfterDays', 'skipDays', 'followSkipDays', 'skipDone'].map(k => R[k]).join('');
   if (takeBox) takeBox.innerHTML = ['selfTakeMax', 'holdMaxPersonal', 'holdMaxGroup', 'reqMaxPersonal', 'reqMaxGroup'].map(k => R[k]).join('');
-  if (etcBox) etcBox.innerHTML = ['groupOn', 'groupMax', 'lockOthers', 'memoSync'].map(k => R[k]).join('');
+  if (etcBox) etcBox.innerHTML = ['groupOn', 'groupMax', 'lockOthers', 'obiOn', 'memoSync'].map(k => R[k]).join('');
 }
 /* ---------- 区域の返却（回り終えた日の記録） ----------
    「返す」を押したら、区域係が決めた目安で、自動で決める（returnPlan）。奉仕者はえらばなくてよい
@@ -11081,7 +11092,7 @@ function openUiSheet() {
       ${uiSlot('feat')}`;
     // 画面に出すもの（ホーム・区域カード・家の画面）
     const F_SHOW = `<h3 class="sub feathead">ホームに出すもの</h3>
-      <div class="featrow"><p><b>毎日はじめのひと言</b><small>その日はじめて開いたときに、ひと言・今日の目標を出します（まわりをさわると閉じます）</small></p>${seg('hello', [['on', '出す'], ['off', '出さない']], UI.hello || 'on')}</div>
+      <div class="featrow"><p><b>毎日はじめのひと言</b><small>その日はじめて開いたときに、ひと言・今日の目標を出します。ひと言は、会衆のみんなの奉仕の記録から出す日もあります（まわりをさわると閉じます）</small></p>${seg('hello', [['on', '出す'], ['off', '出さない']], UI.hello || 'on')}</div>
       <div class="featrow"><p><b>今日やること</b><small>今日の集まり・自分の予定・再訪問の約束・区域カードを、ホームのいちばん上にまとめます</small></p>${seg('todayOn', [['off', '出さない'], ['on', '出す']])}</div>
       <div class="featrow"><p><b>予定の一覧</b><small>ホームの「奉仕の予定」で、カレンダーの下の一覧に出す予定</small></p>${seg('calList', [['upcoming', '今日から'], ['all', 'その月すべて']], UI.calList || 'upcoming')}</div>
       <h3 class="sub">区域カードに出すもの</h3>

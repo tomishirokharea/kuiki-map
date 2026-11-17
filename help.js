@@ -21,7 +21,7 @@
       skipDone: 1, contDays: 60, youngW: 25, awayTries: 3, nightOn: 0,
       awayCap: 3, awayRecentDays: 3, awayNoRepeat: 1, awayScope: 0, awayExp: 0, awayDays: 7, awayMax: 2, awayCardMax: 15,
       awayAllTerr: 0, awayDayOnly: 3, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7, recoLeft: 1,
-      recoOn: 1, wxOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1,
+      recoOn: 1, wxOn: 1, obiOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1,
       mapStd: 0, keepMonths: 12, cacheDays: 30, syncGroupSec: 7, syncNormalSec: 20, remindDays: 21, escalateDays: 42, s21On: 0, ikenOn: 0, ikenWho: 1
     },
 
@@ -162,6 +162,11 @@
         change: '長くすると、再訪問している人の関係を大切にできますが、再訪問が止まった家が長く訪ねられないことがあります。',
         ex: '60日で、再訪問の人が最後に会えたのが3か月前なら、区域カードの人が訪ねます。',
         tip: '60日がおすすめです。' },
+      obiOn: { t: 'みんなの奉仕のひと言', dt: '使う',
+        what: '全員の「毎日はじめのひと言」に、会衆のみんなの奉仕の記録から出る文を出すかどうかです。「きのうは○軒を訪ねる努力が払われ、○軒の方にお会いできました」のように、人や家や区域の名前は出さず、数だけで励ます文です。出る日は、人ごとに、およそ2日に1日です。',
+        change: '「使わない」にすると、全員の毎日はじめのひと言に、みんなの奉仕の文が出なくなり、いつものひと言だけになります。',
+        ex: '先週、留守だった家を訪ね直した数や、きのう会えた家の数が、ひと言に出ます。個人が分からないよう、その期間に5人以上が記録したときだけ出る文がほとんどです。',
+        tip: '「使う」がおすすめです。' },
       memoSync: { t: '再訪問のメモをほかの端末でも使う', dt: '使う',
         what: '再訪問のメモを、同じ人のほかの端末（iPadなど）でも使えるようにするかどうかです。メモは端末の中で暗号化してから保管するので、係の画面やシートでは読めません。',
         change: '「使わない」にすると、サーバーに保管している全員のメモを消して、各自のスマホの中だけになります（スマホの中のメモは消えません）。消したメモは元に戻せません。',
@@ -529,6 +534,11 @@
         change: 'Si es largo, se cuida la relación de quien hace la revisita, pero una revisita que se detuvo puede quedar mucho tiempo sin visitar.',
         ex: 'Con 60 días, si la última vez que se encontró a la persona fue hace 3 meses, la visita quien trabaja el territorio.',
         tip: 'Se recomienda 60 días.' },
+      obiOn: { t: 'Frase del servicio de todos', dt: 'Usar',
+        what: 'Si en la «Frase al empezar el día» de todos sale una frase con los registros de predicación de toda la congregación. Por ejemplo: «Ayer se hizo el esfuerzo de visitar 12 casas, y se pudo hablar con alguien en 4 de ellas». No aparecen nombres de personas, casas ni territorios, solo números. Cada persona la ve aproximadamente un día de cada dos.',
+        change: 'Con «No usar», a nadie le sale la frase del servicio de todos y solo sale la frase de siempre.',
+        ex: 'En la frase pueden salir cuántas casas ausentes se volvieron a visitar la semana pasada o en cuántas se habló con alguien ayer. Para que no se identifique a nadie, casi todas las frases solo salen si 5 o más personas registraron en ese periodo.',
+        tip: 'Se recomienda «Usar».' },
       memoSync: { t: 'Notas de revisitas en otros dispositivos', dt: 'Usar',
         what: 'Permite usar las notas de revisitas en otros dispositivos de la misma persona (por ejemplo, un iPad). Se cifran en el dispositivo antes de guardarse, así que no se pueden leer en la pantalla del encargado ni en la hoja.',
         change: 'Con «No usar», se borran del servidor las notas de todos y quedan solo en cada teléfono (las del teléfono no se borran). Lo borrado no se puede recuperar.',
@@ -864,7 +874,7 @@
   }
   function curVal(k) {
     var v = (typeof D === 'function' && D().settings) ? D().settings[k] : null;
-    if (k === 'groupOn' || k === 'lockOthers' || k === 'memoSync' || k === 'skipDone' || k === 'recoOn' || k === 'extOn')
+    if (k === 'groupOn' || k === 'lockOthers' || k === 'memoSync' || k === 'skipDone' || k === 'recoOn' || k === 'extOn' || k === 'obiOn')
       return v === 0 || v === '0' ? 0 : 1; // 書いていなければ「使う」側
     return v == null || v === '' || !isFinite(Number(v)) ? HELP.def[k] : Number(v);
   }
