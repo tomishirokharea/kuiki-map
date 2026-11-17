@@ -13520,16 +13520,25 @@ function helloPersonal(o) {
   if (featTime() && o.goals[ym] && monthMin(o, ym) >= o.goals[ym]) return '今月の目標、達成です。すばらしいですね！';
   return '';
 }
-/* 順：① 奉仕時間の個人の言葉 → ② みんなの奉仕の文（ob・obi.js） → ③ 天気の言葉 → ④ ふだんの言葉 */
-function helloWord(o, ob) {
-  const now = new Date();
+/* 日替わりの種：その年の何日目（day）と、人の id のハッシュ（hsh）。ふだんの言葉（helloWord）と、みんなの奉仕の日（obi.js の helloText）で同じものを使う */
+function helloSeed(now) {
+  const t = now && typeof now.getTime === 'function' && !isNaN(now.getTime()) ? now : new Date();
+  const day = Math.floor((t - new Date(t.getFullYear(), 0, 0)) / DAY);
+  let hsh = 0; String(me().id).split('').forEach(c => { hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0; });
+  return { day, hsh };
+}
+/* 順：① 奉仕時間の個人の言葉 → ② みんなの奉仕の文（ob・obi.js） → ③ 天気の言葉 → ④ ふだんの言葉
+   ・みんなの奉仕は (day + hsh) が偶数の日だけ。ふだんの言葉・天気の言葉は (day + hsh) を2で割った数で選ぶ
+     （偶奇で選ぶと、みんなの奉仕のない日はいつも奇数になり、半分の言葉が出なくなるため。R9）
+   ・at：その日の時刻（showHello の now。省くと今） */
+function helloWord(o, ob, at) {
+  const now = at || new Date();
   const p = helloPersonal(o); if (p) return p;
   if (ob) return ob;
-  const day = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / DAY);
-  let hsh = 0; String(me().id).split('').forEach(c => { hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0; });
+  const sd = helloSeed(now), i = Math.floor((sd.day + sd.hsh) / 2);
   const wk = helloWxKind();
-  if (wk) return HELLO_WX[wk][(day + hsh) % HELLO_WX[wk].length];
-  return HELLO_WORDS[(day + hsh) % HELLO_WORDS.length];
+  if (wk) return HELLO_WX[wk][i % HELLO_WX[wk].length];
+  return HELLO_WORDS[i % HELLO_WORDS.length];
 }
 /* 天気のひと言を出した日だけ、その下に今日の気温を小さく出す（出どころの表示も） */
 function helloWxLine() {
@@ -13565,7 +13574,7 @@ function showHello() {
   const el = $('#hello');
   el.innerHTML = `<div class="hback" data-hclose></div>
     <div class="hcard" role="dialog" aria-modal="true" aria-labelledby="helloTitle">
-      <div class="hhead"><p>${esc(me().name)}さん、${hi}　${fmtYmd(today)}</p>${obiMark}<h2 id="helloTitle">${esc(helloWord(o, ob && ob.text))}</h2>${helloWxLine()}</div>
+      <div class="hhead"><p>${esc(me().name)}さん、${hi}　${fmtYmd(today)}</p>${obiMark}<h2 id="helloTitle">${esc(helloWord(o, ob && ob.text, now))}</h2>${helloWxLine()}</div>
       <div class="hbody">${goalPart}${meet}
         <p class="hsec">今（${esc(slotShort(slotOf(now)))}）のおすすめ</p><div id="helloReco"><p class="muted">さがしています…</p></div>
         <button type="button" class="btn primary block" data-hclose>閉じる</button>

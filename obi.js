@@ -2,8 +2,10 @@
    区域マップ：みんなの奉仕のひと言（obi.js・2026-11-17）の文と選び方
 
    ・サーバーが返す obi（数と日付だけ。個人が特定される情報は入っていない）から、1日1回のひと言を1つ選ぶ。
-   ・S5（この奉仕年度は全区域の○%）は obi.cv から画面で作る（cv が無い・all が0なら作らない）。
+   ・S5（この奉仕年度は全区域の○%）は obi.cv から画面で作る（cv が無い・all が0・done が0・今日の奉仕年度とちがう年度なら作らない。done は R11・年度は R10）。
    ・日付の合わない項目（きのうのまとめが前の日でない・先週のまとめが前の週でない）は選ばない。日付は端末の日付（日本で使う前提）。
+   ・まとめを作った時刻（obi.at）が今日から48時間より前なら、obi 全体を使わない（端末に控えた古い obi を出しつづけないように。R10）。
+   ・区域係が「使わない」（設定 obiOn＝0）にしたら、端末に控えた obi があっても出さない（R10）。
    ・前の日と同じ種類は続けない（ほかに選べるものがなければ続ける）。S2 は2倍の重みで選ぶ。
    ・何が来ても投げない（壊れた obi は null を返す）。画面の部品（ホームのカード）は別のファイル。
    ========================================================= */
@@ -13,6 +15,7 @@
   const pad = n => (n < 10 ? '0' : '') + n;
   const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const num = v => (typeof v === 'number' && isFinite(v) ? v : 0);
+  const OBI_MAX_AGE = 48 * 3600000; // これより古い obi は使わない（サーバーは36時間より古いと返さない。端末に控えた分の上限）
 
   // 端末の日付から、前の日と、前の週の月曜（どちらも YYYY-MM-DD）
   function dates(today) {
@@ -46,11 +49,17 @@
     return T(s);
   }
 
-  // 今日選べる項目（日付の合わないもの・S4 の0軒を外し、cv から S5 を足す）
+  // 奉仕年度（9月1日〜8月31日。名前は終わる年）。サーバーの obiCover_ と同じ
+  const serviceYear = t => t.getFullYear() + (t.getMonth() >= 8 ? 1 : 0);
+
+  // 今日選べる項目（古い obi は全部外す。日付の合わないもの・S4 の0軒を外し、cv から S5 を足す）
   function eligible(obi, today) {
     const out = [];
     if (!obi || typeof obi !== 'object') return out;
-    const dt = dates(today);
+    const t = today && typeof today.getTime === 'function' && !isNaN(today.getTime()) ? today : new Date();
+    const at = Date.parse(obi.at);
+    if (!isFinite(at) || t.getTime() - at > OBI_MAX_AGE) return out; // 作った時刻がない・48時間より前：使わない（R10）
+    const dt = dates(t);
     (Array.isArray(obi.it) ? obi.it : []).forEach(it => {
       if (!it || typeof it !== 'object') return;
       const k = it.k;
@@ -61,7 +70,7 @@
       out.push(it);
     });
     const cv = obi.cv;
-    if (cv && num(cv.all) > 0) out.push({ k: 'S5', pct: Math.floor(num(cv.done) / num(cv.all) * 100) });
+    if (cv && num(cv.all) > 0 && num(cv.done) > 0 && cv.y === serviceYear(t)) out.push({ k: 'S5', pct: Math.floor(num(cv.done) / num(cv.all) * 100) }); // 0% は出さない（R11）・前の年度の数は出さない（R10）
     return out;
   }
 
@@ -84,15 +93,20 @@
   // 毎日はじめのひと言に出す1つ（1回開くごとに1回だけ呼ぶ）。前の日の種類は localStorage 'kuiki_obi_last'。選べなければ null。何があっても投げない
   function helloText(today) {
     try {
-      // R7：みんなの奉仕は、およそ2日に1日だけ。ふだんの言葉（helloWord）と同じ種：人ごと・日ごとに決まる。奉仕の日でなければ、何も読まず・書かず null
+      // R10：区域係が「使わない」にしたら、端末に控えた obi があっても出さない（設定がまだ無いときは、ふだんどおり）
+      let st = null;
+      try { st = typeof D === 'function' ? (D() || {}).settings : null; } catch (e) { st = null; }
+      if (st && Number(st.obiOn) === 0) return null;
+      // R7・R9：みんなの奉仕は、およそ2日に1日だけ。種は app.js の helloSeed（ふだんの言葉の helloWord と同じ。人ごと・日ごとに決まる）。
+      //   奉仕の日でなければ、何も読まず・書かず null。helloSeed が無い（古い app.js）ときも出さない
+      if (typeof helloSeed !== 'function') return null;
       const t = today && typeof today.getTime === 'function' && !isNaN(today.getTime()) ? today : new Date();
-      const day = Math.floor((t - new Date(t.getFullYear(), 0, 0)) / 864e5);
-      let hsh = 0; String(me().id).split('').forEach(c => { hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0; });
-      if ((day + hsh) % 2 !== 0) return null;
+      const sd = helloSeed(t);
+      if ((sd.day + sd.hsh) % 2 !== 0) return null;
       let last = null;
       try { last = localStorage.getItem('kuiki_obi_last'); } catch (e) { last = null; }
       const obi = typeof OBI !== 'undefined' ? OBI : null; // app.js が控えている、サーバーから届いた最新の obi
-      const it = pick(obi, today, last);
+      const it = pick(obi, t, last);
       if (!it) return null;
       const tx = text(it);
       if (!tx) return null;
