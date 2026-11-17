@@ -8460,8 +8460,7 @@ async function stampFollow(k, res, curText, after) {
   const o = memoAll();
   o[k] = Object.assign({}, before || {}, { text: (line + (base ? '\n' + base : '')).slice(0, 1000), at: now.toISOString() });
   memoSaveAll(o);
-  const m = sum(k).met;
-  const extra = res === 'met' ? { age: m && seeV(m, k) ? m.age : undefined, interest: '再訪問したい' } : {};
+  const extra = {}; // 年代・★（また訪ねたい）は記録しない（2026-11-17）
   saveVisit(hid, unit, res, extra, true, () => { // 取り消したら、メモも元にもどす
     const o2 = memoAll(); if (before) o2[k] = before; else delete o2[k]; memoSaveAll(o2);
   });
