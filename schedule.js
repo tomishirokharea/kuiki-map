@@ -1960,6 +1960,7 @@ body.duemode .terr-label:not(.duelab){display:none}
 .duelab.off.faint span{opacity:calc(var(--labop,.4) * .6)}
 .duelab.off.sel span{font-size:18px;font-weight:800;opacity:1;color:var(--terr);color:color-mix(in srgb,var(--terr) 80%,#000)}
 #map.drawing .duelab.off span{opacity:min(.35,var(--labop,.4))}
+.duelab.off.kfm span,.duelab.off.kfm.sel span{opacity:.3;font-size:14px}
 .duelab.off.grp span{color:#5B2E8C}
 .duelab.off.gray span{color:#7B8782}`;
   document.head.appendChild(cssDm);
@@ -2139,7 +2140,9 @@ body.duemode .terr-label:not(.duelab){display:none}
       if (!on && it.t.id !== sel && typeof terrLabOp === 'function' && terrLabOp() <= 0) continue;
       const faint = !on && sel && it.t.id !== sel;
       const kind = on ? '' : it.gray ? ' gray' : it.t.group ? ' grp' : '';
-      const m = L.marker(it.ll, { icon: L.divIcon({ className: `terr-label duelab${cp ? ' cp' : ''}${on ? '' : ' ro off'}${faint ? ' faint' : ''}${!on && sel && it.t.id === sel ? ' sel' : ''}${kind}`, html: `<span>${esc(it.text)}</span>`, iconSize: [0, 0] }),
+      // おすすめの「地図で見る」のあいだは、区域番号の札をうすくする（札は家の印より上に出るので、回る家の番号をかくしていた・2026-11-17 監査 L-b）
+      const kfm = !on && typeof kfOnTerrs === 'function' && !!kfOnTerrs();
+      const m = L.marker(it.ll, { icon: L.divIcon({ className: `terr-label duelab${cp ? ' cp' : ''}${on ? '' : ' ro off'}${faint ? ' faint' : ''}${!on && sel && it.t.id === sel ? ' sel' : ''}${kfm ? ' kfm' : ''}${kind}`, html: `<span>${esc(it.text)}</span>`, iconSize: [0, 0] }),
         interactive: on, bubblingMouseEvents: false, keyboard: false, pane: 'labelPane' });
       if (on) m.on('click', e => { if (typeof moveTap === 'function' && moveTap(e)) return; openKarte(it.t.id); }); // 家の場所を直しているときは、その場所に動かす
       m.addTo(dueLayer);
