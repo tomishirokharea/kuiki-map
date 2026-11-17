@@ -33,7 +33,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "新しく登録する人（{0}人）": "Personas nuevas que se registrarán ({0})",
 "今の登録にいない人です。登録しない人は、チェックを外してください。登録しても、本人がスマホで申し込み、係が承認するまでは使えません。": "Son personas que aún no están registradas. Quite la marca a las que no quiera registrar. Aunque se registren, no podrán usar la aplicación hasta que lo soliciten desde su teléfono y el encargado lo apruebe.",
 "もう一度使えるようにする人（{0}人）": "Personas que se volverán a habilitar ({0})",
-"前に「使うのをやめる」にした人です。同じ人として戻すので、受け持ちの家と記録が戻ります（消えた再訪問のメモは戻りません）。": "Son personas que se dieron de baja antes. Vuelven como la misma persona, así que recuperan sus casas de revisita y sus registros (las notas de revisitas que se borraron no vuelven).",
+"前に「使うのをやめる」にした人です。同じ人として戻すので、再訪問の家と記録が戻ります（消えた再訪問のメモは戻りません）。": "Son personas que se dieron de baja antes. Vuelven como la misma persona, así que recuperan sus casas de revisita y sus registros (las notas de revisitas que se borraron no vuelven).",
 "変わること": "Cambios",
 "名前・グループなどを直す：{0}人": "Corregir nombre, grupo, etc.: {0}",
 "新しく登録する：{0}人": "Registrar como nuevas: {0}",
@@ -52,7 +52,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "更新する": "Actualizar",
 "今の登録の人は、同じ人のまま直すので、再訪問のメモや記録は消えません。": "Las personas ya registradas se corrigen sin cambiar de persona, así que no se borran sus notas de revisitas ni sus registros.",
 "{0}人のデータを消していいですか？": "¿Borrar los datos de {0} personas?",
-"この人たちは区域マップを使えなくなり、スマホでは、次に開いたときに区域の情報が消えます。再訪問のメモ（次の約束・📌）も消え、元にもどせません（本人がバックアップを保存していれば、もどせます）。受け持ちの家と会えた記録は残ります。": "Estas personas ya no podrán usar el Mapa de Territorios, y la información se borrará de su teléfono la próxima vez que lo abran. También se borrarán sus notas de revisitas (próxima cita y 📌) y no se podrán recuperar (salvo que hayan guardado una copia de seguridad). Se conservan sus casas de revisita y los registros de «Lo encontré».",
+"この人たちは区域マップを使えなくなり、スマホでは、次に開いたときに区域の情報が消えます。再訪問のメモ（次の約束・📌）も消え、元にもどせません（本人がバックアップを保存していれば、もどせます）。再訪問の家と会えた記録は残ります。": "Estas personas ya no podrán usar el Mapa de Territorios, y la información se borrará de su teléfono la próxima vez que lo abran. También se borrarán sus notas de revisitas (próxima cita y 📌) y no se podrán recuperar (salvo que hayan guardado una copia de seguridad). Se conservan sus casas de revisita y los registros de «Lo encontré».",
 "消して、使うのをやめる": "Borrar y dar de baja",
 "この人たちは残す": "Conservar a estas personas",
 "使うのをやめる人は、今のまま残しました。もう一度確かめてください": "Las personas para dar de baja se dejaron como estaban. Revíselo otra vez",
@@ -66,7 +66,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "使うのをやめた人：{0}人": "Personas dadas de baja: {0}",
 "次の{0}件は、そのままにしました。": "Los siguientes {0} se dejaron como estaban.",
 "新しく登録した人は、共通リンクのQRから申し込んでもらい、係の画面の「今日」で、その人の名前をえらんで承認してください。更新の前の名簿は、スプレッドシートの「users_控え」に残っています。": "Pida a las personas nuevas que soliciten con el QR del enlace común, y apruébelas en «Hoy», en la pantalla del encargado, eligiendo su nombre. La lista de antes de la actualización queda guardada en la hoja de cálculo («users_控え»).",
-"この人のスマホでは、次に開いたときに区域の情報が消えます。 再訪問のメモ（次の約束・📌）も消え、あとで使えるようにしても元にもどりません（本人がバックアップを保存していれば、もどせます）。 受け持ちの家のリストと、会えた記録は残ります。": "La información se borrará de su teléfono la próxima vez que lo abra. También se borrarán sus notas de revisitas (próxima cita y 📌), y no volverán aunque se le habilite otra vez (salvo que haya guardado una copia de seguridad). Se conservan su lista de casas de revisita y los registros de «Lo encontré».",
+"この人のスマホでは、次に開いたときに区域の情報が消えます。 再訪問のメモ（次の約束・📌）も消え、あとで使えるようにしても元にもどりません（本人がバックアップを保存していれば、もどせます）。 再訪問の家のリストと、会えた記録は残ります。": "La información se borrará de su teléfono la próxima vez que lo abra. También se borrarán sus notas de revisitas (próxima cita y 📌), y no volverán aunque se le habilite otra vez (salvo que haya guardado una copia de seguridad). Se conservan su lista de casas de revisita y los registros de «Lo encontré».",
 "{0}さんが区域マップを使うのをやめますか？": "¿Dar de baja a {0} del Mapa de Territorios?",
 "このまま使う": "Seguir usando"
 });

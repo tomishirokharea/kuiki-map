@@ -273,8 +273,8 @@
     const sub = t ? `区域${esc(t.no)}　${esc(t.name || '')}` : '区域の線の外';
     const what = unit ? '部屋' : '家';
     const paint = () => {
-      const dnc = typeof dncAt === 'function' ? dncAt(k) : D().dnc[k], f = fol(k), mineF = !!f && f.by === me().id, other = !!f && !mineF;
-      const blocked = (dnc && !isAdmin()) || (other && !isAdmin() && !st.override && recentMet(k));
+      const dnc = typeof dncAt === 'function' ? dncAt(k) : D().dnc[k];
+      const blocked = dnc && !isAdmin(); // ほかの人の再訪問では止めない（再訪問は本人だけのリスト・2026-11-17）
       let b = headHtml(t, title, sub);
       if (fromBuilding) b += '<button class="btn small" id="backBld">← 部屋の入力にもどる</button>';
       // 大事なお知らせだけ（どれも1〜2行）
@@ -284,8 +284,6 @@
         b += skipNoteHtml(what, isAdmin());
       } else if (dnc) {
         b += `<div class="notice refnote"><b>拒否の${what}です。訪問しないでください。</b>${isAdmin() ? '<span class="actions"><button class="btn small" id="unDnc">拒否マークを外す</button></span>' : ''}</div>`;
-      } else if (other) {
-        b += `<div class="notice warn"><b>ほかの人が再訪問している${what}です。</b>${blocked ? '訪問は控えてください。<span class="actions"><button class="btn small" id="shOverride">それでも記録する</button></span>' : ''}</div>`;
       }
       if (window.chuiNotice) b += window.chuiNotice(h, unit); // 注意（！）
       if (!blocked && st.step === 'result') b += recentOtherHtml(k);

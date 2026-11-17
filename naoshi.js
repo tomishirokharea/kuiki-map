@@ -389,8 +389,7 @@
         b += `<div class="okmsg"><b>${all ? 'すべての世帯を訪ねました。' : '世帯を押すと、その世帯を記録できます。'}</b></div>
           <button class="btn primary block" data-close>閉じる</button>`;
       } else {
-        const u = st.unit, k = K(hid, u), f = fol(k), last = visitsOf(k)[0];
-        const other = !!f && f.by !== me().id;
+        const u = st.unit, k = K(hid, u), last = visitsOf(k)[0]; // ほかの人の再訪問では止めない（再訪問は本人だけのリスト・2026-11-17）
         b += `<p class="seqroom"><b>${esc(sideName(u))}</b></p>`;
         b += `<p class="muted">${last ? `前回：${fmtDate(last.at)}　${RESULT_LABEL[last.result]}` : 'はじめて訪ねる世帯'}</p>`;
         b += fixLineHtml(k);
@@ -399,7 +398,6 @@
         if (dncSkip(k)) b += skipNoteHtml('世帯', false);
         else if (!D().dnc[k] && langNo(k)) b += langNoteHtml('世帯', k);
         else if (D().dnc[k]) b += `<div class="notice refnote"><b>拒否の世帯です。</b>訪問しないでください。${h.units.length > 1 ? 'ほかの世帯は訪ねられます。' : ''}</div>`;
-        else if (other && !isAdmin() && !st.override && recentMet(k)) b += `<div class="notice warn"><b>再訪問を受け持っている人がいます。</b>訪問は控えてください。<span class="actions"><button class="btn small" id="duOverride">それでも記録する</button></span></div>`;
         else b += st.step === 'result' ? resultChoicesHtml('') : seqStepsHtml(st, k);
         b += '<button class="btn block" data-close>閉じる</button>';
       }
@@ -425,7 +423,7 @@
       $$('[data-int]', S).forEach(x => x.onclick = () => {
         const it = x.dataset.int;
         if (it === '拒否') { st.step = 'dnc'; paint(); }
-        else if (INTERESTED.has(it) && !fol(k)) { st.interest = it; st.step = 'follow'; paint(); }
+        else if (INTERESTED.has(it) && (typeof canFollow === 'function' ? canFollow(k) : !fol(k))) { st.interest = it; st.step = 'follow'; paint(); }
         else save('met', { age: st.age, interest: it });
       });
       $$('[data-fol]', S).forEach(x => x.onclick = () => { if (x.dataset.fol === '1') { st.step = 'memo'; paint(); } else save('met', {}); });
