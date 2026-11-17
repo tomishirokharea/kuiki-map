@@ -585,6 +585,7 @@
     all.forEach(s => { s.x = s.h.lng * kx; s.y = s.h.lat * ky; });
     const d2 = (x, y, s) => (s.x - x) * (s.x - x) + (s.y - y) * (s.y - y);
     const px = pos ? pos[1] * kx : 0, py = pos ? pos[0] * ky : 0;
+    const maxD = Math.max(300, num(D().settings.recoDist, 500)), maxD2 = maxD * maxD;
     const groups = rain && all.some(s => s.rank < 2) ? [all.filter(s => s.rank < 2), all.filter(s => s.rank === 2)] : [all];
     for (let gi = 0; gi < groups.length; gi++) {
       let rest = groups[gi].slice();
@@ -593,10 +594,12 @@
         const seeds = rain && rest.some(s => s.rank === 0) ? rest.filter(s => s.rank === 0) : rest;
         const seed = pos ? seeds.reduce((a, s) => (d2(px, py, s) < d2(px, py, a) ? s : a)) : seeds.reduce((a, s) => (s.last < a.last ? s : a));
         // 種から近い家を N 軒ぶん（1軒の家に部屋が多いこともあるので、家は N 軒まで見れば足りる）。全部を並べかえずに、近いものだけ残す
+        // 種から遠い家（係の「近くの目安」recoDist・はじめ500m より遠い家）は、同じおすすめに入れない（数km はなれた家が1つのおすすめにならないように・監査 M-2）
         const near = [seed];
         for (const s of rest) {
           if (s === seed) continue;
           const d = d2(seed.x, seed.y, s);
+          if (d > maxD2) continue;
           if (near.length < N + 1 || d < near[near.length - 1]._d) {
             s._d = d; let i = near.length;
             while (i > 1 && near[i - 1]._d > d) i--;
@@ -633,7 +636,9 @@
     out.forEach((c, i) => { c.i = i; });
     return out;
   }
-  const clTitle = c => `区域${(c.ts || [c.t]).map(t => t.no).join('・')}の家 ${c.n}軒`;
+  // 区域の番号のつなぎ：日本語は「・」、ほかの言葉は「, 」（辞書の型 {0} に日本語の字が入ると訳せないため・監査 L-2）
+  const noSep = () => (window.KI && KI.lang && KI.lang !== 'ja' ? ', ' : '・');
+  const clTitle = c => `区域${(c.ts || [c.t]).map(t => t.no).join(noSep())}の家 ${c.n}軒`;
 
   /* ---------- いつ（今／ほかの時間帯）・並べかえ ---------- */
   const VIEW = { shown: 10, list: null, order: [], slot: null, sig: '' };   // slot：null＝今
@@ -895,7 +900,7 @@
      KF：{ tid（いちばん番号の小さい区域）, tids（入っている区域・番号の順）, keys（家id|部屋の Set）, nums（家id → 番号）, since（この時刻のあとの記録で緑のチェック） }
      2026-11-17 から押さえはないので、いつも「見るだけ」（カードを受け取らずに記録できる）。おすすめは区域をまたぐことがある */
   let KF = null;
-  const kfNos = () => (KF ? KF.tids.map(id => { const t = terrById(id); return t ? t.no : '-'; }).join('・') : '');
+  const kfNos = () => (KF ? KF.tids.map(id => { const t = terrById(id); return t ? t.no : '-'; }).join(noSep()) : '');
   function openKF(o) {
     clearTarget(); followMap = false; focusCard = null; roundTerr = null; curTerr = null; firstMapShow = false; barHidden = false;
     const nums = new Map(), tids = []; let n = 0;
@@ -908,14 +913,15 @@
     KF = { tid: tids[0] || null, tids, keys: new Set(o.keys), nums, since: o.since || new Date().toISOString() };
     o.keys.forEach(k => recoMark(keyHid(k), keyUnit(k), 'after'));
     showView('map');
-    setTimeout(() => { map.invalidateSize(); syncTerrJump(); renderTerrs(); renderHouses(); renderCardBar(); fitKF(); }, 80); // 下の案内の高さが分かってから合わせる
+    // 下の案内の高さが分かってから合わせる。スペイン語では、訳したあとに案内が高くなるので、もう一度合わせる（監査 M-1）
+    setTimeout(() => { map.invalidateSize(); syncTerrJump(); renderTerrs(); renderHouses(); fitKF(); setTimeout(() => { if (KF) fitKF(); }, 150); }, 80);
   }
   /* 回る家が見えるように合わせる（2026-11-17 直し：区域の線の全体に合わせると、家が小さく番号が重なって「どこか分からない」ため）。
      上の操作ボタンと下の案内に隠れない所に、回る家だけが入る大きさにする（いちばん近くて18）。家がないときは区域の線に合わせる */
   function fitKF() {
     if (!KF) return;
     const pts = [];
-    KF.keys.forEach(k => { const h = houseById(keyHid(k)); if (h && isFinite(h.lat) && isFinite(h.lng)) pts.push([h.lat, h.lng]); });
+    KF.keys.forEach(k => { const h = houseById(keyHid(k)); if (posOk(h)) pts.push([h.lat, h.lng]); });
     if (!pts.length) {
       const ts = KF.tids.map(terrById).filter(t => t && okPoly(t.polygon));
       if (ts.length) map.fitBounds(L.latLngBounds(ts.flatMap(t => t.polygon)), { padding: [16, 16] });
@@ -926,13 +932,15 @@
     map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [48, top + 48], paddingBottomRight: [48, bottom + 32], maxZoom: 18 });
   }
   /* 回る順の線：番号の順に、家と家を点線でつなぐ（おすすめの地図だけ） */
+  const posOk = h => !!h && typeof h.lat === 'number' && typeof h.lng === 'number' && isFinite(h.lat) && isFinite(h.lng); // null は isFinite で通るので型も見る（監査 L-1）
   let kfLine = null;
   function paintKFLine() {
     if (kfLine) { try { map.removeLayer(kfLine); } catch (e) { /* なにもしない */ } kfLine = null; }
     if (!KF || !KF.nums || KF.nums.size < 2) return;
-    const pts = [...KF.nums.entries()].sort((a, b) => a[1] - b[1]).map(([id]) => houseById(id)).filter(h => h && isFinite(h.lat) && isFinite(h.lng)).map(h => [h.lat, h.lng]);
+    const pts = [...KF.nums.entries()].sort((a, b) => a[1] - b[1]).map(([id]) => houseById(id)).filter(posOk).map(h => [h.lat, h.lng]);
     if (pts.length < 2) return;
-    kfLine = L.polyline(pts, { color: '#C2410C', weight: 4, opacity: 0.85, dashArray: '2 9', lineCap: 'round', interactive: false }).addTo(map);
+    kfLine = L.polyline(pts, { color: '#C2410C', weight: 4, opacity: 0.85, dashArray: '2 9', lineCap: 'round', interactive: false });
+    kfLine.addTo(map); // 先に kfLine に入れておく（足すのに失敗しても、次に消せるように）
   }
   /* カレンダーに残った、前のおすすめの予定（押さえ付き）：その家を見るだけの地図にする（押さえはもう効かない） */
   function openHoldById(id) {

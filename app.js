@@ -4375,11 +4375,17 @@ function renderHouses() {
   const b = map.getBounds().pad(0.2), vis = rotVisTest(0.2); // vis：地図を回しているときの、画面に入っているかの確かめ
   const sel = mode === 'normal' ? selTerrId() : null; // 区域をえらんでいるときは、その区域の家だけ
   const more = sel ? [...(kfOnTerrs() || [])].filter(id => id !== sel) : []; // おすすめが区域をまたぐときは、入っているほかの区域の家も出す（2026-11-17 直し）
-  const list = fkeys
+  let list = fkeys
     ? D().houses.filter(h => targets(h).some(u => fkeys.has(K(h.id, u)))) // 再訪問を地図で見る：自分の再訪問だけ
     : fade > 0.05
       ? D().houses.filter(h => (!sel || houseInTerr(h, sel) || more.some(id => houseInTerr(h, id))) && b.contains([h.lat, h.lng]) && (!vis || vis(h.lat, h.lng)))
       : null;
+  // おすすめの地図で回る家は、地図を縮めていても印を出す（家どうしが離れていると、印が1つも出なかった・監査 M-2）
+  const kfIds = kfHouseIds();
+  if (kfIds && !fkeys) {
+    if (!list) list = D().houses.filter(h => kfIds.has(h.id) && typeof h.lat === 'number' && typeof h.lng === 'number');
+    else if (list.length > 4000) list = list.filter(h => kfIds.has(h.id));
+  }
   const show = !!list && list.length <= 4000; // 小さな点なら多くても軽い。それ以上は拡大してから出す
   setZoomHint(!show);
   if (!show) { houseNameLabels(null, false); return; }
@@ -4391,7 +4397,7 @@ function renderHouses() {
   const dense = !fkeys && map.getZoom() < (UI.mode !== 'detail' ? 18 : 19) && (list.length > 800 || list.length * pinPx * pinPx > sz.x * sz.y * 0.45);
   for (const h of list) {
     const allowed = !okT || canTapHouse(h, okT, mine);
-    const op = fade * (allowed && dimOthers && !isMyHouse(h, mine) ? 0.4 : 1);
+    const op = kfIds && kfIds.has(h.id) ? 1 : fade * (allowed && dimOthers && !isMyHouse(h, mine) ? 0.4 : 1); // おすすめで回る家は、いつもはっきり
     // 混んでいても大きく出す家：おすすめの番号・「地図で見る」でえらんだ家・留守宅カードの家
     const big = !dense || (roundNums && roundNums.has(h.id)) || (target && target.hid === h.id) ||
       (!!ff && allowed && targets(h).some(u => ff(K(h.id, u)) === 'hl'));
