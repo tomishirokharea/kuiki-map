@@ -646,6 +646,8 @@ button.ktag{cursor:pointer}
   // 並べ方を変えたとき・地図で見てもどったとき・集まりを切りかえたときは、開いたまま。開き直したとき・区域カード⇔留守宅カードを切りかえたときは5件から
   const REQ_FIRST = 5, AWAY_MAX = 20;
   let reqMore = false, awayMore = false;
+  // 地図で見て「一覧にもどる」と、一覧の同じ位置にもどす（開き直した直後と、描き終えたあとの両方で合わせる）
+  const sheetTo = y => { const s = $('#sheet'); if (!s || !y) return; s.scrollTop = y; requestAnimationFrame(() => { s.scrollTop = y; }); };
   /* 「区域をもらう」一覧の1区域分の中身。一覧と、地図で区域をタップしたときの画面（openTerrPick）で同じものを使う（2026-11-08） */
   function reqInfoCore(x, showD, back) {
     const { t, last, n, dist, yg } = x;
@@ -784,8 +786,8 @@ button.ktag{cursor:pointer}
     // 受け取る前に、地図で場所を見る（nozoku.js）。「一覧にもどる」で、この一覧にもどる
     $$('[data-peek]', S).forEach(b => b.onclick = () => {
       const x = list.find(y => y.t.id === b.dataset.peek); if (!x) return;
-      const can = canGet(x), G0 = G, U0 = reqUse;
-      window.nozoku.peek(x.t.id, { back: () => { reqForGroup = G0; reqUse = U0; window.openRequestSheet(); }, takeLabel: can ? '受け取る' : '係に頼む',
+      const can = canGet(x), G0 = G, U0 = reqUse, y0 = S.scrollTop; // もどったら、もとの一覧の同じ位置に（2026.13.156）
+      window.nozoku.peek(x.t.id, { back: () => { reqForGroup = G0; reqUse = U0; window.openRequestSheet(); sheetTo(y0); }, takeLabel: can ? '受け取る' : '係に頼む',
         take: can || askOk ? () => { reqForGroup = G0; reqUse = U0; if (can) takeTerr(x.t.id); else askTerr(x.t.id); } : null, // 断られるときは「受け取る・係に頼む」を出さない
         sub: `${x.n}軒・部屋　${x.last ? `前回返却した日 ${fmtDay(x.last)}` : 'まだ回ったことがない区域'}` });
     });
@@ -1052,7 +1054,8 @@ button.ktag{cursor:pointer}
   }
 
   /* 留守宅カードの一覧：地域のようすと、「この時間帯にまだ訪ねていない家」の数を出す */
-  const awayItem = (x, cur, full, attr) => `<article class="ritem k-away"><div>
+  // peek：留守宅カードをえらぶ画面では、受け取るの下に「地図」（data-apeek＝一覧の何番目か。おすすめタブの一覧には出さない）
+  const awayItem = (x, cur, full, attr, peek) => `<article class="ritem k-away"><div>
       <p class="rt"><span class="stamp xs${noCls(x.t.no)}">${esc(x.t.no)}</span> ${slotText(x.slot)}${x.slot === cur ? ' <span class="nowtag">今</span>' : ''}${x.focus ? ' <span class="focustag">区域係のおすすめ</span>' : ''}${dayOnlyN(x.keys.length) ? ' <span class="daytag">今日だけ</span>' : ''}</p>
       ${x.chance != null ? `<p class="metline">会える見込み 約${pctTxt(x.chance)}<small class="muted">（目安）</small></p>` : ''}
       ${profLine(x.t, 'away')}
@@ -1060,7 +1063,8 @@ button.ktag{cursor:pointer}
       ${x.dist != null || x.t.holder ? `<p class="muted">${[x.dist != null ? `ここから約${fmtDist(x.dist)}` : '', x.t.holder ? 'あなたの区域' : ''].filter(Boolean).join('　')}</p>` : ''}
       ${x.tc != null && !isSimple() ? `<p class="muted">試した時間帯 ${x.tc}/${SLOTS.length}</p>` : ''}
       ${x.ext && !isSimple() ? '<p class="muted">区域は回り終えています（残りの留守宅）</p>' : ''}
-    </div><button class="btn small primary" ${attr}="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button></article>`;
+    </div>${peek != null && window.nozoku ? '<div class="pickbtns">' : ''}<button class="btn small primary" ${attr}="${x.t.id}" data-slot="${x.slot}"${full ? ' disabled' : ''}>受け取る</button>${peek != null && window.nozoku
+      ? `<button type="button" class="btn small" data-apeek="${peek}" aria-label="区域${esc(x.t.no)}の留守宅カードの家を地図で見る">地図</button></div>` : ''}</article>`;
   const withAway = (list, idx) => list.map(x => {
     const items = idx.get(x.t.id) || [], ks = new Set(x.keys);
     const oldest = items.reduce((a, i) => (ks.has(i.k) && (!a || i.first < a) ? i.first : a), '');
@@ -1116,9 +1120,10 @@ button.ktag{cursor:pointer}
           .concat(ageOn ? [['young', '若い世代が多い順']] : []).concat(G ? [] : [['now', '今の時間帯']]);
         const ALL = G && reqUse === 'all'; // 全体の集まりで回る留守宅カード（2026-10-24）
         // 簡単モードの1行：区域番号・時間帯・○軒・受け取る（区域をもらうの簡単な形と同じ見た目）
-        const kAway = x => `<article class="pick kpick"><div class="kp-head"><b>区域${esc(x.t.no)}</b><span class="kp-n">${x.keys.length}軒</span></div>
+        const kAway = (x, i) => `<article class="pick kpick"><div class="kp-head"><b>区域${esc(x.t.no)}</b><span class="kp-n">${x.keys.length}軒</span></div>
             <p class="kp-st">${slotText(x.slot)}</p>
-            <div class="pickbtns"><button class="btn small primary" data-awaytake2="${esc(x.t.id)}" data-slot="${esc(x.slot)}"${full ? ' disabled' : ''}>受け取る</button></div></article>`;
+            <div class="pickbtns"><button class="btn small primary" data-awaytake2="${esc(x.t.id)}" data-slot="${esc(x.slot)}"${full ? ' disabled' : ''}>受け取る</button>${window.nozoku
+              ? `<button type="button" class="btn small" data-apeek="${i}" aria-label="区域${esc(x.t.no)}の留守宅カードの家を地図で見る">地図</button>` : ''}</div></article>`;
         const shown = awayMore ? AWAY_MAX : REQ_FIRST;
         setSheet(headHtml(null, G ? (ALL ? '全体の集まりで回る留守宅カード' : `${esc(myGroup())}グループで回る留守宅カード`) : '留守宅カードをえらぶ',
             G ? `持てるのは${D().settings.awayMax}枚まで（今 ${myAwayCount(true)}枚）` : reg ? `行ける時間：${slots.map(slotShort).join('、')}` : `今の時間帯：${slotShort(cur)}`) + `
@@ -1132,7 +1137,7 @@ button.ktag{cursor:pointer}
           </div>`}
           ${G ? '' : `<div class="row"><button class="btn small" id="apSlots">${reg ? '行ける時間を変える' : '行ける時間を登録する'}</button></div>`}
           ${full ? `<div class="notice warn">${G ? 'グループの' : ''}留守宅カードは${D().settings.awayMax}枚まで持てます。受け取り中のカードを終えると、受け取れます。</div>` : ''}
-          ${list.length ? list.slice(0, shown).map(x => (SIMPLE ? kAway(x) : awayItem(x, cur, full, 'data-awaytake2'))).join('') +
+          ${list.length ? list.slice(0, shown).map((x, i) => (SIMPLE ? kAway(x, i) : awayItem(x, cur, full, 'data-awaytake2', i))).join('') +
               (!awayMore && list.length > shown ? `<button type="button" class="btn block" id="apMore">もっと見る（あと${Math.min(list.length, AWAY_MAX) - shown}件）</button>` : '')
             : `<div class="empty">今、合う留守宅カードはありません。${G ? '<br>集まりの時間帯を変えると、ほかのカードが見つかることがあります。' : reg ? '' : '<br>「行ける時間を登録する」と、ほかの時間帯のカードも探せます。'}</div>`}
           ${SIMPLE ? '' : `<p class="hint">${awayExpText()}回り終えたら「返す」を押します。${G ? '<br>受け取ったら「今日回る人」をえらぶと、その人たちも今日だけ記録できます。' : ''}<br>「会える見込み」は、その区域の年齢の割合と、これまでの記録から出した目安です。</p>`}
@@ -1149,6 +1154,16 @@ button.ktag{cursor:pointer}
           reqUse = nu; awayGroupSlot = nextGroupSlot(nu === 'all'); paint(); // 時間帯は、その集まりの次の予定から
         });
         $$('[data-awaytake2]', S).forEach(b => b.onclick = () => { closeSheet(); takeAwayCard(b.dataset.awaytake2, b.dataset.slot, G); });
+        // 受け取る前に、地図でこのカードの家を見る（nozoku.js。2026.13.156）。「一覧にもどる」で、同じ一覧（集まり・時間帯・並べ方・もっと見る・位置）にもどる
+        $$('[data-apeek]', S).forEach(b => b.onclick = () => {
+          const x = list[Number(b.dataset.apeek)]; if (!x || !window.nozoku) return;
+          const U0 = reqUse, slot0 = awayGroupSlot, y0 = S.scrollTop, seen = new Set();
+          const pts = x.keys.map(k => houseById(parseKey(k)[0])).filter(h => h && h.lat != null && h.lng != null && !seen.has(h.id) && seen.add(h.id)).map(h => [h.lat, h.lng]);
+          window.nozoku.peek(x.t.id, { pts, title: '留守宅カード',
+            sub: `${slotText(x.slot)}・${x.keys.length}軒（オレンジの点）`,
+            back: () => { reqUse = U0; awayGroupSlot = slot0; window.openAwayPick(G, true); sheetTo(y0); },
+            take: full ? null : () => { reqUse = U0; awayGroupSlot = slot0; takeAwayCard(x.t.id, x.slot, G); } }); // 持てる枚数に届いているときは「受け取る」を出さない
+        });
       };
       paint();
     };

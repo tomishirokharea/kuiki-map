@@ -1,7 +1,8 @@
 // 使い方：サイトを http://localhost:8765 で開いた状態で  node tools/hyouji-5ken-test.mjs [ポート]
 // 2026.13.156：「区域をもらう」（個人・集まり）と「留守宅カードをえらぶ」（個人・グループ）は、かんたん・くわしいとも、
 // はじめ5件と「もっと見る（あと○件）」にする（R A さん・2026-11-17）。押すと残りを全部（留守宅カードは20件まで）。
-// 並べ方を変えた・地図で見てもどった・地域のようすからもどったときは開いたまま。開き直し・区域カード⇔留守宅カードの切りかえは5件にもどる。
+// 並べ方を変えた・地図で見てもどった・地域のようすからもどったときは開いたまま（地図からは、もとの位置にもどる）。
+// 留守宅カードの一覧にも「地図」（個人・グループ・全体の集まり）。開き直し・区域カード⇔留守宅カードの切りかえは5件にもどる。
 import { chromium } from 'playwright';
 const port = process.argv[2] || '8765';
 const cfg = lang => `window.KUIKI_CONFIG={apiUrl:'',lang:'${lang}',homeView:[26.18,127.68],homeZoom:16,ageData:true};`;
@@ -21,7 +22,8 @@ async function page(w, simple, lang = 'ja') {
   await pg.waitForFunction(() => typeof openRequestSheet === 'function' && typeof openAwayPick === 'function' && typeof Store !== 'undefined' && Store.data);
   await pg.evaluate(({ simple, N_TERR, N_AWAY }) => {
     const s = document.getElementById('splash'); if (s) s.remove();
-    UI.mode = simple ? 'simple' : 'detail'; applyUi();
+    UI.mode = simple ? 'simple' : 'detail'; UI.hello = 'off'; applyUi(); // 毎日のひと言（#hello）は試験のじゃまになるので出さない
+    const hl = document.getElementById('hello'); if (hl) hl.remove();
     const base = D().territories.filter(t => !t.dummy && !isSpecial(t) && okPoly(t.polygon));
     for (let i = 0; freeTerrs().length < N_TERR; i++) {
       const c = JSON.parse(JSON.stringify(base[i % base.length]));
@@ -34,7 +36,9 @@ async function page(w, simple, lang = 'ja') {
     // 留守宅カードの候補（試作のデータには、留守の家がほとんどないため、候補の作り方だけ差しかえる）
     window.awaySuggestions = function () {
       const ts = freeTerrs();
-      return Array.from({ length: N_AWAY }, (_, i) => ({ t: ts[i % ts.length], slot: SLOTS[i % SLOTS.length], keys: ['k' + i + 'a', 'k' + i + 'b'], focus: false, ext: false, dist: null }));
+      const H = D().territories.flatMap(t => housesOf(t.id)).filter(h => h.lat != null); // 家の場所（地図の点）は、試作のデータの家を使う
+      return Array.from({ length: N_AWAY }, (_, i) => ({ t: ts[i % ts.length], slot: SLOTS[i % SLOTS.length],
+        keys: H.length ? [H[i % H.length].id + '|', H[(i + 1) % H.length].id + '|'] : ['k' + i + 'a', 'k' + i + 'b'], focus: false, ext: false, dist: null }));
     };
     renderAll();
   }, { simple: !!simple, N_TERR, N_AWAY });
@@ -43,7 +47,7 @@ async function page(w, simple, lang = 'ja') {
 const reqRows = pg => pg.evaluate(() => document.querySelectorAll('#sheet article.pick').length);
 const awayRows = pg => pg.evaluate(() => document.querySelectorAll('#sheet article.pick, #sheet article.ritem').length);
 const txt = (pg, sel) => pg.evaluate(sel => { const e = document.querySelector(sel); return e ? e.textContent.trim() : null; }, sel);
-const clk = (pg, sel) => pg.click(sel, { timeout: 3000 }).catch(() => {}); // 見つからないときは、次の確かめで NG にする
+const clk = (pg, sel) => pg.click(sel, { timeout: 3000 }).catch(e => { if (process.env.DBG) console.log('click failed', sel, String(e).split('\n').slice(0, 12).join(' / ')); }); // 見つからないときは、次の確かめで NG にする
 // 横のはみ出しは、下から出る画面（#sheet）の中だけで数える（試作モードの上の「使う人」の欄は、スペイン語ではもとからはみ出すため）
 const over = pg => pg.evaluate(() => Math.max(0, ...[...document.querySelectorAll('#sheet *')].map(e => { const r = e.getBoundingClientRect(); return r.width ? Math.round(r.right - innerWidth) : 0; })));
 
@@ -64,12 +68,14 @@ for (const [w, simple] of [[390, false], [1280, false], [390, true], [1280, true
   await pg.evaluate(() => { const d = document.querySelector('#sheet details.ksort'); if (d) d.open = true; });
   await clk(pg, '#sheet [data-rsort="long"]');
   ok(await reqRows(pg) === nFree, `${tag}：並べ方を変えても開いたまま`, await reqRows(pg));
-  // 地図で見てもどっても、開いたまま
-  await clk(pg, '#sheet [data-peek]');
+  // 地図で見てもどっても、開いたまま・同じ位置
+  const ry0 = await pg.evaluate(() => { const S = document.querySelector('#sheet'), b = S.querySelectorAll('[data-peek]')[12]; b.scrollIntoView(); b.setAttribute('data-t12', '1'); return S.scrollTop; });
+  await clk(pg, '#sheet [data-t12]');
   await pg.waitForTimeout(400);
   await clk(pg, '#peekBar [data-pk="back"]');
   await pg.waitForTimeout(300);
   ok(await reqRows(pg) === nFree, `${tag}：地図で見て「一覧にもどる」と開いたまま`, await reqRows(pg));
+  { const y = await pg.evaluate(() => document.querySelector('#sheet').scrollTop); ok(Math.abs(y - ry0) <= 4, `${tag}：区域をもらう　地図からもどると、もとの位置`, [y, ry0]); }
   // 開き直すと5件にもどる
   await pg.evaluate(() => { closeSheet(); openRequestSheet(false); });
   ok(await reqRows(pg) === 5, `${tag}：開き直すと5件にもどる`, await reqRows(pg));
@@ -82,6 +88,12 @@ for (const [w, simple] of [[390, false], [1280, false], [390, true], [1280, true
   // 全体の集まりに切りかえても、開いたまま
   await clk(pg, '#sheet [data-ruse="all"]');
   ok(await reqRows(pg) === nFree, `${tag}：全体の集まりに切りかえても開いたまま`, await reqRows(pg));
+  await clk(pg, '#sheet [data-peek]');
+  await pg.waitForTimeout(400);
+  await clk(pg, '#peekBar [data-pk="back"]');
+  await pg.waitForTimeout(300);
+  ok(await pg.evaluate(() => (document.querySelector('#sheet h2') || {}).textContent === '集まりで使う区域をもらう' && reqUse === 'all' && document.querySelector('#sheet [data-ruse="all"]').getAttribute('aria-pressed') === 'true') && await reqRows(pg) === nFree,
+    `${tag}：集まりの区域をもらうも、地図から同じ一覧（全体の集まり・もっと見る）にもどる`, null);
 
   // 留守宅カード（グループ）：区域カードから切りかえると5件
   await clk(pg, '#sheet [data-gaway]');
@@ -93,6 +105,17 @@ for (const [w, simple] of [[390, false], [1280, false], [390, true], [1280, true
   // 時間帯を変えても開いたまま
   await pg.evaluate(() => { const s = document.querySelector('#apGSlot'); s.value = s.options[(s.selectedIndex + 1) % s.options.length].value; s.dispatchEvent(new Event('change')); });
   ok(await awayRows(pg) === shownMax, `${tag}：集まりの時間帯を変えても開いたまま`, await awayRows(pg));
+  // 地図で見てもどっても、全体の集まり・時間帯・もっと見るはそのまま
+  {
+    const before = await pg.evaluate(() => ({ use: reqUse, slot: document.querySelector('#apGSlot').value, h: document.querySelector('#sheet h2').textContent }));
+    await clk(pg, '#sheet [data-apeek="7"]');
+    await pg.waitForTimeout(400);
+    ok(await pg.evaluate(() => currentView === 'map' && !document.querySelector('#peekBar').hidden), `${tag}：集まりの留守宅カードの「地図」で地図が開く`, null);
+    await clk(pg, '#peekBar [data-pk="back"]');
+    await pg.waitForTimeout(300);
+    const after = await pg.evaluate(() => ({ use: reqUse, slot: (document.querySelector('#apGSlot') || {}).value, h: (document.querySelector('#sheet h2') || {}).textContent }));
+    ok(JSON.stringify(before) === JSON.stringify(after) && await awayRows(pg) === shownMax, `${tag}：集まりの留守宅カードも、地図から同じ一覧（全体の集まり・時間帯・もっと見る）にもどる`, [before, after, await awayRows(pg)]);
+  }
   // 区域カードにもどすと5件
   await clk(pg, '#sheet [data-gterr]');
   ok(await reqRows(pg) === 5, `${tag}：留守宅カードから区域カードに切りかえると5件`, await reqRows(pg));
@@ -102,6 +125,31 @@ for (const [w, simple] of [[390, false], [1280, false], [390, true], [1280, true
   ok(await awayRows(pg) === 5 && await txt(pg, '#apMore') === `もっと見る（あと${shownMax - 5}件）`, `${tag}：個人の留守宅カード　はじめは5件と「もっと見る」`, [await awayRows(pg), await txt(pg, '#apMore')]);
   ok(await pg.evaluate(() => !!document.querySelector('#sheet [data-awaytake2]')), `${tag}：留守宅カードの「受け取る」は今までどおり`, null);
   await clk(pg, '#apMore');
+  // 留守宅カードの「地図」（2026.13.156）：どの行にもある。押すと地図でその家に点・下の帯に「受け取る」「一覧にもどる」。もどると同じ一覧・同じ位置
+  ok(await pg.evaluate(() => [...document.querySelectorAll('#sheet article')].every(a => { const b = a.querySelector('[data-apeek]'); return b && b.textContent.trim() === '地図' && b.getBoundingClientRect().height >= 44; })), `${tag}：留守宅カードのどの行にも「地図」（高さ44px以上）`, null);
+  {
+    const y0 = await pg.evaluate(() => { const S = document.querySelector('#sheet'), b = S.querySelectorAll('[data-apeek]')[9]; b.scrollIntoView(); return S.scrollTop; });
+    await pg.evaluate(() => { window.__took = null; window.takeAwayCard = (tid, slot, g) => { window.__took = [tid, slot, !!g]; }; });
+    const want = await pg.evaluate(() => { const b = document.querySelectorAll('#sheet [data-apeek]')[9]; const a = b.closest('article'); return { no: a.querySelector('.stamp, .kp-head b').textContent.replace('区域', '').trim(), slot: a.querySelector('[data-slot]').dataset.slot }; });
+    await clk(pg, '#sheet [data-apeek="9"]');
+    await pg.waitForTimeout(500);
+    const pk = await pg.evaluate(() => { const b = document.querySelector('#peekBar'); return { view: currentView, bar: !!b && !b.hidden, txt: b ? b.textContent : '', pts: document.querySelectorAll('.pk-pt').length, take: !!(b && b.querySelector('[data-pk="take"]')), back: !!(b && b.querySelector('[data-pk="back"]')) }; });
+    ok(pk.view === 'map' && pk.bar && pk.take && pk.back && pk.txt.includes(want.no) && /留守宅カード/.test(pk.txt), `${tag}：留守宅カードの「地図」で地図が開き、帯に区域${want.no}・「受け取る」「一覧にもどる」`, pk);
+    ok(pk.pts >= 1, `${tag}：カードの家に点が出る`, pk.pts);
+    await clk(pg, '#peekBar [data-pk="back"]');
+    await pg.waitForTimeout(300);
+    const bk = await pg.evaluate(() => ({ title: (document.querySelector('#sheet h2') || {}).textContent, open: !document.querySelector('#sheet').hidden, y: document.querySelector('#sheet').scrollTop }));
+    ok(bk.open && bk.title === '留守宅カードをえらぶ' && await awayRows(pg) === shownMax, `${tag}：「一覧にもどる」で、同じ留守宅カードの一覧（もっと見るも開いたまま）`, [bk, await awayRows(pg)]);
+    ok(Math.abs(bk.y - y0) <= 4, `${tag}：もとの位置にもどる`, [bk.y, y0]);
+    // 帯の「受け取る」：そのカード（区域・時間帯）を受け取る
+    await clk(pg, '#sheet [data-apeek="9"]');
+    await pg.waitForTimeout(400);
+    await clk(pg, '#peekBar [data-pk="take"]');
+    const took = await pg.evaluate(() => window.__took && [terrById(window.__took[0]).no, window.__took[1], window.__took[2]]);
+    ok(took && took[0] === want.no && took[1] === want.slot && took[2] === false, `${tag}：帯の「受け取る」で、その留守宅カードを受け取る`, [took, want]);
+    await pg.evaluate(() => { showView('cards'); openAwayPick(false); });
+    await clk(pg, '#apMore');
+  }
   if (!simple) {
     // くわしい：並べ方を変えても開いたまま
     await clk(pg, '#sheet [data-asort="many"]');
@@ -157,6 +205,19 @@ for (const n of [5, 4]) {
   await ctx.close();
 }
 
+// 留守宅カードを持てる枚数に届いているとき：地図の帯に「受け取る」を出さない（一覧の「受け取る」が押せないのと同じ）
+for (const simple of [false, true]) {
+  const { pg, ctx, errs } = await page(390, simple);
+  await pg.evaluate(() => { D().settings.awayMax = 0; openAwayPick(false); });
+  const dis = await pg.evaluate(() => [...document.querySelectorAll('#sheet [data-awaytake2]')].every(b => b.disabled));
+  await clk(pg, '#sheet [data-apeek="0"]');
+  await pg.waitForTimeout(400);
+  const r = await pg.evaluate(() => ({ bar: !document.querySelector('#peekBar').hidden, take: !!document.querySelector('#peekBar [data-pk="take"]'), back: !!document.querySelector('#peekBar [data-pk="back"]') }));
+  ok(dis && r.bar && !r.take && r.back, `${simple ? 'かんたん' : 'くわしい'}：持てる枚数に届いているときは、地図の帯に「受け取る」を出さない`, [dis, r]);
+  ok(!errs.length, `${simple ? 'かんたん' : 'くわしい'}：JS のエラーなし（持てる枚数に届いている）`, errs);
+  await ctx.close();
+}
+
 // スペイン語
 {
   const { pg, ctx, errs } = await page(390, false, 'es');
@@ -164,6 +225,15 @@ for (const n of [5, 4]) {
   await pg.waitForTimeout(300);
   const t = await txt(pg, '#reqMore');
   ok(/Ver más/.test(t || ''), 'スペイン語：「もっと見る」が訳される', t);
+  await pg.evaluate(() => openAwayPick(false));
+  await pg.waitForTimeout(300);
+  const al = await pg.evaluate(() => (document.querySelector('#sheet [data-apeek]') || {}).getAttribute && document.querySelector('#sheet [data-apeek]').getAttribute('aria-label'));
+  ok(/^Ver en el mapa las casas/.test(al || ''), 'スペイン語：留守宅カードの「地図」の読み上げが訳される', al);
+  await clk(pg, '#sheet [data-apeek="0"]');
+  await pg.waitForTimeout(500);
+  const sub = await pg.evaluate(() => (document.querySelector('#peekBar .pk-s') || {}).textContent || '');
+  ok(/casas \(puntos naranjas\)/.test(sub) && !/[\u3040-\u30ff]/.test(sub), 'スペイン語：地図の帯の説明が訳される', sub);
+  await pg.screenshot({ path: '/tmp/es-peek.png' });
   ok(await over(pg) <= 0, 'スペイン語：横にはみ出さない', await over(pg));
   ok(!errs.length, 'スペイン語：JS のエラーなし', errs);
   await ctx.close();

@@ -220,4 +220,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "訪問しない印のある家は、区域係だけが消せます。削除の申請をしてください": "Las casas con marca «Omitida» solo las puede borrar el encargado. Solicite el borrado.",
 "訪問しない印のある部屋は、区域係だけが消せます": "Las unidades con marca «Omitida» solo las puede borrar el encargado.",
 "拒否は、場所だけの印として残します。": "La marca «No visitar» se conservará como marca de lugar.",
+/* ---- 区域をもらう・留守宅カードをえらぶ：はじめ5件・留守宅カードの「地図」（2026.13.156） ---- */
+"区域{0}の留守宅カードの家を地図で見る": "Ver en el mapa las casas de la tarjeta de ausentes del territorio {0}",
+"{0}・{1}軒（オレンジの点）": "{0} · {1} casas (puntos naranjas)",
 });
