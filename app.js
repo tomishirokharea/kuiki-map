@@ -1424,6 +1424,7 @@ async function api(action, extra, opt) {
   lsSet(SYNC_KEY, String(Store.syncAt));
   if (j.mv && onMemoVer) onMemoVer(j.mv); // 再訪問メモが、ほかの端末で変わった合図
   if (j.wx) { WX = j.wx; lsSet('kuiki_wx', JSON.stringify(j.wx)); } // 雨の日・ひと言の天気（サーバーが調べた天気。weather.gs）。次に開いたとき、届く前でも使えるように控える
+  if (j.obi) { OBI = j.obi; lsSet('kuiki_obi', JSON.stringify(j.obi)); } // みんなの奉仕のひと言（サーバーが数えた数と日付だけ。obi.js）。次に開いたとき、届く前でも使えるように控える（古いサーバーには無い）
   return j;
 }
 /* ---------- はじめての読み込みの記録（遅いときに、どこで時間がかかったかを調べるため） ----------
@@ -3771,6 +3772,7 @@ function evSummary(t) {
 /* 雨の日（2026-10-22）：サーバーが30分ごとに調べた天気（Open-Meteo）。端末からは天気のサービスに通信しない。
    雨なら「区域をもらう」のおすすめ順と「おすすめ」タブで、集合住宅のカード（エレベーターありが先）を先に出す。奉仕者の操作はいらない */
 let WX = (() => { try { return JSON.parse(lsGet('kuiki_wx') || 'null'); } catch (e) { return null; } })(); // 前に届いた天気（古いものは下の判定で使わない）
+let OBI = (() => { try { return JSON.parse(lsGet('kuiki_obi') || 'null'); } catch (e) { return null; } })(); // 前に届いたみんなの奉仕のひと言
 const wxFresh = () => !!(WX && WX.at && !WX.off && !WX.err && Date.now() - Date.parse(WX.at) < 2 * 3600000 && Store.data && Number(D().settings.wxOn) !== 0);
 const isRainy = () => !!(WX && WX.r === 1 && Date.now() - Date.parse(WX.at) < 2 * 3600000 && Store.data && Number(D().settings.wxOn) !== 0);
 /* 集合住宅のカードの順位：0 エレベーターあり・1 ほかの集合住宅・2 それ以外
