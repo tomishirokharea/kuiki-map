@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.159';
+var APP_JS_VER = '2026.13.160';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2817,6 +2817,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.160', items: [
+    ['地', 'おすすめの「地図で見る」を見やすくしました。回る家が大きく見えるところまで地図を近づけ、番号の順に点線でつなぎます。区域をまたぐおすすめで、2つ目の区域の家の印が出ていなかったのも直しました。下の案内も短くしました。']
+  ] },
   { v: '2026.13.159', items: [
     ['薦', 'おすすめタブに出す家を変えました。留守宅カードにして返した区域（だれも持っていない区域）で、まだ訪ねていない家と、まだ会えていない家を、近くの数軒ずつ出します。区域をまたいでまとめることもあります。カードを受け取らなくても回れます。'],
     ['薦', 'おすすめの「今行く」「予定に入れる」をなくしました。「地図で見る」で、区域の線と回る順の番号を見て回ってください。同じ家に、ほかの人が同じ日に行くこともあります（記録が届くと、ほかの人のおすすめから消えます）。'],
@@ -4368,10 +4371,11 @@ function renderHouses() {
   const fade = fkeys ? 1 : iconFade();
   const b = map.getBounds().pad(0.2), vis = rotVisTest(0.2); // vis：地図を回しているときの、画面に入っているかの確かめ
   const sel = mode === 'normal' ? selTerrId() : null; // 区域をえらんでいるときは、その区域の家だけ
+  const more = sel ? [...(kfOnTerrs() || [])].filter(id => id !== sel) : []; // おすすめが区域をまたぐときは、入っているほかの区域の家も出す（2026-11-17 直し）
   const list = fkeys
     ? D().houses.filter(h => targets(h).some(u => fkeys.has(K(h.id, u)))) // 再訪問を地図で見る：自分の再訪問だけ
     : fade > 0.05
-      ? D().houses.filter(h => (!sel || houseInTerr(h, sel)) && b.contains([h.lat, h.lng]) && (!vis || vis(h.lat, h.lng)))
+      ? D().houses.filter(h => (!sel || houseInTerr(h, sel) || more.some(id => houseInTerr(h, id))) && b.contains([h.lat, h.lng]) && (!vis || vis(h.lat, h.lng)))
       : null;
   const show = !!list && list.length <= 4000; // 小さな点なら多くても軽い。それ以上は拡大してから出す
   setZoomHint(!show);

@@ -908,19 +908,31 @@
     KF = { tid: tids[0] || null, tids, keys: new Set(o.keys), nums, since: o.since || new Date().toISOString() };
     o.keys.forEach(k => recoMark(keyHid(k), keyUnit(k), 'after'));
     showView('map');
-    setTimeout(() => { map.invalidateSize(); syncTerrJump(); renderTerrs(); renderHouses(); fitKF(); }, 80);
+    setTimeout(() => { map.invalidateSize(); syncTerrJump(); renderTerrs(); renderHouses(); renderCardBar(); fitKF(); }, 80); // 下の案内の高さが分かってから合わせる
   }
-  /* 入っている区域が全部見えるように合わせる（1つなら今までどおり fitTerr） */
+  /* 回る家が見えるように合わせる（2026-11-17 直し：区域の線の全体に合わせると、家が小さく番号が重なって「どこか分からない」ため）。
+     上の操作ボタンと下の案内に隠れない所に、回る家だけが入る大きさにする（いちばん近くて18）。家がないときは区域の線に合わせる */
   function fitKF() {
     if (!KF) return;
-    const ts = KF.tids.map(terrById).filter(t => t && okPoly(t.polygon));
-    if (ts.length === 1) { fitTerr(ts[0].id); return; }
-    const pts = ts.flatMap(t => t.polygon);
+    const pts = [];
     KF.keys.forEach(k => { const h = houseById(keyHid(k)); if (h && isFinite(h.lat) && isFinite(h.lng)) pts.push([h.lat, h.lng]); });
-    if (!pts.length) return;
+    if (!pts.length) {
+      const ts = KF.tids.map(terrById).filter(t => t && okPoly(t.polygon));
+      if (ts.length) map.fitBounds(L.latLngBounds(ts.flatMap(t => t.polygon)), { padding: [16, 16] });
+      return;
+    }
     const bar = $('#cardBar'), tools = $('#mapTools');
     const top = tools && !tools.hidden ? tools.offsetHeight + 12 : 16, bottom = bar && !bar.hidden ? bar.offsetHeight + 16 : 16;
-    map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [12, top], paddingBottomRight: [12, bottom] });
+    map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [48, top + 48], paddingBottomRight: [48, bottom + 32], maxZoom: 18 });
+  }
+  /* 回る順の線：番号の順に、家と家を点線でつなぐ（おすすめの地図だけ） */
+  let kfLine = null;
+  function paintKFLine() {
+    if (kfLine) { try { map.removeLayer(kfLine); } catch (e) { /* なにもしない */ } kfLine = null; }
+    if (!KF || !KF.nums || KF.nums.size < 2) return;
+    const pts = [...KF.nums.entries()].sort((a, b) => a[1] - b[1]).map(([id]) => houseById(id)).filter(h => h && isFinite(h.lat) && isFinite(h.lng)).map(h => [h.lat, h.lng]);
+    if (pts.length < 2) return;
+    kfLine = L.polyline(pts, { color: '#C2410C', weight: 4, opacity: 0.85, dashArray: '2 9', lineCap: 'round', interactive: false }).addTo(map);
   }
   /* カレンダーに残った、前のおすすめの予定（押さえ付き）：その家を見るだけの地図にする（押さえはもう効かない） */
   function openHoldById(id) {
@@ -938,9 +950,9 @@
     const prov = new Set(keys.map(keyHid).filter(id => { const hh = houseById(id); return hh && hh.prov && !houseHasRec(hh); })).size; // 消せる仮の家だけ（H8）
     const key = (cls, mark, label) => `<span><i class="pin mini st-plain${cls}">${mark}</i>${label}</span>`;
     bar.hidden = false; bar.classList.remove('mini');
-    bar.innerHTML = `<p><b>おすすめの家　区域${esc(kfNos())}</b>　${keys.length}軒・番号の順に回れます</p>
-      <p class="keys">${key(' hl', '', `まだの家 ${keys.length - done}`)}${key(' done', '<u>✓</u>', `訪ねた家 ${done}`)}</p>
-      <p class="muted">カードを受け取らずに記録できます。記録が届くと、ほかの人のおすすめから消えます</p>
+    // 下の案内は短く（地図をおおわないように・2026-11-17 直し）。くわしい説明は、おすすめタブにある
+    bar.innerHTML = `<p><b>おすすめの家 ${keys.length}軒</b>　<span class="muted">区域${esc(kfNos())}</span></p>
+      <p class="keys">${key(' hl', '', `まだの家 ${keys.length - done}`)}${key(' done', '<u>✓</u>', `訪ねた家 ${done}`)}<span>番号の順に回れます（カードなしで記録できます）</span></p>
       ${prov ? `<p class="kgprov">仮の家が${prov}軒あります。家かどうか確かめてください。家でなければ、その家を押して「ここは家ではない（消す）」で消せます</p>` : ''}
       ${keys.length && done === keys.length ? '<p class="okmsg"><b>すべて訪ねました。</b>おつかれさまでした。</p>' : ''}
       <div class="row"><button class="btn small" id="kfClose">表示を戻す</button>${$('#view-reco') ? '<button class="btn small" id="kfBack">おすすめにもどる</button>' : ''}</div>`;
@@ -969,6 +981,7 @@
     if (keys && keys.length && KF && keys.every(k => KF.keys.has(k))) return false; // おすすめの家は、カードを受け取らずに記録できる
     return f.apply(null, a);
   });
+  wrapFn('renderHouses', (f, a) => { const r = f.apply(null, a); try { paintKFLine(); } catch (e) { console.error(e); } return r; });
   wrapFn('renderCardBar', (f, a) => { const r = f.apply(null, a); try { if (KF) paintKFBar(); } catch (e) { console.error(e); } return r; });
   wrapFn('syncTerrJump', (f, a) => {
     const r = f.apply(null, a);
