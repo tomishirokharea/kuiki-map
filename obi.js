@@ -81,5 +81,25 @@
     } catch (e) { return null; }
   }
 
-  window.ObiR = { text, pick, slotName, dates, eligible };
+  // 毎日はじめのひと言に出す1つ（1回開くごとに1回だけ呼ぶ）。前の日の種類は localStorage 'kuiki_obi_last'。選べなければ null。何があっても投げない
+  function helloText(today) {
+    try {
+      // R7：みんなの奉仕は、およそ2日に1日だけ。ふだんの言葉（helloWord）と同じ種：人ごと・日ごとに決まる。奉仕の日でなければ、何も読まず・書かず null
+      const t = today && typeof today.getTime === 'function' && !isNaN(today.getTime()) ? today : new Date();
+      const day = Math.floor((t - new Date(t.getFullYear(), 0, 0)) / 864e5);
+      let hsh = 0; String(me().id).split('').forEach(c => { hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0; });
+      if ((day + hsh) % 2 !== 0) return null;
+      let last = null;
+      try { last = localStorage.getItem('kuiki_obi_last'); } catch (e) { last = null; }
+      const obi = typeof OBI !== 'undefined' ? OBI : null; // app.js が控えている、サーバーから届いた最新の obi
+      const it = pick(obi, today, last);
+      if (!it) return null;
+      const tx = text(it);
+      if (!tx) return null;
+      try { localStorage.setItem('kuiki_obi_last', it.k); } catch (e) { /* 書けなくても出す */ }
+      return { text: tx, k: it.k };
+    } catch (e) { return null; }
+  }
+
+  window.ObiR = { text, pick, slotName, dates, eligible, helloText };
 })();

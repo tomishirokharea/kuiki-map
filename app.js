@@ -13502,10 +13502,18 @@ function helloWxKind() {
   if (p !== null && p >= HELLO_UMB) return 'umb';
   return '';
 }
-function helloWord(o) {
+/* ① 奉仕時間の個人の言葉（なければ ''） */
+function helloPersonal(o) {
   const now = new Date(), ym = ymOf(now);
   if (featTime() && planMin(o, ym) && planDiff(o, ym) < 0) return 'あと少し。今日も、いっしょにがんばりましょう。';
   if (featTime() && o.goals[ym] && monthMin(o, ym) >= o.goals[ym]) return '今月の目標、達成です。すばらしいですね！';
+  return '';
+}
+/* 順：① 奉仕時間の個人の言葉 → ② みんなの奉仕の文（ob・obi.js） → ③ 天気の言葉 → ④ ふだんの言葉 */
+function helloWord(o, ob) {
+  const now = new Date();
+  const p = helloPersonal(o); if (p) return p;
+  if (ob) return ob;
   const day = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / DAY);
   let hsh = 0; String(me().id).split('').forEach(c => { hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0; });
   const wk = helloWxKind();
@@ -13539,10 +13547,14 @@ function showHello() {
   }
   const sc = schedsOn(today);
   const meet = sc.length ? `<p class="hmeet">今日の集まり：<b>${sc.map(s => schedLine(s)).join('／')}</b></p>` : '';
+  // ② みんなの奉仕の文（① の個人の言葉がない日だけ・1回開くごとに1回だけ選ぶ）。開いたあとに obi が届いても、開いているひと言は変えない
+  let ob = null;
+  try { if (!helloPersonal(o) && window.ObiR && ObiR.helloText) ob = ObiR.helloText(now); } catch (e) { ob = null; }
+  const obiMark = ob ? '<p class="hobi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M14.5 19a4 4 0 0 1 6.5-3.1"/></svg>みんなの奉仕</p>' : '';
   const el = $('#hello');
   el.innerHTML = `<div class="hback" data-hclose></div>
     <div class="hcard" role="dialog" aria-modal="true" aria-labelledby="helloTitle">
-      <div class="hhead"><p>${esc(me().name)}さん、${hi}　${fmtYmd(today)}</p><h2 id="helloTitle">${esc(helloWord(o))}</h2>${helloWxLine()}</div>
+      <div class="hhead"><p>${esc(me().name)}さん、${hi}　${fmtYmd(today)}</p>${obiMark}<h2 id="helloTitle">${esc(helloWord(o, ob && ob.text))}</h2>${helloWxLine()}</div>
       <div class="hbody">${goalPart}${meet}
         <p class="hsec">今（${esc(slotShort(slotOf(now)))}）のおすすめ</p><div id="helloReco"><p class="muted">さがしています…</p></div>
         <button type="button" class="btn primary block" data-hclose>閉じる</button>
