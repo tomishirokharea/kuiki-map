@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.157';
+var APP_JS_VER = '2026.13.158';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -571,7 +571,7 @@ const Store = {
     d.dnc = d.dnc || {}; d.follows = d.follows || {}; d.released = d.released || {}; d.caution = d.caution || {}; d.langs = d.langs || {};
     d.requests = d.requests || []; d.awayCards = d.awayCards || []; d.returns = d.returns || []; d.schedules = d.schedules || [];
     d.territories = d.territories || []; d.houses = d.houses || []; d.visits = d.visits || []; d.users = d.users || [];
-    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, wxOn: 1, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7, recoLeft: 1 }, d.settings || {});
+    d.settings = Object.assign({ remindDays: 21, escalateDays: 42, selfTakeMax: 2, holdMaxPersonal: 2, holdMaxGroup: 2, freeAfterDays: 0, awayDays: 7, awayMax: 2, donePct: 90, lowOn: 1, lowWait: 7, wxOn: 1, keepMonths: 12, cacheDays: 30, recAge: 1, recInterest: 1, skipDays: 30, skipDone: 1, lockOthers: 1, groupOn: 1, groupMax: 4, memoShare: 1, memoSync: 1, awayRecentDays: 3, awayCardMax: 15, awayAllTerr: 0, syncGroupSec: 7, syncNormalSec: 20, reqMaxPersonal: 1, reqMaxGroup: 1, followSkipDays: 60, lendDays: 120, awayRetPct: 70, autoFree: 0, awayExp: 0, ageShow: 10, ageShowMode: 0, recoOn: 1, recoKinds: 15, recoCount: 3, recoDist: 500, recoLongDays: 180, recoSkipDays: 14, recoOthers: 1, recoCardOut: 1, recoCardBtn: 1, extOn: 1, extRest: 7, extCap: 2, extDays: 60, extStopBefore: 14, awayDayOnly: 3, awayAgainSlot: 1, recoLock: 0, osaeMax: 2, osaeDays: 7, recoLeft: 1, obiOn: 1 }, d.settings || {});
     d.s13 = d.s13 || [];
     d.agedata = d.agedata || [];
     d.holds = d.holds || [];
@@ -1424,6 +1424,7 @@ async function api(action, extra, opt) {
   lsSet(SYNC_KEY, String(Store.syncAt));
   if (j.mv && onMemoVer) onMemoVer(j.mv); // 再訪問メモが、ほかの端末で変わった合図
   if (j.wx) { WX = j.wx; lsSet('kuiki_wx', JSON.stringify(j.wx)); } // 雨の日・ひと言の天気（サーバーが調べた天気。weather.gs）。次に開いたとき、届く前でも使えるように控える
+  if (j.obi) { OBI = j.obi; lsSet('kuiki_obi', JSON.stringify(j.obi)); } // みんなの奉仕のひと言（サーバーが数えた数と日付だけ。obi.js）。次に開いたとき、届く前でも使えるように控える（古いサーバーには無い）
   return j;
 }
 /* ---------- はじめての読み込みの記録（遅いときに、どこで時間がかかったかを調べるため） ----------
@@ -2816,6 +2817,12 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.158', items: [
+    ['言', '毎日はじめのひと言に、会衆のみんなの奉仕の記録から、ひと言が出る日があります。']
+  ] },
+  { v: '2026.13.158', role: 'admin', items: [
+    ['係', '設定にみんなの奉仕のひと言（使う／使わない）。']
+  ] },
   { v: '2026.13.157', items: [
     ['記', '訪問の記録に、年代と★（また訪ねたい）を残さないようにしました。前の記録に残っていた年代と★も、区域係が消します。'],
     ['係', '「区域をもらう」の「若い世代が多い順」は、市の年齢データだけで並べるようにしました（記録の年代は使いません）。記録の書き出し（CSV）から、年代と再訪問の列をなくしました。']
@@ -3771,6 +3778,7 @@ function evSummary(t) {
 /* 雨の日（2026-10-22）：サーバーが30分ごとに調べた天気（Open-Meteo）。端末からは天気のサービスに通信しない。
    雨なら「区域をもらう」のおすすめ順と「おすすめ」タブで、集合住宅のカード（エレベーターありが先）を先に出す。奉仕者の操作はいらない */
 let WX = (() => { try { return JSON.parse(lsGet('kuiki_wx') || 'null'); } catch (e) { return null; } })(); // 前に届いた天気（古いものは下の判定で使わない）
+let OBI = (() => { try { return JSON.parse(lsGet('kuiki_obi') || 'null'); } catch (e) { return null; } })(); // 前に届いたみんなの奉仕のひと言
 const wxFresh = () => !!(WX && WX.at && !WX.off && !WX.err && Date.now() - Date.parse(WX.at) < 2 * 3600000 && Store.data && Number(D().settings.wxOn) !== 0);
 const isRainy = () => !!(WX && WX.r === 1 && Date.now() - Date.parse(WX.at) < 2 * 3600000 && Store.data && Number(D().settings.wxOn) !== 0);
 /* 集合住宅のカードの順位：0 エレベーターあり・1 ほかの集合住宅・2 それ以外
@@ -5067,15 +5075,19 @@ function openTarget(hid, unit, fromBuilding, review) {
 }
 /* 記録につけるカードの印（状況のグラフ用・2026-10-31）。自分が持つ（グループのカードは今日回る人も）留守宅カードに入っている家 → 'card'、それ以外 → 'area'（区域カードなど）。印はこの2つだけ（カードの番号は付けない）。
    同じ区域の区域カードも持っているときは、そのカードの画面（focusCard）を開いているときだけ留守宅カード。おすすめから開いた記録（viaReco）は、画面の文脈がないので、自分のカードの家なら留守宅カード。
-   サーバーは src にこの形だけを通す（Code.gs の CARD_SRC_RE・RECO_CARD_SRC_RE） */
+   サーバーは src にこの形だけを通す（Code.gs の CARD_SRC_RE・RECO_CARD_SRC_RE）。
+   個人のカード・区域には末尾に :p を付ける（card:p／area:p。みんなの奉仕のひと言の「個人の区域カードや留守宅カード」の数に使う）。グループ奉仕・全体の集まりには付けない。状況のグラフ・おすすめの集計は :p を除いて同じに読む */
 function cardMark(hid, unit, viaReco) {
   const k = K(hid, unit || ''), h = houseById(hid), t = h ? terrById(h.terrId) : null;
   const cs = activeCards().filter(c => c.keys.includes(k) && (c.by === me().id || isCardHelper(c)));
-  if (!cs.length) return 'area';
-  if (viaReco) return 'card';
-  if (cs.some(c => c.id === focusCard)) return 'card';
-  if (t && (t.holder === me().id || helpersOf(t).some(x => x.uid === me().id))) return 'area';
-  return 'card';
+  const areaMk = t && !t.group ? 'area:p' : 'area'; // :p＝個人のカード（集まりでない。t.group があるのはグループ奉仕・全体の集まり）。区域が分からないときは付けない
+  if (!cs.length) return areaMk;
+  const cardMk = c => (c && !c.group ? 'card:p' : 'card'); // 集まりで使う留守宅カード（c.group）には付けない
+  if (viaReco) return cardMk(cs[0]);
+  const fc = cs.find(c => c.id === focusCard);
+  if (fc) return cardMk(fc);
+  if (t && (t.holder === me().id || helpersOf(t).some(x => x.uid === me().id))) return areaMk;
+  return cardMk(cs[0]);
 }
 /* 記録に付ける src：おすすめの印（reco…）を先頭に残し、半角のスペースのあとにカードの印（例：reco:after card）。おすすめでなければカードの印だけ。
    カードの印を調べるところで例外が出ても、記録は保存する（印なし・おすすめの印だけ。L-7） */
@@ -8895,6 +8907,11 @@ function renderInbox() {
       <div class="seg" role="group" aria-label="自分の区域以外を選べないようにする">
         <button type="button" data-sset="lockOthers" data-v="1" aria-pressed="${st.lockOthers !== 0}">オン</button>
         <button type="button" data-sset="lockOthers" data-v="0" aria-pressed="${st.lockOthers === 0}">オフ</button></div></div>`,
+    obiOn: `<div class="setrow">
+      <span>みんなの奉仕のひと言<br><small class="hint">毎日はじめのひと言に、会衆のみんなの奉仕の記録から出る文を出すかどうかです。出さないにすると、いつものひと言だけになります</small></span>
+      <div class="seg" role="group" aria-label="みんなの奉仕のひと言">
+        <button type="button" data-sset="obiOn" data-v="1" aria-pressed="${st.obiOn !== 0}">使う</button>
+        <button type="button" data-sset="obiOn" data-v="0" aria-pressed="${st.obiOn === 0}">使わない</button></div></div>`,
     memoSync: `<div class="setrow">
       <span>再訪問のメモを、同じ人のほかの端末（iPadなど）でも使えるようにする<br><small class="hint">メモは各自の端末の中で暗号化してから保管するので、係の画面やシートでは読めません。「使わない」にすると、保管しているメモをサーバーから消し、これまでどおり各自のスマホの中だけになります（スマホの中のメモは消えません）</small></span>
       <div class="seg" role="group" aria-label="再訪問のメモをほかの端末でも使う">
@@ -8905,7 +8922,7 @@ function renderInbox() {
   const lendBox = $('#krLend'), takeBox = $('#krTake'), etcBox = $('#krTipsEtc');
   if (lendBox) lendBox.innerHTML = ['lendDays', 'donePct', 'awayRetPct', 'awayAgainSlot', 'lowOn', 'lowWait', 'autoFree', 'freeAfterDays', 'skipDays', 'followSkipDays', 'skipDone'].map(k => R[k]).join('');
   if (takeBox) takeBox.innerHTML = ['selfTakeMax', 'holdMaxPersonal', 'holdMaxGroup', 'reqMaxPersonal', 'reqMaxGroup'].map(k => R[k]).join('');
-  if (etcBox) etcBox.innerHTML = ['groupOn', 'groupMax', 'lockOthers', 'memoSync'].map(k => R[k]).join('');
+  if (etcBox) etcBox.innerHTML = ['groupOn', 'groupMax', 'lockOthers', 'obiOn', 'memoSync'].map(k => R[k]).join('');
 }
 /* ---------- 区域の返却（回り終えた日の記録） ----------
    「返す」を押したら、区域係が決めた目安で、自動で決める（returnPlan）。奉仕者はえらばなくてよい
@@ -11075,7 +11092,7 @@ function openUiSheet() {
       ${uiSlot('feat')}`;
     // 画面に出すもの（ホーム・区域カード・家の画面）
     const F_SHOW = `<h3 class="sub feathead">ホームに出すもの</h3>
-      <div class="featrow"><p><b>毎日はじめのひと言</b><small>その日はじめて開いたときに、ひと言・今日の目標を出します（まわりをさわると閉じます）</small></p>${seg('hello', [['on', '出す'], ['off', '出さない']], UI.hello || 'on')}</div>
+      <div class="featrow"><p><b>毎日はじめのひと言</b><small>その日はじめて開いたときに、ひと言・今日の目標を出します。ひと言は、会衆のみんなの奉仕の記録から出す日もあります（まわりをさわると閉じます）</small></p>${seg('hello', [['on', '出す'], ['off', '出さない']], UI.hello || 'on')}</div>
       <div class="featrow"><p><b>今日やること</b><small>今日の集まり・自分の予定・再訪問の約束・区域カードを、ホームのいちばん上にまとめます</small></p>${seg('todayOn', [['off', '出さない'], ['on', '出す']])}</div>
       <div class="featrow"><p><b>予定の一覧</b><small>ホームの「奉仕の予定」で、カレンダーの下の一覧に出す予定</small></p>${seg('calList', [['upcoming', '今日から'], ['all', 'その月すべて']], UI.calList || 'upcoming')}</div>
       <h3 class="sub">区域カードに出すもの</h3>
@@ -13496,15 +13513,32 @@ function helloWxKind() {
   if (p !== null && p >= HELLO_UMB) return 'umb';
   return '';
 }
-function helloWord(o) {
+/* ① 奉仕時間の個人の言葉（なければ ''） */
+function helloPersonal(o) {
   const now = new Date(), ym = ymOf(now);
   if (featTime() && planMin(o, ym) && planDiff(o, ym) < 0) return 'あと少し。今日も、いっしょにがんばりましょう。';
   if (featTime() && o.goals[ym] && monthMin(o, ym) >= o.goals[ym]) return '今月の目標、達成です。すばらしいですね！';
-  const day = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / DAY);
+  return '';
+}
+/* 日替わりの種：その年の何日目（day）と、人の id のハッシュ（hsh）。ふだんの言葉（helloWord）と、みんなの奉仕の日（obi.js の helloText）で同じものを使う */
+function helloSeed(now) {
+  const t = now && typeof now.getTime === 'function' && !isNaN(now.getTime()) ? now : new Date();
+  const day = Math.floor((t - new Date(t.getFullYear(), 0, 0)) / DAY);
   let hsh = 0; String(me().id).split('').forEach(c => { hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0; });
+  return { day, hsh };
+}
+/* 順：① 奉仕時間の個人の言葉 → ② みんなの奉仕の文（ob・obi.js） → ③ 天気の言葉 → ④ ふだんの言葉
+   ・みんなの奉仕は (day + hsh) が偶数の日だけ。ふだんの言葉・天気の言葉は (day + hsh) を2で割った数で選ぶ
+     （偶奇で選ぶと、みんなの奉仕のない日はいつも奇数になり、半分の言葉が出なくなるため。R9）
+   ・at：その日の時刻（showHello の now。省くと今） */
+function helloWord(o, ob, at) {
+  const now = at || new Date();
+  const p = helloPersonal(o); if (p) return p;
+  if (ob) return ob;
+  const sd = helloSeed(now), i = Math.floor((sd.day + sd.hsh) / 2);
   const wk = helloWxKind();
-  if (wk) return HELLO_WX[wk][(day + hsh) % HELLO_WX[wk].length];
-  return HELLO_WORDS[(day + hsh) % HELLO_WORDS.length];
+  if (wk) return HELLO_WX[wk][i % HELLO_WX[wk].length];
+  return HELLO_WORDS[i % HELLO_WORDS.length];
 }
 /* 天気のひと言を出した日だけ、その下に今日の気温を小さく出す（出どころの表示も） */
 function helloWxLine() {
@@ -13533,10 +13567,14 @@ function showHello() {
   }
   const sc = schedsOn(today);
   const meet = sc.length ? `<p class="hmeet">今日の集まり：<b>${sc.map(s => schedLine(s)).join('／')}</b></p>` : '';
+  // ② みんなの奉仕の文（① の個人の言葉がない日だけ・1回開くごとに1回だけ選ぶ）。開いたあとに obi が届いても、開いているひと言は変えない
+  let ob = null;
+  try { if (!helloPersonal(o) && window.ObiR && ObiR.helloText) ob = ObiR.helloText(now); } catch (e) { ob = null; }
+  const obiMark = ob ? '<p class="hobi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M14.5 19a4 4 0 0 1 6.5-3.1"/></svg>みんなの奉仕</p>' : '';
   const el = $('#hello');
   el.innerHTML = `<div class="hback" data-hclose></div>
     <div class="hcard" role="dialog" aria-modal="true" aria-labelledby="helloTitle">
-      <div class="hhead"><p>${esc(me().name)}さん、${hi}　${fmtYmd(today)}</p><h2 id="helloTitle">${esc(helloWord(o))}</h2>${helloWxLine()}</div>
+      <div class="hhead"><p>${esc(me().name)}さん、${hi}　${fmtYmd(today)}</p>${obiMark}<h2 id="helloTitle">${esc(helloWord(o, ob && ob.text, now))}</h2>${helloWxLine()}</div>
       <div class="hbody">${goalPart}${meet}
         <p class="hsec">今（${esc(slotShort(slotOf(now)))}）のおすすめ</p><div id="helloReco"><p class="muted">さがしています…</p></div>
         <button type="button" class="btn primary block" data-hclose>閉じる</button>

@@ -13,7 +13,7 @@
    ・サーバー（GAS）とのやりとり・版の確認には、手を出さない
    ・招待コード（?t=）の入ったURLは保存しない（URLの ? から後ろを消して保存する）
    ========================================================= */
-const APP_CACHE = 'kuiki-app-v157'; // v157：2026.13.157（年代・★を記録しない・古い記録の年代・★を消す）
+const APP_CACHE = 'kuiki-app-v158'; // v158：2026.13.158（みんなの奉仕のひと言・スペイン語・係の設定）
 // v156：2026.13.156（区域をもらう・留守宅カードは、はじめ5件・留守宅カードにも「地図」・地図から一覧の同じところにもどる）
 // v155：2026.13.155（再訪問を本人だけのリストに・留守の家も再訪問に・引き継ぎ待ちをなくす・「受け持ち」を「再訪問」に）
 // v154：2026.13.154（初めて使う人の地図の見やすさの初期値）
@@ -45,7 +45,7 @@ const AREA_KEY = 'https://kuiki.invalid/area';
 let AREA = undefined; // [南, 西, 北, 東]。undefined＝まだ読んでいない、null＝区域がない
 const NET_WAIT_MS = 6000;
 // 圏外用に控える、アプリのファイル（新しくファイルを足したら、ここに名前を足す）
-const APP_NAMES = ['config', 'schedule', 'kantan', 'tsuzuki', 'kangaeru', 'chizu', 'apt-import', 'apt-wizard', 'apt-heya', 'naoshi', 'kyohi', 'chui', 'kml-koushin', 'help', 'douga', 'kyoukai', 'torikomi', 'tokubetsu', 'nozoku', 'i18n', 'i18n-es', 'i18n-es-chizu', 'i18n-es-kyoukai', 'i18n-es-tokubetsu', 'guruchu', 'i18n-es-guruchu', 'meibo', 'i18n-es-meibo', 'i18n-es-shikai', 'i18n-es-tenken', 'i18n-es-kaizen', 'i18n-es-osusume', 'houkoku', 'iken', 'i18n-es-houkoku', 'joukyou-graph', 'i18n-es-joukyou', 'i18n-es-shinai', 'app', 'chizu-okuru', 'heya-wake', 'app-head', 'kimari', 'gaikokugo', 'tochi-kugiri'];
+const APP_NAMES = ['config', 'schedule', 'kantan', 'tsuzuki', 'kangaeru', 'chizu', 'apt-import', 'apt-wizard', 'apt-heya', 'naoshi', 'kyohi', 'chui', 'kml-koushin', 'help', 'douga', 'kyoukai', 'torikomi', 'tokubetsu', 'nozoku', 'i18n', 'i18n-es', 'i18n-es-chizu', 'i18n-es-kyoukai', 'i18n-es-tokubetsu', 'guruchu', 'i18n-es-guruchu', 'meibo', 'i18n-es-meibo', 'i18n-es-shikai', 'i18n-es-tenken', 'i18n-es-kaizen', 'i18n-es-osusume', 'houkoku', 'iken', 'i18n-es-houkoku', 'joukyou-graph', 'i18n-es-joukyou', 'i18n-es-shinai', 'i18n-es-obi', 'obi', 'app', 'chizu-okuru', 'heya-wake', 'app-head', 'kimari', 'gaikokugo', 'tochi-kugiri'];
 const APP_FILES = new RegExp('/(' + APP_NAMES.join('|') + ')\\.js$');
 
 /* 新しい版を入れるとき（install）：画面のファイルを先に取って、新しい控えに入れておく（M2・2026.13.102）。

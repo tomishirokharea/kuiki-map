@@ -47,7 +47,8 @@
     const kindOf = (v, key, day) => {
       const src = v.src ? String(v.src) : '';
       if (src) { // 印：card／area。おすすめの記録は、おすすめの印（reco…）の半角スペースのあとに付く（例：reco:after card）
-        const sp = src.lastIndexOf(' '), mk = sp >= 0 ? src.slice(sp + 1) : src;
+        const sp = src.lastIndexOf(' '); let mk = sp >= 0 ? src.slice(sp + 1) : src;
+        if (mk.slice(-2) === ':p') mk = mk.slice(0, -2); // :p＝個人のカード。数えるときは付かない印と同じ
         if (mk === 'card') return 'card';
         if (mk === 'area') return 'area';
       }

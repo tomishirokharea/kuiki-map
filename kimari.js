@@ -104,7 +104,7 @@
     krLend: ['awayAgainSlot', 'lowOn', 'lowWait', 'freeAfterDays', 'skipDays', 'followSkipDays', 'skipDone', 'contDays'],
     krExt: ['recoOn', 'wxOn'],
     krTake: ['selfTakeMax', 'holdMaxGroup', 'reqMaxPersonal', 'reqMaxGroup'],
-    krTips: ['youngW', 'awayTries', 'nightOn', 'offDays', 'groupOn', 'groupMax', 'lockOthers', 'memoSync']
+    krTips: ['youngW', 'awayTries', 'nightOn', 'offDays', 'groupOn', 'groupMax', 'lockOthers', 'obiOn', 'memoSync']
   };
   const BOX_OF = {};
   Object.keys(PLACE).forEach(b => PLACE[b].forEach(k => { BOX_OF[k] = b; }));
