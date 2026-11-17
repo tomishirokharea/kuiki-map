@@ -47,7 +47,6 @@
   /* ---------- 設定ごとの短い名前・今の値・効く状況 ---------- */
   const st = () => D().settings;
   const tries = () => (window.KM && KM.triesAll ? KM.triesAll() : Math.max(2, Math.min(10, Number(st().awayTries) || 3)));
-  const ext = () => (typeof extSet === 'function' ? extSet() : { on: false });
   // s：札の短い名前（「：」まで）・t：設定の行の名前（下から出る画面の見出し・お知らせ）・v：今の値・w：効く状況
   const F = {
     lendDays: { s: '返却の目安：', t: '返却の目安（受け取ってから）', v: () => `${lendDays()}日`, w: '期限の見張り（今月中に出したい区域・声かけ候補）・全体の状況（返却の目安を過ぎた貸出）' },
@@ -55,9 +54,7 @@
     awayAgainSlot: { s: '訪ね直しの条件：', t: '留守宅を「訪ね直した」と数える条件', v: () => (typeof againSlot === 'function' && againSlot() ? '別の日・別の時間帯' : '別の日'), w: '期限の見張り（正式な返却になるか → 年1回の期限）・全体の状況（留守宅カードで回っている区域）' },
     donePct: { s: '完了の目安：', t: '区域カードを「完了」にできる目安', v: () => `${st().donePct}%`, w: '期限の見張り（正式な返却になるか → 年1回の期限）' },
     awayTries: { s: '留守宅を終える回数：', t: '留守宅を終える回数', v: () => `${tries()}回`, w: '手紙の候補・何度訪ねても会えない家・まだ試していない家の数' },
-    extRest: { s: '寝かせる日数：', t: '寝かせる日数（完了のあと）', v: () => `${ext().rest}日`, w: '留守宅の状況（完了した区域の「寝かせ中」）' },
-    extDays: { s: 'おすすめに出す期間：', t: 'おすすめに出す期間', v: () => `${ext().days}日`, w: '留守宅の状況（完了した区域の「期間が終わった」）' },
-    freeAfterDays: { s: '自由に受け取れるまで：', t: '正式に返却されてから、自動で受け取り可になるまで', v: () => `${Number(st().freeAfterDays) || 0}日`, w: '留守宅の状況（完了した区域を、おすすめに出すのをやめる日）' },
+    freeAfterDays: { s: '自由に受け取れるまで：', t: '正式に返却されてから、自動で受け取り可になるまで', v: () => `${Number(st().freeAfterDays) || 0}日`, w: '全体の状況（自動で受け取れる区域）' },
     awayScope: { s: '試した時間帯の数え方：', t: '試した時間帯の数え方', v: () => (typeof awayRule === 'function' && awayRule().sc ? '前回の巡回も含める' : '今回の巡回だけ'), w: 'まだ試していない家の数・区域ごと' },
     keepMonths: { s: '記録を残す期間：', t: '訪問記録を残す期間', v: () => `${Number(st().keepMonths) || 24}か月`, w: '会えた成果（設定タブにあります）', tab: 'set' }
   };
@@ -68,7 +65,7 @@
     { id: 'adTilesH', name: '全体の状況', keys: ['lendDays', 'awayRetPct'] }, // 全体の状況
     { id: 'adAchH', name: '会えた成果', keys: ['keepMonths'] }, // 会えた成果
     { id: 'adCandH', name: '何度訪ねても会えない家', keys: ['awayTries'] }, // 何度訪ねても会えない家
-    { id: 'adAwaySetH', name: '留守宅の状況', keys: ['extRest', 'extDays', 'freeAfterDays'] }, // 留守宅の状況
+    { id: 'adAwaySetH', name: '留守宅の状況', keys: ['awayScope', 'awayTries'] }, // 留守宅の状況（完了した区域の表は外した・2026-11-17）
     { id: 'adAwaySlotsH', name: 'まだ試していない家の数', keys: ['awayScope', 'awayTries'] }, // まだ試していない家の数（時間帯ごと）
     { id: 'adAwayTerrsH', name: '留守宅の区域ごと', keys: ['awayScope', 'awayTries'] }, // 区域ごと
     { id: 'adHardH', name: 'なかなか会えない家', keys: ['awayTries'] } // なかなか会えない家
@@ -78,7 +75,8 @@
   const num = sel => { const b = document.querySelector(sel); return b ? b.textContent.trim() : null; };
   // 手紙の候補の数（一覧と同じ数え方。一覧は30件まで出して「ほか○件」なので、数は留守宅の索引から数える）
   const hardN = () => { try { return typeof unmetIndex === 'function' ? String([...unmetIndex().values()].flat().filter(x => x.hard).length) : null; } catch (e) { return null; } };
-  const extN = () => { const t = document.querySelector('#adAwaySet table'); return t ? String(Math.max(0, t.querySelectorAll('tr').length - 1)) : '0'; }; // 完了した区域の数
+  // 会えていない家の数（留守宅の索引から数える。状況の「留守宅の状況」をたたんだときの要点）
+  const awayN = () => { try { return typeof unmetIndex === 'function' ? String([...unmetIndex().values()].flat().length) : null; } catch (e) { return null; } };
 
   /* ---------- 設定の行に、どの設定かの印（data-krk）を付ける（「？」の説明と同じ見つけ方） ---------- */
   const SRC = [['data-sset', null], ['data-kset', null], ['data-aset', null], ['data-set', null], ['data-dueset', null], ['data-range', null],
@@ -361,7 +359,7 @@
   const SUMS = {
     due: () => [['年1回の期限を過ぎた', dueNum('over')], ['期限まで60日以内', dueNum('warn')], ['今月中に出したい', dueNum('need')], ['声かけ候補', dueNum('pace')]],
     tiles: () => [['区域の数', tileNum('terr')], ['返却の目安を過ぎた貸出', tileNum('over')], ['この90日で会えた', tileNum('met')]],
-    away: () => [['完了した区域', extN()]],
+    away: () => [['会えていない家', awayN()]],
     hard: () => [['手紙の候補', hardN()]],
     jg: () => (window.JGUI ? JGUI.sum() : []), // 区域カードと留守宅カードのグラフ（joukyou-graph.js）：直近30日の会えた割合
     ops: () => [['要確認', String(document.querySelectorAll('#adOpsBox [data-ops="warn"]').length) + '件']] // 毎月の点検（状況のいちばん下）
