@@ -9579,11 +9579,13 @@ function afterDone(t) { return !!t && !t.holder && !t.awayPoolAt && !!t.complete
    S-13 で貸し出し中（未返却）のまま、留守宅カードにして返してあり（awayPoolAt）、だれも持っていない区域。
    ・受け取り中の留守宅カードが1枚でもある区域は出さない（受け取るとその区域の留守の家が全部入るので）
    ・紙の記録で貸出中・試験用・特別区域（保留1：決まるまで出さない）・紙や口頭で回り終えた巡回（recLess）は出さない
+   ・係が区域ごとに止めた区域（t.extStop。状況の「留守宅の状況」の「区域ごと」の表の「止める」）・貸出中止の区域も出さない（前の「完了した区域」の表の働きを引きつぐ）
    ・1回目の割合が係の目安（donePct）以上で返した区域だけ。記録の割合（poolPct1）で、どの端末でも同じに決める。
      係の端末では、返却の記録の印（low＝目安未満で返した・lowOk＝紙や口頭で確かめた）も見る（伝道者の端末には返却の記録が来ない）
    完了した区域（S-13 の完了）は出さない（R8）。完了したら、残りの家は次に区域カードとして受け取った人が回る */
 function poolOpen(t) {
   if (!t || !t.awayPoolAt || t.holder || t.dummy || t.paperLentAt || t.recLess || isSpecial(t)) return false;
+  if (t.extStop || lendMode(t) === 'stop') return false; // 係が区域ごとに「おすすめに出さない」にした区域（苦情のあった地域など）・貸出中止の区域
   if (activeCards().some(c => c.terrId === t.id)) return false;
   const rec = t.poolRetId ? (D().returns || []).find(r => r.id === t.poolRetId) : null;
   if (rec && (rec.low || rec.lowOk)) return false;
@@ -10369,7 +10371,8 @@ function extSetHtml(rrow, stpd) {
   const st = D().settings, rc = Math.max(1, Math.min(5, Number(st.recoCount) || 3)), th = Number(st.donePct) || 90;
   const lockOn = Number(st.recoLock) === 1, leftOn = Number(st.recoLeft) !== 0;
   const set = `<p class="hint">留守宅カードにして返した区域（だれも持っていない区域）で、まだ訪ねていない家と、まだ会えていない家を、全員の「おすすめ」タブに近くの数軒ずつ出します。区域をまたいでまとめます。</p>
-    <p class="hint">1回目が目安（${th}%）に届かずに返した区域・だれかが留守宅カードを受け取っている区域・特別区域・試験用の区域は出しません。完了した区域も出しません（残りの家は、次に区域カードとして受け取った人が回ります）。</p>` +
+    <p class="hint">1回目が目安（${th}%）に届かずに返した区域・だれかが留守宅カードを受け取っている区域・特別区域・試験用の区域は出しません。完了した区域も出しません（残りの家は、次に区域カードとして受け取った人が回ります）。</p>
+    <p class="hint">区域ごとに止めるときは、状況の「留守宅の状況」の「区域ごと」の表の「おすすめ」の欄で「止める」を押します（苦情のあった地域など）。</p>` +
     `<div class="setrow"><span>1つのおすすめに入れる家の数<br><small class="hint">近い家どうしを、この軒数ずつまとめて出します</small></span><div class="stepper">
       <button type="button" data-kset="recoCount" data-d="-1" aria-label="家の数を減らす">−</button><output class="wide">${rc}軒まで</output>
       <button type="button" data-kset="recoCount" data-d="1" aria-label="家の数を増やす">＋</button></div></div>` +
@@ -10420,6 +10423,19 @@ function renderAwayRules() {
       <button type="button" data-sset="awayAllTerr" data-v="0" aria-pressed="${st.awayAllTerr !== 1}">使わない</button></div></div>` +
     rrow('その日限りにする軒数', 'この軒数以下のカードは、受け取った日の終わりに自動で終わります（用事のついでに寄る人向け）。0にすると使いません', stpd('awayDayOnly', dayOnly, dayOnly ? '軒まで' : '（使わない）', 'その日限りにする軒数', 1));
 }
+/* 係：留守宅の区域ごとの表の「おすすめ」の欄。留守宅カードにして返した区域（だれも持っていない）だけ、出しているか・止めるボタン。
+   区域ごとに止める（t.extStop）働きは、前の「完了した区域」の表から引きついだ（苦情のあった地域など・2026-11-17） */
+function recoCell(t) {
+  if (!t.awayPoolAt || t.holder) return '—';
+  if (lendMode(t) === 'stop') return '<span class="muted">貸出中止</span>';
+  const st = poolOpen(t) ? '出している' : t.extStop ? '止めている' : '<span class="muted">出していない</span>';
+  return `${st}<br><button type="button" class="btn small" data-extstop="${esc(t.id)}">${t.extStop ? '出す' : '止める'}</button>`;
+}
+/* 係の画面：留守宅カードの区域を、区域ごとにおすすめに出す／止める */
+function toggleExtStop(tid) {
+  const t = terrById(tid); if (!t) return;
+  commit(t.extStop ? `区域${t.no}を、おすすめに出すようにしました` : `区域${t.no}を、おすすめに出さないようにしました`, () => { if (t.extStop) delete t.extStop; else t.extStop = true; });
+}
 /* 係：留守宅の状況（状況タブ）。設定の行は renderAwayRules（設定タブ）。完了した区域の表は外した（2026-11-17・R8） */
 function renderAwayAdmin() {
   const idx = unmetIndex(), act = activeCards();
@@ -10437,14 +10453,15 @@ function renderAwayAdmin() {
 
   const rows = D().territories.slice().sort(byNo).map(t => {
     const items = idx.get(t.id) || [];
-    if (!items.length) return '';
-    const avg = (items.reduce((s, x) => s + slotCount(x.tried), 0) / items.length).toFixed(1);
+    if (!items.length && !(t.awayPoolAt && !t.holder)) return ''; // 留守宅カードの区域は、会えていない家がなくても出す（回り残しがおすすめに出る・止める／出すを押せるように）
+    const avg = items.length ? (items.reduce((s, x) => s + slotCount(x.tried), 0) / items.length).toFixed(1) : '0';
     const using = act.filter(c => c.terrId === t.id).length;
     return `<tr><th>区域${t.no}</th><td>${items.length}軒</td><td>${avg} / ${SLOTS.length}</td><td>${triedOf(items) == null ? '—' : triedOf(items) + ' / ' + SLOTS.length}</td><td>${using ? `${using}枚` : '—'}</td>
-      <td>${t.holder ? `${esc(uname(t.holder))}さん` : afterDone(t) ? '<span class="muted">カードにしない（完了した区域）</span>' : (t.completedAt ? 'だれでも' : '<span class="muted">回り終えた記録なし</span>')}</td></tr>`;
+      <td>${t.holder ? `${esc(uname(t.holder))}さん` : afterDone(t) ? '<span class="muted">カードにしない（完了した区域）</span>' : (t.completedAt ? 'だれでも' : '<span class="muted">回り終えた記録なし</span>')}</td>
+      <td>${recoCell(t)}</td></tr>`;
   }).join('');
   $('#adAwayTerrs').innerHTML = rows
-    ? `<div class="scroll"><table class="slots narrow"><tr><th>区域</th><th>会えていない家</th><th>1軒あたり試した時間帯（平均）</th><th>区域で試した時間帯（合わせて）</th><th>使用中のカード</th><th>留守宅カードを使える人</th></tr>${rows}</table></div>`
+    ? `<div class="scroll"><table class="slots narrow"><tr><th>区域</th><th>会えていない家</th><th>1軒あたり試した時間帯（平均）</th><th>区域で試した時間帯（合わせて）</th><th>使用中のカード</th><th>留守宅カードを使える人</th><th>おすすめ</th></tr>${rows}</table></div>`
     : '<p class="muted">会えていない家はありません。</p>';
 
   const hard = all.filter(x => x.hard);
@@ -16507,6 +16524,7 @@ function bindStatic() {
       st[key] = Math.min(lim[1], Math.max(lim[0], cur + Number(x.dataset.d)));
       Store.save(); renderAll(); toast('設定を変えました');
     }
+    else if ((x = q('[data-extstop]'))) toggleExtStop(x.dataset.extstop);
     else if ((x = q('[data-delok]'))) approveDel(x.dataset.delok);
     else if ((x = q('[data-delno]'))) { const r = D().requests.find(y => y.id === x.dataset.delno); if (r && !houseById(r.houseId)) approveDel(r.id); else declineDel(x.dataset.delno); }
     else if ((x = q('[data-takemax]'))) {

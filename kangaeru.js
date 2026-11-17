@@ -530,7 +530,7 @@
   const ceil5 = m => Math.max(5, Math.ceil(m / 5) * 5);
   const keyHid = k => k.slice(0, k.indexOf('|'));
   const keyUnit = k => k.slice(k.indexOf('|') + 1);
-  const MAX_CL = 40;                                                                // 一覧に作るおすすめの数の上限（「もっと見る」で10ずつ出す）
+  const MAX_CL = 60;                                                                // 一覧に作るおすすめの数の上限（「もっと見る」で10ずつ出す）
   /* 押さえ（holds）：2026-11-17 からなくした。前からある押さえは、カレンダーに残った古い予定の「地図をひらく」で、その家を見るだけに使う */
   const holdById = id => (D().holds || []).find(h => h.id === id) || null;
   const myFol = k => { const f = fol(k); return !!f && f.by === me().id; };          // 自分の再訪問の家（ほかの人の再訪問は出す・本人だけのリスト）
@@ -538,7 +538,7 @@
   /* ---------- 候補の家（えらんだ時間帯に、まだ訪ねていない家） ---------- */
   function afterItems(slot) {
     const st = D().settings;
-    const tsig = D().territories.map(t => t.id + ':' + (t.holder || '') + ':' + (t.awayPoolAt || '') + ':' + (t.completedAt || '') + ':' + (t.recLess ? 1 : 0) + ':' + (t.paperLentAt || '') + ':' + (t.dummy ? 1 : 0) + ':' + (Array.isArray(t.focus) ? t.focus.length : 0)).join(',');
+    const tsig = D().territories.map(t => t.id + ':' + (t.holder || '') + ':' + (t.awayPoolAt || '') + ':' + (t.completedAt || '') + ':' + (t.recLess ? 1 : 0) + ':' + (t.paperLentAt || '') + ':' + (t.dummy ? 1 : 0) + ':' + (t.extStop ? 1 : 0) + ':' + (t.lend || '') + ':' + (Array.isArray(t.focus) ? t.focus.length : 0)).join(',');
     const csig = activeCards().map(c => c.id).join(',');
     const ssig = [st.recoLock, st.recoLeft, st.skipDays, st.skipDone, st.awayRecentDays, st.awayNoRepeat, st.awayScope, st.awayCap, st.donePct].join('|');
     return memo(['kga', slot, vl(), D().houses.length, D().awayCards.length, Object.keys(D().dnc).length, Object.keys(D().follows).length + ':' + Object.values(D().follows).filter(f => f && f.by === me().id).length, (D().returns || []).length, tsig, csig, ssig, me().id].join('|'), () => {
@@ -564,6 +564,7 @@
           out.push({ k: x.k, h: x.h, u: x.u, t, lastAt: x.lastAt, focus: fs });
         }
       }
+      out.anyPool = D().territories.some(poolOpen); // 一覧が空のときの文に使う（区域ごとの数え直しを、ここで1回だけ）
       return out;
     });
   }
@@ -585,9 +586,10 @@
     const d2 = (x, y, s) => (s.x - x) * (s.x - x) + (s.y - y) * (s.y - y);
     const px = pos ? pos[1] * kx : 0, py = pos ? pos[0] * ky : 0;
     const groups = rain && all.some(s => s.rank < 2) ? [all.filter(s => s.rank < 2), all.filter(s => s.rank === 2)] : [all];
-    for (const g of groups) {
-      let rest = g.slice();
-      while (rest.length && out.length < MAX_CL) {
+    for (let gi = 0; gi < groups.length; gi++) {
+      let rest = groups[gi].slice();
+      const lim = groups.length > 1 && gi === 0 ? MAX_CL / 2 : MAX_CL;              // 雨の日：集合住宅は半分まで（ほかの家の分を残す）
+      while (rest.length && out.length < lim) {
         const seeds = rain && rest.some(s => s.rank === 0) ? rest.filter(s => s.rank === 0) : rest;
         const seed = pos ? seeds.reduce((a, s) => (d2(px, py, s) < d2(px, py, a) ? s : a)) : seeds.reduce((a, s) => (s.last < a.last ? s : a));
         // 種から近い家を N 軒ぶん（1軒の家に部屋が多いこともあるので、家は N 軒まで見れば足りる）。全部を並べかえずに、近いものだけ残す
@@ -623,8 +625,8 @@
         const xs = route.flatMap(s => s.xs), keys = xs.map(x => x.k);
         const ts = [...new Set(xs.map(x => x.t))].sort((a, b) => cmpNo(a.no, b.no));
         const last = xs.reduce((a, x) => (x.lastAt < a ? x.lastAt : a), '9999');
-        out.push({ kind: 'after', t: route[0].xs[0].t, ts, stops: route, keys, n: keys.length, dist: pos ? route[0].leg : null, mins: ceil5(walk / 67 + 4 * keys.length),
-          last, rank: Math.max(...route.map(s => rainRank(s.h))), rain: !!rain, focus: xs.some(x => x.focus), left: xs.some(x => x.left),
+        out.push({ kind: 'after', t: ts[0], ts, stops: route, keys, n: keys.length, dist: pos ? route[0].leg : null, mins: ceil5(walk / 67 + 4 * keys.length),
+          last, rank: Math.max(...route.map(s => rainRank(s.h))), rain: !!rain, focus: xs.some(x => x.focus), left: xs.some(x => x.left), allLeft: xs.every(x => x.left),
           prov: route.filter(s => s.h.prov && !houseHasRec(s.h)).length }); // 消せる仮の家だけ数える（記録・印のある家は消せない。H8）
       }
     }
@@ -683,6 +685,7 @@
     const sig = [slot, pos ? pos[0].toFixed(5) + ',' + pos[1].toFixed(5) : '', rain ? 1 : 0, recoN()].join('|');
     if (GL && GL.items === items && GL.sig === sig) return GL.list;
     const list = buildClusters(items, pos, rain);
+    list.anyPool = !!items.anyPool;
     GL = { items, sig, list };
     return list;
   }
@@ -713,7 +716,7 @@
   /* 理由（1行）。押すと「区域のようす」 */
   function reasonFor(c, slot) {
     if (c.rain && c.rank < 2) return `雨の日なので、集合住宅の部屋です${c.rank === 0 ? '（エレベーターあり）' : ''}`;
-    if (c.left) return 'この巡回で、まだ一度も訪ねていない家です';
+    if (c.left) return c.allLeft ? 'この巡回で、まだ一度も訪ねていない家です' : 'この巡回で、まだ一度も訪ねていない家が入っています';
     if (c.focus) return `${slotShort(slot)}は、区域係が重点にしている時間帯です`;
     if (c.dist != null && c.dist <= num(D().settings.recoDist, 500)) {
       const mn = Math.max(1, Math.round(c.dist / 67));
@@ -785,7 +788,7 @@
     if (show.some(c => c.rain && c.rank < 2)) h += '<p class="notice rainnote"><b>雨のため、集合住宅の部屋を先に出しています</b>（エレベーターありが先）。<small>天気：Open-Meteo</small></p>';
     h += show.map((c, i) => cardHtml(c, i, simple, sk, slot, nv)).join('');
     if (!show.length) {
-      h = !D().territories.some(poolOpen)
+      h = !list.anyPool
         ? '<div class="empty">今出せるおすすめはありません。<br>区域が留守宅カードにして返されると、まだ訪ねていない家や、まだ会えていない家がここに出ます。</div>'
         : `<div class="empty">${esc(slotShort(slot))}に訪ねられる家は、今はありません。${simple ? '' : '<br>「ほかの時間帯」をえらぶと、出ることがあります。'}</div>`;
     }

@@ -187,5 +187,11 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "おすすめの「今行く」「予定に入れる」をなくしました。「地図で見る」で、区域の線と回る順の番号を見て回ってください。同じ家に、ほかの人が同じ日に行くこともあります（記録が届くと、ほかの人のおすすめから消えます）。": "Quitamos «Ir ahora» y «Agregar a mi agenda» de las recomendaciones. Use «Ver en el mapa» para ver el límite del territorio y el orden de las casas. Otra persona puede ir a la misma casa el mismo día (cuando llega el registro, la casa desaparece de las recomendaciones de los demás).",
 "完了した区域は、おすすめに出さないようにしました。残りの家は、次に区域カードとして受け取った人が回ります。": "Los territorios completados ya no salen en recomendaciones. Las casas restantes las visitará quien tome después el territorio.",
 "区域の決まりの「おすすめ」から、完了した区域のための決め（寝かせる日数・1軒あたりの回数・おすすめに出す期間・次の新規の前に止める）と、押さえの決め（押さえられる予定の数・何日先まで）を外しました。状況の「完了した区域」の表も外しました（設定の値は残っています）。": "En «Recomendaciones» de las reglas del territorio, quitamos los ajustes para territorios completados (días de descanso, visitas por casa, período en recomendaciones, detener antes del próximo turno) y los de reservas (planes por persona, días de anticipación). También quitamos la tabla «Territorios completados» de la situación (los valores se conservan).",
-"おすすめに出すのは、1回目が目安に届いて留守宅カードにして返した区域だけです。だれかが留守宅カードを受け取ると、その区域はおすすめから消えます。": "Solo salen en recomendaciones los territorios devueltos como tarjeta de ausentes después de llegar a la meta de la primera vuelta. Cuando alguien recibe la tarjeta de ausentes, ese territorio desaparece de las recomendaciones."
+"おすすめに出すのは、1回目が目安に届いて留守宅カードにして返した区域だけです。だれかが留守宅カードを受け取ると、その区域はおすすめから消えます。": "Solo salen en recomendaciones los territorios devueltos como tarjeta de ausentes después de llegar a la meta de la primera vuelta. Cuando alguien recibe la tarjeta de ausentes, ese territorio desaparece de las recomendaciones.",
+"この巡回で、まだ一度も訪ねていない家が入っています": "Incluye casas que aún no se visitaron en esta vuelta",
+"出している": "Se muestra",
+"出していない": "No se muestra",
+"区域{0}を、おすすめに出すようにしました": "El territorio {0} ahora sale en recomendaciones",
+"区域{0}を、おすすめに出さないようにしました": "El territorio {0} ya no sale en recomendaciones",
+"区域ごとに止めるときは、状況の「留守宅の状況」の「区域ごと」の表の「おすすめ」の欄で「止める」を押します（苦情のあった地域など）。": "Para detener un territorio, pulse «Detener» en la columna «Recomendadas» de la tabla «Por territorio» en «Situación de ausentes» (por ejemplo, zonas con quejas)."
 });
