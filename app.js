@@ -2468,7 +2468,9 @@ function canSeeDetail(k, house) {
 }
 const seeV = (v, k, house) => v.by === me().id || canSeeDetail(k, house);
 /* 再訪問のリストから「外した」家（もう訪ねない）：外したときより前の★は数えない */
-const closedAt = k => { const r = D().released[k]; return r && r.reason === 'closed' ? r.at : null; };
+const folClosedKey = () => 'kuiki_folclosed_' + me().id; // 本人が「リストから外した」日（この端末だけ・2026-11-17。家ごとの印はもう書かない）
+const folClosedAll = () => { try { const o = JSON.parse(lsGet(folClosedKey()) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } };
+const closedAt = k => { const r = D().released[k], mine = folClosedAll()[k] || null, c = r && r.reason === 'closed' ? r.at : null; return mine && (!c || mine > c) ? mine : c; };
 /* 引き継ぎ待ち（released の 'handoff'）は 2026-11-17 に廃止した（R A さんの決定）。
    古い画面が作った印や、前に付いた印が残っていても、引き継ぎ待ちとしては扱わない（普通の家）。
    呼び出し（一覧・おすすめ・留守宅カードの除外など）は残し、いつも null を返す。サーバーでも、印では受け持てない（auto followOk_） */
@@ -2816,7 +2818,7 @@ function terrStats(t, sinceMs) {
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
   { v: '2026.13.155', items: [
-    ['再', '再訪問は、あなただけのリストになりました。ほかの人が同じ家を再訪問していても、自分の再訪問にできます。あなたの再訪問とメモは、ほかの人には見えません（区域係にも見えません）。'],
+    ['再', '再訪問は、あなただけのリストになりました。ほかの人が同じ家を再訪問していても、自分の再訪問にできます。あなたの再訪問とメモは、ほかの人のアプリの画面には出ません（区域係の画面にも出ません）。'],
     ['再', '留守だった家も、再訪問のリストに入れられるようになりました（「留守」で記録したあとの「再訪問に入れる」か、家の画面の「再訪問のリストに入れる」）。リストでは「留守のまま」と出ます。'],
     ['再', 'ほかの人が再訪問している家でも、記録を止めず、「ほかの人が再訪問している家です」も出さないようにしました（最近会えた家は、今までどおり「最近会えた家」と出ます）。'],
     ['再', '「引き継ぎを待っている家」をなくしました。再訪問をやめるときは「リストから外す」を押してください。'],
@@ -4952,7 +4954,7 @@ function openTarget(hid, unit, fromBuilding, review) {
     if (st.step === 'review' && !blocked) b += `<button class="btn primary block review-rec" id="shRecord">訪問の結果を記録する</button>`;
 
     b += navLink(h);
-    if (canAddAwayFollow(k) && !sum(k).met) b += `<button class="btn block" id="shAddFol">再訪問のリストに入れる</button>`; // 留守の家を再訪問に（会えた家は「会えた」のあとの「また訪ねますか？」から・2026-11-17）
+    if (canAddAwayFollow(k)) b += `<button class="btn block" id="shAddFol">再訪問のリストに入れる</button>`; // 留守の家を再訪問に（会えた家は「会えた」のあとの「また訪ねますか？」から・2026-11-17）
     if (unit) {
       b += `<details class="more"${st.editOpen || (st.mk && st.mk.kind) ? ' open' : ''}><summary>この部屋の編集</summary>
         ${window.chuiMark ? window.chuiMark.html(k, st.mk || (st.mk = {})) + '<button class="btn block" id="mkSave">この部屋の印を保存する</button>' : ''}
@@ -5105,9 +5107,8 @@ function quickVisit(hid, unit, result, extra, msg, onUndo, keepOpen) {
    自分が訪ねた家か自分の区域の家。サーバーの L16 と同じ）。ほかの人の再訪問があってもよい（本人だけのリスト・2026-11-17） */
 function canAddAwayFollow(k) {
   if (!featFollow() || !canFollow(k) || dncAt(k)) return false;
-  const h = houseById(parseKey(k)[0]); if (!h) return false;
-  const t = terrById(h.terrId);
-  return visitsOf(k).some(v => v.by === me().id) || !!(t && t.holder === me().id);
+  if (!houseById(parseKey(k)[0])) return false;
+  return !sum(k).met && visitsOf(k).some(v => v.by === me().id && v.result === 'away'); // 会えた家は「また訪ねますか？」から（監査 L4）
 }
 /* 自分の再訪問のリストに入れて、メモの画面を開く（メモは「あとで」で閉じられる） */
 function addMyFollow(k) {
@@ -6085,6 +6086,8 @@ function startFollow(k, by) {
 }
 function releaseFollow(k, reason) {
   // 自分の再訪問だけを外す（サーバーも、ほかの人の分は残す）。家ごとの印（released）は書かない：ほかの人の★の見え方を変えないため（2026-11-17）
+  // 「もう訪ねない」で外した日は、この端末だけに控え、本人の画面で、それより前の★を数えない（今までの働きを残す・監査 M3）
+  if (reason === 'lost' || reason === 'gone') { try { const o = folClosedAll(); o[k] = new Date().toISOString(); lsSet(folClosedKey(), JSON.stringify(o)); } catch (e) { /* 控えられなくても外す */ } }
   delete D().follows[k];
 }
 async function followAction(act, k) {
@@ -6112,7 +6115,7 @@ async function followAction(act, k) {
       break;
     }
     case 'take':
-      if (!canFollow(k)) { toast('すでにほかの人が再訪問しています'); return; }
+      if (!canFollow(k)) { toast('この家は、もう再訪問のリストに入っています'); return; }
       commitIn([], '再訪問します', () => startFollow(k, me().id));
       break;
   }
@@ -11230,7 +11233,7 @@ function openUiSheet() {
       if (k === 'round') { me().roundMode = v; Store.save(); renderHouses(); paint(true); return; }
       if (k === 'fFollow' && v === 'off' && featFollow()) {
         const n = Object.values(D().follows).filter(f => f.by === me().id).length;
-        if (n && !await ask(`再訪問している家が${n}件あります。\n「使わない」にするとリストは見えなくなりますが、再訪問は残ります（ほかの人は訪問を控えたままです）。\n再訪問をやめる場合は、先にリストから外してください。\n「使わない」にしますか？`)) return;
+        if (n && !await ask(`再訪問している家が${n}件あります。\n「使わない」にするとリストは見えなくなりますが、再訪問は残ります。\n再訪問をやめる場合は、先にリストから外してください。\n「使わない」にしますか？`)) return;
       }
       if (k === 'fTime' || k === 'fFollow') {
         UI[k] = v; uiSave(); applyUi(); updateTabs(); renderAll(); paint(true);
@@ -11403,7 +11406,7 @@ function createDummy(testers) {
       (sc.v || []).forEach(e => addV(hid, '', e, owner));
       const k = K(hid, '');
       if (sc.dnc) dnc[k] = true;
-      if (sc.follow) follows[k] = { by: owner, since: iso(now - 60 * DAY), touchedAt: iso(now - sc.follow * DAY) };
+      if (sc.follow && owner === me().id) follows[k] = { by: owner, since: iso(now - 60 * DAY), touchedAt: iso(now - sc.follow * DAY) }; // 再訪問は本人だけのリスト：ほかの人の分は作れない（2026-11-17）
       if (sc.released) released[k] = { at: iso(now - 5 * DAY), reason: 'handoff' };
     });
     spread(tid, b, SC.length, 6, '検証'); // 各自の区域にも、時間帯をずらした留守の家
@@ -11452,7 +11455,7 @@ function openDummyGuide(tid) {
     <p>・★ また訪ねたい家：自分の区域の06・アパート203<br>・若い世代：自分の区域の07<br>
       <span class="muted">★や年代は、区域の担当者にしか見えません。ほかの人の区域の06・07は、ほかの人には出ません。</span></p>
     <h3 class="sub">地図（自分の区域をひらく）</h3>
-    <p>・白い丸：01・02ほか　・緑のチェック：12・13・16（今回訪ねた家）<br>・青いチェック：11　・赤い「拒」：14　・「再」の札：09・10<br>・16をタップすると「10分前に、ほかの人が記録しています」と出ます${LIVE && isAdmin() ? '（区域係が作った記録なので、区域係本人には出ません）' : ''}。</p>
+    <p>・白い丸：01・02ほか　・緑のチェック：12・13・16（今回訪ねた家）<br>・青いチェック：11　・赤い「拒」：14　・「再」の札：09・10（作った区域係の区域だけ。再訪問は本人だけのリストのため）<br>・16をタップすると「10分前に、ほかの人が記録しています」と出ます${LIVE && isAdmin() ? '（区域係が作った記録なので、区域係本人には出ません）' : ''}。</p>
     <h3 class="sub">区域カード画面</h3>
     <p>・あなたの再訪問：09（しばらく訪問なし）・10（確認が必要）。「地図で見る」で、目印の動きと、記録とメモの確認画面を確かめられます。</p>
     ${isAdmin() ? `<h3 class="sub">係の画面</h3><p>・なかなか会えない家：各区域の15<br>・取り残し：06・08・アパート203<br>・確認が必要な再訪問：各区域の10<br>・留守宅の状況：区域ごとの「使用中のカード」</p>
