@@ -2468,7 +2468,7 @@ function canSeeDetail(k, house) {
 }
 const seeV = (v, k, house) => v.by === me().id || canSeeDetail(k, house);
 /* 再訪問のリストから「外した」家（もう訪ねない）：外したときより前の★は数えない */
-const folClosedKey = () => 'kuiki_folclosed_' + me().id; // 本人が「リストから外した」日（この端末だけ・2026-11-17。家ごとの印はもう書かない）
+const folClosedKey = () => 'kuiki_memo_folclosed_' + me().id; // 本人が「リストから外した」日（この端末だけ・2026-11-17。家ごとの印はもう書かない）。名前が kuiki_memo_ で始まるので、端末の情報を消すときに一緒に消える（監査）
 const folClosedAll = () => { try { const o = JSON.parse(lsGet(folClosedKey()) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } };
 const closedAt = k => { const r = D().released[k], mine = folClosedAll()[k] || null, c = r && r.reason === 'closed' ? r.at : null; return mine && (!c || mine > c) ? mine : c; };
 /* 引き継ぎ待ち（released の 'handoff'）は 2026-11-17 に廃止した（R A さんの決定）。
