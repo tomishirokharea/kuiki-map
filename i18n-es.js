@@ -2477,8 +2477,8 @@ window.KUIKI_I18N.es = {
 "日数で": "Por días",
 "区域の返却の目安まで": "Hasta la fecha límite del territorio",
 "20〜39歳 {0}%（市の年齢データ）": "20–39 años: {0} % (datos de edad del municipio)",
-"市の年齢データ（字ごとの20〜39歳の割合）から出しています。字が決まっていない区域は、「会えた」記録の年代から出します。": "Se calcula con los datos de edad del municipio (porcentaje de 20–39 años por barrio). Si el territorio no tiene barrio asignado, se usan las edades anotadas.",
-"市の年齢データが入っていないので、これまでに「会えた」と記録したときの年代から出した目安です。": "No hay datos de edad del municipio; es un cálculo aproximado según las edades anotadas al encontrar a alguien.",
+"市の年齢データ（字ごとの20〜39歳の割合）から出しています。字が決まっていない区域は、並べる順の後ろになります。": "Se calcula con los datos de edad del municipio (porcentaje de 20–39 años por barrio). Los territorios sin barrio asignado quedan al final.",
+"市の年齢データが入っていないので、この並べ方は使えません（区域係が年齢データを取り込むと使えます）。": "No hay datos de edad del municipio, así que este orden no se puede usar (se podrá cuando el encargado de territorios importe los datos de edad).",
 "{0}（{1}）": "{0} ({1})",
 "年齢データ（字ごとの年齢の割合）": "Datos de edad (porcentajes por barrio)",
 "e-Stat（政府統計の総合窓口）の統計GISで、国勢調査の「小地域（町丁・字等別）」から「男女，年齢（5歳階級）別人口」をえらび、": "En el SIG estadístico de e-Stat (portal de estadísticas del gobierno), en el censo «Áreas pequeñas (por chōme/aza)», elija «Población por sexo y edad (grupos de 5 años)» y descargue el archivo (zip) de ",
@@ -3343,4 +3343,6 @@ window.KUIKI_I18N.es = {
 "再訪問は、あなただけのリストになりました。ほかの人が同じ家を再訪問していても、自分の再訪問にできます。あなたの再訪問とメモは、ほかの人のアプリの画面には出ません（区域係の画面にも出ません）。": "Las revisitas ahora son su lista personal. Aunque otra persona haga revisitas en la misma casa, usted también puede añadirla. Sus revisitas y notas no aparecen en la app de otras personas (tampoco en la del encargado de territorios).",
 "留守だった家も、再訪問のリストに入れられるようになりました（「留守」で記録したあとの「再訪問に入れる」か、家の画面の「再訪問のリストに入れる」）。リストでは「留守のまま」と出ます。": "Ahora también puede añadir a sus revisitas una casa donde no había nadie («Añadir a revisitas» después de registrar «Ausente», o «Añadir a mi lista de revisitas» en la pantalla de la casa). En la lista aparece «Sigue ausente».",
 "ほかの人が再訪問している家でも、記録を止めず、「ほかの人が再訪問している家です」も出さないようにしました（最近会えた家は、今までどおり「最近会えた家」と出ます）。": "En casas donde otra persona hace revisitas, ya no se detiene el registro ni se muestra «Otra persona hace revisitas en esta casa» (las casas encontradas hace poco siguen mostrándose como «Casa encontrada hace poco»).",
+"訪問の記録に、年代と★（また訪ねたい）を残さないようにしました。前の記録に残っていた年代と★も、区域係が消します。": "Los registros de visitas ya no guardan la edad ni la ★ (volver a visitar). El encargado de territorios también borrará las que quedaban en registros anteriores.",
+"「区域をもらう」の「若い世代が多い順」は、市の年齢データだけで並べるようにしました（記録の年代は使いません）。記録の書き出し（CSV）から、年代と再訪問の列をなくしました。": "En «Pedir territorio», el orden «Más gente joven» usa solo los datos de edad del municipio (no las edades de los registros). Se quitaron las columnas de edad y revisita del archivo CSV.",
 };
