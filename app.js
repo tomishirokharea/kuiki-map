@@ -5067,15 +5067,19 @@ function openTarget(hid, unit, fromBuilding, review) {
 }
 /* 記録につけるカードの印（状況のグラフ用・2026-10-31）。自分が持つ（グループのカードは今日回る人も）留守宅カードに入っている家 → 'card'、それ以外 → 'area'（区域カードなど）。印はこの2つだけ（カードの番号は付けない）。
    同じ区域の区域カードも持っているときは、そのカードの画面（focusCard）を開いているときだけ留守宅カード。おすすめから開いた記録（viaReco）は、画面の文脈がないので、自分のカードの家なら留守宅カード。
-   サーバーは src にこの形だけを通す（Code.gs の CARD_SRC_RE・RECO_CARD_SRC_RE） */
+   サーバーは src にこの形だけを通す（Code.gs の CARD_SRC_RE・RECO_CARD_SRC_RE）。
+   個人のカード・区域には末尾に :p を付ける（card:p／area:p。みんなの奉仕のひと言の「個人の区域カードや留守宅カード」の数に使う）。グループ奉仕・全体の集まりには付けない。状況のグラフ・おすすめの集計は :p を除いて同じに読む */
 function cardMark(hid, unit, viaReco) {
   const k = K(hid, unit || ''), h = houseById(hid), t = h ? terrById(h.terrId) : null;
   const cs = activeCards().filter(c => c.keys.includes(k) && (c.by === me().id || isCardHelper(c)));
-  if (!cs.length) return 'area';
-  if (viaReco) return 'card';
-  if (cs.some(c => c.id === focusCard)) return 'card';
-  if (t && (t.holder === me().id || helpersOf(t).some(x => x.uid === me().id))) return 'area';
-  return 'card';
+  const areaMk = t && !t.group ? 'area:p' : 'area'; // :p＝個人のカード（集まりでない。t.group があるのはグループ奉仕・全体の集まり）。区域が分からないときは付けない
+  if (!cs.length) return areaMk;
+  const cardMk = c => (c && !c.group ? 'card:p' : 'card'); // 集まりで使う留守宅カード（c.group）には付けない
+  if (viaReco) return cardMk(cs[0]);
+  const fc = cs.find(c => c.id === focusCard);
+  if (fc) return cardMk(fc);
+  if (t && (t.holder === me().id || helpersOf(t).some(x => x.uid === me().id))) return areaMk;
+  return cardMk(cs[0]);
 }
 /* 記録に付ける src：おすすめの印（reco…）を先頭に残し、半角のスペースのあとにカードの印（例：reco:after card）。おすすめでなければカードの印だけ。
    カードの印を調べるところで例外が出ても、記録は保存する（印なし・おすすめの印だけ。L-7） */
