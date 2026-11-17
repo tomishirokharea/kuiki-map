@@ -2818,7 +2818,7 @@ function terrStats(t, sinceMs) {
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
   { v: '2026.13.160', items: [
-    ['地', 'おすすめの「地図で見る」を見やすくしました。回る家が大きく見えるところまで地図を近づけ、番号の順に点線でつなぎます。区域をまたぐおすすめで、2つ目の区域の家の印が出ていなかったのも直しました。下の案内も短くしました。']
+    ['地', 'おすすめの「地図で見る」を見やすくしました。回る家が大きく見えるところまで地図を近づけ、番号の順に点線でつなぎます。ほかの建物の名前で番号がかくれないよう、名前は回る家の分だけ出します。区域をまたぐおすすめで、2つ目の区域の家の印が出ていなかったのも直しました。下の案内も短くしました。']
   ] },
   { v: '2026.13.159', items: [
     ['薦', 'おすすめタブに出す家を変えました。留守宅カードにして返した区域（だれも持っていない区域）で、まだ訪ねていない家と、まだ会えていない家を、近くの数軒ずつ出します。区域をまたいでまとめることもあります。カードを受け取らなくても回れます。'],
@@ -4308,6 +4308,9 @@ function selectTerr(id, opts) {
 }
 /* えらんだ区域と同じく濃く出す区域（おすすめの「地図で見る」で、区域をまたぐとき。kangaeru.js が包む。ふだんは null） */
 function kfOnTerrs() { return null; }
+/* おすすめの「地図で見る」で回る家（家id の Set。kangaeru.js が包む。ふだんは null）。
+   建物の名前の札は家の印より上（labelPane）に出るので、ほかの建物の名前が回る家の番号をかくしていた（2026-11-17）。このあいだは回る家の名前だけ出す */
+function kfHouseIds() { return null; }
 /* 今えらんでいる区域（選んでいないときは null） */
 function selTerrId() {
   const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
@@ -4452,9 +4455,11 @@ function houseNameLabels(list, dense) {
     dense = dense && list.some(h => onMap.has(h.id));
   }
   if (!list) return;
+  const only = kfHouseIds();
   let n = 0;
   for (const h of list) {
     if (!h.label || n > 300) continue;
+    if (only && !only.has(h.id)) continue; // おすすめの地図：回る家の名前だけ（ほかの名前で番号がかくれないように）
     const k = h.type === 'apt' ? aptKind(h) : kindOf(h);
     const isFc = k !== 'home';
     if (h.type === 'apt' ? !(apt || (fc && isFc)) : !(fc && isFc)) continue; // 一戸建ての「目印」は出さない

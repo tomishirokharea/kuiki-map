@@ -964,6 +964,7 @@
   const kfHas = id => !!KF && KF.tids.includes(id);
   wrapFn('selTerrId', (f, a) => (KF && terrById(KF.tid) ? KF.tid : f.apply(null, a)));
   wrapFn('kfOnTerrs', (f, a) => (KF ? new Set(KF.tids) : f.apply(null, a))); // 入っている区域の線を、すべて濃く出す（app.js の renderTerrs）
+  wrapFn('kfHouseIds', (f, a) => (KF ? new Set(KF.nums.keys()) : f.apply(null, a))); // 建物の名前は、回る家の分だけ出す（app.js の houseNameLabels）
   wrapFn('focusFn', (f, a) => {
     if (!KF) return f.apply(null, a);
     roundNums = KF.nums;
