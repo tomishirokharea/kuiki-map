@@ -48,6 +48,6 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "今いる場所から近い順です。": "Ordenados por cercanía al lugar donde está.",
 "前回返却した日が古い区域から並べます。": "Primero los territorios devueltos hace más tiempo.",
 "家・部屋が多い区域から並べます。": "Primero los territorios con más casas y departamentos.",
-"市の年齢データ（字ごとの20〜49歳の割合）から出しています。字が決まっていない区域は、「会えた」記録の年代から出します。": "Según los datos de edad del municipio (porcentaje de 20 a 49 años por barrio). Si el territorio no tiene barrio asignado, se usan las edades anotadas al encontrar a alguien.",
+"市の年齢データ（字ごとの20〜49歳の割合）から出しています。字が決まっていない区域は、並べる順の後ろになります。": "Según los datos de edad del municipio (porcentaje de 20–49 años por barrio). Los territorios sin barrio asignado quedan al final.",
 "近": "Cer"
 });

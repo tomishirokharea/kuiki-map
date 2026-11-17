@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.156';
+var APP_JS_VER = '2026.13.157';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -38,8 +38,7 @@ const INT_LABEL = { 再訪問したい: '★ また訪ねたい', 再訪問し�
 /* 会衆で決める「記録する項目」 */
 /* 各自の「使う機能」（歯車の設定・このスマホだけ）。はじめはどちらも「使わない」 */
 const featTime = () => UI.fTime === 'on';
-/* 再訪問・★・引き継ぎの機能は、画面から外しました（これまでのデータはサーバーに残っています）。
-   もどす場合は、ここを () => UI.fFollow === 'on' に戻し、設定の「使う機能」に再訪問の行を足します */
+/* 再訪問は、各自が設定でえらぶ（2026-11-17：再訪問は本人だけのリスト。年代・★は記録せず、古い記録の分もサーバーで消す。引き継ぎ待ちは廃止） */
 const featFollow = () => UI.fFollow === 'on'; // 再訪問を使う（各自が設定でえらぶ）
 /* 年代・「また訪ねたいか」は、会衆で記録する設定で、かつ本人が「再訪問」を使うときだけ聞く */
 const recAgeOn = () => false; // 年代は聞かない（会えた → 再訪問するか → メモ）
@@ -71,7 +70,7 @@ function memoStepHtml(k) {
 /* 会えた（再訪問する）を記録し、メモの先頭に日時を入れて、このスマホに残す */
 function saveFollowVisit(hid, unit, text, keepOpen, next) {
   const k = K(hid, unit);
-  saveVisit(hid, unit, 'met', { interest: '再訪問したい', follow: true }, keepOpen);
+  saveVisit(hid, unit, 'met', { follow: true }, keepOpen); // 年代・★（また訪ねたい）は記録しない（サーバーも保存しない・2026-11-17）
   const now = new Date(), t = String(text || '').trim(), o = memoAll();
   const line = `${now.getMonth() + 1}月${now.getDate()}日 ${fmtTime(now)}　会えた`;
   o[k] = { text: (line + (t ? '\n' + t : '')).slice(0, 1000), at: now.toISOString() };
@@ -2817,6 +2816,10 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.157', items: [
+    ['記', '訪問の記録に、年代と★（また訪ねたい）を残さないようにしました。前の記録に残っていた年代と★も、区域係が消します。'],
+    ['係', '「区域をもらう」の「若い世代が多い順」は、市の年齢データだけで並べるようにしました（記録の年代は使いません）。記録の書き出し（CSV）から、年代と再訪問の列をなくしました。']
+  ] },
   { v: '2026.13.156', items: [
     ['区', '「区域をもらう」と「留守宅カードをえらぶ」は、はじめは5件だけ出すようにしました（くわしい表示でも）。ほかは下の「もっと見る」で見られます。'],
     ['地', '「留守宅カードをえらぶ」にも「地図」を付けました。受け取る前に、その区域とカードの家の場所を地図で確かめられます。'],
@@ -6166,7 +6169,7 @@ function followItem(k, f, mode) {
       <p class="rt"><span class="stamp xs${t ? noCls(t.no) : ''}">${t ? esc(t.no) : '-'}</span> ${targetName(h, unit)}</p>
       ${met ? `<p class="metline">前回 会えた日：${fmtDate(met.at)}（${slotShort(slotOf(new Date(met.at)))}）</p>` : '<p class="muted">まだ会えた記録はありません</p>'}
       <p class="muted">${mode === 'admin' ? `再訪問する人：${esc(uname(f.by))}さん　` : ''}最後の記録から ${d}日${state}</p>
-      ${m ? `<p class="muted">★${YOUNG.has(m.age) ? '・若い世代' : ''}${bs ? `　会えた時間帯：${bs}` : ''}</p>` : ''}
+      ${m || bs ? `<p class="muted">${m ? `★${YOUNG.has(m.age) ? '・若い世代' : ''}` : ''}${m && bs ? '　' : ''}${bs ? `会えた時間帯：${bs}` : ''}</p>` : ''}
       ${memo ? `<p class="memoline">メモ：${esc(memoShort(memo))}</p>` : ''}
     </div><button class="btn small" data-go="${esc(hid)}" data-unit="${esc(unit)}" data-route="1">地図で見る</button>
     ${acts ? `<div class="actions span">${acts}</div>` : ''}</article>`;
@@ -8457,8 +8460,7 @@ async function stampFollow(k, res, curText, after) {
   const o = memoAll();
   o[k] = Object.assign({}, before || {}, { text: (line + (base ? '\n' + base : '')).slice(0, 1000), at: now.toISOString() });
   memoSaveAll(o);
-  const m = sum(k).met;
-  const extra = res === 'met' ? { age: m && seeV(m, k) ? m.age : undefined, interest: '再訪問したい' } : {};
+  const extra = {}; // 年代・★（また訪ねたい）は記録しない（2026-11-17）
   saveVisit(hid, unit, res, extra, true, () => { // 取り消したら、メモも元にもどす
     const o2 = memoAll(); if (before) o2[k] = before; else delete o2[k]; memoSaveAll(o2);
   });
@@ -8679,7 +8681,7 @@ function renderRequestArea() {
 let reqForGroup = false; // 監督・司会者が「集まりで使う区域」として申し込むとき
 let reqUse = 'grp';       // そのときの使い道：grp グループ奉仕・all 全体の集まり
 let reqSort = 'long';     // 区域をもらう一覧の並べ方：near 近い順・long 長く回っていない順・young 若い世代・many 家が多い順
-/* 区域の「若い世代」の割合：これまでに会えた記録のうち、年代が若い世代だった割合（記録が少ないときは出さない） */
+/* 区域の「若い世代」の割合：市の年齢データ（字ごとの20〜39歳の割合）から。データがないときは出さない */
 function youngShare(t) {
   const am = AGE_ON ? ageMap() : null;
   if (am) { // 市の年齢データ（字ごとの20〜39歳の割合）を、区域に入っている字の割合で平均する
@@ -8689,11 +8691,8 @@ function youngShare(t) {
       return { city: true, pct: Math.round(list.reduce((s2, a) => s2 + am.get(a.k).y * a.r, 0) / w) };
     }
   }
-  let n = 0, y = 0;
-  for (const h of housesOf(t.id)) for (const u of targets(h)) {
-    for (const v of visitsOf(K(h.id, u))) { if (v.result !== 'met' || !v.age) continue; n++; if (YOUNG.has(v.age)) y++; }
-  }
-  return { n, y, pct: n >= 3 ? Math.round(y / n * 100) : null };
+  // 「会えた」記録の年代からの目安は、2026-11-17 にやめた（年代は記録せず、古い記録の年代も消したため）
+  return { n: 0, y: 0, pct: null };
 }
 function openRequestSheet(g) {
   if (g !== undefined) reqForGroup = !!g;
@@ -8727,7 +8726,7 @@ function openRequestSheet(g) {
       <button type="button" class="chip" data-rsort="young" aria-pressed="${reqSort === 'young'}">若い世代が多い順</button>
       <button type="button" class="chip" data-rsort="many" aria-pressed="${reqSort === 'many'}">家が多い順</button></div>
     ${reqSort === 'near' ? '<div class="row"><button class="btn small" id="reqNear">現在地を更新する</button></div>' : ''}
-    ${reqSort === 'young' ? `<p class="hint">${AGE_ON && ageMap() ? '市の年齢データ（字ごとの20〜39歳の割合）から出しています。字が決まっていない区域は、「会えた」記録の年代から出します。' : '市の年齢データが入っていないので、これまでに「会えた」と記録したときの年代から出した目安です。'}</p>` : ''}
+    ${reqSort === 'young' ? `<p class="hint">${AGE_ON && ageMap() ? '市の年齢データ（字ごとの20〜39歳の割合）から出しています。字が決まっていない区域は、並べる順の後ろになります。' : '市の年齢データが入っていないので、この並べ方は使えません（区域係が年齢データを取り込むと使えます）。'}</p>` : ''}
     ${rows || '<div class="empty">今、空いている区域はありません。</div>'}
     <button class="btn block primary" data-ask="">どこでもよいので係に頼む</button>
     <button class="btn block" data-close>閉じる</button>`);
@@ -12723,11 +12722,11 @@ async function bulkMove() {
   });
 }
 function exportCsv() {
-  const rows = [['区域番号', '家ID', '種類', '部屋', '結果', '年代', '再訪問', '日時', '曜日区分', '時間帯', 'おすすめ経由']];
+  const rows = [['区域番号', '家ID', '種類', '部屋', '結果', '日時', '曜日区分', '時間帯', 'おすすめ経由']]; // 年代・★の列は、2026-11-17 になくした（記録しない・消した）
   for (const v of D().visits) {
     const h = houseById(v.houseId), t = h && terrById(h.terrId), d = new Date(v.at);
     rows.push([t ? t.no : '', v.houseId, h ? (h.type === 'apt' ? '集合住宅' : '一戸建て') : '', v.unit ? uName(h, v.unit) : '',
-      RESULT_LABEL[v.result], ageName(v.age), intName(v.interest),
+      RESULT_LABEL[v.result],
       `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
       dayTypeOf(d), bandOf(d), recoLabel(v.src)]);
   }
