@@ -541,7 +541,7 @@
     const tsig = D().territories.map(t => t.id + ':' + (t.holder || '') + ':' + (t.awayPoolAt || '') + ':' + (t.completedAt || '') + ':' + (t.recLess ? 1 : 0) + ':' + (t.paperLentAt || '') + ':' + (t.dummy ? 1 : 0) + ':' + (Array.isArray(t.focus) ? t.focus.length : 0)).join(',');
     const csig = activeCards().map(c => c.id).join(',');
     const ssig = [st.recoLock, st.recoLeft, st.skipDays, st.skipDone, st.awayRecentDays, st.awayNoRepeat, st.awayScope, st.awayCap, st.donePct].join('|');
-    return memo(['kga', slot, vl(), D().houses.length, D().awayCards.length, Object.keys(D().dnc).length, Object.keys(D().follows).length, (D().returns || []).length, tsig, csig, ssig, me().id].join('|'), () => {
+    return memo(['kga', slot, vl(), D().houses.length, D().awayCards.length, Object.keys(D().dnc).length, Object.keys(D().follows).length + ':' + Object.values(D().follows).filter(f => f && f.by === me().id).length, (D().returns || []).length, tsig, csig, ssig, me().id].join('|'), () => {
       const rl = awayRule(), now = Date.now(), lockOk = num(st.recoLock, 0) === 1, leftOk = num(st.recoLeft, 1) !== 0;
       const okHouse = h => isFinite(h.lat) && isFinite(h.lng) && !(h.type === 'apt' && (h.ban === 'no' || h.ban === 'letter' || (h.lock && !lockOk))); // 立入禁止・手紙のみ・オートロック（係の設定）
       const out = [], seen = new Set();
@@ -579,15 +579,30 @@
     });
     const all = [...stops.values()];
     all.forEach(s => s.xs.sort((a, b) => (a.lastAt < b.lastAt ? -1 : a.lastAt > b.lastAt ? 1 : 0)));
+    // 近さをえらぶ計算は、平面の近似（メートル）で軽くする（家が数千軒でも、古いスマホで待たないように）。道のりの数字は distM のまま
+    const lat0 = all.length ? all[0].h.lat : 0, kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
+    all.forEach(s => { s.x = s.h.lng * kx; s.y = s.h.lat * ky; });
+    const d2 = (x, y, s) => (s.x - x) * (s.x - x) + (s.y - y) * (s.y - y);
+    const px = pos ? pos[1] * kx : 0, py = pos ? pos[0] * ky : 0;
     const groups = rain && all.some(s => s.rank < 2) ? [all.filter(s => s.rank < 2), all.filter(s => s.rank === 2)] : [all];
-    const dOf = (p, s) => distM(p, [s.h.lat, s.h.lng]);
     for (const g of groups) {
       let rest = g.slice();
       while (rest.length && out.length < MAX_CL) {
         const seeds = rain && rest.some(s => s.rank === 0) ? rest.filter(s => s.rank === 0) : rest;
-        const seed = pos ? seeds.reduce((a, s) => (dOf(pos, s) < dOf(pos, a) ? s : a)) : seeds.reduce((a, s) => (s.last < a.last ? s : a));
+        const seed = pos ? seeds.reduce((a, s) => (d2(px, py, s) < d2(px, py, a) ? s : a)) : seeds.reduce((a, s) => (s.last < a.last ? s : a));
+        // 種から近い家を N 軒ぶん（1軒の家に部屋が多いこともあるので、家は N 軒まで見れば足りる）。全部を並べかえずに、近いものだけ残す
+        const near = [seed];
+        for (const s of rest) {
+          if (s === seed) continue;
+          const d = d2(seed.x, seed.y, s);
+          if (near.length < N + 1 || d < near[near.length - 1]._d) {
+            s._d = d; let i = near.length;
+            while (i > 1 && near[i - 1]._d > d) i--;
+            near.splice(i, 0, s);
+            if (near.length > N + 1) near.pop();
+          }
+        }
         const sp = [seed.h.lat, seed.h.lng];
-        const near = rest.slice().sort((a, b) => (a === seed ? -1 : b === seed ? 1 : dOf(sp, a) - dOf(sp, b)));
         const sel = []; let n = 0;
         for (const s of near) {
           if (n >= N) break;
@@ -662,10 +677,14 @@
     // 1つのおすすめに回り残しと留守の家がまざるので、回り残しを先にする並べ方はやめた（近い順が近い順になるように・2026-11-17）
     return list.slice().sort((a, b) => (a.rain ? cmpN(a.rank, b.rank) : 0) || cmpN(b.focus ? 1 : 0, a.focus ? 1 : 0) || f(a, b) || cmpN(a.i, b.i));
   }
+  let GL = null; // 作った一覧：家の候補（afterItems の結果）と、起点・雨が同じあいだは使い回す
   function getList(slot) {
-    const pos = orgPos(), rain = rainy();
-    const sig = [slot, pos ? pos[0].toFixed(5) + ',' + pos[1].toFixed(5) : '', rain ? 1 : 0].join('|');
-    return memo('kgl|' + sig + '|' + vl() + '|' + activeCards().length, () => buildClusters(afterItems(slot), pos, rain));
+    const pos = orgPos(), rain = rainy(), items = afterItems(slot);  // afterItems は、記録・区域・カード・再訪問・設定が変わると作り直す
+    const sig = [slot, pos ? pos[0].toFixed(5) + ',' + pos[1].toFixed(5) : '', rain ? 1 : 0, recoN()].join('|');
+    if (GL && GL.items === items && GL.sig === sig) return GL.list;
+    const list = buildClusters(items, pos, rain);
+    GL = { items, sig, list };
+    return list;
   }
 
   /* ---------- 5つの欄 → 3つの欄（近さ・前回・若い世代）。欄を押しても並べかえる ---------- */
