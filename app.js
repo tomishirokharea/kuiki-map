@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.168';
+var APP_JS_VER = '2026.13.169';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2032,8 +2032,8 @@ async function firstRefresh() {
     : 'サーバーから最新の情報を受け取れませんでした。前回の情報を表示しています。自動でもう一度ためします', null, { label: '記録を見る', fn: openErrLog });
 }
 /* ---------- 通信の失敗の記録を、区域係に送る（2026.13.167・サーバーは diag.gs） ----------
-   ・送るのは、歯車の設定で「送る」をえらんだスマホだけ（はじめは「送らない」。このスマホだけの設定）。
-     「送る」にする前の失敗は、自動では送らない（えらんだ時刻より新しいものだけ）
+   ・送るのは、歯車の設定が「送る」のスマホだけ（はじめは「送る」。「送らない」にもどせる。このスマホだけの設定）。
+     「送る」になる前の失敗は、自動では送らない（2026.13.169：はじめから「送る」の人は、この版を開いた時刻より新しいものだけ）
    ・記録の画面の「この記録を区域係に送る」は、押したときに、いまある記録を送る（本人が押したので）
    ・送る項目は、時刻・通信の名前・失敗の種類・秒数・圏外かどうか・画面が裏か・続けて起きた回数だけ。
      サーバーが返したエラーの文（sample）は送らない。名前はサーバーが、ログインしている人から付ける
@@ -2042,7 +2042,7 @@ async function firstRefresh() {
 const DIAG_ON_KEY = 'kuiki_diag_send', DIAG_SENT_KEY = 'kuiki_diag_sent', DIAG_TRY_KEY = 'kuiki_diag_try';
 const DIAG_EVERY_MS = 6 * 3600000, DIAG_QUIET_MS = 120000;
 let diagBusy = false, diagCheckAt = 0;
-function diagOn() { return lsGet(DIAG_ON_KEY) === '1'; }
+function diagOn() { return lsGet(DIAG_ON_KEY) !== '0'; } // 2026.13.169：はじめは「送る」。「送らない」をえらんだスマホ（'0'）だけ送らない
 function diagSetOn(on) {
   lsSet(DIAG_ON_KEY, on ? '1' : '0');
   if (on) lsSet(DIAG_SENT_KEY, new Date().toISOString()); // えらんだ時刻より前の記録は、自動では送らない
@@ -2068,7 +2068,8 @@ async function diagPost(list) {
 async function diagMaybeSend(force) {
   if (!LIVE || diagBusy || !diagOn() || navigator.onLine === false || Store.authLost || Store.inactive) return;
   if (!force && Date.now() - Number(lsGet(DIAG_TRY_KEY) || 0) < DIAG_EVERY_MS) return;
-  const ptr = lsGet(DIAG_SENT_KEY) || '';
+  let ptr = lsGet(DIAG_SENT_KEY) || '';
+  if (!ptr) { lsSet(DIAG_SENT_KEY, new Date().toISOString()); return; } // はじめから「送る」のスマホ：この版を開く前の記録は送らない（ここから数える）
   const L = errLogList().filter(x => !/^diag_/.test(String(x.action || '')) && diagStamp(x) > ptr);
   if (!L.length) return;
   if (L.some(x => Date.now() - Date.parse(diagStamp(x)) < DIAG_QUIET_MS)) return;
@@ -2089,7 +2090,7 @@ function diagSetHtml() {
   return `<div class="diagset"><h3 class="sub">不具合の記録を送る</h3>
     <p class="q">通信がうまくいかなかったときの記録を、区域係に送る</p>
     <div class="seg uiseg" role="group" aria-label="通信がうまくいかなかったときの記録を、区域係に送る"><button type="button" data-diag="off" aria-pressed="${!on}">送らない</button><button type="button" data-diag="on" aria-pressed="${on}">送る</button></div>
-    <p class="diagnote">「送る」にすると、このスマホで通信がうまくいかなかったときの記録が、自動で区域係に届きます。不具合を早く見つけて直すためだけに使います。届くのは、起きた時刻・通信の種類・失敗の種類・かかった秒数・電波の状態・アプリの版・スマホの種類（iPhone など）と、あなたの名前・役割です。住所・訪問の記録・メモは送りません。届いた記録は、90日をすぎたら消します（区域係が取る全体の控えには、そのあともしばらく残ります）。いつでも「送らない」にもどせます。</p>
+    <p class="diagnote">はじめは「送る」になっています。「送る」のとき、このスマホで通信がうまくいかなかったときの記録が、自動で区域係に届きます。不具合を早く見つけて直すためだけに使います。届くのは、起きた時刻・通信の種類・失敗の種類・かかった秒数・電波の状態・アプリの版・スマホの種類（iPhone など）と、あなたの名前・役割です。住所・訪問の記録・メモは送りません。届いた記録は、90日をすぎたら消します（区域係が取る全体の控えには、そのあともしばらく残ります）。いつでも「送らない」にもどせます。</p>
     <div class="row"><button type="button" class="btn small" id="diagSee">このスマホの記録を見る</button></div></div>`;
 }
 /* 最新の変更を取りに行く */
@@ -2965,6 +2966,7 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.169', items: [['通', '通信がうまくいかなかったときの記録を区域係に送る設定が、はじめから「送る」になりました。送りたくないときは、歯車の設定の「不具合の記録を送る」で「送らない」をえらんでください（すでに「送らない」をえらんだスマホは、そのままです）。住所や訪問の記録は送りません。']] },
   { v: '2026.13.168', role: 'admin', items: [['人', '区域係：「人」で、訪問の記録を付けたことがある人は「登録まだ」に入れないようにしました（前から使っている人が、まちがって「登録まだ」と出ることがありました）。']] },
   { v: '2026.13.167', items: [['通', '通信がうまくいかなかったときの記録を、区域係に自動で送れるようになりました。歯車の設定の「不具合の記録を送る」で「送る」をえらんだスマホだけが送ります（はじめは「送らない」です）。住所や訪問の記録は送りません。']] },
   { v: '2026.13.167', role: 'admin', items: [['人', '区域係：「人」で、まだ登録していない人と、しばらく開いていない人が、うすい色の行と文字の印で分かるようになりました。その人だけにしぼることもできます。'], ['通', '区域係：みんなのスマホから届いた通信の失敗の記録が、「設定」の「こまったこと・提案」の「AIに渡す形でコピー」に、名前を外して入るようになりました。']] },
