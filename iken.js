@@ -261,8 +261,10 @@
     const seq0 = markSeq;
     // 通信の失敗の記録も一緒に読む（読めなくても、届いた声の一覧は今までどおり出す）
     const dp = api('diag_list', {}, { timeout: 30000 }).then(r => (Array.isArray(r.items) ? r.items : null)).catch(() => null);
-    try { const r = await api('iken_list', {}, { timeout: 45000 }); items = withMarks(r.items || [], seq0); diag = await dp; }
-    catch (e) { items = null; toast(e && e.code === 'unknown_action' ? 'サーバーの準備がまだできていません（サーバーの更新が必要です）' : '読み込めませんでした。電波を確かめて、もう一度押してください'); }
+    // 記録の返事は待たない（届いた声を先に出す。記録は、届いたときに1行足す）
+    dp.then(d => { diag = d; if (items && !loading) renderAdmin(); });
+    try { const r = await api('iken_list', {}, { timeout: 45000 }); items = withMarks(r.items || [], seq0); }
+    catch (e) { items = null; diag = null; toast(e && e.code === 'unknown_action' ? 'サーバーの準備がまだできていません（サーバーの更新が必要です）' : '読み込めませんでした。電波を確かめて、もう一度押してください'); }
     finally { loading = false; }
     renderAdmin();
   }
@@ -325,19 +327,20 @@
     const txt = D.map(x => `${dAt(x.at)}　${plain(x.who) || '（名前なし）'}（${x.role}）　${DEV_NAME[x.dev] || '—'}　${dAct(x.action)}　${dCode(x.code)}（${x.code}）${Number(x.sec) ? '　' + x.sec + '秒' : ''}`
       + (Number(x.n) > 1 ? `　続けて${x.n}回` : '') + (x.on === '0' ? '　スマホは圏外' : '') + (x.hid === '1' ? '　画面は裏' : '')).join('\n');
     setSheet(`<h2>自動で届いた通信の失敗の記録（${D.length}件）</h2>
-      <p class="hint">歯車の設定で「送る」をえらんだ人、または記録の画面で「送る」を押した人のスマホから届いたものです。新しい順。90日で消えます。</p>
+      <p class="hint">歯車の設定で「送る」をえらんだ人、または記録の画面で「送る」を押した人のスマホから届いたものです。新しい順。90日をすぎたものは消えます。</p>
       <pre class="loadlog">${esc(txt)}</pre>
       <div class="row"><button type="button" class="btn primary" data-close>閉じる</button></div>`);
   }
   /* AIに渡す形に足す段（名前は外し、同じ人は同じ番号にする）。記録がなければ空（今までの文と同じになる） */
   function aiDiag(D) {
     if (!D || !D.length) return '';
+    // 人の番号：サーバーが人ごとに付けた番号（p）を使う。ないときだけ、名前ごとに付ける
     const who = {}; let n = 0;
-    const tag = x => who[x.who] || (who[x.who] = '人' + (++n));
+    const tag = x => (Number(x.p) > 0 ? '人' + Number(x.p) : who['n:' + x.who] || (who['n:' + x.who] = '人' + (1000 + ++n)));
     return `
 ## 通信の失敗の記録（アプリが自動で集めたもの・${D.length}件）
 
-設定で「送る」をえらんだ人のスマホから、通信がうまくいかなかったときに自動で届いた記録です（名前は外し、同じ人は同じ番号にしてあります）。上の声とあわせて、次のこともしてください。
+設定で「送る」をえらんだ人のスマホから、通信がうまくいかなかったときに自動で届いた記録です（名前と役割は外し、同じ人は同じ番号にしてあります）。上の声とあわせて、次のこともしてください。
 
 8. 失敗の種類ごと・通信の種類ごと・時間帯ごとに、件数をまとめる
 9. 特定の人・端末・版にかたよっていないかを見る
@@ -347,8 +350,8 @@
 失敗の種類：timeout＝返事が来ない／network＝つながらなかった／nonjson＝Googleのエラー画面が返ってきた／busy＝サーバーが混んで順番待ちで入れなかった／server＝サーバーの中のエラー／http＋数字＝通信のエラー番号
 通信の種類：load＝最新の情報の受け取り／sync＝記録を送る／そのほかは、アプリの中の通信の名前
 
-### データ（起きた日時（UTC）｜人｜役割｜端末｜版｜通信｜失敗の種類｜秒数｜スマホが圏外と言っていたか｜画面は裏だったか｜続けて起きた回数）
-` + D.map(x => `- ${String(x.at).slice(0, 16).replace('T', ' ')}｜${tag(x)}｜${x.role || '—'}｜${DEV_NAME[x.dev] || '—'}｜${x.ver || '—'}｜${x.action}｜${x.code}｜${x.sec}｜${x.on === '0' ? '圏外' : '—'}｜${x.hid === '1' ? '裏' : '—'}｜${x.n || 1}`).join('\n') + '\n';
+### データ（起きた日時（UTC）｜人｜端末｜版｜通信｜失敗の種類｜秒数｜スマホが圏外と言っていたか｜画面は裏だったか｜続けて起きた回数）
+` + D.map(x => `- ${String(x.at).slice(0, 16).replace('T', ' ')}｜${tag(x)}｜${DEV_NAME[x.dev] || '—'}｜${x.ver || '—'}｜${x.action}｜${x.code}｜${x.sec}｜${x.on === '0' ? '圏外' : '—'}｜${x.hid === '1' ? '裏' : '—'}｜${x.n || 1}`).join('\n') + '\n';
   }
   function aiText(L, D) {
     const d = new Date();

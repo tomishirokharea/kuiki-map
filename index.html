@@ -55,8 +55,11 @@ h2,h3,p{margin:0}
 .hint{display:block;color:var(--ink2);font-size:15px;margin-top:4px}
 /* 係の画面「人」：まだ登録していない人・しばらく開いていない人（うすい色の行＋文字の印。色だけで分けない）（2026.13.167） */
 .trow1.urow-off{background:#EEF0EF;color:#4E5A63}
-.ubadge{display:inline-block;background:#fff;color:#3F4A52;border:2px solid #7C8891;border-radius:99px;padding:0 10px;font-size:14px;font-weight:700;vertical-align:middle;white-space:nowrap}
+.ubadge{display:inline-block;background:#fff;color:#3F4A52;border:2px solid #7C8891;border-radius:99px;padding:0 10px;font-size:15px;font-weight:700;vertical-align:middle;white-space:nowrap}
 .usenote{display:block;color:var(--ink2);font-size:15px;line-height:1.6;margin:6px 0 10px}
+.usebox{min-height:120px} /* 返事を待つ間も同じ高さを取る（返事が来たときに、下の行がずれないように） */
+.usebox .chips{margin:6px 0 8px}
+.usehelp>summary{min-height:44px;display:flex;align-items:center;font-size:15px;font-weight:700;cursor:pointer}
 .diagnote{display:block;color:var(--ink2);font-size:15px;line-height:1.6;margin:8px 0} /* 不具合の記録を送る：何を送るかの説明。「説明の文をかくす」でも消さない（同意のための文なので） */
 .wrap{max-width:760px;margin:0 auto}
 .sec{font-size:21px;margin:26px 0 10px;padding-left:10px;border-left:6px solid var(--terr)}
