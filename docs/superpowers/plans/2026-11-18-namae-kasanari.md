@@ -186,3 +186,25 @@
 - [ ] **Step 5: スペイン語で開いて**、お知らせが日本語のまま残らないことを確かめる（`KUIKI_CONFIG.lang:'es'`）。
 - [ ] **Step 6: commit・push・PR**（本文に、確かめたこと／未確認（実機・本物のデータの二重の数）を分けて書く）。
 - [ ] **Step 7: 独立監査**（別のエージェント・いちばん力のあるモデル）：main と比べて機能が消えていないかを最初に。Critical / High / Important が残るあいだはマージしない。マージは R A さんの指示で。
+
+---
+
+## 追加（2026-11-18・最終監査の M-1・M-2 を本人が「はい」）
+
+### Task 5: 再訪問を地図で見るときと、薄い目印の名前の順番（NK-12・NK-13）
+
+**Files:**
+- Modify: `chizu.js` `placeNames`（`zoomedIn` と目印の順番 `rLm` を決めるところ）
+- Test: `tools/namae-kasanari-test.mjs`（T19・T20 を足す）
+
+**Interfaces:**
+- Consumes: `nameRank`（Task 1）、app.js のグローバル `followMap`（`let`。`typeof followMap !== 'undefined' && followMap` で読む）、`landmarkCands(z).nop`。
+- 決めた値：再訪問を地図で見るときは `zoomedIn = true`（建物が先・目印は③）。目印の名前の薄さ `nop < 1` のときは、目印の順番を 3（建物のどの順番よりあと）にする。薄い目印は、二重の相手の建物の順番を上げない（`e.rank < best.rank` のままで自然にそうなる）。`nop === 1` は今までどおり。
+
+- [ ] **Step 1: 試験を足す**
+  - T19：組 E の「ホワイトニング店」を自分の再訪問にして「再訪問を地図で見る」にする（app.js で `followMap = true` にする入口をさがして使う）。拡大 `base - 0.5`（縮めた地図）で「ホワイトニング店」が出て「白ゆり公園」の名前は出ない。再訪問を地図で見るのをやめると、同じ拡大で「白ゆり公園」が出て「ホワイトニング店」は出ない（今までどおり）。
+  - T20：`UI.lmNameZ = base - 0.5` にして `lmRepaint()`。組 E で、拡大 `base - 0.9`（目印の名前が薄い・縮めた地図・建物の名前は出る大きさ）では「ホワイトニング店」が出て「白ゆり公園」の名前は出ない。拡大 `base - 0.5`（はっきり）では「白ゆり公園」が出て「ホワイトニング店」は出ない。どちらでも、出ている名前の DOM の四角どうしが重ならない。
+- [ ] **Step 2: 走らせて T19・T20 が NG を確かめる**
+- [ ] **Step 3: `placeNames` を直す**（上の決めた値）
+- [ ] **Step 4: 全部の試験**：namae-kasanari-test・namae-kz-test・namae-tanaoroshi --check（①②OK、③の数の変化を報告）・今までの `tools/*-test.mjs`・genzaichi-kiroku --check。期待：NG 0（haguruma・morau は main から失敗のまま）。
+- [ ] **Step 5: commit**（push は controller）。
