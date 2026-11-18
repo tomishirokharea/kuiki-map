@@ -168,5 +168,92 @@
   if (typeof window === 'undefined') return;
   window.Sakai = Object.assign(window.Sakai || {}, SK_API);
 
-  /* ここから下（地図の層・凡例・取り込み画面）は、後の作業で足す */
+  /* =========================================================
+     地図に出す（会衆の境：灰色の破線・区域の線より下・押せない）
+     ========================================================= */
+  const SK_COLOR = { pale: '#374151', photo: '#F3F4F6' }; // 淡色地図：こい灰／写真：うす灰（写真の上でも見える色）
+  /* 読み込んだ境のうち、使える輪だけ（3点以上で、点がすべて緯度・経度の数）。ない・こわれていれば null */
+  function skRings() {
+    let ca;
+    try { ca = D().settings.congArea; } catch (e) { return null; }
+    if (!ca || typeof ca !== 'object' || !Array.isArray(ca.rings)) return null;
+    const rings = ca.rings.filter(r => typeof okPoly === 'function' && okPoly(r));
+    return rings.length ? rings : null;
+  }
+  function skInfo() {
+    const rings = skRings();
+    if (!rings) return null;
+    const ca = D().settings.congArea;
+    return { n: String(ca.n || ''), d: String(ca.d || ''), pts: rings.reduce((a, r) => a + r.length, 0), nRings: rings.length };
+  }
+  const skCanImport = () => !LIVE || Number(D().settings.capArea) === 1; // 古いサーバーには、境を送らない（送っても捨てられるため）
+
+  let skLayer = null, skSig = '', skFirstDone = false, skBound = false;
+  function skEnsurePane() {
+    if (map.getPane('congPane')) return;
+    map.createPane('congPane'); // 区域の線（350）より下。タップは下の区域・地図に通す
+    map.getPane('congPane').style.zIndex = 340;
+    map.getPane('congPane').style.pointerEvents = 'none';
+  }
+  /* はじめの表示：区域が1つもなく境があるときだけ、境が入る範囲に合わせる（1回だけ）。区域があれば何も変えない */
+  function skFirstView(rings) {
+    if (skFirstDone || !map) return;
+    const sz = map.getSize();
+    if (!sz.x || !sz.y) return; // 地図のタブがまだ開いていない（開いたあとの描き直しでやる）
+    skFirstDone = true;
+    let has = false;
+    try { has = D().territories.some(t => okPoly(t.polygon)); } catch (e) { has = true; }
+    if (has || !rings) return;
+    const pts = [];
+    rings.forEach(r => r.forEach(p => pts.push([p[0], p[1]])));
+    map.fitBounds(L.latLngBounds(pts), { animate: false, padding: [20, 20] });
+  }
+  function skRender() {
+    if (!map) return;
+    if (!skBound) { skBound = true; map.on('resize', () => { try { skRender(); } catch (e) { console.error(e); } }); } // 地図のタブをはじめて開いて大きさが決まったとき、はじめの表示をやり直す
+    const rings = skRings();
+    skFirstView(rings);
+    const photo = typeof baseName !== 'undefined' && baseName === 'photo';
+    const ca = rings ? D().settings.congArea : null;
+    const sig = rings ? [ca.at || '', rings.length, rings.reduce((a, r) => a + r.length, 0), photo ? 'photo' : 'pale'].join('|') : '';
+    if (sig === skSig) return; // 同じ内容なら描き直さない
+    skSig = sig;
+    if (skLayer) { map.removeLayer(skLayer); skLayer = null; }
+    if (!rings) return;
+    skEnsurePane();
+    skLayer = L.polygon(rings, {
+      pane: 'congPane', interactive: false, fill: false, color: photo ? SK_COLOR.photo : SK_COLOR.pale,
+      weight: 2.5, opacity: 0.65, dashArray: '10 7', lineJoin: 'round'
+    }).addTo(map);
+  }
+  /* 凡例（「?」の「印の見かた」）に、境があるときだけ1行を足す */
+  function skLegend() {
+    const grid = document.querySelector('#legendKeys .legendgrid');
+    if (!grid) return;
+    let row = document.getElementById('skLegendRow');
+    if (!skRings()) { if (row) row.remove(); return; }
+    if (!row) {
+      row = document.createElement('span'); row.id = 'skLegendRow';
+      row.innerHTML = '<svg width="34" height="14" viewBox="0 0 34 14" aria-hidden="true" style="flex:none;margin:8px"><path d="M2 7H32" stroke="#374151" stroke-width="2.5" stroke-dasharray="7 5" stroke-linecap="round" fill="none"/></svg>会衆の境（S-54）';
+      grid.appendChild(row);
+    }
+  }
+
+  window.Sakai = Object.assign(window.Sakai || {}, { rings: skRings, info: skInfo, render: skRender, canImport: skCanImport });
+
+  /* 区域を描き直すとき・地図の種類を切りかえたとき・凡例を作り直すときに、いっしょに描く（元の動きはそのまま） */
+  const _renderTerrs = window.renderTerrs;
+  if (typeof _renderTerrs === 'function') {
+    window.renderTerrs = function () { const r = _renderTerrs.apply(this, arguments); try { skRender(); } catch (e) { console.error(e); } return r; };
+  }
+  const _setBase = window.setBase;
+  if (typeof _setBase === 'function') {
+    window.setBase = function () { const r = _setBase.apply(this, arguments); try { skRender(); } catch (e) { console.error(e); } return r; };
+  }
+  const _renderLegend = window.renderLegend;
+  if (typeof _renderLegend === 'function') {
+    window.renderLegend = function () { const r = _renderLegend.apply(this, arguments); try { skLegend(); } catch (e) { console.error(e); } return r; };
+  }
+
+  /* ここから下（取り込み画面）は、後の作業で足す */
 })();

@@ -296,7 +296,7 @@ function makeDemo() {
     { id: 'p4', kind: 'p', terrId: 't2', year: svcYearOf(new Date(now - 365 * DAY)), c: dAgo(420), at: iso(now), by: 'u3' }
   ];
   return { version: 4, users, territories, houses, visits, dnc, follows, released, requests, awayCards: [], returns, s13, schedules,
-    settings: { remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, awayCap: 3, awayNoRepeat: 1, awayScope: 0, capDncQ: 1, capLang: 1 }, currentUser: 'u1' };
+    settings: { remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, awayCap: 3, awayNoRepeat: 1, awayScope: 0, capDncQ: 1, capLang: 1, capArea: 1 }, currentUser: 'u1' };
 }
 
 /* ---------- 保存 ----------
