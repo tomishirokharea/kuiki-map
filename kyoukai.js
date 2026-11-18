@@ -283,7 +283,7 @@
     // すき間（区域に囲まれて、どの区域にも入っていない所）
     // 区域どうしが「点だけ」でふれていると、すき間が外とつながっているとみなされてしまう。
     // そこで、2つ以上の区域がふれている点に小さな四角（5cm）を置いてつなげてから、囲まれた所を探す
-    const tiny = touchPoints(scope).map(p => sqAt(p, 0.05));
+    const tp = touchPoints(scope), tiny = tp.map(p => sqAt(p, 0.05));
     let u = null;
     try { u = P.union(...scope.map(x => toPC(x.polygon)), ...tiny); } catch (e) { u = null; }
     (u || []).forEach(poly => poly.slice(1).forEach(h => {
@@ -306,14 +306,15 @@
     // （取りこぼしの計算でエラーになっても、すき間・重なりの結果はそのまま出す）
     const SK = window.Sakai;
     const rings = !tid && SK && typeof SK.rings === 'function' && typeof SK.coreAreaAtLeast === 'function' ? SK.rings() : null;
-    if (rings) { try { out.push(...findMiss(P, rings, scope, u, out)); } catch (e) { console.error(e); S.missHidden = { n: 0, area: 0 }; } }
+    if (rings) { try { out.push(...findMiss(P, rings, scope, u, out, tp)); } catch (e) { console.error(e); S.missHidden = { n: 0, area: 0 }; } }
     return out;
   }
   /* ---------- 取りこぼし（会衆の境の中で、どの区域にも入っていない所） ----------
      境 −（全部の区域を合わせた形 u：すき間を探すときの小さな四角つき）を、つながった塊に分ける。
      出すのは、中に家の印がある塊と、幅のある部分が広い塊（coreAreaAtLeast）。出さない塊は S.missHidden に数と広さを足す。
-     すでに見つけたすき間と同じ所は出さない（二重に出さない）。並びは、家の印の多い順 → 広い順 */
-  function findMiss(P, rings, scope, u, found) {
+     すでに見つけたすき間と同じ所は出さない（二重に出さない）。並びは、家の印の多い順 → 広い順。
+     tp：区域どうしがふれる点（u の小さな四角の真ん中）。区域に入れられる所は、四角でできた切れこみをもどす（unNotch） */
+  function findMiss(P, rings, scope, u, found, tp) {
     const SK = window.Sakai;
     let rest;
     try {
@@ -354,6 +355,8 @@
       const b1 = bbM(ring, 1);
       const near = tb.filter(o => bbHit(b1, o.b) && touches(ring, o.t.polygon));
       const x = { k: 'miss', ring, holes, area: ar, houses, adj: near.map(o => o.t.id) };
+      // 区域に入れられるかもしれない所（5,000㎡以下・穴なし）は、ふれる点の小さな四角でできた切れこみを、区域の角にもどしてから調べる
+      if (!holes.length && ar <= GAP_MAX && near.length) { const r = unNotch(ring, tp, tb.filter(o => bbHit(b1, o.b)).map(o => o.t)); if (r) { x.ring = r; x.area = area(r); } }
       x.into = near.filter(o => missCanInto(o.t, x)).map(o => o.t.id); // 「区域○に入れる」を出す区域
       // 穴（島のようにある区域など）のある所：「！」と地図の真ん中は、穴の外の点（外の輪だけの札の場所は、穴の中＝区域の中になることがある）
       if (holes.length && typeof SK.innerPoint === 'function') { const lp = SK.innerPoint(ring, holes); if (lp) x.lp = lp; }
@@ -366,6 +369,36 @@
   function sqAt(p, h) {
     const dl = h / 110574, dn = h / (111320 * Math.cos(p[0] * Math.PI / 180));
     return [[[p[1] - dn, p[0] - dl], [p[1] + dn, p[0] - dl], [p[1] + dn, p[0] + dl], [p[1] - dn, p[0] + dl], [p[1] - dn, p[0] - dl]]];
+  }
+  /* 取りこぼしの輪の、ふれる点の小さな四角（すき間を探すための 5cm）でできた切れこみ（10cm×5cm）を、ふれる点（区域の角）にもどす。
+     切れこみが残ると、区域に入れたとき、切れこみの角が区域の角の代わりに残り（20cm 以内の点は1つにするため）、となりの区域と細く重なる。
+     四角の中（sqAt と同じ測り方・1mm の余裕）にある点を、いちばん近いふれる点にする。区域の角そのものは動かさない。
+     ring：[緯度, 経度] の輪／tp：ふれる点／terrs：近くの区域。もどす所がない・同じ点を2回通る形になるときは null（今の輪のまま） */
+  function unNotch(ring, tp, terrs) {
+    const b = bbM(ring, 0.1);
+    const pts = tp.filter(p => p[0] >= b[0] && p[0] <= b[1] && p[1] >= b[2] && p[1] <= b[3]);
+    if (!pts.length) return null;
+    const own = new Set();
+    terrs.forEach(t => t.polygon.forEach(p => own.add(key8(p))));
+    const H = 0.051;
+    let moved = 0;
+    const out = [];
+    ring.forEach(p => {
+      let q = p;
+      if (!own.has(key8(p))) {
+        let bd = Infinity;
+        for (const c of pts) {
+          const dl = Math.abs(p[0] - c[0]) * 110574, dn = Math.abs(p[1] - c[1]) * 111320 * Math.cos(c[0] * Math.PI / 180);
+          if (dl <= H && dn <= H && dl + dn < bd) { bd = dl + dn; q = c; }
+        }
+        if (q !== p) moved++;
+      }
+      const l = out[out.length - 1];
+      if (!l || l[0] !== q[0] || l[1] !== q[1]) out.push([q[0], q[1]]);
+    });
+    while (out.length > 1 && out[0][0] === out[out.length - 1][0] && out[0][1] === out[out.length - 1][1]) out.pop();
+    if (!moved || out.length < 3 || new Set(out.map(key8)).size !== out.length) return null;
+    return out;
   }
   /* 2つ以上の区域がふれている点（同じ角、またはほかの区域の線の上にある角） */
   function touchPoints(scope) {
