@@ -51,6 +51,31 @@
     const dy = (a[0] - b[0]) * 110540, dx = (a[1] - b[1]) * 111320 * Math.cos(a[0] * Math.PI / 180);
     return Math.sqrt(dx * dx + dy * dy);
   }
+  /* 名前くらべ：全角半角・大文字小文字・空白（全角もふくむ）をそろえた「かぎ」 */
+  const nameKey = s => String(s == null ? '' : s).normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+  /* 同じ名前か：かぎが同じ、または片方がもう片方をふくむ（ふくまれるほうは2文字以上）。空は false */
+  function sameName(a, b) {
+    const x = nameKey(a), y = nameKey(b);
+    if (!x || !y) return false;
+    if (x === y) return true;
+    const [sh, lg] = x.length <= y.length ? [x, y] : [y, x];
+    return Array.from(sh).length >= 2 && lg.indexOf(sh) >= 0;
+  }
+  /* 置き場所：boxes は順番の高い順。前から置き、置いた四角と重なるものは false（辺がふれるだけは重ならない）。force なら全部 true */
+  function layoutNames(boxes, force) {
+    const placed = [];
+    return (boxes || []).map(bx => {
+      const a = bx.r;
+      if (!force && placed.some(b => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1])) return false;
+      placed.push(a);
+      return true;
+    });
+  }
+  /* 名前の順番（小さいほど先に置く）。拡大した地図：区域の中の建物0・ほかの建物1・目印2／縮めた地図：目印0・区域の中の建物1・ほかの建物2 */
+  function nameRank(kind, inSel, zoomedIn) {
+    if (zoomedIn) return kind === 'lm' ? 2 : (inSel ? 0 : 1);
+    return kind === 'lm' ? 0 : (inSel ? 1 : 2);
+  }
   const lmSrcLine = items => {
     const set = [];
     (items || []).forEach(x => { if (x && x.src && set.indexOf(x.src) < 0) set.push(x.src); });
@@ -97,7 +122,7 @@
     return { ok, ask, bad };
   }
 
-  const KZ = { LM_KINDS, lmNameCheck, lmSrcCheck, lmKindFromText, lmSrcLine, tileXY, tileUrls, lmCsvEval, mDist };
+  const KZ = { LM_KINDS, lmNameCheck, lmSrcCheck, lmKindFromText, lmSrcLine, tileXY, tileUrls, lmCsvEval, mDist, nameKey, sameName, layoutNames, nameRank };
   if (typeof module !== 'undefined' && module.exports) module.exports = KZ;
   if (typeof Store === 'undefined' || typeof D !== 'function' || typeof L === 'undefined' || typeof document === 'undefined') return;
   window.KZ = KZ;
