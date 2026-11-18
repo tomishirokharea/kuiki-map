@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.163';
+var APP_JS_VER = '2026.13.164';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -1318,6 +1318,11 @@ function openWaiting() {
   let p = {};
   try { p = JSON.parse(lsGet(PENDING_KEY) || '{}'); } catch (e) { p = {}; }
   paintWaiting(p);
+  /* none（サーバーが、このスマホの申し込みをまだ見つけられない）は、すぐ「見送り」にしない（2026.13.164）。
+     何人かが続けて QR を読むと、サーバーの一覧が数十秒おくれることがあり、そのあいだ none が返った。
+     ここで合いことばを捨てると、番号が係の画面と合わなくなり、申し込みが二重になる。
+     12回（40秒あまり）続けて none のときだけ、見送りとして扱う。係が見送った（denied）ときは、今までどおりすぐ知らせる */
+  let noneCount = 0;
   const check = async () => {
     clearTimeout(waitTimer);
     if (document.hidden) { waitTimer = setTimeout(check, 3000); return; }
@@ -1331,8 +1336,14 @@ function openWaiting() {
       return;
     }
     if (j.ok && j.status === 'pending') {
+      noneCount = 0;
       if ($('#wState')) $('#wState').textContent = `確認中です（${fmtTime(new Date())}）`;
       waitTimer = setTimeout(check, 3000); // 係が登録したら、すぐ分かるように
+      return;
+    }
+    if (j.ok && j.status === 'none' && ++noneCount < 12) {
+      if ($('#wState')) $('#wState').textContent = `確認中です（${fmtTime(new Date())}）`;
+      waitTimer = setTimeout(check, 3500);
       return;
     }
     if (!j.ok && j.error !== 'auth') { // 混んでいる・回数制限（slow）・サーバーのエラー：申し込みは消さずに、少し待って確かめ直す
@@ -2819,6 +2830,8 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.164', items: [['登', '共通のQRを何人かが続けて読んだときに、「登録は見送りになりました」と出たり、係の登録がなかなか届かなかったりすることがあったのを直しました']] },
+  { v: '2026.13.164', role: 'admin', items: [['人', '係の画面「人」で、登録ずみの人の名前（漢字）を直せるようになりました。今までの記録・再訪問・スマホの登録は、そのまま使えます']] },
   { v: '2026.13.161', items: [
     ['境', '地図に、会衆の境を灰色の破線で出すようにしました（区域係が取り込んだとき）。区域の線とは別の線で、押してもえらばれません。']
   ] },
@@ -14458,8 +14471,9 @@ function openSchedForm(s, date, back, draft) {
 /* ---- 人とグループ（区域係は変更できる。監督は自分のグループの人を見るだけ） ---- */
 /* 保存中の変更（id → 変えた値）。返事を待つあいだに同期で名簿が届いても、画面が元にもどって見えないように上から重ねる */
 var USER_PENDING = new Map(); // var：同期の受け取り（上のほうで定義）から、読み込みの順に関係なく見られるように
-const userPatchOf = (group, overseer, leader, role, active, yomi, mgr) => {
+const userPatchOf = (group, overseer, leader, role, active, yomi, mgr, name) => {
   const p = { group: group || undefined, overseer: !!overseer || undefined, leader: !!leader || undefined };
+  if (name) p.name = name; // 名前は、直したときだけ（ほかの保存では今のまま・2026.13.164）
   if (typeof mgr === 'boolean') p.mgr = mgr || undefined; // 家と拒否の管理（送らないときは、今のまま）
   if (role) p.role = role;
   if (yomi !== undefined) p.yomi = yomi || undefined; // よみは、直したときだけ（ほかの保存では今のまま）
@@ -14470,16 +14484,17 @@ function applyUserPending() {
   USER_PENDING.forEach((p, id) => { const u = userById(id); if (u) Object.assign(u, p); });
 }
 const USER_SAVING = new Map(); // id → 送っている保存（同じ人の保存は、順番に1つずつ送る。あとの変更が先に届いて古い値に戻らないように）
-function setUserGroup(u, group, overseer, leader, role, active, yomi, mgr) {
-  const patch = userPatchOf(group, overseer, leader, role, active, yomi, mgr);
+function setUserGroup(u, group, overseer, leader, role, active, yomi, mgr, newName) {
+  const patch = userPatchOf(group, overseer, leader, role, active, yomi, mgr, newName);
   if (!LIVE) {
     Object.assign(u, patch);
     Store.save(); toast(`${u.name}さんの設定を保存しました`);
     renderAll(); return Promise.resolve();
   }
   const id = u.id, name = u.name;
-  const before = { group: u.group, overseer: u.overseer, leader: u.leader, role: u.role, inactive: u.inactive, yomi: u.yomi, mgr: u.mgr };
+  const before = { group: u.group, overseer: u.overseer, leader: u.leader, role: u.role, inactive: u.inactive, yomi: u.yomi, mgr: u.mgr, name: u.name };
   const body = { id, group, overseer, leader };
+  if (newName) body.name = newName; // 送ったときだけサーバーが書く（古いサーバーは使わずに捨てる）
   if (typeof mgr === 'boolean') body.mgr = mgr;
   if (role) body.role = role;
   if (yomi !== undefined) body.yomi = yomi; // 送ったときだけサーバーが書く（古いサーバーは使わずに捨てる）
@@ -14500,7 +14515,20 @@ async function saveUserNow(id, name, body, patch, before) {
     j = await api('user_set', body);
   } catch (e) {
     if (USER_PENDING.get(id) === patch) { USER_PENDING.delete(id); Object.assign(userById(id) || {}, before); }
-    toast(`${name}さんの設定を保存できませんでした。通信を確認して、もう一度変えてください`);
+    toast(e && e.code === 'dup_name' ? `同じ名前の人が、もう登録されています。${name}さんの設定は保存していません`
+      : e && e.code === 'name' ? `名前が空のため、${name}さんの設定は保存していません`
+      : `${name}さんの設定を保存できませんでした。通信を確認して、もう一度変えてください`);
+    renderAll(); return;
+  }
+  // 名前を送ったのに受け取りの印がない：サーバーが古い版。名前だけ元にもどして知らせる
+  if ('name' in body && !(j && j.name)) {
+    delete patch.name;
+    const u = userById(id); if (u) u.name = before.name;
+    toast(`${name}さんの名前は保存できませんでした（ほかの設定は保存しました）。サーバーの更新を待って、もう一度入れてください`);
+    if (USER_PENDING.get(id) === patch) {
+      try { await refresh(true); } catch (e2) { /* 次の同期で取り直す */ }
+      if (USER_PENDING.get(id) === patch) { USER_PENDING.delete(id); Object.assign(userById(id) || {}, patch); }
+    }
     renderAll(); return;
   }
   // よみを送ったのに受け取りの印がない：サーバーが古い版か、11列目がほかに使われている。よみだけ元にもどして知らせる（監査 よみ M-3）
@@ -14794,10 +14822,12 @@ function openEditUser(id) {
   const u0 = userById(id); if (!u0 || !isAdmin()) return;
   const groups = groupsAll();
   const roleOf = u => (u.role === 'admin' ? 'admin' : 'pub');
-  const f = { role: roleOf(u0), group: u0.group || '', overseer: !!u0.overseer, leader: !!u0.leader, yomi: u0.yomi || '', mgr: !!u0.mgr };
+  const f = { role: roleOf(u0), group: u0.group || '', overseer: !!u0.overseer, leader: !!u0.leader, yomi: u0.yomi || '', mgr: !!u0.mgr, name: u0.name || '' };
   const paint = () => {
     const u = userById(id); if (!u) { closeSheet(); return; }
-    setSheet(headHtml(null, `${esc(u.name)}さん`, yomiOn() ? '役割・グループ・よみを直します' : '役割とグループを直します') + `
+    setSheet(headHtml(null, `${esc(u.name)}さん`, yomiOn() ? '名前・役割・グループ・よみを直します' : '名前・役割・グループを直します') + `
+      <label class="field"><span>名前</span>
+        <input type="text" id="euName" maxlength="30" value="${esc(f.name)}" placeholder="例：山田 花子" autocomplete="off" lang="ja"></label>
       <p class="q">役割</p>
       <div class="seg uiseg" role="group" aria-label="役割">
         <button type="button" data-eurole="pub" aria-pressed="${f.role === 'pub'}">伝道者</button>
@@ -14816,23 +14846,29 @@ function openEditUser(id) {
       <button class="btn block" id="euLink">リンク・QR</button>
       ${u.id === me().id ? '' : '<div class="kops"><details><summary>この人が使うのをやめる</summary><p class="hint">この人のスマホでは、次に開いたときに区域の情報が消えます。</p><button class="btn block danger" id="euOff">使うのをやめる</button></details></div>'}
       <button class="btn block" data-close>やめる</button>`);
-    const keep = () => { f.group = $('#euGroup').value; f.overseer = $('#euOver').checked; f.leader = $('#euLead').checked; if ($('#euYomi')) f.yomi = $('#euYomi').value; if ($('#euMgr')) f.mgr = $('#euMgr').checked; };
+    const keep = () => { if ($('#euName')) f.name = $('#euName').value; f.group = $('#euGroup').value; f.overseer = $('#euOver').checked; f.leader = $('#euLead').checked; if ($('#euYomi')) f.yomi = $('#euYomi').value; if ($('#euMgr')) f.mgr = $('#euMgr').checked; };
     $$('[data-eurole]', $('#sheet')).forEach(x => x.onclick = () => { keep(); f.role = x.dataset.eurole; sheetKeep = true; paint(); });
     $('#euGroup').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('#euSave').click(); } };
     $('#euSave').onclick = async () => {
       keep();
       const u = userById(id); if (!u) { closeSheet(); return; }
       const g = normGroup(f.group), roleCh = roleOf(u) !== f.role;
+      // 名前：前後の空白と、先頭の = + - @（シートで式になる文字。サーバーの sheetSafe_ と同じ）を外す。空・同じ名前の別の人（空白と全角半角のちがいは同じとみる。使うのをやめた人もふくむ）は保存しない。サーバーでも確かめる
+      const nm = $('#euName') ? String(f.name || '').replace(/[\u0000-\u001f\u007f]/g, '').trim().replace(/^[=+\-@\s]+/, '').trim() : u.name, nameCh = nm !== u.name;
+      const nameKey = v => String(v || '').normalize('NFKC').replace(/\s+/g, '');
+      if ($('#euName') && !nm) { toast('名前を入れてください'); $('#euName').focus(); return; }
+      if (nameCh && D().users.some(x => x.id !== u.id && nameKey(x.name) === nameKey(nm))) { toast('同じ名前の人が、もう登録されています'); $('#euName').focus(); return; }
       if (yomiBad(f.yomi)) { toast('よみは、ひらがなで入れてください'); $('#euYomi').focus(); return; }
       const y = $('#euYomi') ? normYomi(f.yomi) : undefined, yomiCh = y !== undefined && y !== (u.yomi || '');
       const mgrNow = f.role === 'admin' ? false : f.mgr, mgrCh = f.role !== 'admin' && !!u.mgr !== mgrNow; // 区域係には付けない
-      if (!roleCh && !yomiCh && !mgrCh && (u.group || '') === g && !!u.overseer === f.overseer && !!u.leader === f.leader) { closeSheet(); toast('変わったところはありません'); return; }
+      if (!nameCh && !roleCh && !yomiCh && !mgrCh && (u.group || '') === g && !!u.overseer === f.overseer && !!u.leader === f.leader) { closeSheet(); toast('変わったところはありません'); return; }
+      if (nameCh && !await ask('', { title: `名前を「${nm}」に直しますか？`, body: `今の名前：${u.name}\n今までの記録・再訪問・スマホの登録は、そのまま使えます。`, ok: '直す', cancel: 'やめる', danger: false })) return;
       if (roleCh && !await ask(`${u.name}さんを「${f.role === 'admin' ? '区域係' : '伝道者'}」にします。よろしいですか？`)) return;
       if (mgrCh && !await ask('', mgrNow
         ? { title: `${u.name}さんに家と拒否の管理を任せますか？`, body: 'この人は、家の削除・拒否の削除・家の編集ができるようになります。', ok: '任せる', cancel: 'やめる', danger: false }
         : { title: `${u.name}さんの家と拒否の管理をやめますか？`, body: 'この人は、家と拒否の管理ができなくなります。', ok: 'やめる', cancel: 'このまま', danger: true })) return;
       closeSheet();
-      setUserGroup(u, g, f.overseer, f.leader, roleCh ? f.role : undefined, undefined, yomiCh ? y : undefined, mgrCh ? mgrNow : undefined);
+      setUserGroup(u, g, f.overseer, f.leader, roleCh ? f.role : undefined, undefined, yomiCh ? y : undefined, mgrCh ? mgrNow : undefined, nameCh ? nm : undefined);
     };
     $('#euLink').onclick = () => { const u = userById(id); if (u) openUserLink(u, false); };
     if ($('#euOff')) $('#euOff').onclick = async () => {
