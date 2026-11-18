@@ -186,6 +186,8 @@
     const ca = D().settings.congArea;
     return { n: String(ca.n || ''), d: String(ca.d || ''), pts: rings.reduce((a, r) => a + r.length, 0), nRings: rings.length };
   }
+  /* 「2024-12-11」→「2024年12月11日」（日付でなければ ''） */
+  function skDateText(d) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d || '')); return m ? `${m[1]}年${+m[2]}月${+m[3]}日` : ''; }
   const skCanImport = () => !LIVE || Number(D().settings.capArea) === 1; // 古いサーバーには、境を送らない（送っても捨てられるため）
 
   let skLayer = null, skSig = '', skFirstDone = false, skBound = false;
@@ -195,15 +197,16 @@
     map.getPane('congPane').style.zIndex = 340;
     map.getPane('congPane').style.pointerEvents = 'none';
   }
-  /* はじめの表示：区域が1つもなく境があるときだけ、境が入る範囲に合わせる（1回だけ）。区域があれば何も変えない */
+  /* はじめの表示：区域が1つもなく境があるときだけ、境が入る範囲に合わせる（1回だけ）。区域があれば何も変えない。
+     境がまだないあいだは「1回」を使わない（境があとから届いたときに合わせるため） */
   function skFirstView(rings) {
-    if (skFirstDone || !map) return;
+    if (skFirstDone || !map || !rings) return;
     const sz = map.getSize();
     if (!sz.x || !sz.y) return; // 地図のタブがまだ開いていない（開いたあとの描き直しでやる）
     skFirstDone = true;
     let has = false;
     try { has = D().territories.some(t => okPoly(t.polygon)); } catch (e) { has = true; }
-    if (has || !rings) return;
+    if (has) return;
     const pts = [];
     rings.forEach(r => r.forEach(p => pts.push([p[0], p[1]])));
     map.fitBounds(L.latLngBounds(pts), { animate: false, padding: [20, 20] });
@@ -239,7 +242,7 @@
     }
   }
 
-  window.Sakai = Object.assign(window.Sakai || {}, { rings: skRings, info: skInfo, render: skRender, canImport: skCanImport });
+  window.Sakai = Object.assign(window.Sakai || {}, { rings: skRings, info: skInfo, render: skRender, canImport: skCanImport, dateText: skDateText });
 
   /* 区域を描き直すとき・地図の種類を切りかえたとき・凡例を作り直すときに、いっしょに描く（元の動きはそのまま） */
   const _renderTerrs = window.renderTerrs;
@@ -255,5 +258,122 @@
     window.renderLegend = function () { const r = _renderLegend.apply(this, arguments); try { skLegend(); } catch (e) { console.error(e); } return r; };
   }
 
-  /* ここから下（取り込み画面）は、後の作業で足す */
+  /* =========================================================
+     取り込む・入れなおす・消す（区域係だけ。入口は torikomi.js の「区域の線・取り込み」）
+     ========================================================= */
+  const SK_MAX_RINGS = 20; // サーバー（CONG_RINGS_MAX）と同じ。これより多い輪は取り込まない
+  const SK_PREV = { color: '#D97706', weight: 3.5, opacity: 0.95, dashArray: '8 6' }; // 仮の線：今の境（灰色）と見分けのつく色
+  const skCss = document.createElement('style');
+  skCss.textContent = '#skConfirm .sk-row{display:flex;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line)}#skConfirm .sk-row span{flex:none;width:5.5em;color:var(--ink2)}#skConfirm .sk-row b{flex:1;min-width:0;word-break:break-all}';
+  document.head.appendChild(skCss);
+  const skSleep = ms => new Promise(r => setTimeout(r, ms));
+  const skEsc = x => (typeof esc === 'function' ? esc(x) : String(x));
+
+  /* ファイル → KML の文章（KMZ は app.js の readKmlFile と同じ手順：先頭が PK なら zip の doc.kml か最初の .kml） */
+  async function skReadText(file) {
+    const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+    if (head[0] === 0x50 && head[1] === 0x4B) {
+      await loadScript(LIB.zip);
+      const zip = await window.JSZip.loadAsync(file);
+      const f = zip.file('doc.kml') || zip.file(/\.kml$/i)[0];
+      if (!f) throw new Error('nokml');
+      return f.async('string');
+    }
+    return file.text();
+  }
+
+  /* 確認の画面にいるあいだだけ、仮の線を地図に出す（閉じ方を問わず、画面が消えたら線も消して、地図の見た目をもとに戻す） */
+  let skPrev = null, skPrevObs = null, skPrevSaved = null;
+  function skPreviewOff(restore) {
+    if (skPrevObs) { skPrevObs.disconnect(); skPrevObs = null; }
+    if (skPrev) { try { map.removeLayer(skPrev); } catch (e) { /* 何もしない */ } skPrev = null; }
+    const sv = skPrevSaved; skPrevSaved = null;
+    if (restore && sv && map) {
+      try { map.setView(sv.c, sv.z, { animate: false }); } catch (e) { /* 何もしない */ }
+      if (sv.view && typeof currentView !== 'undefined' && currentView !== sv.view) { try { showView(sv.view); } catch (e) { /* 何もしない */ } }
+    }
+  }
+  async function skPreviewOn(rings) {
+    skPreviewOff(false);
+    if (!map) return;
+    const sv = { c: map.getCenter(), z: map.getZoom(), view: typeof currentView !== 'undefined' ? currentView : '' };
+    skPrevSaved = sv;
+    skEnsurePane();
+    if (sv.view !== 'map') { showView('map'); await skSleep(90); } // 地図が見えるように（閉じる・やめるでもとの画面に戻す）
+    if (!document.getElementById('skConfirm') || skPrevSaved !== sv) return; // 待っているあいだに画面が閉じた
+    map.invalidateSize();
+    skPrev = L.polygon(rings, Object.assign({ pane: 'congPane', interactive: false, fill: false, lineJoin: 'round' }, SK_PREV)).addTo(map);
+    const sz = map.getSize(), sh = $('#sheet').getBoundingClientRect().height || 0;
+    map.fitBounds(skPrev.getBounds(), { animate: false, paddingTopLeft: [20, 20], paddingBottomRight: [20, Math.min(sh + 10, Math.round(sz.y * 0.6))] });
+    const sheet = $('#sheet');
+    skPrevObs = new MutationObserver(() => { if (!document.getElementById('skConfirm') || sheet.hidden) skPreviewOff(true); });
+    skPrevObs.observe(sheet, { attributes: true, attributeFilter: ['hidden'], childList: true, subtree: true });
+  }
+
+  const skKm2 = m2 => { const k = m2 / 1e6; return (k < 10 ? k.toFixed(2) : k.toFixed(1)); };
+  const skInJapan = rings => rings.every(r => r.every(p => p[0] >= 20 && p[0] <= 46 && p[1] >= 122 && p[1] <= 154)); // サーバー（cleanCongArea_）と同じ範囲
+
+  /* ファイル → 確認の画面 →「会衆の境にする」で保存 */
+  async function skOpenImport(file) {
+    if (typeof isAdmin === 'function' && !isAdmin()) { toast('区域係だけが使えます'); return; }
+    if (!skCanImport()) { infoSheet('会衆の境を取り込む', skEsc('サーバーを更新してから取り込んでください')); return; }
+    let parsed;
+    try { parsed = SK_API.parseS54(await skReadText(file)); } catch (e) {
+      infoSheet('ファイルを読み込めませんでした', 'S-54「会衆の区域割り当て」のKML（またはKMZ）のファイルを選んでください。KMZのときは、インターネットにつながっている必要があります。');
+      return;
+    }
+    const cap = SK_API.capRings(parsed.rings, 300);
+    if (!cap.rings.length) {
+      infoSheet('会衆の境が見つかりませんでした', parsed.network
+        ? 'このファイルには地図の中身が入っていません。「ネットワーク リンク」を外して、もう一度書き出してください。'
+        : 'このファイルには、境（面）の線がありません。S-54「会衆の区域割り当て」のKMLを選んでください。');
+      return;
+    }
+    const name = (parsed.name || String(file.name || '').replace(/\.[^.]+$/, '')).replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 40);
+    const tooMany = cap.rings.length > SK_MAX_RINGS || parsed.rings.length > SK_MAX_RINGS;
+    const outside = !skInJapan(cap.rings);
+    const notS54 = parsed.type !== 'Congregation';
+    const row = (k, v) => v ? `<div class="sk-row"><span>${k}</span><b>${skEsc(v)}</b></div>` : '';
+    const b = parsed.borders, dt = skDateText(parsed.date);
+    const nPts = cap.after;
+    const warns = [];
+    if (notS54) warns.push(`S-54 のファイルではないかもしれません（区域の線が${parsed.polys}本あります）`);
+    if (tooMany) warns.push('区域の線が多すぎて、会衆の境にはできません（会衆の境は20本までです）');
+    else if (outside) warns.push('日本のまわりの場所ではないので、会衆の境にはできません');
+    if (cap.after < cap.before) warns.push(`点の数が多いので、形を少しなめらかにしました（${cap.before}点 → ${cap.after}点）`);
+    const had = !!skInfo();
+    setSheet(headHtml(null, '会衆の境を取り込む', skEsc(file.name || '')) + `<div id="skConfirm">
+      ${row('名前', name)}${row('最終更新', dt)}${row('北', b.n)}${row('東', b.e)}${row('南', b.s)}${row('西', b.w)}
+      ${row('点の数', `${nPts}点`)}${row('広さ', `約${skKm2(SK_API.ringsAreaM2(cap.rings))} km²`)}
+      ${warns.map(w => `<div class="notice warn">${skEsc(w)}</div>`).join('')}
+      ${had && !tooMany && !outside ? `<p class="hint">今の会衆の境は、このファイルのものに置きかわります。区域は変わりません。</p>` : ''}
+      ${tooMany || outside ? '' : '<button type="button" class="btn primary block" id="skGo">会衆の境にする</button>'}
+      <button type="button" class="btn block" data-skno>やめる</button></div>`);
+    const S = $('#sheet');
+    $$('[data-skno]', S).forEach(x => { x.onclick = () => { skPreviewOff(true); closeSheet(); }; });
+    const go = $('#skGo');
+    if (go) go.onclick = () => {
+      if (!skCanImport()) { toast('サーバーを更新してから取り込んでください'); return; }
+      skPreviewOff(false);
+      const now = new Date().toISOString();
+      D().settings.congArea = { v: 1, n: name, d: parsed.date || '', at: now, rings: cap.rings };
+      closeSheet();
+      Store.save(); renderAll();
+      if (typeof currentView !== 'undefined' && currentView !== 'map') { try { showView('map'); } catch (e) { /* 何もしない */ } }
+      toast('会衆の境を取り込みました');
+    };
+    skPreviewOn(cap.rings).catch(e => console.error(e));
+  }
+
+  /* 境を消す（区域は変わらない）。確かめてから */
+  async function skClear() {
+    if (typeof isAdmin === 'function' && !isAdmin()) { toast('区域係だけが使えます'); return; }
+    if (!skInfo()) return;
+    if (!await ask('地図の境の線を消します。区域は変わりません。', { title: '会衆の境を消しますか？', body: '地図の境の線を消します。区域は変わりません。', ok: '消す', danger: true })) return;
+    D().settings.congArea = {};
+    Store.save(); renderAll();
+    toast('会衆の境を消しました');
+  }
+  window.Sakai.openImport = skOpenImport;
+  window.Sakai.clear = skClear;
 })();
