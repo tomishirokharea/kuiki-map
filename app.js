@@ -2831,7 +2831,7 @@ function terrStats(t, sinceMs) {
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
   { v: '2026.13.164', items: [['登', '共通のQRを何人かが続けて読んだときに、「登録は見送りになりました」と出たり、係の登録がなかなか届かなかったりすることがあったのを直しました。']] },
-  { v: '2026.13.164', role: 'admin', items: [['人', '区域係：「人」で、登録ずみの人の名前（漢字）を直せるようになりました。名前のまちがいを直すためのもので、今までの記録・再訪問・スマホの登録は、そのまま使えます。']] },
+  { v: '2026.13.164', role: 'admin', items: [['登', '区域係：共通のQRを読んだ人の番号が、係の画面のどのタブを開いていても数秒で出るようになりました（ほかの画面を見ているときは15秒ほど）。'], ['人', '区域係：「人」で、登録ずみの人の名前（漢字）を直せるようになりました。名前のまちがいを直すためのもので、今までの記録・再訪問・スマホの登録は、そのまま使えます。']] },
   { v: '2026.13.161', items: [
     ['境', '地図に、会衆の境を灰色の破線で出すようにしました（区域係が取り込んだとき）。区域の線とは別の線で、押してもえらばれません。']
   ] },
@@ -11812,11 +11812,17 @@ function openQrSheet(title, sub, url, opts) {
 /* ---------- 係の画面：スマホの承認と共通リンク（本番のときだけ） ---------- */
 const devState = { list: null, joinUrl: '', at: 0, busy: false, sig: '' };
 let qrWatching = false; // 共通リンクのQRを見せているあいだは、読み取った人をすぐ出す
-const devFast = () => qrWatching || (currentView === 'admin' && adPane === 'inbox' && !document.hidden);
 const devPending = () => (devState.list || []).filter(d => d.status === 'pending');
+/* スマホの申し込みを確かめる間隔（2026.13.164）：
+   速く（3.5秒）：共通リンクのQRを見せている間／係の画面を開いている間（どのタブでも。前は「今日」だけだった）／
+                 10分以内の申し込みが残っている間（どの画面でも。続けて読む人の番号を、待たせずに出す）
+   ふだん（15秒）：そのほか（前は60秒。紙のQRを読んでもらっていて、係がほかの画面を見ていても、最初の番号が15秒ほどで出る）
+   10分より古い申し込み（登録も見送りもされずに残ったもの）では、速くしない（ずっと通信しつづけないように） */
+const DEV_FAST_MS = 3500, DEV_IDLE_MS = 15000, DEV_FRESH_MS = 10 * 60000;
+const devFast = () => qrWatching || (!document.hidden && (currentView === 'admin' || devPending().some(d => Date.now() - Date.parse(d.reqAt) < DEV_FRESH_MS)));
 async function fetchDevices(force) {
   if (!LIVE || !isAdmin() || devState.busy) return;
-  if (!force && Date.now() - devState.at < (devFast() ? 3500 : 60000)) return;
+  if (!force && Date.now() - devState.at < (devFast() ? DEV_FAST_MS : DEV_IDLE_MS)) return;
   devState.busy = true;
   let changed = false;
   try {
@@ -16788,7 +16794,7 @@ async function init() {
     // ほかの人の記録を取りに行く間隔：一緒に回っている間は約7秒、区域カード・地図を見ている間は約20秒、そのほかは約45秒
     const again = () => {
       if (document.hidden || Store.inactive || checkExpiry() || Store.authLost) return;
-      fetchDevices(false); // 区域係のとき、スマホの申し込みを1分ごとに確認
+      fetchDevices(false); // 区域係のとき、スマホの申し込みを確かめる（間隔は devFast のところ）
       updateSyncAge();
       if (Store.queue.length) { if (!flushing) flush(); return; }
       MemoSync.tick(); // 再訪問メモを、同じ人のほかの端末と合わせる（送っていない変更を送り終えてから）

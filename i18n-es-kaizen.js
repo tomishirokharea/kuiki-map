@@ -37,6 +37,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "名前・役割・グループを直します": "Cambiar nombre, función y grupo",
 "名前・役割・グループ・よみを直します": "Cambiar nombre, función, grupo y lectura",
 "同じ名前の人が、もう登録されています": "Ya hay una persona registrada con el mismo nombre",
+"区域係：共通のQRを読んだ人の番号が、係の画面のどのタブを開いていても数秒で出るようになりました（ほかの画面を見ているときは15秒ほど）。": "Encargado: el número de quien lee el QR común ahora aparece en pocos segundos en cualquier pestaña de la pantalla del encargado (unos 15 segundos si está en otra pantalla).",
 "名前を「{0}」に直しますか？": "¿Cambiar el nombre a «{0}»?",
 "同じ名前の人が、もう登録されています。{0}さんの設定は保存していません": "Ya hay una persona registrada con el mismo nombre. No se guardaron los ajustes de {0}",
 "名前が空のため、{0}さんの設定は保存していません": "El nombre está vacío. No se guardaron los ajustes de {0}",
