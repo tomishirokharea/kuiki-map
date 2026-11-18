@@ -1321,7 +1321,7 @@ function openWaiting() {
   /* none（サーバーが、このスマホの申し込みをまだ見つけられない）は、すぐ「見送り」にしない（2026.13.164）。
      何人かが続けて QR を読むと、サーバーの一覧が数十秒おくれることがあり、そのあいだ none が返った。
      ここで合いことばを捨てると、番号が係の画面と合わなくなり、申し込みが二重になる。
-     12回（40秒あまり）続けて none のときだけ、見送りとして扱う。係が見送った（denied）ときは、今までどおりすぐ知らせる */
+     none が合わせて12回（40秒あまり）になったときだけ、見送りとして扱う（pending が返れば数え直す）。係が見送った（denied）ときは、今までどおりすぐ知らせる */
   let noneCount = 0;
   const check = async () => {
     clearTimeout(waitTimer);
@@ -2830,8 +2830,8 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
-  { v: '2026.13.164', items: [['登', '共通のQRを何人かが続けて読んだときに、「登録は見送りになりました」と出たり、係の登録がなかなか届かなかったりすることがあったのを直しました']] },
-  { v: '2026.13.164', role: 'admin', items: [['人', '係の画面「人」で、登録ずみの人の名前（漢字）を直せるようになりました。今までの記録・再訪問・スマホの登録は、そのまま使えます']] },
+  { v: '2026.13.164', items: [['登', '共通のQRを何人かが続けて読んだときに、「登録は見送りになりました」と出たり、係の登録がなかなか届かなかったりすることがあったのを直しました。']] },
+  { v: '2026.13.164', role: 'admin', items: [['人', '区域係：「人」で、登録ずみの人の名前（漢字）を直せるようになりました。名前のまちがいを直すためのもので、今までの記録・再訪問・スマホの登録は、そのまま使えます。']] },
   { v: '2026.13.161', items: [
     ['境', '地図に、会衆の境を灰色の破線で出すようにしました（区域係が取り込んだとき）。区域の線とは別の線で、押してもえらばれません。']
   ] },
@@ -14542,7 +14542,7 @@ async function saveUserNow(id, name, body, patch, before) {
     delete patch.mgr;
     const u = userById(id); if (u) { if (before.mgr) u.mgr = before.mgr; else delete u.mgr; }
     toast(`${name}さんの家と拒否の管理は保存できませんでした（ほかの設定は保存しました）。サーバーの更新を待って、もう一度入れてください`);
-  } else toast(`${name}さんの設定を保存しました`);
+  } else toast(`${patch.name || name}さんの設定を保存しました`);
   if (USER_PENDING.get(id) === patch) { // このあとに、もう変更がないとき
     try { await refresh(true); } catch (e) { /* 次の同期で取り直す */ }
     if (USER_PENDING.get(id) === patch) { USER_PENDING.delete(id); Object.assign(userById(id) || {}, patch); } // 保存できた値を正とする
@@ -14862,7 +14862,7 @@ function openEditUser(id) {
       const y = $('#euYomi') ? normYomi(f.yomi) : undefined, yomiCh = y !== undefined && y !== (u.yomi || '');
       const mgrNow = f.role === 'admin' ? false : f.mgr, mgrCh = f.role !== 'admin' && !!u.mgr !== mgrNow; // 区域係には付けない
       if (!nameCh && !roleCh && !yomiCh && !mgrCh && (u.group || '') === g && !!u.overseer === f.overseer && !!u.leader === f.leader) { closeSheet(); toast('変わったところはありません'); return; }
-      if (nameCh && !await ask('', { title: `名前を「${nm}」に直しますか？`, body: `今の名前：${u.name}\n今までの記録・再訪問・スマホの登録は、そのまま使えます。`, ok: '直す', cancel: 'やめる', danger: false })) return;
+      if (nameCh && !await ask('', { title: `名前を「${nm}」に直しますか？`, body: `今の名前：${u.name}\n名前のまちがいを直すための画面です。今までの記録・再訪問・スマホの登録は、そのまま使えます。\n別の人に入れかえるときは、使わないでください（奉仕報告の送り先と、紙のS-13の記録は、名前で見分けています）。`, ok: '直す', cancel: 'やめる', danger: false })) return;
       if (roleCh && !await ask(`${u.name}さんを「${f.role === 'admin' ? '区域係' : '伝道者'}」にします。よろしいですか？`)) return;
       if (mgrCh && !await ask('', mgrNow
         ? { title: `${u.name}さんに家と拒否の管理を任せますか？`, body: 'この人は、家の削除・拒否の削除・家の編集ができるようになります。', ok: '任せる', cancel: 'やめる', danger: false }
