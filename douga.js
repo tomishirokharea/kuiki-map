@@ -191,6 +191,8 @@ window.DOUGA = DOUGA;
     var took = get('renshu_took') || [];
     (d.territories || []).forEach(function (t) { if (t.holder === me0.id && since(t.lentAt) && took.indexOf(t.id) < 0) took.push(t.id); });
     if (took.length && typeof lsSet === 'function') lsSet('renshu_took', JSON.stringify(took));
+    /* 自分で受け取った区域（受け取ると selfTakenAt が付き、返しても残る）。ホームを開かずに「受け取る → 返す」をしても数える（監査 I-1） */
+    var selfTook = (d.territories || []).filter(function (t) { return t.selfTakenAt && since(t.selfTakenAt); });
     var ids = {}; (d.houses || []).forEach(function (h) { ids[h.id] = h; });
     var recoBtn = q('#tabs button[data-view="reco"]');
     var aptChanged = (d.houses || []).some(function (h) {
@@ -201,7 +203,7 @@ window.DOUGA = DOUGA;
     return [
       (u.size !== ui0.size) || (Number(u.pct) || 0) !== (Number(ui0.pct) || 0),
       u.fFollow === 'on' && !!recoBtn && !recoBtn.hidden,
-      took.length > 0 || (d.returns || []).some(function (r) { return r.by === me0.id && since(r.at); }) ||
+      took.length > 0 || selfTook.length > 0 || (d.returns || []).some(function (r) { return r.by === me0.id && since(r.at); }) ||
         (d.requests || []).some(function (r) { return r.by === me0.id && since(r.at) && !r.type; }),
       mine.some(function (v) { return v.result === 'met'; }) && mine.some(function (v) { return v.result === 'away'; }),
       Object.keys(d.follows || {}).some(function (k) { var f = d.follows[k]; return f && f.by === me0.id && since(f.since); }),
@@ -210,7 +212,8 @@ window.DOUGA = DOUGA;
       aptChanged,
       (d.awayCards || []).some(function (c) { return c.by === me0.id && since(c.at); }) || !!(typeof lsGet === 'function' && lsGet('renshu_reco')),
       (d.returns || []).some(function (r) { return r.by === me0.id && since(r.at); }) ||
-        took.some(function (id) { var t = (d.territories || []).find(function (x) { return x.id === id; }); return t && t.holder !== me0.id; })
+        took.some(function (id) { var t = (d.territories || []).find(function (x) { return x.id === id; }); return t && t.holder !== me0.id; }) ||
+        selfTook.some(function (t) { return t.holder !== me0.id; })
     ];
   }
   function practiceCard() {
