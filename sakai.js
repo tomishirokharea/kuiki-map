@@ -289,14 +289,15 @@
     if (skPrev) { try { map.removeLayer(skPrev); } catch (e) { /* 何もしない */ } skPrev = null; }
     const sv = skPrevSaved; skPrevSaved = null;
     if (restore && sv && map) {
-      try { map.setView(sv.c, sv.z, { animate: false }); } catch (e) { /* 何もしない */ }
+      if (sv.wasFirst) firstMapShow = true; // 地図をまだ一度も開いていなかったなら、「はじめて開くときの表示」をとっておく（やめたあと、はじめて開くときは今までどおり）
+      else { try { map.setView(sv.c, sv.z, { animate: false }); } catch (e) { /* 何もしない */ } }
       if (sv.view && typeof currentView !== 'undefined' && currentView !== sv.view) { try { showView(sv.view); } catch (e) { /* 何もしない */ } }
     }
   }
   async function skPreviewOn(rings) {
     skPreviewOff(false);
     if (!map) return;
-    const sv = { c: map.getCenter(), z: map.getZoom(), view: typeof currentView !== 'undefined' ? currentView : '' };
+    const sv = { c: map.getCenter(), z: map.getZoom(), view: typeof currentView !== 'undefined' ? currentView : '', wasFirst: typeof firstMapShow !== 'undefined' && firstMapShow };
     skPrevSaved = sv;
     skEnsurePane();
     if (sv.view !== 'map') { showView('map'); await skSleep(90); } // 地図が見えるように（閉じる・やめるでもとの画面に戻す）
