@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.164';
+var APP_JS_VER = '2026.13.165';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2830,6 +2830,7 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.165', role: 'admin', items: [['登', '区域係：「共通リンクのQRを見せる」を押したときに、リンクがあるのに「共通リンクがありません」と出ることがあったのを直しました。']] },
   { v: '2026.13.164', items: [['登', '共通のQRを何人かが続けて読んだときに、「登録は見送りになりました」と出たり、係の登録がなかなか届かなかったりすることがあったのを直しました。']] },
   { v: '2026.13.164', role: 'admin', items: [['登', '区域係：共通のQRを読んだ人の番号が、係の画面のどのタブを開いていても数秒で出るようになりました（ほかの画面を見ているときは15秒ほど）。'], ['人', '区域係：「人」で、登録ずみの人の名前（漢字）を直せるようになりました。名前のまちがいを直すためのもので、今までの記録・再訪問・スマホの登録は、そのまま使えます。']] },
   { v: '2026.13.161', items: [
@@ -11810,7 +11811,7 @@ function openQrSheet(title, sub, url, opts) {
 }
 
 /* ---------- 係の画面：スマホの承認と共通リンク（本番のときだけ） ---------- */
-const devState = { list: null, joinUrl: '', at: 0, busy: false, sig: '' };
+const devState = { list: null, joinUrl: '', at: 0, busy: false, sig: '', p: null, err: false }; // p：いま読んでいる途中の通信／err：最後の読みこみが失敗した（2026.13.165）
 let qrWatching = false; // 共通リンクのQRを見せているあいだは、読み取った人をすぐ出す
 const devPending = () => (devState.list || []).filter(d => d.status === 'pending');
 /* スマホの申し込みを確かめる間隔（2026.13.164）：
@@ -11824,14 +11825,15 @@ async function fetchDevices(force) {
   if (!LIVE || !isAdmin() || devState.busy) return;
   if (!force && Date.now() - devState.at < (devFast() ? DEV_FAST_MS : DEV_IDLE_MS)) return;
   devState.busy = true;
-  let changed = false;
+  let changed = false, done;
+  devState.p = new Promise(r => { done = r; }); // 読み終わるのを待ちたい所（共通リンクのQR）のため
   try {
     const j = await api('devices');
-    devState.list = j.devices || []; devState.joinUrl = j.joinUrl || ''; devState.at = Date.now();
+    devState.list = j.devices || []; devState.joinUrl = j.joinUrl || ''; devState.at = Date.now(); devState.err = false;
     const sig = JSON.stringify(devState.list);
     changed = sig !== devState.sig; devState.sig = sig;
-  } catch (e) { /* 次の機会に */ }
-  finally { devState.busy = false; }
+  } catch (e) { devState.err = true; /* 次の機会に */ }
+  finally { devState.busy = false; devState.p = null; done(); }
   if (!changed && !force) return;
   badgeRev++; // スマホの登録の申し込みが変わった
   if (currentView === 'admin') { renderDevices(); renderInbox(); }
@@ -14692,7 +14694,15 @@ async function openUserLink(u, reissue) {
 /* 共通リンクのQR（集会などで、みんなに読み取ってもらう） */
 async function openJoinQr() {
   if (!LIVE) { toast('共通リンクは、本番のときだけ使えます'); return; }
-  if (!devState.joinUrl) await fetchDevices(true);
+  /* リンクをまだ受け取っていないとき（2026.13.165）：
+     係の画面は数秒ごとに一覧を読んでいる。読んでいる途中に押されたら、読み終わるのを待つ
+     （前は待たずに「共通リンクがありません」と出していた。リンクは本当はあるのに、作り直しをさそってしまう）。
+     通信できなかったときは、そう知らせる。「ありません」と出すのは、サーバーが「ない」と答えたときだけ */
+  if (!devState.joinUrl) {
+    if (devState.p) await devState.p;
+    if (!devState.joinUrl) { devState.err = false; await fetchDevices(true); if (devState.p) await devState.p; }
+    if (!devState.joinUrl && (devState.err || !devState.at)) { toast('通信できませんでした。少し待って、もう一度押してください'); return; }
+  }
   if (!devState.joinUrl) { toast('共通リンクがありません。スプレッドシートのメニューから作ってください'); return; }
   openQrSheet('共通リンクのQR', 'みんなに読み取ってもらいます', devState.joinUrl, {
     note: 'スマホのカメラでこのQRを読み取ると、すぐ下に番号が出ます。本人のスマホに出ている番号と同じか確かめて「登録する」を押すと、その場で使えるようになります。',

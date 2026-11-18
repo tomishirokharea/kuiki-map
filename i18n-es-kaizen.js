@@ -44,6 +44,8 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "{0}さんの名前は保存できませんでした（ほかの設定は保存しました）。サーバーの更新を待って、もう一度入れてください": "No se pudo guardar el nombre de {0} (los demás ajustes sí se guardaron). Espere a que el servidor se actualice e inténtelo de nuevo",
 "共通のQRを何人かが続けて読んだときに、「登録は見送りになりました」と出たり、係の登録がなかなか届かなかったりすることがあったのを直しました。": "Se corrigió un problema: cuando varias personas leían seguidas el QR común, a veces aparecía «El registro no fue aprobado» o el registro del encargado tardaba en llegar.",
 "区域係：「人」で、登録ずみの人の名前（漢字）を直せるようになりました。名前のまちがいを直すためのもので、今までの記録・再訪問・スマホの登録は、そのまま使えます。": "Encargado: en «Personas» ahora se puede corregir el nombre de una persona ya registrada. Sirve para corregir errores en el nombre; los registros, las revisitas y el registro del teléfono siguen igual.",
+"通信できませんでした。少し待って、もう一度押してください": "No se pudo conectar. Espere un momento y vuelva a pulsar",
+"区域係：「共通リンクのQRを見せる」を押したときに、リンクがあるのに「共通リンクがありません」と出ることがあったのを直しました。": "Encargado: se corrigió que, al pulsar «Mostrar el QR del enlace común», a veces aparecía «No hay enlace común» aunque el enlace existía.",
 "この人が使うのをやめる": "Dar de baja a esta persona",
 "この人のスマホでは、次に開いたときに区域の情報が消えます。": "En el teléfono de esta persona, la información de territorios se borrará la próxima vez que lo abra.",
 "監督と司会者は、グループ奉仕の区域を受け取り、その日回る人をえらべます。集まりの予定を入れられるのは監督だけです。": "El superintendente y el conductor reciben territorios de grupo y eligen quién sale ese día. Solo el superintendente puede poner reuniones.",
