@@ -14,6 +14,7 @@ export async function openPage(b, port, { w = 390, simple = false } = {}) {
   const ctx = await b.newContext({ viewport: { width: w, height: 844 } });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', e => errs.push(String(e)));
+  pg.on('console', m => { if (m.type() === 'error' && !/gsi\.go\.jp|fonts\.g|script\.google|open-meteo/.test(m.location().url || '')) errs.push('console.error: ' + String(m.text()).slice(0, 200)); });   // 画面の console.error も数える（M3-4）
   await pg.route('**/*', r => /gsi\.go\.jp|fonts\.g|script\.google|open-meteo/.test(r.request().url()) ? r.abort() : r.continue());
   await pg.route('**/config.js', r => r.fulfill({ status: 200, contentType: 'application/javascript', body: CFG }));
   await pg.goto(`http://localhost:${port}/index.html`);

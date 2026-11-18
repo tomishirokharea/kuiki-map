@@ -545,8 +545,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
       if (lmGroup) { clearTimeout(lmTimer); lmTimer = setTimeout(() => { try { lmRender(); } catch (e) { console.error(e); } }, 60); }
     });
   }
-  let lmFontFam = 'sans-serif';   // 目印の名前の書体（地図の入れものから受けつぐ。placeNames のたびに読む）
-  /* kind：'h'＝建物の名前・'lm'＝目印の名前。p：画面の上の点（印の根元）。o：{ out, dot, simple }。返す：[左, 上, 右, 下]（まわりに2pxの余白） */
+  /* kind：'h'＝建物の名前・'lm'＝目印の名前。p：画面の上の点（印の根元）。o：{ out, dot, simple, font }（font：目印の名前の書体）。返す：[左, 上, 右, 下]（まわりに2pxの余白） */
   function nameRect(kind, p, text, o) {
     o = o || {};
     let w, h, top;
@@ -557,7 +556,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
       top = o.dot ? 9 : 20;
     } else {
       const fs = o.simple ? 16 : 14;
-      w = textWidth(`700 ${fs}px ${lmFontFam}`, String(text)) + 2;
+      w = textWidth(`700 ${fs}px ${o.font || 'sans-serif'}`, String(text)) + 2;
       h = fs * 1.3;
       top = 14;
     }
@@ -572,6 +571,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
   function placeNames() {
     lmEnsureLayer();
     if (!map || !lmGroup) return;
+    const lmFont = getComputedStyle(map.getContainer()).fontFamily || 'sans-serif';   // 目印の名前の書体。DOM を消す前に読む（消したあとだと毎回スタイルの計算が走る）
     lmGroup.clearLayers();
     hnMarks.forEach(m => { if (houseLayer) houseLayer.removeLayer(m); });
     hnMarks = [];
@@ -581,7 +581,6 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     const lmc = lmOn() && LM.items.length ? landmarkCands(z) : { cand: [], nop: 0 };
     const houses = houseLayer ? (window.HOUSE_NAMES || []) : [];
     const simpleUi = document.body.classList.contains('simple');
-    lmFontFam = getComputedStyle(map.getContainer()).fontFamily || 'sans-serif';
     // 1. 候補と順番（ord：同じ順番の中の並び。目印は lmPri 順、建物は HOUSE_NAMES の順）
     const rLm = nameRank('lm', false, zoomedIn);
     const lms = lmc.cand.map((it, i) => ({ it, t: lmShort(it.name), rank: rLm, ord: i, dup: false, put: false }));   // t：10文字＋「…」
@@ -597,7 +596,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
       });
       if (!best) return;
       e.dup = true;
-      if (e.rank < best.rank || (e.rank === best.rank && e.ord < best.ord)) { best.rank = e.rank; best.ord = e.ord + 0.5; }
+      if (e.rank < best.rank) { best.rank = e.rank; best.ord = e.ord + 0.5; }
     });
     // 3. 順番の小さい順（同じ順番の中は元の並び）
     const names = lmc.nop > 0;
@@ -605,7 +604,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     // 4. 画面の上の四角を作り、重なれば出さない
     const ok = layoutNames(all.map(e => ({ r: e.c
       ? nameRect('h', scrPt([e.c.lat, e.c.lng]), e.c.text, { out: e.c.out, dot: e.c.dot })
-      : nameRect('lm', scrPt([e.it.lat, e.it.lng]), e.t, { simple: simpleUi }) })), force);
+      : nameRect('lm', scrPt([e.it.lat, e.it.lng]), e.t, { simple: simpleUi, font: lmFont }) })), force);
     all.forEach((e, i) => { e.put = ok[i]; });
     // 5. 描く（目印は lmPri 順・建物は HOUSE_NAMES の順。描く pane・見た目は今までどおり）
     lms.forEach(e => drawLandmark(e, z, lmc.nop));

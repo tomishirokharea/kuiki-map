@@ -60,7 +60,6 @@ async function collect() {
     const vis = await visibleNames(pg);
     res.z20[`${it.kind}:${it.text}@${it.group}`] = {
       visible: vis.some(n => n.text === it.text && n.kind === it.kind),
-      groupHouseVisible: vis.some(n => n.kind === 'h' && fx.items.some(x => x.kind === 'h' && x.group === it.group && x.text === n.text)),
       // 目印の二重の相手（同じ組・同じ名前・50m以内の建物）の名前が見えているか
       sameHouseVisible: it.kind === 'lm' && vis.some(n => n.kind === 'h' && fx.items.some(x => x.kind === 'h' && x.group === it.group && x.text === n.text &&
         KZ.sameName(x.text, it.text) && KZ.mDist([x.lat, x.lng], [it.lat, it.lng]) <= 50)),

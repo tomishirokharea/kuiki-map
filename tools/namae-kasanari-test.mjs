@@ -172,13 +172,14 @@ const gear = async (pg, k, v) => {
   }
   // T7：組 A〜H、拡大15〜20（0.5ずつ）で、名前だけ出て印がない目印がない
   {
-    const bad = [];
+    const bad = []; let nLabels = 0;
     for (const g of GROUPS) for (let z = 15; z <= 20; z += 0.5) {
       await goTo(pg, ...fx.groups[g].center, z);
       const st = await lmLayers(pg);
+      nLabels += st.labels.length;
       st.labels.filter(l => !st.marks.some(m => near(m, l))).forEach(l => bad.push(`${g}@${z}:${l.t}`));
     }
-    ok(bad.length === 0, 'T7 組A〜H 拡大15〜20：名前だけ出て印がない目印はない', bad);
+    ok(nLabels > 0 && bad.length === 0, `T7 組A〜H 拡大15〜20：名前だけ出て印がない目印はない（のべ${nLabels}個の名前を見た）`, bad);
   }
   // T8：目印を「切」にしても、建物の名前は出る。目印は0
   await pg.evaluate(() => { lsSet('kuiki_lm_on', '0'); renderHouses(); });
