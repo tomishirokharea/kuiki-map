@@ -4444,7 +4444,7 @@ function houseNameLabels(list, dense) {
   const cands = [];
   const done = () => {
     window.HOUSE_NAMES = cands;
-    if (typeof window.placeNames === 'function') window.placeNames();
+    if (typeof window.placeNames === 'function') { try { window.placeNames(); } catch (e) { console.error(e); } } // 名前の置き場所で落ちても、家の印の描き直しは止めない
     else cands.forEach(c => drawHouseName(c, houseLayer));
   };
   const z = map.getZoom(), base = nameZoomNow();

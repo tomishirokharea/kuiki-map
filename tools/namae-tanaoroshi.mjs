@@ -10,8 +10,10 @@
    --port 番号 で、ポートを変えられる（初期値 8765）
    ===================================================================== */
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import { chromium, openPage, setupFixture, goTo, visibleNames, visibleMarks } from './namae-fixture.mjs';
 
+const KZ = createRequire(import.meta.url)('../chizu.js');   // 二重の見分け（sameName・mDist）は画面と同じ部品で
 const args = process.argv.slice(2);
 const opt = k => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
 const SAVE = opt('--save'), CHECK = opt('--check'), PORT = opt('--port') || '8765';
@@ -59,6 +61,9 @@ async function collect() {
     res.z20[`${it.kind}:${it.text}@${it.group}`] = {
       visible: vis.some(n => n.text === it.text && n.kind === it.kind),
       groupHouseVisible: vis.some(n => n.kind === 'h' && fx.items.some(x => x.kind === 'h' && x.group === it.group && x.text === n.text)),
+      // 目印の二重の相手（同じ組・同じ名前・50m以内の建物）の名前が見えているか
+      sameHouseVisible: it.kind === 'lm' && vis.some(n => n.kind === 'h' && fx.items.some(x => x.kind === 'h' && x.group === it.group && x.text === n.text &&
+        KZ.sameName(x.text, it.text) && KZ.mDist([x.lat, x.lng], [it.lat, it.lng]) <= 50)),
       dup: !!it.dup
     };
   }
@@ -87,13 +92,13 @@ if (CHECK) {
   lost.forEach(p => { ng++; console.log('NG  部品が無くなった／変わった：' + p); });
   added.forEach(p => { ng++; console.log('NG  部品が増えた／変わった：' + p); });
   if (!lost.length && !added.length) console.log(`OK  ① 名前の部品は同じ（${pb.length}）`);
-  // ② 拡大20で、before に見えていた名前が全部見える（dup の目印は、同じ組の建物の名前が見えていればよい）
+  // ② 拡大20で、before に見えていた名前が全部見える（目印は、二重の相手＝同じ組で同じ名前・50m以内の建物の名前が見えていればよい）
   let n2 = 0;
   for (const [k, b] of Object.entries(before.z20)) {
     if (!b.visible) continue;
     n2++;
     const a = res.z20[k];
-    const good = a && (a.visible || (a.dup && a.groupHouseVisible));
+    const good = a && (a.visible || a.sameHouseVisible);
     if (!good) { ng++; console.log('NG  拡大20で見えなくなった：' + k); }
   }
   if (!ng) console.log(`OK  ② 拡大20で、前に見えていた名前 ${n2} 件は全部見える`);

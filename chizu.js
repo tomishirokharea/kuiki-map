@@ -523,7 +523,51 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     return rad && typeof rotPt === 'function' ? c0.add(rotPt(p.subtract(c0), rad)) : p;
   }
   function lmRender() { placeNames(); }
-  /* 名前（目印・建物）を描くところ。建物の名前の候補は app.js の houseNameLabels が window.HOUSE_NAMES に出す */
+  /* ---- 名前の四角（画面の上）：文字の大きさ・上からの位置は CSS（.hname span・.lm-label span）と同じにする ---- */
+  let textCtx = null;
+  const textW = new Map();   // 書体＋文字 → 幅（px）
+  function textWidth(font, s) {
+    const k = font + '\u0001' + s;
+    let w = textW.get(k);
+    if (w == null) {
+      if (!textCtx) textCtx = document.createElement('canvas').getContext('2d');
+      textCtx.font = font;
+      w = textCtx.measureText(s).width;
+      if (textW.size > 4000) textW.clear();
+      textW.set(k, w);
+    }
+    return w;
+  }
+  // 書体が読みこまれたら幅を測りなおす（BIZ UDPGothic は Google フォントで、あとから入れかわる）
+  if (typeof document !== 'undefined' && document.fonts && document.fonts.addEventListener) {
+    document.fonts.addEventListener('loadingdone', () => {
+      textW.clear();
+      if (lmGroup) { clearTimeout(lmTimer); lmTimer = setTimeout(() => { try { lmRender(); } catch (e) { console.error(e); } }, 60); }
+    });
+  }
+  let lmFontFam = 'sans-serif';   // 目印の名前の書体（地図の入れものから受けつぐ。placeNames のたびに読む）
+  /* kind：'h'＝建物の名前・'lm'＝目印の名前。p：画面の上の点（印の根元）。o：{ out, dot, simple }。返す：[左, 上, 右, 下]（まわりに2pxの余白） */
+  function nameRect(kind, p, text, o) {
+    o = o || {};
+    let w, h, top;
+    if (kind === 'h') {
+      const fs = o.out ? 11 : 12, b = o.out ? 1 : 1.5;
+      w = Math.min(textWidth(`${o.out ? 400 : 700} ${fs}px "BIZ UDPGothic",sans-serif`, String(text)) + 12 + 2 * b, 140); // padding 0 6px・ふち・max-width 140px（border-box）
+      h = fs * 1.5 + 2 * b;
+      top = o.dot ? 9 : 20;
+    } else {
+      const fs = o.simple ? 16 : 14;
+      w = textWidth(`700 ${fs}px ${lmFontFam}`, String(text)) + 2;
+      h = fs * 1.3;
+      top = 14;
+    }
+    const M = 2;
+    return [p.x - w / 2 - M, p.y + top - M, p.x + w / 2 + M, p.y + top + h + M];
+  }
+  const lmShort = name => { const a = Array.from(name); return a.length > 10 ? a.slice(0, 10).join('') + '…' : name; };   // 目印の名前は10文字＋「…」
+  /* 名前（目印・建物）を描くところ。建物の名前の候補は app.js の houseNameLabels が window.HOUSE_NAMES に出す
+     ・二重（50m以内で同じ名前）なら、建物の名前を残し、目印は印も名前も出さない（NK-1〜3）
+     ・建物の名前と目印の名前を順番に置き、重なるものは出さない。いちばん拡大したときは全部出す（NK-4〜6） */
   let hnMarks = [];   // 建物の名前の印（houseLayer に置く。札をよける schedule.js が houseLayer から読むため）
   function placeNames() {
     lmEnsureLayer();
@@ -531,11 +575,45 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     lmGroup.clearLayers();
     hnMarks.forEach(m => { if (houseLayer) houseLayer.removeLayer(m); });
     hnMarks = [];
-    if (lmOn() && LM.items.length) drawLandmarks();
-    if (houseLayer) (window.HOUSE_NAMES || []).forEach(c => hnMarks.push(drawHouseName(c, houseLayer)));
+    const z = map.getZoom();
+    const base = typeof nameZoomNow === 'function' ? nameZoomNow() : 17;
+    const zoomedIn = z >= base - 0.05, force = z >= map.getMaxZoom() - 0.05;
+    const lmc = lmOn() && LM.items.length ? landmarkCands(z) : { cand: [], nop: 0 };
+    const houses = houseLayer ? (window.HOUSE_NAMES || []) : [];
+    const simpleUi = document.body.classList.contains('simple');
+    lmFontFam = getComputedStyle(map.getContainer()).fontFamily || 'sans-serif';
+    // 1. 候補と順番（ord：同じ順番の中の並び。目印は lmPri 順、建物は HOUSE_NAMES の順）
+    const rLm = nameRank('lm', false, zoomedIn);
+    const lms = lmc.cand.map((it, i) => ({ it, t: lmShort(it.name), rank: rLm, ord: i, dup: false, put: false }));   // t：10文字＋「…」
+    const hs = houses.map((c, k) => ({ c, rank: nameRank('h', !!c.inSel, zoomedIn), ord: lms.length + k, put: false }));
+    // 2. 二重：50m以内で同じ名前の建物があれば、目印は出さない。その建物は高いほうの順番（縮めた地図では目印の場所に入る）
+    lms.forEach(e => {
+      const a = [e.it.lat, e.it.lng];
+      let best = null, bd = Infinity;
+      hs.forEach(he => {
+        if (Math.abs(he.c.lat - a[0]) * 110540 > 50) return;   // 南北だけで50mをこえるものは、測るまでもない
+        const d = mDist(a, [he.c.lat, he.c.lng]);
+        if (d <= 50 && d < bd && sameName(e.it.name, he.c.text)) { best = he; bd = d; }
+      });
+      if (!best) return;
+      e.dup = true;
+      if (e.rank < best.rank || (e.rank === best.rank && e.ord < best.ord)) { best.rank = e.rank; best.ord = e.ord + 0.5; }
+    });
+    // 3. 順番の小さい順（同じ順番の中は元の並び）
+    const names = lmc.nop > 0;
+    const all = lms.filter(e => names && !e.dup).concat(hs).sort((x, y) => x.rank - y.rank || x.ord - y.ord);
+    // 4. 画面の上の四角を作り、重なれば出さない
+    const ok = layoutNames(all.map(e => ({ r: e.c
+      ? nameRect('h', scrPt([e.c.lat, e.c.lng]), e.c.text, { out: e.c.out, dot: e.c.dot })
+      : nameRect('lm', scrPt([e.it.lat, e.it.lng]), e.t, { simple: simpleUi }) })), force);
+    all.forEach((e, i) => { e.put = ok[i]; });
+    // 5. 描く（目印は lmPri 順・建物は HOUSE_NAMES の順。描く pane・見た目は今までどおり）
+    lms.forEach(e => drawLandmark(e, z, lmc.nop));
+    if (houseLayer) hs.forEach(e => { if (e.put) hnMarks.push(drawHouseName(e.c, houseLayer)); });
   }
-  function drawLandmarks() {
-    const z = map.getZoom(), b = map.getBounds().pad(0.25), vis = typeof rotVisTest === 'function' ? rotVisTest(0.25) : null;
+  /* 今の画面の目印の候補（lmPri 順・200件まで）と、名前の薄さ nop */
+  function landmarkCands(z) {
+    const b = map.getBounds().pad(0.25), vis = typeof rotVisTest === 'function' ? rotVisTest(0.25) : null;
     // 名前がはっきり出る大きさ（各自の設定。初めて使う人は12.5・前から使っている人は16）。その0.75段手前から薄く出はじめる（2026.13.145）
     // 薄く出はじめるのは、値の0.75段手前から。ただし値が16以上のときは16より手前では出さない（はじめの16は今までどおり16からはっきり出る・再監査 Important1）
     const full = typeof lmNameFull === 'function' ? lmNameFull() : 16, FADE = 0.75;
@@ -546,28 +624,18 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     let cand = LM.items.filter(it => (z >= markMin || it.kind === 'kaikan') && b.contains([it.lat, it.lng]) && (!vis || vis(it.lat, it.lng)));
     cand.sort((a, c) => lmPri(a.kind) - lmPri(c.kind));
     cand = cand.slice(0, 200);
-    const names = nop > 0;
-    // 拡大16より縮めているときは、重なる名前を出さない（会館 → 学校 → … の順に残す）。16以上は今までどおり
-    const placed = [], cull = z < 16, simpleUi = document.body.classList.contains('simple');
-    cand.forEach(it => {
-      const mark = () => L.marker([it.lat, it.lng], { pane: 'lmPane', interactive: false, keyboard: false,
-        icon: L.divIcon({ className: 'lm-mark', html: `<span class="lmchip">${esc(lmKindMark(it.kind))}</span>`, iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(lmGroup);
-      // 拡大15より縮めているときは、会館のほかは、名前を出せた目印だけ印を出す（縮めた地図が印で混まないように・再監査 Minor3）
-      const lowZ = z < 15 && it.kind !== 'kaikan';
-      if (!lowZ) mark();
-      if (names) {
-        const a = Array.from(it.name), t = a.length > 10 ? a.slice(0, 10).join('') + '…' : it.name;
-        if (cull) {
-          const p = scrPt([it.lat, it.lng]), fs = simpleUi ? 16 : 14;
-          const w = Array.from(t).length * fs + 8, r = [p.x - w / 2, p.y + 12, p.x + w / 2, p.y + 14 + fs * 1.3];
-          if (placed.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) return;
-          placed.push(r);
-        }
-        if (lowZ) mark();
-        L.marker([it.lat, it.lng], { pane: 'lmLabelPane', interactive: false, keyboard: false,
-          icon: L.divIcon({ className: 'lm-label', html: `<span data-notr${nop < 1 ? ` style="opacity:${nop.toFixed(2)}"` : ''}>${esc(t)}</span>`, iconSize: [0, 0] }) }).addTo(lmGroup);
-      }
-    });
+    return { cand, nop };
+  }
+  /* 目印を1つ描く。二重のものは印も名前も出さない。名前は置けたものだけ */
+  function drawLandmark(e, z, nop) {
+    if (e.dup) return;
+    const it = e.it;
+    // 拡大15より縮めているときは、会館のほかは、名前を出せた目印だけ印を出す（縮めた地図が印で混まないように・再監査 Minor3）
+    const lowZ = z < 15 && it.kind !== 'kaikan';
+    if (!lowZ || e.put) L.marker([it.lat, it.lng], { pane: 'lmPane', interactive: false, keyboard: false,
+      icon: L.divIcon({ className: 'lm-mark', html: `<span class="lmchip">${esc(lmKindMark(it.kind))}</span>`, iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(lmGroup);
+    if (e.put) L.marker([it.lat, it.lng], { pane: 'lmLabelPane', interactive: false, keyboard: false,
+      icon: L.divIcon({ className: 'lm-label', html: `<span data-notr${nop < 1 ? ` style="opacity:${nop.toFixed(2)}"` : ''}>${esc(e.t)}</span>`, iconSize: [0, 0] }) }).addTo(lmGroup);
   }
   window.placeNames = placeNames;
   window.lmRepaint = () => { try { lmRender(); } catch (e) { console.error(e); } }; // 歯車の「目印の名前」を変えたとき
