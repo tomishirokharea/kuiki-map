@@ -4364,7 +4364,7 @@ function renderHouses() {
   const fkeys = followMap ? new Set(myFollowKeys()) : null;
   const ff = fkeys ? (k => (fkeys.has(k) ? 'hl' : 'dim')) : focusFn();
   renderCardBar();
-  if ((mode === 'draw' && drawTap === 'line' && !drawShowHouses) || mode === 'sen' || mode === 'tok') { setZoomHint(false); return; } // 線引き中は写真が見えるように家の印を隠す（特別区域の分け方では、分け方の印だけを出す）
+  if ((mode === 'draw' && drawTap === 'line' && !drawShowHouses) || mode === 'sen' || mode === 'tok') { setZoomHint(false); houseNameLabels(null, false); return; } // 線引き中は写真が見えるように家の印を隠す（特別区域の分け方では、分け方の印だけを出す）
   const fade = fkeys ? 1 : iconFade();
   const b = map.getBounds().pad(0.2), vis = rotVisTest(0.2); // vis：地図を回しているときの、画面に入っているかの確かめ
   const sel = mode === 'normal' ? selTerrId() : null; // 区域をえらんでいるときは、その区域の家だけ
@@ -4431,23 +4431,39 @@ function nameZoomText(v) {
   const n = Math.abs(v), times = Math.round(Math.pow(2, n) * 10) / 10;
   return v > 0 ? `${n}段 拡大したときから（${times}倍）` : `${n}段 縮めても（${times}分の1）`;
 }
+/* 家の名前を1つ描く（c＝houseNameLabels の候補）。置き場所の判定は chizu.js の placeNames がする */
+function drawHouseName(c, layer) {
+  return L.marker([c.lat, c.lng], {
+    icon: L.divIcon({ className: c.cls, html: `<span class="${c.fc ? 'fc' : ''}">${esc(c.text)}</span>`, iconSize: [0, 0] }),
+    pane: 'labelPane', interactive: false, keyboard: false,
+    zIndexOffset: c.zOff // 重なったときは、えらんだ区域の名前が上
+  }).addTo(layer);
+}
+/* 家の名前の候補をつくり、window.HOUSE_NAMES に出して placeNames（chizu.js）に描かせる。どの return でも出す（空もある） */
 function houseNameLabels(list, dense) {
+  const cands = [];
+  const done = () => {
+    window.HOUSE_NAMES = cands;
+    if (typeof window.placeNames === 'function') window.placeNames();
+    else cands.forEach(c => drawHouseName(c, houseLayer));
+  };
   const z = map.getZoom(), base = nameZoomNow();
   const apt = UI.aptName === 'on' && z >= base + nameZoomOff('aptZoom') - 0.05;
   const fc = UI.fcName === 'on' && z >= base + nameZoomOff('fcZoom') - 0.05;
-  if ((!apt && !fc) || mode !== 'normal') return;
+  if ((!apt && !fc) || mode !== 'normal') return done();
   // 設定で「地図に見えている全体」をえらんだときは、えらんだ区域の外の建物の名前も出す
   const all = UI.nameScope === 'all' && !followMap;
   // 区域をえらんでいるときの、ほかの区域の建物の名前は、まわりの区域番号と同じように薄く出す（現場で見る区域の名前を目立たせる）
-  let inSel = null;
+  let fadeSet = null;
   if (all) {
     const b = map.getBounds().pad(0.1), onMap = new Set((list || []).map(h => h.id));
-    if (selTerrId() && list) inSel = onMap;
+    if (selTerrId() && list) fadeSet = onMap;
     list = D().houses.filter(h => h.label && b.contains([h.lat, h.lng]));
-    if (inSel) list.sort((x, y) => (inSel.has(y.id) ? 1 : 0) - (inSel.has(x.id) ? 1 : 0)); // 300件の上限では、えらんだ区域の名前を先に
+    if (fadeSet) list.sort((x, y) => (fadeSet.has(y.id) ? 1 : 0) - (fadeSet.has(x.id) ? 1 : 0)); // 300件の上限では、えらんだ区域の名前を先に
     dense = dense && list.some(h => onMap.has(h.id));
   }
-  if (!list) return;
+  if (!list) return done();
+  const sel = selTerrId();
   let n = 0;
   for (const h of list) {
     if (!h.label || n > 300) continue;
@@ -4455,13 +4471,14 @@ function houseNameLabels(list, dense) {
     const isFc = k !== 'home';
     if (h.type === 'apt' ? !(apt || (fc && isFc)) : !(fc && isFc)) continue; // 一戸建ての「目印」は出さない
     n++;
-    const out = !!inSel && !inSel.has(h.id); // えらんだ区域の外（家の印は出ていないので、点のときの位置に）
-    L.marker([h.lat, h.lng], {
-      icon: L.divIcon({ className: 'hname' + (out ? ' out dot' : dense && !(roundNums && roundNums.has(h.id)) ? ' dot' : ''), html: `<span class="${isFc ? 'fc' : ''}">${esc(h.label)}</span>`, iconSize: [0, 0] }),
-      pane: 'labelPane', interactive: false, keyboard: false,
-      zIndexOffset: out ? -1000 : 0 // 重なったときは、えらんだ区域の名前が上
-    }).addTo(houseLayer);
+    const out = !!fadeSet && !fadeSet.has(h.id); // えらんだ区域の外（家の印は出ていないので、点のときの位置に）
+    const dot = out || (dense && !(roundNums && roundNums.has(h.id)));
+    cands.push({
+      lat: h.lat, lng: h.lng, text: h.label, cls: 'hname' + (out ? ' out dot' : dot ? ' dot' : ''), fc: isFc,
+      out, dot, inSel: !!sel && houseInTerr(h, sel), zOff: out ? -1000 : 0
+    });
   }
+  done();
 }
 /* 小さな点の色：白＝まだ、緑＝今回訪ねた、青＝最近会えた、赤＝拒否、灰＝選べない家 */
 const DOT = {

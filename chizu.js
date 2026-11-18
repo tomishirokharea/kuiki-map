@@ -517,10 +517,21 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     lmGroup = L.layerGroup().addTo(map);
     map.on('moveend zoomend', () => { clearTimeout(lmTimer); lmTimer = setTimeout(lmRender, 60); });   // 家の印の描き直しとは別に動かす
   }
-  function lmRender() {
+  /* 地図を回しているときは、画面の上での位置で重なりを比べる（再監査 Minor2） */
+  function scrPt(ll) {
+    const c0 = map.getSize().divideBy(2), rad = map._kmRad || 0, p = map.latLngToContainerPoint(ll);
+    return rad && typeof rotPt === 'function' ? c0.add(rotPt(p.subtract(c0), rad)) : p;
+  }
+  function lmRender() { placeNames(); }
+  /* 名前（目印・建物）を描くところ。建物の名前の候補は app.js の houseNameLabels が window.HOUSE_NAMES に出す */
+  function placeNames() {
+    lmEnsureLayer();
     if (!map || !lmGroup) return;
     lmGroup.clearLayers();
-    if (!lmOn() || !LM.items.length) return;
+    if (lmOn() && LM.items.length) drawLandmarks();
+    (window.HOUSE_NAMES || []).forEach(c => drawHouseName(c, lmGroup));
+  }
+  function drawLandmarks() {
     const z = map.getZoom(), b = map.getBounds().pad(0.25), vis = typeof rotVisTest === 'function' ? rotVisTest(0.25) : null;
     // 名前がはっきり出る大きさ（各自の設定。初めて使う人は12.5・前から使っている人は16）。その0.75段手前から薄く出はじめる（2026.13.145）
     // 薄く出はじめるのは、値の0.75段手前から。ただし値が16以上のときは16より手前では出さない（はじめの16は今までどおり16からはっきり出る・再監査 Important1）
@@ -535,9 +546,6 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     const names = nop > 0;
     // 拡大16より縮めているときは、重なる名前を出さない（会館 → 学校 → … の順に残す）。16以上は今までどおり
     const placed = [], cull = z < 16, simpleUi = document.body.classList.contains('simple');
-    // 地図を回しているときは、画面の上での位置で重なりを比べる（再監査 Minor2）
-    const c0 = map.getSize().divideBy(2), rad = map._kmRad || 0;
-    const scr = ll => { const p = map.latLngToContainerPoint(ll); return rad && typeof rotPt === 'function' ? c0.add(rotPt(p.subtract(c0), rad)) : p; };
     cand.forEach(it => {
       const mark = () => L.marker([it.lat, it.lng], { pane: 'lmPane', interactive: false, keyboard: false,
         icon: L.divIcon({ className: 'lm-mark', html: `<span class="lmchip">${esc(lmKindMark(it.kind))}</span>`, iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(lmGroup);
@@ -547,7 +555,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
       if (names) {
         const a = Array.from(it.name), t = a.length > 10 ? a.slice(0, 10).join('') + '…' : it.name;
         if (cull) {
-          const p = scr([it.lat, it.lng]), fs = simpleUi ? 16 : 14;
+          const p = scrPt([it.lat, it.lng]), fs = simpleUi ? 16 : 14;
           const w = Array.from(t).length * fs + 8, r = [p.x - w / 2, p.y + 12, p.x + w / 2, p.y + 14 + fs * 1.3];
           if (placed.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) return;
           placed.push(r);
@@ -558,6 +566,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
       }
     });
   }
+  window.placeNames = placeNames;
   window.lmRepaint = () => { try { lmRender(); } catch (e) { console.error(e); } }; // 歯車の「目印の名前」を変えたとき
   /* 凡例（「?」）の中：目印を出す（入／切）・印の見かた・出典 */
   function lmLegendPaint() {
