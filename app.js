@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.165';
+var APP_JS_VER = '2026.13.166';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -1383,8 +1383,55 @@ function openWaiting() {
    server  … サーバーの処理の中でエラー
    もう一度ためせば直る見込みのあるものには retry をつける */
 const LASTERR_KEY = 'kuiki_last_error';
-function noteError(action, e) {
+function noteError(action, e, T) {
   try { lsSet(LASTERR_KEY, JSON.stringify({ at: new Date().toISOString(), action, code: e.code || e.message, sample: e.sample || '' })); } catch (x) { /* 何もしない */ }
+  errLogAdd(action, e, T);
+}
+/* ---------- 通信の失敗の記録（2026.13.166） ----------
+   電波に問題がないのに「つながっていません」「未送信」と出るときに、どの種類の失敗かを調べるため。
+   ・失敗1回ごとに「いつ・何の通信・失敗の種類・かかった秒数・スマホが圏外と言っていたか・画面が裏だったか」を残す
+   ・この端末の中だけに、新しい30件まで（同じ失敗が続いたら1件にまとめる）。名前・住所・合いことばは記録しない。
+     sample は、サーバーや Google（または途中の機器）が返したエラーの文の先頭100字だけ。ほかへは送らない
+   ・見る所：「送信のようす」／係の画面「設定」／開いたときの知らせの「記録を見る」 */
+const ERRLOG_KEY = 'kuiki_err_log', ERRLOG_MAX = 30;
+function errLogList() {
+  try { const a = JSON.parse(lsGet(ERRLOG_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+function errLogAdd(action, e, T) {
+  try {
+    const x = { at: new Date().toISOString(), action: String(action || '').slice(0, 30), code: String((e && (e.code || e.message)) || '').slice(0, 30),
+      sec: T ? Math.round((Date.now() - T) / 100) / 10 : 0, on: navigator.onLine !== false, hid: !!document.hidden };
+    if (e && e.sample) x.sample = String(e.sample).slice(0, 100);
+    // 同じ失敗が続いたとき（圏外が続いた・サーバーが止まっていた）は、1件にまとめて回数を数える（前の記録を押し出さないように。監査）
+    const list = errLogList(), p = list[list.length - 1];
+    if (p && p.action === x.action && p.code === x.code && p.on === x.on) { p.n = (p.n || 1) + 1; p.last = x.at; p.sec = x.sec; p.hid = x.hid; if (x.sample) p.sample = x.sample; }
+    else list.push(x);
+    lsSet(ERRLOG_KEY, JSON.stringify(list.slice(-ERRLOG_MAX)));
+  } catch (x) { /* 記録できなくても、通信の処理は止めない */ }
+}
+const ERRLOG_CODE = { timeout: '時間切れ（返事が来ない）', network: 'つながらなかった', nonjson: 'Googleのエラー画面が返ってきた', busy: '混み合い（順番待ちで入れなかった）',
+  server: 'サーバーの中のエラー', slow: '回数の制限', badreply: '返事の形がちがう' };
+const ERRLOG_ACT = { load: '受け取り', sync: '記録を送る', devices: 'スマホの申し込みの確認', memo_sync: '再訪問メモ', memo_key: '再訪問メモ' };
+function errLogText(list) {
+  const p2 = n => String(n).padStart(2, '0');
+  const when = t => { const d = new Date(t); return isNaN(d) ? String(t) : `${d.getMonth() + 1}/${d.getDate()} ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`; };
+  return [`通信の失敗の記録（${list.length}件・${APP_VERSION}・${deviceLabel()}）`, '時刻　何の通信　失敗の種類　かかった時間',
+    ...list.slice().reverse().map(x => `${when(x.at)}　${ERRLOG_ACT[x.action] ? ERRLOG_ACT[x.action] + '（' + x.action + '）' : x.action}　${/^http\d+$/.test(x.code) ? '通信のエラー番号' : (ERRLOG_CODE[x.code] || 'そのほか')}（${x.code}）${x.sec ? '　' + x.sec + '秒' : ''}`
+      + (x.n > 1 ? `　続けて${x.n}回（最後 ${when(x.last)}）` : '')
+      + (x.on === false ? '　スマホは圏外' : '') + (x.hid ? '　画面は裏' : '') + (x.sample ? `\n　　${x.sample}` : ''))].join('\n');
+}
+function openErrLog() {
+  const list = errLogList();
+  if (!list.length) { toast('まだ記録がありません（通信が失敗したときに残ります）'); return; }
+  const txt = errLogText(list);
+  setSheet(headHtml(null, '通信の失敗の記録', 'このスマホで、通信がうまくいかなかったときの記録') + `
+    <pre class="loadlog">${esc(txt)}</pre>
+    <button type="button" class="btn primary block" id="elCopy">コピーする</button>
+    <p class="hint">「つながっていません」「未送信」とよく出るときは、コピーして区域係（または作った人）に送ってください。名前や住所は記録していません（サーバーが返したエラーの文の先頭だけ、入ることがあります）。</p>`);
+  $('#elCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText(txt); toast('コピーしました'); }
+    catch (e) { const r = document.createRange(); r.selectNodeContents($('#sheet .loadlog')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('選んだ状態にしました。長押しでコピーしてください'); }
+  };
 }
 const wait = ms => new Promise(r => setTimeout(r, ms));
 async function api(action, extra, opt) {
@@ -1406,7 +1453,7 @@ async function api(action, extra, opt) {
     const code = err && err.name === 'AbortError' ? 'timeout' : 'network';
     const e = Object.assign(new Error(code), { code, retry: true });
     logReq(rqName, T, code, 0, 0);
-    noteError(action, e); throw e;
+    noteError(action, e, T); throw e;
   } finally { clearTimeout(timer); }
   if (!res.ok) {
     // 404：サーバーの処理は終わっているのに、Googleの受け渡し先から返事を受け取れなかったことがある → 送り直す
@@ -1417,20 +1464,20 @@ async function api(action, extra, opt) {
       sample: `${what}・${where}${res.redirected ? '（転送あり）' : ''}・${String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)}` });
     logReq(rqName, T, 'http' + res.status, (text || '').length, 0);
     if (res.status === 404) relayLost = true;
-    noteError(action, e); throw e;
+    noteError(action, e, T); throw e;
   }
   let j;
   try { j = JSON.parse(text); } catch (err) {
     const e = Object.assign(new Error('nonjson'), { code: 'nonjson', retry: true, sample: String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) });
     logReq(rqName, T, 'nonjson：' + e.sample.slice(0, 60), text.length, 0);
-    noteError(action, e); throw e;
+    noteError(action, e, T); throw e;
   }
   logReq(rqName, T, j.ok ? (j.snap ? 'ok（まとめ）' : 'ok') : j.error, text.length, Array.isArray(j.rows) ? j.rows.length : 0);
   if (!j.ok) {
     if (j.error === 'auth') authLost();
     const e = Object.assign(new Error(j.error || 'error'), { code: j.error, retry: j.error === 'server' || j.error === 'busy' });
     if (j.msg) e.msg = String(j.msg).slice(0, 120); // 奉仕報告（S21）が断った理由（houkoku.js）
-    if (j.error !== 'auth') noteError(action, e);
+    if (j.error !== 'auth') noteError(action, e, T);
     throw e;
   }
   Store.syncAt = Date.now();
@@ -1959,6 +2006,21 @@ async function flush(force) {
   if (!Store.queue.length && window.kmlAfterFlush) window.kmlAfterFlush(); // 区域をまとめて新しくしたあと：家の区域をサーバーで決め直す（kml-koushin.js）
   if (Store.needFull && !Store.queue.length) reloadAll(true).catch(() => {});
 }
+/* 開いたとき（前回の情報を出したあと）の、最初の受け取り（2026.13.166）
+   前は、1回失敗すると、理由が何であっても「インターネットにつながっていません」と出していた（サーバーの混み合いやエラーでも）。
+   ・スマホが圏外と言っているとき：今までどおり、すぐ知らせる
+   ・そうでないとき：4秒後に、受け取れるかをもう一度確かめる。それでもだめなときだけ、圏外とは言わない文で知らせる
+     （その間に、ふだんの取りに行く動き（again）も動く。どちらかで受け取れていれば、4秒後の確かめも通る）
+   知らせたあとも、ふだんの取りに行く動きが続くので、自動で最新になる */
+async function firstRefresh() {
+  try { await refresh(true); return; } catch (e) { /* 下でやり直す */ }
+  if (navigator.onLine === false) { toast('インターネットにつながっていません。前回の情報を表示しています'); return; }
+  await wait(4000);
+  try { await refresh(true); return; } catch (e) { /* 下で知らせる */ }
+  if (Store.authLost || Store.inactive) return;
+  toast(navigator.onLine === false ? 'インターネットにつながっていません。前回の情報を表示しています'
+    : 'サーバーから最新の情報を受け取れませんでした。前回の情報を表示しています。自動でもう一度ためします', null, { label: '記録を見る', fn: openErrLog });
+}
 /* 最新の変更を取りに行く */
 async function refresh(force) {
   if (!LIVE || flushing || Store.queue.length || Store.inactive) return;
@@ -2000,7 +2062,9 @@ function openSyncSheet() {
       「もう一度送る」を押しても送れないときは、区域係に伝えてください。${last && last.code ? `<br>番号：${esc(last.code)}` : ''}</div>
       <button class="btn block" id="syRetry">もう一度送る</button>
       <button class="btn block danger" id="syDrop">送らずに消す</button>` : ''}
+    ${errLogList().length ? '<button class="btn block" id="syErrLog">通信の失敗の記録を見る</button>' : ''}
     <button class="btn block" data-close>閉じる</button>`);
+  if ($('#syErrLog')) $('#syErrLog').onclick = openErrLog;
   if ($('#syNoteOk')) $('#syNoteOk').onclick = () => { lsDel(SYNC_NOTE_KEY); openSyncSheet(); };
   if ($('#syNow')) $('#syNow').onclick = () => { flushFail = 0; flush(true).then(() => { closeSheet(); toast(Store.queue.length ? 'まだ送れていません。電波のよい場所でためしてください' : '送りました'); }); };
   if ($('#syRetry')) $('#syRetry').onclick = () => {
@@ -2830,6 +2894,7 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.166', items: [['通', '開いたときに、電波に問題がなくても「インターネットにつながっていません」と出ることがあったのを見直しました。1回うまくいかなくても自動でやり直し、それでも受け取れないときだけ知らせます。'], ['通', '通信がうまくいかなかったときの記録を、このスマホの中に残すようにしました。上に「未送信」と出ているときに、そこを押した画面から見られます（名前や住所は記録しません）。']] },
   { v: '2026.13.165', role: 'admin', items: [['登', '区域係：「共通リンクのQRを見せる」を押したときに、リンクがあるのに「共通リンクがありません」と出ることがあったのを直しました。']] },
   { v: '2026.13.164', items: [['登', '共通のQRを何人かが続けて読んだときに、「登録は見送りになりました」と出たり、係の登録がなかなか届かなかったりすることがあったのを直しました。']] },
   { v: '2026.13.164', role: 'admin', items: [['登', '区域係：共通のQRを読んだ人の番号が、係の画面のどのタブを開いていても数秒で出るようになりました（ほかの画面を見ているときは15秒ほど）。'], ['人', '区域係：「人」で、登録ずみの人の名前（漢字）を直せるようになりました。名前のまちがいを直すためのもので、今までの記録・再訪問・スマホの登録は、そのまま使えます。']] },
@@ -16432,6 +16497,7 @@ function bindStatic() {
   $('#adS12').onclick = () => openS12();
   $('#adPerf').onclick = () => { toast('測っています…'); setTimeout(runPerfCheck, 50); };
   $('#adLoadLog').onclick = () => openLoadLog();
+  if ($('#adErrLog')) $('#adErrLog').onclick = () => openErrLog();
   document.addEventListener('click', e => { // 「ほか○人」：その行を全員の名前にする（覚えない）
     /* .fellows の行は、押せる要素（[data-open] [data-awayopen] [data-asgopen] [data-asgok] .topen [data-go]）の中に置かない（ここは document の委譲なので、中に置くと先にそちらが開く） */
     const m = e.target.closest('[data-fellowsmore]'), p = m && m.closest('.fellows'); if (!p) return;
@@ -16830,7 +16896,7 @@ async function init() {
     registerSw();
     fetchDevices(true);
     if (Store.queue.length) flush();
-    else if (from === 'cache') refresh(true).catch(() => toast('インターネットにつながっていません。前回の情報を表示しています'));
+    else if (from === 'cache') firstRefresh().catch(() => {});
     if (!lsGet(LOCK_KEY)) {
       setSheet(headHtml(null, 'はじめにお願い', '') + `
         <div class="notice warn"><b>スマホに画面ロック（パスコード、指紋、顔認証）を設定してください。</b><br>
