@@ -69,18 +69,66 @@
     }
     return c;
   }
-  /* メートルの座標 [x,y] どうしでの内外判定 */
-  function inXY(x, y, ring) {
-    let c = false;
-    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-      const a = ring[i], b = ring[j];
-      if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c;
+  /* 辺の索引：辺を、それが通る升（一辺 C m）に入れておき、点 (x, y) から half m 未満の辺があるかを、まわりの升の辺だけで調べる。
+     返す関数の答えは、全部の辺を segDist で調べたときと同じ（升への入れ方は、辺が通る升を少し広めにとる） */
+  function edgeIndex(edges, half) {
+    if (!(half > 0) || !edges.length) return () => false; // half が 0 以下：segDist < half になる辺はない
+    let ex0 = Infinity, ex1 = -Infinity, ey0 = Infinity, ey1 = -Infinity;
+    for (const [a, b] of edges) { ex0 = Math.min(ex0, a[0], b[0]); ex1 = Math.max(ex1, a[0], b[0]); ey0 = Math.min(ey0, a[1], b[1]); ey1 = Math.max(ey1, a[1], b[1]); }
+    let C = half;
+    while ((Math.floor((ex1 - ex0) / C) + 1) * (Math.floor((ey1 - ey0) / C) + 1) > 1e6) C *= 2; // 升が多すぎるときは、升を大きく（入れ物を 4MB ほどまでに）
+    const cw = Math.floor((ex1 - ex0) / C) + 1, ch = Math.floor((ey1 - ey0) / C) + 1, E = 1e-3;
+    const col = x => Math.max(0, Math.min(cw - 1, Math.floor((x - ex0) / C)));
+    const row = y => Math.max(0, Math.min(ch - 1, Math.floor((y - ey0) / C)));
+    const visit = (k, fn) => { // 辺 k が通る升（列ごとに、その列の中での y の範囲）
+      const a = edges[k][0], b = edges[k][1], dx = b[0] - a[0];
+      const xa = Math.min(a[0], b[0]) - E, xb = Math.max(a[0], b[0]) + E;
+      for (let c = col(xa), c1 = col(xb); c <= c1; c++) {
+        let ylo = Math.min(a[1], b[1]), yhi = Math.max(a[1], b[1]);
+        if (Math.abs(dx) > 1e-9) {
+          const t0 = Math.max(0, Math.min(1, (Math.max(xa, ex0 + c * C) - a[0]) / dx)), t1 = Math.max(0, Math.min(1, (Math.min(xb, ex0 + (c + 1) * C) - a[0]) / dx));
+          const ya = a[1] + (b[1] - a[1]) * t0, yb = a[1] + (b[1] - a[1]) * t1;
+          ylo = Math.min(ya, yb); yhi = Math.max(ya, yb);
+        }
+        for (let r = row(ylo - E), r1 = row(yhi + E); r <= r1; r++) fn(r * cw + c);
+      }
+    };
+    const nc = cw * ch, start = new Int32Array(nc + 1);
+    for (let k = 0; k < edges.length; k++) visit(k, c => { start[c + 1]++; });
+    for (let c = 0; c < nc; c++) start[c + 1] += start[c];
+    const ids = new Int32Array(start[nc]), fill = start.slice(0, nc);
+    for (let k = 0; k < edges.length; k++) visit(k, c => { ids[fill[c]++] = k; });
+    const seen = new Int32Array(edges.length);
+    let stamp = 0;
+    return (x, y) => {
+      stamp++;
+      for (let r = row(y - half - E), r1 = row(y + half + E); r <= r1; r++) {
+        for (let c = col(x - half - E), c1 = col(x + half + E); c <= c1; c++) {
+          for (let q = start[r * cw + c], q1 = start[r * cw + c + 1]; q < q1; q++) {
+            const k = ids[q];
+            if (seen[k] === stamp) continue;
+            seen[k] = stamp;
+            if (segDist([x, y], edges[k][0], edges[k][1]) < half) return true;
+          }
+        }
+      }
+      return false;
+    };
+  }
+  /* メートルの座標の輪の辺と、高さ y の横線が交わる x（偶奇判定の式：辺 a=r[i]・b=r[i-1] で、a・b が y をはさむとき）。小さい順 */
+  function crossX(r, y) {
+    const xs = [];
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const a = r[i], b = r[j];
+      if ((a[1] > y) !== (b[1] > y)) xs.push((b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]);
     }
-    return c;
+    return xs.sort((p, q) => p - q);
   }
   /* 塊（outer から holes を除いた形）の、幅が 2×half 以上ある部分の広さが needM2 以上あるか。
      step m 間隔の点で測る：辺から half m 以上はなれた点（芯）を求め、芯から half m 以内にある点を数える
-     （芯をもとの広さに戻した形）。数×step² が足りた時点で true を返す */
+     （芯をもとの広さに戻した形）。数×step² が足りた時点で true を返す
+     速さ（2026-11-18）：点の内外は、行ごとに辺と交わる x を求めて左から順に決め（点ごとの偶奇判定と同じ答え）、
+     辺から half m 未満かは、まわりの升の辺だけで調べる（edgeIndex）。答えは、全部の辺を1点ずつ調べたときと同じ */
   function coreAreaAtLeast(outer, holes, needM2, step = 10, half = 10) {
     if (!outer || outer.length < 3) return false;
     const cosLat = cosOf(outer), o = outer.map(p => mXY(p, cosLat));
@@ -90,20 +138,31 @@
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     o.forEach(q => { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); });
     const nx = Math.floor((x1 - x0) / step) + 1, ny = Math.floor((y1 - y0) / step) + 1;
-    const inn = [], core = new Uint8Array(nx * ny);
-    for (let i = 0; i < nx; i++) {
-      for (let j = 0; j < ny; j++) {
-        const x = x0 + step / 2 + i * step, y = y0 + step / 2 + j * step;
-        if (x > x1 || y > y1 || !inXY(x, y, o) || hs.some(h => inXY(x, y, h))) continue;
-        inn.push([i, j]);
-        let near = false;
-        for (let k = 0; k < edges.length; k++) { if (segDist([x, y], edges[k][0], edges[k][1]) < half) { near = true; break; } }
-        if (!near) core[i * ny + j] = 1;
+    const inn = [], core = new Uint8Array(nx * ny), near = edgeIndex(edges, half);
+    const hb = hs.map(h => { let lo = Infinity, hi = -Infinity; h.forEach(q => { lo = Math.min(lo, q[1]); hi = Math.max(hi, q[1]); }); return { h, lo, hi }; });
+    for (let j = 0; j < ny; j++) {
+      const y = y0 + step / 2 + j * step;
+      if (y > y1) continue;
+      const xo = crossX(o, y);
+      if (!xo.length) continue;
+      const hx = []; // この行と交わる穴（交わらない穴の中に、この行の点はない）
+      hb.forEach(q => { if (y >= q.lo && y < q.hi) { const xs = crossX(q.h, y); if (xs.length) hx.push({ xs, p: 0 }); } });
+      let po = 0;
+      for (let i = 0; i < nx; i++) {
+        const x = x0 + step / 2 + i * step;
+        if (x > x1) break;
+        while (po < xo.length && xo[po] <= x) po++;
+        let inside = (xo.length - po) & 1; // x より右（x < 交わる x）で交わる数が奇数なら中
+        for (const q of hx) { while (q.p < q.xs.length && q.xs[q.p] <= x) q.p++; if ((q.xs.length - q.p) & 1) inside = 0; }
+        if (!inside) continue;
+        inn.push(i * ny + j);
+        if (!near(x, y)) core[i * ny + j] = 1;
       }
     }
     const r = Math.ceil(half / step), lim = half + step * 0.01;
     let n = 0;
-    for (const [i, j] of inn) {
+    for (const idx of inn) {
+      const i = Math.floor(idx / ny), j = idx - i * ny;
       let hit = false;
       for (let a = -r; a <= r && !hit; a++) {
         for (let b = -r; b <= r; b++) {

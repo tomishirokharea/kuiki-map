@@ -69,7 +69,7 @@
 
   /* ---------- 状態 ---------- */
   // tid：えらんでいる区域／tool：null・split・merge・fit・check
-  const S = { tid: null, tool: null, cut: [], split: null, fit: null, issues: [], ii: -1, scope: null, undo: [], drawSnap: null };
+  const S = { tid: null, tool: null, cut: [], split: null, fit: null, issues: [], ii: -1, scope: null, undo: [], drawSnap: null, skip: new Set() }; // skip：今回「とばす」にした取りこぼし（missKey）
   let lay = null;
 
   /* ---------- 計算の道具 ---------- */
@@ -322,9 +322,15 @@
       else rest = P.difference(B, u);
     } catch (e) { return []; }
     const gaps = found.filter(x => x.k === 'gap').map(x => ({ ring: x.ring, b: bboxOf(x.ring) }));
-    // 家の印：境の外わくの中の家だけを、緯度の順にしておく（塊ごとに、緯度の範囲だけを見る）
+    // 家の印：境の外わくの中の家だけを、緯度の順にしておく（塊ごとに、緯度の範囲だけを見る）。
+    // 自分の区域（terrId）の線の中にある家は、区域の合わせた形の中なので、どの塊にも入らない：先に外す（大きな穴のある塊で、家ごとに穴の線を見ないように）
     const bb = rings.map(bboxOf).reduce((a, b) => [Math.min(a[0], b[0]), Math.max(a[1], b[1]), Math.min(a[2], b[2]), Math.max(a[3], b[3])]);
-    const hs = D().houses.filter(h => h && h.lat >= bb[0] && h.lat <= bb[1] && h.lng >= bb[2] && h.lng <= bb[3]).sort((a, b) => a.lat - b.lat);
+    const tmap = new Map(scope.map(t => [t.id, t]));
+    const hs = D().houses.filter(h => {
+      if (!h || !(h.lat >= bb[0] && h.lat <= bb[1] && h.lng >= bb[2] && h.lng <= bb[3])) return false;
+      const t = h.terrId && tmap.get(h.terrId);
+      return !(t && inPoly(h.lat, h.lng, t.polygon));
+    }).sort((a, b) => a.lat - b.lat);
     const firstLat = lat => { let lo = 0, hi = hs.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (hs[mid].lat < lat) lo = mid + 1; else hi = mid; } return lo; };
     const tb = scope.map(t => ({ t, b: bboxOf(t.polygon) }));
     const hid = S.missHidden, out = [];
@@ -345,8 +351,10 @@
       // 幅を測るのは、家の印がなく、広さが足りうる塊だけ（時間がかかるため）
       if (!houses && !(ar >= MISS_CORE_M2 && SK.coreAreaAtLeast(ring, holes, MISS_CORE_M2, MISS_STEP_M, MISS_HALF_M))) { hid.n++; hid.area += ar; continue; }
       const b1 = bbM(ring, 1);
-      const adj = tb.filter(o => bbHit(b1, o.b) && touches(ring, o.t.polygon)).map(o => o.t.id);
-      out.push({ k: 'miss', ring, holes, area: ar, houses, adj });
+      const near = tb.filter(o => bbHit(b1, o.b) && touches(ring, o.t.polygon));
+      const x = { k: 'miss', ring, holes, area: ar, houses, adj: near.map(o => o.t.id) };
+      x.into = near.filter(o => missCanInto(o.t, x)).map(o => o.t.id); // 「区域○に入れる」を出す区域
+      out.push(x);
     }
     out.sort((a, b) => b.houses - a.houses || b.area - a.area);
     return out;
@@ -491,10 +499,10 @@
       body.innerHTML = head + `<div class="senrow">${x.adj.map(id => btn('gapTo', `区域${esc(tno(id))}に入れる`, 'small primary', ` data-t="${esc(id)}"`)).join('')}</div>
         <div class="senrow">${nav}${btn('cancel', 'もどる', 'small')}</div>`;
     } else if (x.k === 'miss') {
-      // 「区域○に入れる」は、5,000㎡以下で、穴（島のようにある区域など）がなく、となりの区域があるときだけ（大きな区域の変更・ほかの区域をのみこむのを防ぐ）
-      const into = x.area <= GAP_MAX && !x.holes.length && x.adj.length;
+      // 「区域○に入れる」は、5,000㎡以下で、穴（島のようにある区域など）がなく、入れたあとの区域の線に穴ができない区域だけ（大きな区域の変更・ほかの区域をのみこむのを防ぐ）
+      const into = x.area <= GAP_MAX && !x.holes.length ? x.into || [] : [];
       hint.textContent = `${S.ii + 1}/${n}：境の中で、どの区域にも入っていない所（${m2(x.area)}・家の印 ${x.houses}軒）${x.houses ? '' : '。家の印はありません。地図で、家があるかを見てください'}`;
-      body.innerHTML = head + (into ? `<div class="senrow">${x.adj.map(id => btn('gapTo', `区域${esc(tno(id))}に入れる`, 'small primary', ` data-t="${esc(id)}"`)).join('')}</div>` : '') +
+      body.innerHTML = head + (into.length ? `<div class="senrow">${into.map(id => btn('gapTo', `区域${esc(tno(id))}に入れる`, 'small primary', ` data-t="${esc(id)}"`)).join('')}</div>` : '') +
         `<div class="senrow">${btn('missNew', '新しい区域の線を引く', 'small')}${btn('missSkip', 'とばす', 'small')}</div>
         <div class="senrow">${nav}${btn('cancel', 'もどる', 'small')}</div>`;
     } else {
@@ -659,6 +667,7 @@
       if (!pc() && !await ensurePc()) return;
       toast('調べています…');
       setTimeout(() => {
+        S.skip = new Set(); // 「とばす」は、次に「調べる」を押すまで
         S.tool = 'check'; S.scope = k === 'check' ? S.tid : null; S.issues = findIssues(S.scope); markAuto(); S.ii = -1;
         paint();
         if (!S.issues.length) toast('すき間や重なりはありませんでした');
@@ -830,8 +839,14 @@
   }
 
   /* ---------- すき間・重なりを直す ---------- */
+  /* 直したあとに一覧を作り直す。「とばす」にした取りこぼしは、次に「調べる」を押すまで出さない */
+  function reFind() {
+    const is = findIssues(S.scope);
+    S.issues = S.skip.size ? is.filter(x => x.k !== 'miss' || !S.skip.has(missKey(x))) : is;
+    markAuto();
+  }
   function afterFix() {
-    S.issues = findIssues(S.scope); markAuto();
+    reFind();
     S.ii = S.issues.length ? Math.min(S.ii, S.issues.length - 1) : -1;
     paint();
     if (S.ii >= 0) focusIssue(S.ii); else toast('すき間・重なりは、すべて直りました');
@@ -844,6 +859,16 @@
     const ring = exactify(fromRing(r[0][0]), [PO(t), x.ring, ...neighbors(t, 3).map(PO)]);
     return ring.length < 3 || selfCross(ring) ? null : ring;
   }
+  /* 取りこぼし x を区域 t に入れてよいか：5,000㎡以下・穴なしで、t と合わせた形が1つの形で穴がないとき
+     （t が x と2か所でふれていると、合わせた形に穴ができ、穴の中のほかの区域を t の線がおおってしまう） */
+  function missCanInto(t, x) {
+    if (!t || !x || x.area > GAP_MAX || (x.holes && x.holes.length)) return false;
+    let r;
+    try { r = pc().union(toPC(t.polygon), toPC(x.ring)); } catch (e) { return false; }
+    return !!r && r.length === 1 && r[0].length === 1;
+  }
+  /* 取りこぼしの見分け（「とばす」に使う）：札の場所（小数5けた）と広さ */
+  const missKey = x => { const p = labelPoint(x.ring); return `${p[0].toFixed(5)},${p[1].toFixed(5)},${Math.round(x.area)}`; };
   /* 区域 lose から、重なり（区域 keep の線）を引いた形。大きい順（なければ null） */
   function ovPieces(lose, keep, PO) {
     let r;
@@ -858,15 +883,16 @@
   const livePoly = t => t.polygon;
   function fixGap(x, tid) {
     const t = terrById(tid); if (!x || !t) return;
-    const ring = gapRing(t, x, livePoly);
+    const ring = x.k === 'miss' && !missCanInto(t, x) ? null : gapRing(t, x, livePoly);
     if (!ring) { toast('うまく入れられませんでした。「形を直す」で直してください'); return; }
     doCommit(`すき間を区域${t.no}に入れました`, () => { const y = terrById(tid); if (y) { y.polygon = ring; reassign(); } });
     afterFix();
   }
-  /* 取りこぼしを「とばす」：今回の一覧からだけ外して、次の所を出す（覚えない。もう一度調べると、また出る） */
+  /* 取りこぼしを「とばす」：今回だけ外して、次の所を出す（次に「調べる」を押すと、また出る） */
   function skipMiss() {
     const x = S.issues[S.ii];
     if (!x || x.k !== 'miss') return;
+    S.skip.add(missKey(x)); // 直したあとの作り直しでも出さない（次に「調べる」を押すまで）
     S.issues.splice(S.ii, 1);
     if (!S.issues.length) { S.ii = -1; paint(); return; }
     focusIssue(Math.min(S.ii, S.issues.length - 1));
@@ -964,7 +990,7 @@
       over.forEach((ring, id) => { const y = terrById(id); if (y) y.polygon = ring; });
       reassign();
     });
-    S.issues = findIssues(S.scope); markAuto(); S.ii = -1;
+    reFind(); S.ii = -1;
     paint();
   }
 
