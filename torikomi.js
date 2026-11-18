@@ -38,19 +38,24 @@
   document.head.appendChild(css);
 
   const item = (key, ic, title, sub, file, cls) => file
-    ? `<label class="tk-it${cls ? ' ' + cls : ''}"><span class="ic" aria-hidden="true">${ic}</span><span class="tx"><b>${title}</b><small>${sub}</small></span><span class="chev" aria-hidden="true">›</span><input type="file" data-tkf="${key}"${file === 'multi' ? ' multiple' : ''}${key === 'xlsx' || key === 'dncXl' ? ' accept=".xlsx,.xls,.csv,.tsv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"' : ''}></label>`
+    ? `<label class="tk-it${cls ? ' ' + cls : ''}"><span class="ic" aria-hidden="true">${ic}</span><span class="tx"><b>${title}</b><small>${sub}</small></span><span class="chev" aria-hidden="true">›</span><input type="file" data-tkf="${key}"${file === 'multi' ? ' multiple' : ''}${key === 'sakai' ? ' accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz"' : ''}${key === 'xlsx' || key === 'dncXl' ? ' accept=".xlsx,.xls,.csv,.tsv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"' : ''}></label>`
     : `<button type="button" class="tk-it${cls ? ' ' + cls : ''}" data-tk="${key}"><span class="ic" aria-hidden="true">${ic}</span><span class="tx"><b>${title}</b><small>${sub}</small></span><span class="chev" aria-hidden="true">›</span></button>`;
 
   /* ---------- 区域の線・取り込み（下から出る画面） ---------- */
   function openMake() {
     if (!isAdmin()) { toast('区域係だけが使えます'); return; }
     const nT = D().territories.filter(t => !t.dummy && !isSpecial(t)).length;
+    const sk = window.Sakai && Sakai.info ? Sakai.info() : null; // 会衆の境（S-54）：今あれば名前と日付を出す
+    const skSub = !sk ? '会衆の区域割り当て（S-54）のKMLから、会衆の境を地図に出します。区域は変わりません'
+      : '今：' + esc(sk.n || '（名前なし）') + (Sakai.dateText && Sakai.dateText(sk.d) ? '（' + Sakai.dateText(sk.d) + '）' : '');
     setSheet(headHtml(null, '区域の線・取り込み', `全部で ${nT}区域`) + `
       <p class="tk-sec">地図で</p>
       ${item('new', '＋', '新しい区域の線を引く', '地図をタップして、区域の線を引きます', null, 'primary')}
       ${item('fix', '✎', '区域の線を直す', '形・となりに合わせる・分ける（家の数を見ながら）・1つにする')}
       ${item('del', '−', '区域の線を消す', '線だけを消します。家・拒否・訪問の記録は残ります')}
       <p class="tk-sec">ファイルから（えらんだものだけが変わります）</p>
+      ${window.Sakai && Sakai.openImport ? item('sakai', '境', '会衆の境（S-54）', skSub, 'one') : ''}
+      ${sk && Sakai.clear ? item('sakaiDel', '−', '会衆の境を消す', '地図の境の線を消します。区域は変わりません') : ''}
       ${item('lines', '線', '区域の線だけ（マイマップ）', 'ファイルにある区域の線だけを新しくします。拒否・注意・家はそのまま', 'multi')}
       ${item('pins', '拒', '拒否・注意だけ（マイマップ）', '区域の線は変えずに、ピンを拒否・注意として入れます', 'multi')}
       ${item('dncXl', '拒', '拒否だけ（エクセル・CSVの住所の一覧）', '住所から場所を調べて、拒否として入れます', 'one')}
@@ -71,6 +76,7 @@
       const k = inp.dataset.tkf;
       if (k === 'lines' || k === 'pins' || k === 'all') { if (window.kmlKoushinStart) window.kmlKoushinStart(fs, k); return; }
       if (k === 'dncXl') { if (window.kyohiApi && window.kyohiApi.readXl) window.kyohiApi.readXl(fs[0]); return; }
+      if (k === 'sakai') { if (window.Sakai && Sakai.openImport) Sakai.openImport(fs[0]); return; }
       if (k === 'xlsx') readXlsxFile(fs[0]);
     });
   }
@@ -80,6 +86,7 @@
     if (k === 'del') { openDelLines(); return; }
     if (k === 'apt') { closeSheet(); $('#adAptImp').click(); return; }
     if (k === 'special') { openSpecialSheet(null); return; }
+    if (k === 'sakaiDel') { closeSheet(); if (window.Sakai && Sakai.clear) Sakai.clear(); return; }
   }
 
   /* ---------- 区域の線を消す（家・拒否・記録は残す） ---------- */

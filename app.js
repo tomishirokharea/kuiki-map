@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.160';
+var APP_JS_VER = '2026.13.161';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -296,7 +296,7 @@ function makeDemo() {
     { id: 'p4', kind: 'p', terrId: 't2', year: svcYearOf(new Date(now - 365 * DAY)), c: dAgo(420), at: iso(now), by: 'u3' }
   ];
   return { version: 4, users, territories, houses, visits, dnc, follows, released, requests, awayCards: [], returns, s13, schedules,
-    settings: { remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, awayCap: 3, awayNoRepeat: 1, awayScope: 0, capDncQ: 1, capLang: 1 }, currentUser: 'u1' };
+    settings: { remindDays: 21, escalateDays: 42, selfTakeMax: 2, awayDays: 7, awayMax: 2, donePct: 90, awayCap: 3, awayNoRepeat: 1, awayScope: 0, capDncQ: 1, capLang: 1, capArea: 1 }, currentUser: 'u1' };
 }
 
 /* ---------- 保存 ----------
@@ -2817,6 +2817,13 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.161', items: [
+    ['境', '地図に、会衆の境を灰色の破線で出すようにしました（区域係が取り込んだとき）。区域の線とは別の線で、押してもえらばれません。']
+  ] },
+  { v: '2026.13.161', role: 'admin', items: [
+    ['境', '区域係：「区域の線・取り込み」で、会衆の区域割り当て（S-54）のKMLから会衆の境を取り込めます。'],
+    ['境', '区域係：「全部の区域のすき間・重なりを調べる」で、会衆の境の中で、どの区域にも入っていない所（取りこぼし）も出ます。']
+  ] },
   { v: '2026.13.160', items: [['地', '地図の名前が重ならないようにしました。同じ場所の目印と建物の名前は、建物の名前だけを出します。重なるときは、縮めた地図では目印を、拡大した地図では建物の名前を先に出します。いちばん拡大すると、全部の名前が出ます。']] },
   { v: '2026.13.159', items: [
     ['薦', 'おすすめタブに出す家を変えました。留守宅カードにして返した区域（だれも持っていない区域）で、まだ訪ねていない家と、まだ会えていない家を、近くの数軒ずつ出します。区域をまたいでまとめることもあります。カードを受け取らなくても回れます。'],
