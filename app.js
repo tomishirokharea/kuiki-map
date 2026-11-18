@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.166';
+var APP_JS_VER = '2026.13.167';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -1384,6 +1384,7 @@ function openWaiting() {
    もう一度ためせば直る見込みのあるものには retry をつける */
 const LASTERR_KEY = 'kuiki_last_error';
 function noteError(action, e, T) {
+  if (/^diag_/.test(String(action || ''))) return; // 記録を送る・届いた記録を読む通信の失敗は、「直前のエラー」にも記録にも残さない（監査）
   try { lsSet(LASTERR_KEY, JSON.stringify({ at: new Date().toISOString(), action, code: e.code || e.message, sample: e.sample || '' })); } catch (x) { /* 何もしない */ }
   errLogAdd(action, e, T);
 }
@@ -1398,6 +1399,7 @@ function errLogList() {
   try { const a = JSON.parse(lsGet(ERRLOG_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
 }
 function errLogAdd(action, e, T) {
+  if (/^diag_/.test(String(action || ''))) return; // 記録を送る通信そのものの失敗は足さない（くり返しになるため）
   try {
     const x = { at: new Date().toISOString(), action: String(action || '').slice(0, 30), code: String((e && (e.code || e.message)) || '').slice(0, 30),
       sec: T ? Math.round((Date.now() - T) / 100) / 10 : 0, on: navigator.onLine !== false, hid: !!document.hidden };
@@ -1426,8 +1428,16 @@ function openErrLog() {
   const txt = errLogText(list);
   setSheet(headHtml(null, '通信の失敗の記録', 'このスマホで、通信がうまくいかなかったときの記録') + `
     <pre class="loadlog">${esc(txt)}</pre>
-    <button type="button" class="btn primary block" id="elCopy">コピーする</button>
-    <p class="hint">「つながっていません」「未送信」とよく出るときは、コピーして区域係（または作った人）に送ってください。名前や住所は記録していません（サーバーが返したエラーの文の先頭だけ、入ることがあります）。</p>`);
+    ${LIVE ? '<button type="button" class="btn primary block" id="elSend">この記録を区域係に送る</button>' : ''}
+    <button type="button" class="btn block" id="elCopy">コピーする</button>
+    <p class="hint">「つながっていません」「未送信」とよく出るときは、「この記録を区域係に送る」を押してください（送るのは、時刻・通信の種類・失敗の種類・かかった秒数などと、あなたの名前・役割です。住所や訪問の記録は送りません）。歯車の設定で、自動で送るようにもできます。</p>`);
+  if ($('#elSend')) $('#elSend').onclick = async () => {
+    const b = $('#elSend'); b.disabled = true;
+    const r = await diagSendAll();
+    toast(r === 'ok' ? '送りました。ありがとうございます' : r === 'unknown_action' ? 'サーバーの準備がまだできていません（サーバーの更新が必要です）'
+      : r === 'many' ? '少し前に送ったばかりです。1時間ほどあとに、もう一度押してください' : '送れませんでした。少し待って、もう一度押してください');
+    if ($('#elSend')) $('#elSend').disabled = false;
+  };
   $('#elCopy').onclick = async () => {
     try { await navigator.clipboard.writeText(txt); toast('コピーしました'); }
     catch (e) { const r = document.createRange(); r.selectNodeContents($('#sheet .loadlog')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('選んだ状態にしました。長押しでコピーしてください'); }
@@ -2020,6 +2030,67 @@ async function firstRefresh() {
   if (Store.authLost || Store.inactive) return;
   toast(navigator.onLine === false ? 'インターネットにつながっていません。前回の情報を表示しています'
     : 'サーバーから最新の情報を受け取れませんでした。前回の情報を表示しています。自動でもう一度ためします', null, { label: '記録を見る', fn: openErrLog });
+}
+/* ---------- 通信の失敗の記録を、区域係に送る（2026.13.167・サーバーは diag.gs） ----------
+   ・送るのは、歯車の設定で「送る」をえらんだスマホだけ（はじめは「送らない」。このスマホだけの設定）。
+     「送る」にする前の失敗は、自動では送らない（えらんだ時刻より新しいものだけ）
+   ・記録の画面の「この記録を区域係に送る」は、押したときに、いまある記録を送る（本人が押したので）
+   ・送る項目は、時刻・通信の名前・失敗の種類・秒数・圏外かどうか・画面が裏か・続けて起きた回数だけ。
+     サーバーが返したエラーの文（sample）は送らない。名前はサーバーが、ログインしている人から付ける
+   ・自動で送るのは6時間に1回まで。失敗の直後（2分以内）は送らない（混んでいるときに通信を足さないため）
+   ・送れなかったときは、何も出さず、次の機会に送る */
+const DIAG_ON_KEY = 'kuiki_diag_send', DIAG_SENT_KEY = 'kuiki_diag_sent', DIAG_TRY_KEY = 'kuiki_diag_try';
+const DIAG_EVERY_MS = 6 * 3600000, DIAG_QUIET_MS = 120000;
+let diagBusy = false, diagCheckAt = 0;
+function diagOn() { return lsGet(DIAG_ON_KEY) === '1'; }
+function diagSetOn(on) {
+  lsSet(DIAG_ON_KEY, on ? '1' : '0');
+  if (on) lsSet(DIAG_SENT_KEY, new Date().toISOString()); // えらんだ時刻より前の記録は、自動では送らない
+}
+const diagStamp = x => String(x.last || x.at || '');
+function diagPick(list) {
+  return list.filter(x => x && !/^diag_/.test(String(x.action || ''))).slice(-30).map(x => {
+    const o = { at: x.at, action: x.action, code: x.code, sec: x.sec, on: x.on !== false, hid: !!x.hid };
+    if (x.n > 1) { o.n = x.n; o.last = x.last; }
+    return o;
+  });
+}
+function diagDev() { try { return (window.IkenR && IkenR._ctx().dev) || ''; } catch (e) { return ''; } }
+async function diagPost(list) {
+  const items = diagPick(list);
+  if (!items.length) return false;
+  await api('diag_send', { items, ver: APP_VERSION, dev: diagDev() }, { timeout: 30000 });
+  const top = list.map(diagStamp).sort().pop();
+  if (top && top > (lsGet(DIAG_SENT_KEY) || '')) lsSet(DIAG_SENT_KEY, top);
+  return true;
+}
+/* 自動の送信。force：6時間に1回の決まりだけを外す（試験用） */
+async function diagMaybeSend(force) {
+  if (!LIVE || diagBusy || !diagOn() || navigator.onLine === false || Store.authLost || Store.inactive) return;
+  if (!force && Date.now() - Number(lsGet(DIAG_TRY_KEY) || 0) < DIAG_EVERY_MS) return;
+  const ptr = lsGet(DIAG_SENT_KEY) || '';
+  const L = errLogList().filter(x => !/^diag_/.test(String(x.action || '')) && diagStamp(x) > ptr);
+  if (!L.length) return;
+  if (L.some(x => Date.now() - Date.parse(diagStamp(x)) < DIAG_QUIET_MS)) return;
+  diagBusy = true; lsSet(DIAG_TRY_KEY, String(Date.now()));
+  try { await diagPost(L); } catch (e) { /* 次の機会に */ } finally { diagBusy = false; }
+}
+/* 記録の画面から、いまある記録を送る。送れたら 'ok'。だめなら、失敗の種類（unknown_action＝古いサーバー・many＝送りすぎ など） */
+async function diagSendAll() {
+  if (!LIVE) return 'off';
+  if (diagBusy) return 'busy';
+  diagBusy = true;
+  try { return (await diagPost(errLogList())) ? 'ok' : 'empty'; } catch (e) { return String((e && e.code) || 'error'); } finally { diagBusy = false; }
+}
+/* 歯車の設定に出す所（かんたん：1画面の中／くわしく：「起動と案内」の中） */
+function diagSetHtml() {
+  if (!LIVE) return '';
+  const on = diagOn();
+  return `<div class="diagset"><h3 class="sub">不具合の記録を送る</h3>
+    <p class="q">通信がうまくいかなかったときの記録を、区域係に送る</p>
+    <div class="seg uiseg" role="group" aria-label="通信がうまくいかなかったときの記録を、区域係に送る"><button type="button" data-diag="off" aria-pressed="${!on}">送らない</button><button type="button" data-diag="on" aria-pressed="${on}">送る</button></div>
+    <p class="diagnote">「送る」にすると、このスマホで通信がうまくいかなかったときの記録が、自動で区域係に届きます。不具合を早く見つけて直すためだけに使います。届くのは、起きた時刻・通信の種類・失敗の種類・かかった秒数・電波の状態・アプリの版・スマホの種類（iPhone など）と、あなたの名前・役割です。住所・訪問の記録・メモは送りません。届いた記録は、90日をすぎたら消します（区域係が取る全体の控えには、そのあともしばらく残ります）。いつでも「送らない」にもどせます。</p>
+    <div class="row"><button type="button" class="btn small" id="diagSee">このスマホの記録を見る</button></div></div>`;
 }
 /* 最新の変更を取りに行く */
 async function refresh(force) {
@@ -2894,6 +2965,8 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.167', items: [['通', '通信がうまくいかなかったときの記録を、区域係に自動で送れるようになりました。歯車の設定の「不具合の記録を送る」で「送る」をえらんだスマホだけが送ります（はじめは「送らない」です）。住所や訪問の記録は送りません。']] },
+  { v: '2026.13.167', role: 'admin', items: [['人', '区域係：「人」で、まだ登録していない人と、しばらく開いていない人が、うすい色の行と文字の印で分かるようになりました。その人だけにしぼることもできます。'], ['通', '区域係：みんなのスマホから届いた通信の失敗の記録が、「設定」の「こまったこと・提案」の「AIに渡す形でコピー」に、名前を外して入るようになりました。']] },
   { v: '2026.13.166', items: [['通', '開いたときに、電波に問題がなくても「インターネットにつながっていません」と出ることがあったのを見直しました。1回うまくいかなくても自動でやり直し、それでも受け取れないときだけ知らせます。'], ['通', '通信がうまくいかなかったときの記録を、このスマホの中に残すようにしました。上に「未送信」と出ているときに、そこを押した画面から見られます（名前や住所は記録しません）。']] },
   { v: '2026.13.165', role: 'admin', items: [['登', '区域係：「共通リンクのQRを見せる」を押したときに、リンクがあるのに「共通リンクがありません」と出ることがあったのを直しました。']] },
   { v: '2026.13.164', items: [['登', '共通のQRを何人かが続けて読んだときに、「登録は見送りになりました」と出たり、係の登録がなかなか届かなかったりすることがあったのを直しました。']] },
@@ -11256,7 +11329,7 @@ function openUiSheet() {
       // かんたんモード：目次にせず1画面（地図の見た目・画面の見え方・文字の大きさ・番号と線の濃さ・機能をふやす・はじめの案内・使い方の動画・言語）
       b = `<h2 id="sheetTitle" class="uititle" tabindex="-1">設定</h2>` + S_BASE + S_VIEW + S_TEXT + S_NOUDO +
         `<details class="kmore"${uiKOpen ? ' open' : ''}><summary>機能をふやす</summary>${F_FEAT}</details>` +
-        S_GUIDE_SIMPLE + uiSlot('start') + (window.KI ? KI.picker(false) : '') +
+        S_GUIDE_SIMPLE + uiSlot('start') + diagSetHtml() + (window.KI ? KI.picker(false) : '') +
         `<p class="hint">「くわしく」にすると、テーマの色・文字の種類・地図の印の大きさなども、自分の好みに変えられます。</p>` + tail;
     } else if (page === 'top') {
       b = `<h2 id="sheetTitle" class="uititle" tabindex="-1">設定</h2>` + S_BASE + S_VIEW + uiCatList() + tail;
@@ -11313,7 +11386,7 @@ function openUiSheet() {
         ${UI.splash !== 'off' ? `<div class="zoomrow"><input type="range" id="uiSplash" min="1" max="5" step="0.5" value="${UI.splashSec || 1.8}" aria-label="あいさつを出す時間（秒）"><output id="uiSplashOut">${UI.splashSec || 1.8}秒</output></div>
           <div class="row"><button type="button" class="btn small" id="uiSplashTry">ためしに見る</button></div>` : ''}
         <p class="q">はじめの案内（使い方の動画のお知らせ・「拡大すると家の印が出ます」など）</p>${seg('guide', [['auto', '最初の数日だけ'], ['on', 'いつも出す'], ['off', '出さない']])}
-        ${uiSlot('start')}`;
+        ${uiSlot('start')}${diagSetHtml()}`;
       } else if (page === 'lang') {
         body = window.KI ? KI.picker(false, { noHead: true }) : '';
       }
@@ -11401,6 +11474,14 @@ function openUiSheet() {
       if (k === 'mode') page = 'top'; // かんたん／くわしくを切りかえたら、最初の画面から
       paint(k !== 'mode');
     });
+    // 不具合の記録を送る（このスマホだけの設定。「見え方を最初にもどす」では変えない）
+    $$('[data-diag]', $('#sheet')).forEach(x => x.onclick = () => {
+      const on = x.dataset.diag === 'on';
+      if (on === diagOn()) return;
+      diagSetOn(on); paint(true);
+      toast(on ? '通信の失敗の記録を、区域係に送るようにしました' : '通信の失敗の記録を、送らないようにしました');
+    });
+    if ($('#diagSee')) $('#diagSee').onclick = () => openErrLog();
     const rs = $('#uiReset');
     if (rs) rs.onclick = async () => {
       if (!await ask('画面の見え方を、最初の状態にもどします（「使う機能」はそのままです）。地図の線の色や建物の名前も、最初の状態（見やすい設定）になります。よろしいですか？')) return;
@@ -11876,7 +11957,7 @@ function openQrSheet(title, sub, url, opts) {
 }
 
 /* ---------- 係の画面：スマホの承認と共通リンク（本番のときだけ） ---------- */
-const devState = { list: null, joinUrl: '', at: 0, busy: false, sig: '', p: null, err: false }; // p：いま読んでいる途中の通信／err：最後の読みこみが失敗した（2026.13.165）
+const devState = { list: null, joinUrl: '', at: 0, busy: false, sig: '', p: null, err: false, seenBy: null, seenAt: 0, seenSig: '', seenNo: false }; // seenBy：人ごとの最後に使った時刻（係の画面「人」。古いサーバーでは null のまま）／seenAt：それを最後に聞いた時刻 // p：いま読んでいる途中の通信／err：最後の読みこみが失敗した（2026.13.165）
 let qrWatching = false; // 共通リンクのQRを見せているあいだは、読み取った人をすぐ出す
 const devPending = () => (devState.list || []).filter(d => d.status === 'pending');
 /* スマホの申し込みを確かめる間隔（2026.13.164）：
@@ -11890,15 +11971,26 @@ async function fetchDevices(force) {
   if (!LIVE || !isAdmin() || devState.busy) return;
   if (!force && Date.now() - devState.at < (devFast() ? DEV_FAST_MS : DEV_IDLE_MS)) return;
   devState.busy = true;
-  let changed = false, done;
+  let changed = false, seenChanged = false, done;
   devState.p = new Promise(r => { done = r; }); // 読み終わるのを待ちたい所（共通リンクのQR）のため
   try {
-    const j = await api('devices');
+    // 係の画面「人」を開いている間だけ、人ごとの「最後に使った時刻」も聞く（1分に1回まで。数秒ごとの確かめには付けない）
+    const wantSeen = currentView === 'admin' && adPane === 'people' && Date.now() - devState.seenAt > 60000;
+    if (wantSeen) devState.seenAt = Date.now();
+    const j = await api('devices', wantSeen ? { seen: 1 } : {});
     devState.list = j.devices || []; devState.joinUrl = j.joinUrl || ''; devState.at = Date.now(); devState.err = false;
     const sig = JSON.stringify(devState.list);
     changed = sig !== devState.sig; devState.sig = sig;
+    if (wantSeen && j.seenOk !== 1 && !devState.seenBy && !devState.seenNo) { devState.seenNo = true; seenChanged = true; } // 古いサーバー：場所を取るのをやめる
+    if (wantSeen && j.seenOk === 1 && j.seenBy && typeof j.seenBy === 'object') {
+      devState.seenNo = false;
+      devState.seenBy = j.seenBy;
+      const ss = userUseSig();
+      if (ss !== devState.seenSig) { devState.seenSig = ss; seenChanged = true; }
+    }
   } catch (e) { devState.err = true; /* 次の機会に */ }
   finally { devState.busy = false; devState.p = null; done(); }
+  if (seenChanged && currentView === 'admin' && adPane === 'people') renderPeople();
   if (!changed && !force) return;
   badgeRev++; // スマホの登録の申し込みが変わった
   if (currentView === 'admin') { renderDevices(); renderInbox(); }
@@ -14850,10 +14942,26 @@ async function approveDevice(d, extra, name, back) {
 }
 /* 人のさがす欄と、グループの絞り込み（その場で絞る。描き直しても残す）。名前・よみの比べ方は nameHit（ひらがな・カタカナどちらでも） */
 let peopleQ = '', peopleGrp = '';
+/* ---------- 人ごとの「使っているか」（2026.13.167・係の画面「人」） ----------
+   まだ登録していない人・しばらく開いていない人を、うすい色の行と文字の印で分かるようにする。
+   ・人の id で見る（サーバーの seenBy：人の id → 最後に使った時刻）。グループや並び順は使わないので、グループを変えても変わらない
+   ・none ＝使った記録がない（登録まだ）／stale ＝スマホに情報を残す日数（設定の日数。こえるとスマホから情報が消える）より長く開いていない／'' ＝使っている
+   ・サーバーが古くて seenBy がないとき・区域係でないときは null（印を出さない。「まだ」とまちがって出さないため） */
+function userUse(u) {
+  if (!isAdmin() || !devState.seenBy || !u) return null;
+  const at = Date.parse(devState.seenBy[u.id] || '');
+  if (!isFinite(at)) return { k: 'none', days: 0 };
+  const days = Math.max(0, Math.floor((Date.now() - at) / DAY));
+  return { k: days > cacheDaysLimit() ? 'stale' : '', days };
+}
+function userUseSig() { try { return D().users.filter(u => !u.inactive).map(u => { const x = userUse(u); return x ? `${u.id}:${x.k}:${x.k === 'stale' ? x.days : ''}` : ''; }).join(','); } catch (e) { return ''; } }
+function userUseText(x) { return !x ? '' : x.k === 'none' ? '登録まだ' : x.k === 'stale' ? `${x.days}日 開いていない` : ''; }
+let peopleUse = ''; // しぼりこみ：''（すべて）・none（登録まだ）・stale（しばらく開いていない）
 function applyPeopleFilter() {
   const box = $('#adPeople'); if (!box) return;
   const rows = $$('.uplist [data-name]', box);
-  rows.forEach(r => { r.hidden = !(nameHit(r.dataset.name, r.dataset.yomi, peopleQ) && (!peopleGrp || r.dataset.grp === peopleGrp)); });
+  rows.forEach(r => { r.hidden = !(nameHit(r.dataset.name, r.dataset.yomi, peopleQ) && (!peopleGrp || r.dataset.grp === peopleGrp) && (!peopleUse || r.dataset.use === peopleUse)); });
+  $$('#adUseChips [data-puse]', box).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.puse === peopleUse)));
   const none = $('#adPeopleNone', box); if (none) none.hidden = !rows.length || rows.some(r => !r.hidden);
   $$('#adPeopleChips [data-pgrp]', box).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.pgrp === peopleGrp)));
 }
@@ -14866,6 +14974,21 @@ function renderPeople() {
   const noYomi = admin && yomiOn() ? D().users.filter(u => !u.inactive && !u.yomi).length : 0;
   const groups = admin ? groupsAll() : [];
   if (peopleGrp && !groups.includes(peopleGrp)) peopleGrp = '';
+  // 使っているか（区域係だけ。サーバーが新しいときだけ）。開いたときに聞く（返事が来たら、もう一度描く）
+  if (admin && LIVE && currentView === 'admin' && adPane === 'people' && Date.now() - devState.seenAt > 60000) {
+    if (devState.p) devState.p.then(() => fetchDevices(true)); // いま別の確かめの途中なら、それが終わってからすぐ聞く
+    else fetchDevices(true);
+  }
+  const useOf = {}; let nNone = 0, nStale = 0;
+  if (admin) users.forEach(u => { const x = userUse(u); if (x) { useOf[u.id] = x; if (x.k === 'none') nNone++; else if (x.k === 'stale') nStale++; } });
+  if (peopleUse && !((peopleUse === 'none' && nNone) || (peopleUse === 'stale' && nStale))) peopleUse = '';
+  // 使っているかの場所（区域係だけ）。返事を待つ間も同じ高さを取っておき、返事が来たときに下の行がずれて押しまちがえないようにする（監査）。
+  // 古いサーバー（返事に印がない）と分かったら出さない
+  const lim = cacheDaysLimit();
+  const useBox = !(admin && LIVE) || devState.seenNo ? '' : `<div class="usebox" id="adUseBox">${!devState.seenBy ? '<p class="usenote">使っているかを確かめています…</p>'
+    : nNone + nStale ? `<div class="chips" id="adUseChips" role="group" aria-label="使っているかの絞り込み"><button type="button" class="chip" data-puse="" aria-pressed="${!peopleUse}">すべて</button>${nNone ? `<button type="button" class="chip" data-puse="none" aria-pressed="${peopleUse === 'none'}">登録まだ（${nNone}）</button>` : ''}${nStale ? `<button type="button" class="chip" data-puse="stale" aria-pressed="${peopleUse === 'stale'}">しばらく開いていない（${nStale}）</button>` : ''}</div>
+      <details class="usehelp"><summary>うすい色の行について</summary><p class="usenote">うすい色の行は、まだ登録していない人（一度も開いていない人）と、${lim}日より長く開いていない人です。${lim}日より長く開いていないスマホからは、区域の情報が消えています（電波のある所で開き直すと、また使えます）。その人だけのリンクで使っている人は、この版になってから一度開くまで「登録まだ」と出ます。</p></details>`
+    : `<p class="usenote">全員が登録していて、この${lim}日のあいだに開いています。</p>`}</div>`;
   const keepFocus = document.activeElement && document.activeElement.id === 'adPeopleQ' ? document.activeElement.selectionStart : null;
   box.innerHTML = `<h2 class="sec">${admin ? '人とグループ' : `${esc(myGroup())}グループの人`}</h2>
     ${admin ? `<div class="row"><button class="btn primary" id="adUserAdd">＋ 人を追加</button>
@@ -14875,19 +14998,24 @@ function renderPeople() {
     ${noYomi ? `<div class="notice info"><b>よみが入っていない人が ${noYomi}人 います。</b>よみを入れると、名前があいうえお順に並び、ひらがなでもさがせます。<div class="row"><button class="btn small" id="adYomi">まとめて入れる</button></div></div>` : ''}
     <div class="pfind"><div class="tfind"><input type="search" id="adPeopleQ" enterkeyhint="search" autocomplete="off" placeholder="名前・よみでさがす" aria-label="人をさがす（名前・よみ）" value="${esc(peopleQ)}"></div>
       ${groups.length ? `<div class="chips" id="adPeopleChips" role="group" aria-label="グループの絞り込み"><button type="button" class="chip" data-pgrp="" aria-pressed="${!peopleGrp}">すべて</button>${groups.map(g => `<button type="button" class="chip" data-pgrp="${esc(g)}" aria-pressed="${peopleGrp === g}">${esc(g)}</button>`).join('')}</div>` : ''}
+      ${useBox}
       ${admin ? '<p class="hint">人の行を押すと、グループ・役割を直せます。</p>' : ''}</div>
     <div class="uplist">${users.map(u => {
       const who = `<span class="stamp sm" style="font-size:16px">${esc(u.group || '—')}</span>
         <span class="tl-n"><b>${esc(u.name)}${u.role === 'admin' ? '（区域係）' : ''}${u.overseer ? ' <span class="gbadge">監督</span>' : ''}${u.leader ? ' <span class="gbadge">司会者</span>' : ''}${admin && u.mgr && u.role !== 'admin' ? ' <span class="gbadge">家の管理</span>' : ''}</b></span>`;
-      const at = `data-name="${esc(u.name)}"${yomiAttr(u)} data-grp="${esc(u.group || '')}"`;
+      const ux = useOf[u.id], ut = userUseText(ux);
+      const at = `data-name="${esc(u.name)}"${yomiAttr(u)} data-grp="${esc(u.group || '')}"${ux ? ` data-use="${ux.k}"` : ''}`;
       // 区域係：1人1行。押すと下から出る画面で直す（改善案A5。押しまちがいでグループや役割が変わらないように）
-      return admin ? `<button type="button" class="trow1" ${at} data-uedit="${esc(u.id)}">${who}<span class="tl-go" aria-hidden="true">›</span></button>` : `<div class="trow1 prow-ro" ${at}>${who}</div>`;
+      // まだ登録していない人・しばらく開いていない人は、うすい色の行にして、文字の印も付ける（色だけで分けない）
+      return admin ? `<button type="button" class="trow1${ut ? ' urow-off' : ''}" ${at} data-uedit="${esc(u.id)}">${ut ? who.replace('</b>', ` <span class="ubadge">${esc(ut)}</span></b>`) : who}<span class="tl-go" aria-hidden="true">›</span></button>` : `<div class="trow1 prow-ro" ${at}>${who}</div>`;
     }).join('')}</div>
     <p class="muted" id="adPeopleNone" hidden>当てはまる人がいません。</p>`;
   const q = $('#adPeopleQ', box);
   q.addEventListener('input', () => { peopleQ = q.value; applyPeopleFilter(); });
   const chips = $('#adPeopleChips', box);
   if (chips) chips.addEventListener('click', e => { const b = e.target.closest('[data-pgrp]'); if (!b) return; peopleGrp = b.dataset.pgrp; applyPeopleFilter(); });
+  const uchips = $('#adUseChips', box);
+  if (uchips) uchips.addEventListener('click', e => { const b = e.target.closest('[data-puse]'); if (!b) return; peopleUse = b.dataset.puse; applyPeopleFilter(); });
   applyPeopleFilter();
   if (keepFocus != null) { q.focus(); try { q.setSelectionRange(keepFocus, keepFocus); } catch (e) { /* 種類による */ } }
   if (admin) {
@@ -14906,7 +15034,9 @@ function openEditUser(id) {
   const f = { role: roleOf(u0), group: u0.group || '', overseer: !!u0.overseer, leader: !!u0.leader, yomi: u0.yomi || '', mgr: !!u0.mgr, name: u0.name || '' };
   const paint = () => {
     const u = userById(id); if (!u) { closeSheet(); return; }
+    const ux = userUse(u);
     setSheet(headHtml(null, `${esc(u.name)}さん`, yomiOn() ? '名前・役割・グループ・よみを直します' : '名前・役割・グループを直します') + `
+      ${ux && ux.k ? `<p class="usenote">${ux.k === 'none' ? 'まだ登録していません（一度も開いていません）。下の「リンク・QR」か、共通リンクのQRで登録できます。' : `${ux.days}日 開いていません。${cacheDaysLimit()}日より長く開いていないスマホからは、区域の情報が消えています（電波のある所で開き直すと、また使えます）。`}</p>` : ''}
       <label class="field"><span>名前</span>
         <input type="text" id="euName" maxlength="30" value="${esc(f.name)}" placeholder="例：山田 花子" autocomplete="off" lang="ja"></label>
       <p class="q">役割</p>
@@ -16874,6 +17004,7 @@ async function init() {
       updateSyncAge();
       if (Store.queue.length) { if (!flushing) flush(); return; }
       MemoSync.tick(); // 再訪問メモを、同じ人のほかの端末と合わせる（送っていない変更を送り終えてから）
+      if (Date.now() - diagCheckAt > 60000) { diagCheckAt = Date.now(); diagMaybeSend(); } // 通信の失敗の記録を送る（「送る」をえらんだスマホだけ・6時間に1回まで）
       if (Date.now() >= nextPollAt) {
         schedulePoll(); // 返事を待つ間に、もう一度取りに行かないように先に次の時刻を決める
         refresh(true).then(() => { pollFail = 0; }).catch(() => { pollFail = Math.min(3, pollFail + 1); }).then(schedulePoll);

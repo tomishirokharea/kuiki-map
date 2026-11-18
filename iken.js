@@ -234,6 +234,7 @@
 
   /* ---- 区域係：設定と、届いた声 ---- */
   let items = null, filt = 'open', loading = false;
+  let diag = null; // 自動で届いた通信の失敗の記録（diag.gs）。読めなかったとき・古いサーバーのときは null（2026.13.167）
   // 読み込みの途中で状態を変えたとき、あとから届いた古い一覧で元にもどらないよう、変えた分を重ねる（監査 M-2）
   let markSeq = 0;
   const marks = [];
@@ -258,8 +259,12 @@
     loading = true;
     const box = $('#ikList'); if (box) box.innerHTML = '<p class="hint">読み込んでいます…</p>';
     const seq0 = markSeq;
+    // 通信の失敗の記録も一緒に読む（読めなくても、届いた声の一覧は今までどおり出す）
+    const dp = api('diag_list', {}, { timeout: 30000 }).then(r => (Array.isArray(r.items) ? r.items : null)).catch(() => null);
+    // 記録の返事は待たない（届いた声を先に出す。記録は、届いたときに1行足す）
+    dp.then(d => { diag = d; if (items && !loading) renderAdmin(); });
     try { const r = await api('iken_list', {}, { timeout: 45000 }); items = withMarks(r.items || [], seq0); }
-    catch (e) { items = null; toast(e && e.code === 'unknown_action' ? 'サーバーの準備がまだできていません（サーバーの更新が必要です）' : '読み込めませんでした。電波を確かめて、もう一度押してください'); }
+    catch (e) { items = null; diag = null; toast(e && e.code === 'unknown_action' ? 'サーバーの準備がまだできていません（サーバーの更新が必要です）' : '読み込めませんでした。電波を確かめて、もう一度押してください'); }
     finally { loading = false; }
     renderAdmin();
   }
@@ -269,8 +274,9 @@
     const L = shown();
     return `<div class="seg" role="group" aria-label="表示する声" style="margin:8px 0">
         ${[['open', 'まだのもの'], ['closed', '済・見送り'], ['all', 'すべて']].map(f => `<button type="button" data-ikf="${f[0]}" aria-pressed="${filt === f[0]}">${f[1]}（${n(f[0])}）</button>`).join('')}</div>
-      <div class="row" style="margin-bottom:8px"><button type="button" class="btn primary" id="ikCopy"${L.length ? '' : ' disabled'}>AIに渡す形でコピー（${L.length}件）</button>
+      <div class="row" style="margin-bottom:8px"><button type="button" class="btn primary" id="ikCopy"${L.length || (diag && diag.length) ? '' : ' disabled'}>AIに渡す形でコピー（${L.length}件）</button>
         <button type="button" class="btn" id="ikReload">読み込み直す</button></div>
+      ${diag && diag.length ? `<p id="ikDiag" style="margin:0 0 8px;font-size:15px"><span>自動で届いた通信の失敗の記録：${diag.length}件（${new Set(diag.map(x => x.who)).size}人）。「AIに渡す形でコピー」に、名前を外して入ります</span> <button type="button" class="btn small" id="ikDiagSee">見る</button></p>` : ''}
       ${L.length ? L.map(x => `<div class="setrow" style="display:block">
           <p style="margin:0 0 4px"><b>${esc(KIND_NAME[x.kind] || x.kind)}</b>　<small class="hint">${esc(fmtAt(x.at))}・${esc(plain(x.who) || '（名前なし）')}（${esc(x.role)}）・${esc(ST_NAME[x.status] || x.status)}</small></p>
           <p style="margin:0 0 6px;white-space:pre-wrap;word-break:break-word">${esc(plain(x.text))}</p>
@@ -285,6 +291,7 @@
     $$('[data-ikf]').forEach(b => { b.onclick = () => { filt = b.dataset.ikf; renderAdmin(); }; });
     const rl = $('#ikReload'); if (rl) rl.onclick = load;
     const cp = $('#ikCopy'); if (cp) cp.onclick = copyForAi;
+    const ds = $('#ikDiagSee'); if (ds) ds.onclick = showDiag;
     $$('[data-ikph]').forEach(b => { b.onclick = () => showPhotos(b.dataset.ikph, Number(b.dataset.ikpn) || 0); });
     $$('[data-ikmark]').forEach(b => {
       b.onclick = async () => {
@@ -311,7 +318,42 @@
       } catch (e) { el.textContent = `${i + 1}枚目は読み込めませんでした`; }
     }
   }
-  function aiText(L) {
+  /* 自動で届いた通信の失敗の記録（区域係だけ。だれのスマホの記録かも出す） */
+  const dAt = s => { const t = Date.parse(s); if (!isFinite(t)) return ''; const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const dCode = c => (/^http\d+$/.test(c) ? '通信のエラー番号' : (typeof ERRLOG_CODE === 'object' && ERRLOG_CODE[c]) || 'そのほか');
+  const dAct = a => (typeof ERRLOG_ACT === 'object' && ERRLOG_ACT[a] ? `${ERRLOG_ACT[a]}（${a}）` : a);
+  function showDiag() {
+    const D = diag || [];
+    const txt = D.map(x => `${dAt(x.at)}　${plain(x.who) || '（名前なし）'}（${x.role}）　${DEV_NAME[x.dev] || '—'}　${dAct(x.action)}　${dCode(x.code)}（${x.code}）${Number(x.sec) ? '　' + x.sec + '秒' : ''}`
+      + (Number(x.n) > 1 ? `　続けて${x.n}回` : '') + (x.on === '0' ? '　スマホは圏外' : '') + (x.hid === '1' ? '　画面は裏' : '')).join('\n');
+    setSheet(`<h2>自動で届いた通信の失敗の記録（${D.length}件）</h2>
+      <p class="hint">歯車の設定で「送る」をえらんだ人、または記録の画面で「送る」を押した人のスマホから届いたものです。新しい順。90日をすぎたものは消えます。</p>
+      <pre class="loadlog">${esc(txt)}</pre>
+      <div class="row"><button type="button" class="btn primary" data-close>閉じる</button></div>`);
+  }
+  /* AIに渡す形に足す段（名前は外し、同じ人は同じ番号にする）。記録がなければ空（今までの文と同じになる） */
+  function aiDiag(D) {
+    if (!D || !D.length) return '';
+    // 人の番号：サーバーが人ごとに付けた番号（p）を使う。ないときだけ、名前ごとに付ける
+    const who = {}; let n = 0;
+    const tag = x => (Number(x.p) > 0 ? '人' + Number(x.p) : who['n:' + x.who] || (who['n:' + x.who] = '人' + (1000 + ++n)));
+    return `
+## 通信の失敗の記録（アプリが自動で集めたもの・${D.length}件）
+
+設定で「送る」をえらんだ人のスマホから、通信がうまくいかなかったときに自動で届いた記録です（名前と役割は外し、同じ人は同じ番号にしてあります）。上の声とあわせて、次のこともしてください。
+
+8. 失敗の種類ごと・通信の種類ごと・時間帯ごとに、件数をまとめる
+9. 特定の人・端末・版にかたよっていないかを見る
+10. 上の声（「送れない」「つながらない」など）と日時が近い記録があれば、結び付ける（結び付けたものは「推定」と書く）
+11. 原因の見当と、確かめる手順を書く（この記録だけで決められないことは、決めつけない）
+
+失敗の種類：timeout＝返事が来ない／network＝つながらなかった／nonjson＝Googleのエラー画面が返ってきた／busy＝サーバーが混んで順番待ちで入れなかった／server＝サーバーの中のエラー／http＋数字＝通信のエラー番号
+通信の種類：load＝最新の情報の受け取り／sync＝記録を送る／そのほかは、アプリの中の通信の名前
+
+### データ（起きた日時（UTC）｜人｜端末｜版｜通信｜失敗の種類｜秒数｜スマホが圏外と言っていたか｜画面は裏だったか｜続けて起きた回数）
+` + D.map(x => `- ${String(x.at).slice(0, 16).replace('T', ' ')}｜${tag(x)}｜${DEV_NAME[x.dev] || '—'}｜${x.ver || '—'}｜${x.action}｜${x.code}｜${x.sec}｜${x.on === '0' ? '圏外' : '—'}｜${x.hid === '1' ? '裏' : '—'}｜${x.n || 1}`).join('\n') + '\n';
+  }
+  function aiText(L, D) {
     const d = new Date();
     const head = `# 区域マップ：こまったこと・提案（${L.length}件・${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} 時点）
 
@@ -330,10 +372,10 @@
 ## データ（id｜日時｜種類｜送った人の役割｜直前の画面｜版｜表示｜端末｜電波｜直前のエラー｜状態）
 `;
     return head + L.map(x => `- ${x.id.slice(-6)}｜${x.at.slice(0, 16).replace('T', ' ')}（UTC）｜${KIND_NAME[x.kind] || x.kind}｜${x.role}｜${VIEW_NAME[x.scr] || x.scr || '—'}｜${x.ver || '—'}｜${MODE_NAME[x.mode] || '—'}｜${DEV_NAME[x.dev] || '—'}｜${x.net === 'off' ? 'なし' : x.net === 'on' ? 'あり' : '—'}｜${plain(x.err) || 'なし'}｜${ST_NAME[x.status] || x.status}${x.pc ? `｜写真 ${x.pc}枚（係が別に渡す）` : ''}
-  本文：${plain(x.text).replace(/\s*\n\s*/g, ' ／ ')}`).join('\n') + '\n';
+  本文：${plain(x.text).replace(/\s*\n\s*/g, ' ／ ')}`).join('\n') + '\n' + aiDiag(D);
   }
   async function copyForAi() {
-    const t = aiText(shown());
+    const t = aiText(shown(), diag);
     let ok = false;
     try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(t); ok = true; } } catch (e) { ok = false; }
     if (ok) { toast('コピーしました。Claude などの AI に貼り付けてください'); return; }
