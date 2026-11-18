@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="app-version" content="2026.13.166"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
+<meta name="app-version" content="2026.13.167"><!-- 更新したら、この番号を上げる（アプリはここを見て、新しい版があるか確かめる）。app.js の APP_JS_VER と sw.js の APP_CACHE（kuiki-app-v＋版の最後の番号）も合わせて上げる。版の最後の番号は、真ん中の番号を変えても続けて増やす（例：2026.14.105。そろわないと、新しい版の取りこみが失敗する。auto の tests/site/mamori-b-logic.test.js の T-B5-7 で確かめる） -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cyberjapandata.gsi.go.jp https://msearch.gsi.go.jp; media-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><!-- 読み込み先の制限（改善案C1）：スクリプトは自分のサイトのファイルだけ。宛先は自分のサイト・GAS・国土地理院・Googleフォントだけ。版の確かめが最初の1,024バイトを読むので、app-version より下に置く -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>区域マップ</title>
@@ -53,6 +53,11 @@ button{cursor:pointer}
 h2,h3,p{margin:0}
 .muted{color:var(--ink2);font-size:16px}
 .hint{display:block;color:var(--ink2);font-size:15px;margin-top:4px}
+/* 係の画面「人」：まだ登録していない人・しばらく開いていない人（うすい色の行＋文字の印。色だけで分けない）（2026.13.167） */
+.trow1.urow-off{background:#EEF0EF;color:#4E5A63}
+.ubadge{display:inline-block;background:#fff;color:#3F4A52;border:2px solid #7C8891;border-radius:99px;padding:0 10px;font-size:14px;font-weight:700;vertical-align:middle;white-space:nowrap}
+.usenote{display:block;color:var(--ink2);font-size:15px;line-height:1.6;margin:6px 0 10px}
+.diagnote{display:block;color:var(--ink2);font-size:15px;line-height:1.6;margin:8px 0} /* 不具合の記録を送る：何を送るかの説明。「説明の文をかくす」でも消さない（同意のための文なので） */
 .wrap{max-width:760px;margin:0 auto}
 .sec{font-size:21px;margin:26px 0 10px;padding-left:10px;border-left:6px solid var(--terr)}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
