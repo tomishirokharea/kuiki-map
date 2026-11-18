@@ -43,8 +43,15 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "地図の境の線を消します。区域は変わりません。": "Se borrará la línea del límite en el mapa. Los territorios no cambian.",
 "会衆の境を消しました": "Se borró el límite de la congregación",
 "区域係だけが使えます": "Solo lo puede usar el encargado de territorios",
+/* お知らせ（2026.13.160・app.js の CHANGELOG） */
+"地図に、会衆の境を灰色の破線で出すようにしました（区域係が取り込んだとき）。区域の線とは別の線で、押してもえらばれません。": "El mapa ahora muestra el límite de la congregación con una línea gris discontinua (cuando el encargado de territorios lo importa). Es una línea aparte de las de los territorios y no se puede seleccionar al tocarla.",
+"区域係：「区域の線・取り込み」で、会衆の区域割り当て（S-54）のKMLから会衆の境を取り込めます。": "Encargado de territorios: en «Límites e importación» puede importar el límite de la congregación desde el KML de la «Asignación de territorio de la congregación» (S-54).",
+"区域係：「全部の区域のすき間・重なりを調べる」で、会衆の境の中で、どの区域にも入っていない所（取りこぼし）も出ます。": "Encargado de territorios: «Buscar huecos y superposiciones en todos los territorios» también muestra las zonas dentro del límite de la congregación que no están en ningún territorio (sin territorio).",
 /* 取りこぼし（kyoukai.js の「全部の区域のすき間・重なりを調べる」） */
 "取りこぼし {0}か所": "Sin territorio: {0}",
+"すき間 {0}か所": "Huecos: {0}",
+"すき間 {0}か所・": "Huecos: {0} · ",
+"重なり {0}か所": "Superposiciones: {0}",
 "{0}/{1}：境の中で、どの区域にも入っていない所（{2}・家の印 {3}軒）": "{0}/{1}: zona dentro del límite que no está en ningún territorio ({2} · casas marcadas: {3})",
 "{0}/{1}：境の中で、どの区域にも入っていない所（{2}・家の印 {3}軒）。家の印はありません。地図で、家があるかを見てください": "{0}/{1}: zona dentro del límite que no está en ningún territorio ({2} · casas marcadas: {3}). No hay casas marcadas. Mire en el mapa si hay casas.",
 "新しい区域の線を引く": "Dibujar un territorio nuevo",
