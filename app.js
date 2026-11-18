@@ -4445,7 +4445,7 @@ function houseNameLabels(list, dense) {
   const cands = [];
   const done = () => {
     window.HOUSE_NAMES = cands;
-    if (typeof window.placeNames === 'function') { try { window.placeNames(); } catch (e) { console.error(e); } } // 名前の置き場所で落ちても、家の印の描き直しは止めない
+    if (typeof window.placeNames === 'function') { try { window.placeNames({ fromHouses: true }); } catch (e) { console.error(e); } } // 名前の置き場所で落ちても、家の印の描き直しは止めない（区域の番号の札は renderHouses のあとに出し直す）
     else cands.forEach(c => drawHouseName(c, houseLayer));
   };
   const z = map.getZoom(), base = nameZoomNow();
@@ -11199,7 +11199,7 @@ function openUiSheet() {
         <div class="featrow"><p><b>学校・役所・お店などの名前</b><small>家の種別をえらんで、名前を入れた建物です</small></p>${seg('fcName', [['off', '出さない'], ['on', '出す']])}
           ${UI.fcName === 'on' ? nameZoomSlider('fcZoom') : ''}</div>
         ${UI.aptName === 'on' || UI.fcName === 'on' ? `<div class="featrow"><p><b>名前を出す範囲</b><small>「全体」にすると、区域をえらんでいるときも、ほかの区域の建物の名前が薄く出ます</small></p>${seg('nameScope', [['sel', 'えらんだ区域だけ'], ['all', '地図に見えている全体']], UI.nameScope || 'sel')}</div>` : ''}
-        <div class="featrow"><p><b>目印（会館・学校など）の名前</b><small>地図の場所を見つけやすくするための名前です。左にするほど、地図を縮めても出ます。縮めたときに重なる名前は出しません（会館・学校を先に出します）</small></p>${lmNameSlider()}</div>
+        <div class="featrow"><p><b>目印（会館・学校など）の名前</b><small>地図の場所を見つけやすくするための名前です。左にするほど、地図を縮めても出ます。重なる名前は出しません（縮めた地図では目印を、拡大した地図では建物の名前を先に出します。いちばん拡大すると全部出ます）</small></p>${lmNameSlider()}</div>
         <h3 class="sub">自分の区域を回るとき</h3>
         <p class="q">自分の区域を回るときの表示</p>${seg('round', [['reco', 'おすすめ順'], ['progress', '進み具合']], me().roundMode || 'reco')}
         ${uiSlot('map')}`;

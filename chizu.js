@@ -515,7 +515,13 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     map.createPane('lmPane');      map.getPane('lmPane').style.zIndex = 350;      map.getPane('lmPane').style.pointerEvents = 'none';        // 家の印・区域の線より下
     map.createPane('lmLabelPane'); map.getPane('lmLabelPane').style.zIndex = 655; map.getPane('lmLabelPane').style.pointerEvents = 'none';   // 名前の文字は家の印より上
     lmGroup = L.layerGroup().addTo(map);
-    map.on('moveend zoomend', () => { clearTimeout(lmTimer); lmTimer = setTimeout(lmRender, 60); });   // 家の印の描き直しとは別に動かす
+    map.on('moveend zoomend', () => { clearTimeout(lmTimer); lmTimer = setTimeout(lmMoveRender, 60); });   // 家の印の描き直しとは別に動かす
+  }
+  /* 動かしたあとの描き直し。家の印の描き直し（renderHouses → placeNames）が同じ画面ですでに置いていれば、もう一度は置かない（M-4）。
+     目印のデータ・設定が変わったときは、それぞれの所から lmRender を直接呼ぶので、ここでは見ない */
+  function lmMoveRender() {
+    if (lastView && lastView === viewKey() && lastHN === window.HOUSE_NAMES) return;
+    lmRender();
   }
   /* 地図を回しているときは、画面の上での位置で重なりを比べる（再監査 Minor2） */
   function scrPt(ll) {
@@ -541,7 +547,7 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
   // 書体が読みこまれたら幅を測りなおす（BIZ UDPGothic は Google フォントで、あとから入れかわる）
   if (typeof document !== 'undefined' && document.fonts && document.fonts.addEventListener) {
     document.fonts.addEventListener('loadingdone', () => {
-      textW.clear();
+      textW.clear(); lastView = '';   // 幅が変わるので、同じ画面でも置きなおす
       if (lmGroup) { clearTimeout(lmTimer); lmTimer = setTimeout(() => { try { lmRender(); } catch (e) { console.error(e); } }, 60); }
     });
   }
@@ -566,11 +572,17 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
   const lmShort = name => { const a = Array.from(name); return a.length > 10 ? a.slice(0, 10).join('') + '…' : name; };   // 目印の名前は10文字＋「…」
   /* 名前（目印・建物）を描くところ。建物の名前の候補は app.js の houseNameLabels が window.HOUSE_NAMES に出す
      ・二重（50m以内で同じ名前）なら、建物の名前を残し、目印は印も名前も出さない（NK-1〜3）
-     ・建物の名前と目印の名前を順番に置き、重なるものは出さない。いちばん拡大したときは全部出す（NK-4〜6） */
+       ただし、その建物の名前が重なりで置けなかったときは、目印にもどす（NK-2・Ruling 12）
+     ・建物の名前と目印の名前を順番に置き、重なるものは出さない。いちばん拡大したときは全部出す（NK-4〜6）
+     opt.fromHouses：houseNameLabels（renderHouses）から呼んだとき。区域の番号の札は、schedule.js の renderHouses の包みが出し直す */
   let hnMarks = [];   // 建物の名前の印（houseLayer に置く。札をよける schedule.js が houseLayer から読むため）
-  function placeNames() {
+  let hnSig = '';     // 置いた建物の名前の見分け（変わったら区域の番号の札を出し直す・M-3）
+  let lastView = '', lastHN = null;   // 前に置いた画面と HOUSE_NAMES（動かしたあとの二度目を省く・M-4）
+  function viewKey() { const c = map.getCenter(), s = map.getSize(); return [map.getZoom(), c.lat, c.lng, map._kmRad || 0, s.x, s.y].join(','); }
+  function placeNames(opt) {
     lmEnsureLayer();
     if (!map || !lmGroup) return;
+    const fromHouses = !!(opt && opt.fromHouses === true);
     const lmFont = getComputedStyle(map.getContainer()).fontFamily || 'sans-serif';   // 目印の名前の書体。DOM を消す前に読む（消したあとだと毎回スタイルの計算が走る）
     lmGroup.clearLayers();
     hnMarks.forEach(m => { if (houseLayer) houseLayer.removeLayer(m); });
@@ -583,8 +595,8 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     const simpleUi = document.body.classList.contains('simple');
     // 1. 候補と順番（ord：同じ順番の中の並び。目印は lmPri 順、建物は HOUSE_NAMES の順）
     const rLm = nameRank('lm', false, zoomedIn);
-    const lms = lmc.cand.map((it, i) => ({ it, t: lmShort(it.name), rank: rLm, ord: i, dup: false, put: false }));   // t：10文字＋「…」
-    const hs = houses.map((c, k) => ({ c, rank: nameRank('h', !!c.inSel, zoomedIn), ord: lms.length + k, put: false }));
+    const lms = lmc.cand.map((it, i) => ({ it, t: lmShort(it.name), rank: rLm, ord: i, dup: false, hb: null, put: false }));   // t：10文字＋「…」・hb：二重の相手の建物
+    const hs = houses.map((c, k) => { const rank = nameRank('h', !!c.inSel, zoomedIn), ord = lms.length + k; return { c, rank, ord, rank0: rank, ord0: ord, put: false }; });   // rank0・ord0：自分の順番
     // 2. 二重：50m以内で同じ名前の建物があれば、目印は出さない。その建物は高いほうの順番（縮めた地図では目印の場所に入る）
     lms.forEach(e => {
       const a = [e.it.lat, e.it.lng];
@@ -595,20 +607,45 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
         if (d <= 50 && d < bd && sameName(e.it.name, he.c.text)) { best = he; bd = d; }
       });
       if (!best) return;
-      e.dup = true;
+      e.dup = true; e.hb = best;
       if (e.rank < best.rank) { best.rank = e.rank; best.ord = e.ord + 0.5; }
     });
-    // 3. 順番の小さい順（同じ順番の中は元の並び）
+    // 3・4. 順番の小さい順（同じ順番の中は元の並び）に、画面の上の四角を置き、重なれば出さない（四角は1回だけ作る）
     const names = lmc.nop > 0;
-    const all = lms.filter(e => names && !e.dup).concat(hs).sort((x, y) => x.rank - y.rank || x.ord - y.ord);
-    // 4. 画面の上の四角を作り、重なれば出さない
-    const ok = layoutNames(all.map(e => ({ r: e.c
+    const rectOf = e => e.r || (e.r = e.c
       ? nameRect('h', scrPt([e.c.lat, e.c.lng]), e.c.text, { out: e.c.out, dot: e.c.dot })
-      : nameRect('lm', scrPt([e.it.lat, e.it.lng]), e.t, { simple: simpleUi, font: lmFont }) })), force);
-    all.forEach((e, i) => { e.put = ok[i]; });
+      : nameRect('lm', scrPt([e.it.lat, e.it.lng]), e.t, { simple: simpleUi, font: lmFont }));
+    const layout = () => {
+      const all = lms.filter(e => names && !e.dup).concat(hs).sort((x, y) => x.rank - y.rank || x.ord - y.ord);
+      const ok = layoutNames(all.map(e => ({ r: rectOf(e) })), force);
+      lms.forEach(e => { e.put = false; });
+      all.forEach((e, i) => { e.put = ok[i]; });
+    };
+    layout();
+    // 4b. 二重の相手の建物の名前が置けなかったら、その目印はもどす（NK-2：建物の名前が出るときだけまとめる・Ruling 12）。
+    //     建物は自分の順番にもどし、もう1回だけ全部を置きなおす（目印の名前は自分の順番で比べ、印は今までの決まりで出す。くり返さない）。
+    //     いちばん拡大したとき（force）は建物の名前が全部置けるので、ここには来ない
+    let back = false;
+    lms.forEach(e => {
+      if (!e.dup || e.hb.put) return;
+      e.dup = false; e.hb.rank = e.hb.rank0; e.hb.ord = e.hb.ord0; back = true;
+    });
+    if (back) {
+      layout();
+      // 置きなおしで、ほかの二重の相手の建物が置けなくなったときは、その目印も消さない（名前は置かず、印は今までの決まりで出す）
+      lms.forEach(e => { if (e.dup && !e.hb.put) { e.dup = false; e.put = false; } });
+    }
     // 5. 描く（目印は lmPri 順・建物は HOUSE_NAMES の順。描く pane・見た目は今までどおり）
     lms.forEach(e => drawLandmark(e, z, lmc.nop));
     if (houseLayer) hs.forEach(e => { if (e.put) hnMarks.push(drawHouseName(e.c, houseLayer)); });
+    lastView = viewKey(); lastHN = window.HOUSE_NAMES;
+    // 6. 出す建物の名前が変わったら、区域の番号の札を出し直す（札は建物の名前をよけるため・M-3）。
+    //    renderHouses からのときは、schedule.js の renderHouses の包みが出し直すので、ここでは呼ばない（二度にしない）
+    const sig = hs.filter(e => e.put).map(e => e.c.lat + ',' + e.c.lng + ',' + e.c.cls + ',' + e.c.text).join('\n');
+    if (sig !== hnSig) {
+      hnSig = sig;
+      if (!fromHouses && typeof window.repaintTerrLabels === 'function') window.repaintTerrLabels();
+    }
   }
   /* 今の画面の目印の候補（lmPri 順・200件まで）と、名前の薄さ nop */
   function landmarkCands(z) {
