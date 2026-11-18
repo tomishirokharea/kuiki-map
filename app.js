@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.159';
+var APP_JS_VER = '2026.13.160';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2817,6 +2817,7 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.160', items: [['地', '地図の名前が重ならないようにしました。同じ場所の目印と建物の名前は、建物の名前だけを出します。重なるときは、縮めた地図では目印を、拡大した地図では建物の名前を先に出します。いちばん拡大すると、全部の名前が出ます。']] },
   { v: '2026.13.159', items: [
     ['薦', 'おすすめタブに出す家を変えました。留守宅カードにして返した区域（だれも持っていない区域）で、まだ訪ねていない家と、まだ会えていない家を、近くの数軒ずつ出します。区域をまたいでまとめることもあります。カードを受け取らなくても回れます。'],
     ['薦', 'おすすめの「今行く」「予定に入れる」をなくしました。「地図で見る」で、区域の線と回る順の番号を見て回ってください。同じ家に、ほかの人が同じ日に行くこともあります（記録が届くと、ほかの人のおすすめから消えます）。'],
@@ -4364,7 +4365,7 @@ function renderHouses() {
   const fkeys = followMap ? new Set(myFollowKeys()) : null;
   const ff = fkeys ? (k => (fkeys.has(k) ? 'hl' : 'dim')) : focusFn();
   renderCardBar();
-  if ((mode === 'draw' && drawTap === 'line' && !drawShowHouses) || mode === 'sen' || mode === 'tok') { setZoomHint(false); return; } // 線引き中は写真が見えるように家の印を隠す（特別区域の分け方では、分け方の印だけを出す）
+  if ((mode === 'draw' && drawTap === 'line' && !drawShowHouses) || mode === 'sen' || mode === 'tok') { setZoomHint(false); houseNameLabels(null, false); return; } // 線引き中は写真が見えるように家の印を隠す（特別区域の分け方では、分け方の印だけを出す）
   const fade = fkeys ? 1 : iconFade();
   const b = map.getBounds().pad(0.2), vis = rotVisTest(0.2); // vis：地図を回しているときの、画面に入っているかの確かめ
   const sel = mode === 'normal' ? selTerrId() : null; // 区域をえらんでいるときは、その区域の家だけ
@@ -4431,23 +4432,39 @@ function nameZoomText(v) {
   const n = Math.abs(v), times = Math.round(Math.pow(2, n) * 10) / 10;
   return v > 0 ? `${n}段 拡大したときから（${times}倍）` : `${n}段 縮めても（${times}分の1）`;
 }
+/* 家の名前を1つ描く（c＝houseNameLabels の候補）。置き場所の判定は chizu.js の placeNames がする */
+function drawHouseName(c, layer) {
+  return L.marker([c.lat, c.lng], {
+    icon: L.divIcon({ className: c.cls, html: `<span class="${c.fc ? 'fc' : ''}">${esc(c.text)}</span>`, iconSize: [0, 0] }),
+    pane: 'labelPane', interactive: false, keyboard: false,
+    zIndexOffset: c.zOff // 重なったときは、えらんだ区域の名前が上
+  }).addTo(layer);
+}
+/* 家の名前の候補をつくり、window.HOUSE_NAMES に出して placeNames（chizu.js）に描かせる。どの return でも出す（空もある） */
 function houseNameLabels(list, dense) {
+  const cands = [];
+  const done = () => {
+    window.HOUSE_NAMES = cands;
+    if (typeof window.placeNames === 'function') { try { window.placeNames({ fromHouses: true }); } catch (e) { console.error(e); } } // 名前の置き場所で落ちても、家の印の描き直しは止めない（区域の番号の札は renderHouses のあとに出し直す）
+    else cands.forEach(c => drawHouseName(c, houseLayer));
+  };
   const z = map.getZoom(), base = nameZoomNow();
   const apt = UI.aptName === 'on' && z >= base + nameZoomOff('aptZoom') - 0.05;
   const fc = UI.fcName === 'on' && z >= base + nameZoomOff('fcZoom') - 0.05;
-  if ((!apt && !fc) || mode !== 'normal') return;
+  if ((!apt && !fc) || mode !== 'normal') return done();
   // 設定で「地図に見えている全体」をえらんだときは、えらんだ区域の外の建物の名前も出す
   const all = UI.nameScope === 'all' && !followMap;
   // 区域をえらんでいるときの、ほかの区域の建物の名前は、まわりの区域番号と同じように薄く出す（現場で見る区域の名前を目立たせる）
-  let inSel = null;
+  let fadeSet = null;
   if (all) {
     const b = map.getBounds().pad(0.1), onMap = new Set((list || []).map(h => h.id));
-    if (selTerrId() && list) inSel = onMap;
+    if (selTerrId() && list) fadeSet = onMap;
     list = D().houses.filter(h => h.label && b.contains([h.lat, h.lng]));
-    if (inSel) list.sort((x, y) => (inSel.has(y.id) ? 1 : 0) - (inSel.has(x.id) ? 1 : 0)); // 300件の上限では、えらんだ区域の名前を先に
+    if (fadeSet) list.sort((x, y) => (fadeSet.has(y.id) ? 1 : 0) - (fadeSet.has(x.id) ? 1 : 0)); // 300件の上限では、えらんだ区域の名前を先に
     dense = dense && list.some(h => onMap.has(h.id));
   }
-  if (!list) return;
+  if (!list) return done();
+  const sel = selTerrId();
   let n = 0;
   for (const h of list) {
     if (!h.label || n > 300) continue;
@@ -4455,13 +4472,14 @@ function houseNameLabels(list, dense) {
     const isFc = k !== 'home';
     if (h.type === 'apt' ? !(apt || (fc && isFc)) : !(fc && isFc)) continue; // 一戸建ての「目印」は出さない
     n++;
-    const out = !!inSel && !inSel.has(h.id); // えらんだ区域の外（家の印は出ていないので、点のときの位置に）
-    L.marker([h.lat, h.lng], {
-      icon: L.divIcon({ className: 'hname' + (out ? ' out dot' : dense && !(roundNums && roundNums.has(h.id)) ? ' dot' : ''), html: `<span class="${isFc ? 'fc' : ''}">${esc(h.label)}</span>`, iconSize: [0, 0] }),
-      pane: 'labelPane', interactive: false, keyboard: false,
-      zIndexOffset: out ? -1000 : 0 // 重なったときは、えらんだ区域の名前が上
-    }).addTo(houseLayer);
+    const out = !!fadeSet && !fadeSet.has(h.id); // えらんだ区域の外（家の印は出ていないので、点のときの位置に）
+    const dot = out || (dense && !(roundNums && roundNums.has(h.id)));
+    cands.push({
+      lat: h.lat, lng: h.lng, text: h.label, cls: 'hname' + (out ? ' out dot' : dot ? ' dot' : ''), fc: isFc,
+      out, dot, inSel: !!sel && houseInTerr(h, sel), zOff: out ? -1000 : 0
+    });
   }
+  done();
 }
 /* 小さな点の色：白＝まだ、緑＝今回訪ねた、青＝最近会えた、赤＝拒否、灰＝選べない家 */
 const DOT = {
@@ -11181,7 +11199,7 @@ function openUiSheet() {
         <div class="featrow"><p><b>学校・役所・お店などの名前</b><small>家の種別をえらんで、名前を入れた建物です</small></p>${seg('fcName', [['off', '出さない'], ['on', '出す']])}
           ${UI.fcName === 'on' ? nameZoomSlider('fcZoom') : ''}</div>
         ${UI.aptName === 'on' || UI.fcName === 'on' ? `<div class="featrow"><p><b>名前を出す範囲</b><small>「全体」にすると、区域をえらんでいるときも、ほかの区域の建物の名前が薄く出ます</small></p>${seg('nameScope', [['sel', 'えらんだ区域だけ'], ['all', '地図に見えている全体']], UI.nameScope || 'sel')}</div>` : ''}
-        <div class="featrow"><p><b>目印（会館・学校など）の名前</b><small>地図の場所を見つけやすくするための名前です。左にするほど、地図を縮めても出ます。縮めたときに重なる名前は出しません（会館・学校を先に出します）</small></p>${lmNameSlider()}</div>
+        <div class="featrow"><p><b>目印（会館・学校など）の名前</b><small>地図の場所を見つけやすくするための名前です。左にするほど、地図を縮めても出ます。重なる名前は出しません（縮めた地図では目印を、拡大した地図では建物の名前を先に出します。いちばん拡大すると全部出ます）</small></p>${lmNameSlider()}</div>
         <h3 class="sub">自分の区域を回るとき</h3>
         <p class="q">自分の区域を回るときの表示</p>${seg('round', [['reco', 'おすすめ順'], ['progress', '進み具合']], me().roundMode || 'reco')}
         ${uiSlot('map')}`;
