@@ -3307,7 +3307,7 @@ window.KUIKI_I18N.es = {
 "はじめの案内（使い方の動画のお知らせ・「拡大すると家の印が出ます」など）": "Guías iniciales (aviso de videos de ayuda, «Acerque el mapa para ver las marcas de casas», etc.)",
 "歯車の設定を、分類ごとの目次にしました。地図の見た目（見やすい地図・地名の多い地図・写真）は、どの画面から開いても、いちばん上で変えられます。": "Los ajustes del engranaje ahora tienen un índice por categorías. El aspecto del mapa (mapa claro, mapa con más nombres, foto) se puede cambiar arriba, desde cualquier pantalla.",
 "目印（会館・学校など）の名前": "Nombres de puntos de referencia (Salón del Reino, escuelas, etc.)",
-"地図の場所を見つけやすくするための名前です。左にするほど、地図を縮めても出ます。縮めたときに重なる名前は出しません（会館・学校を先に出します）": "Sirven para ubicar lugares en el mapa. Cuanto más a la izquierda, se ven aunque el mapa esté alejado. Al alejar, no se muestran los nombres que se superponen (primero el Salón del Reino y las escuelas).",
+"地図の場所を見つけやすくするための名前です。左にするほど、地図を縮めても出ます。重なる名前は出しません（縮めた地図では目印を、拡大した地図では建物の名前を先に出します。いちばん拡大すると全部出ます）": "Sirven para ubicar lugares en el mapa. Cuanto más a la izquierda, se ven aunque el mapa esté alejado. No se muestran los nombres que se superponen (con el mapa alejado, primero los puntos de referencia; con el mapa acercado, primero los edificios; con el zoom máximo se ven todos).",
 "はっきり出る大きさ：": "Se ven claramente:",
 "地域の全体が見えているときから": "desde que se ve toda la zona",
 "町がいくつか見えるときから": "desde que se ven varios barrios",
