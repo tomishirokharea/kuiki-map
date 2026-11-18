@@ -589,12 +589,13 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
     hnMarks = [];
     const z = map.getZoom();
     const base = typeof nameZoomNow === 'function' ? nameZoomNow() : 17;
-    const zoomedIn = z >= base - 0.05, force = z >= map.getMaxZoom() - 0.05;
+    // 再訪問を地図で見るときは、縮めた地図でも建物の名前を先に（NK-12）
+    const zoomedIn = z >= base - 0.05 || (typeof followMap !== 'undefined' && followMap), force = z >= map.getMaxZoom() - 0.05;
     const lmc = lmOn() && LM.items.length ? landmarkCands(z) : { cand: [], nop: 0 };
     const houses = houseLayer ? (window.HOUSE_NAMES || []) : [];
     const simpleUi = document.body.classList.contains('simple');
     // 1. 候補と順番（ord：同じ順番の中の並び。目印は lmPri 順、建物は HOUSE_NAMES の順）
-    const rLm = nameRank('lm', false, zoomedIn);
+    const rLm = lmc.nop < 1 ? 3 : nameRank('lm', false, zoomedIn);   // 目印の名前が薄い間は建物のあと（NK-13）
     const lms = lmc.cand.map((it, i) => ({ it, t: lmShort(it.name), rank: rLm, ord: i, dup: false, hb: null, put: false }));   // t：10文字＋「…」・hb：二重の相手の建物
     const hs = houses.map((c, k) => { const rank = nameRank('h', !!c.inSel, zoomedIn), ord = lms.length + k; return { c, rank, ord, rank0: rank, ord0: ord, put: false }; });   // rank0・ord0：自分の順番
     // 2. 二重：50m以内で同じ名前の建物があれば、目印は出さない。その建物は高いほうの順番（縮めた地図では目印の場所に入る）

@@ -6,6 +6,7 @@
            R1 は Task 3 から「before に無かった名前・印が増えない」を見る（Task 3 は二重と重なりで名前を出さなくするだけ。
            拡大18は、もとから目印どうしの重なりの判定がない大きさなので、増えることはない。消えたものは T1〜T6 と棚卸しの③で見る）
    T1〜T13：二重をまとめ、重なったら出さない（Task 3）
+   T19・T20：再訪問を地図で見るとき・薄い目印の名前の順番（NK-12・NK-13）
    T14〜T18：最終監査の直し（2026-11-18）。T14・T15＝二重の相手の建物の名前が出ないときは目印にもどす（I-1・Ruling 12）
             T16＝区域の番号の札の出し直し（M-3）・T17＝動かしたあとの二度目の置き直しを省く（M-4）・T18＝歯車の説明の文（I-2）
    ===================================================================== */
@@ -357,6 +358,44 @@ for (const [simple, w] of [[true, 375], [false, 390]]) {
     allErrs.push(...errs);
     await ctx.close();
   }
+}
+// T19（NK-12）：再訪問を地図で見るときは、建物の名前が先・目印は後（縮めた地図でも）。やめると今までどおり目印が先
+{
+  const { pg, ctx, errs } = await openPage(b, PORT);
+  const fx = await setupFixture(pg);
+  const base = await pg.evaluate(() => nameZoomNow());
+  await pg.evaluate(() => {
+    const h = D().houses.find(x => x.label === 'ホワイトニング店');
+    D().follows[K(h.id, '')] = { by: me().id, since: new Date().toISOString(), touchedAt: new Date().toISOString() };
+    Store.save();
+    openFollowMap();
+  });
+  await pg.waitForTimeout(500);
+  await goTo(pg, ...fx.groups.E.center, base - 0.5);
+  const nf = await visibleNames(pg);
+  const onF = await pg.evaluate(() => followMap === true);
+  ok(onF && has(nf, 'h', 'ホワイトニング店') && !has(nf, 'lm', '白ゆり公園'), 'T19 再訪問を地図で見る・縮めた地図：「ホワイトニング店」が出て「白ゆり公園」の名前は出ない', { onF, names: keys(nf) });
+  await pg.evaluate(() => { followMap = false; renderHouses(); });
+  await goTo(pg, ...fx.groups.E.center, base - 0.5);
+  const nn = await visibleNames(pg);
+  ok(has(nn, 'lm', '白ゆり公園') && !has(nn, 'h', 'ホワイトニング店'), 'T19 再訪問を地図で見るのをやめる：今までどおり「白ゆり公園」が出て「ホワイトニング店」は出ない', { names: keys(nn) });
+  allErrs.push(...errs);
+  await ctx.close();
+}
+// T20（NK-13）：目印の名前が薄い間は（「はっきり出る大きさ」を base-0.5 にすると、薄い範囲は 16〜base-0.5 ＝ base-0.6 は薄い）、建物の名前が先。はっきり出たら目印が先
+{
+  const { pg, ctx, errs } = await openPage(b, PORT);
+  const fx = await setupFixture(pg);
+  const base = await pg.evaluate(() => nameZoomNow());
+  await pg.evaluate(b0 => { UI.lmNameZ = b0 - 0.5; window.lmRepaint(); }, base);
+  await goTo(pg, ...fx.groups.E.center, base - 0.6);
+  const nl = await visibleNames(pg);
+  ok(has(nl, 'h', 'ホワイトニング店') && !has(nl, 'lm', '白ゆり公園') && overlapsOf(nl).length === 0, 'T20 目印の名前が薄い（拡大 base-0.6）：「ホワイトニング店」が出て「白ゆり公園」の名前は出ない・重ならない', { names: keys(nl), ov: overlapsOf(nl) });
+  await goTo(pg, ...fx.groups.E.center, base - 0.5);
+  const nh = await visibleNames(pg);
+  ok(has(nh, 'lm', '白ゆり公園') && !has(nh, 'h', 'ホワイトニング店') && overlapsOf(nh).length === 0, 'T20 目印の名前がはっきり（拡大 base-0.5）：「白ゆり公園」が出て「ホワイトニング店」は出ない・重ならない', { names: keys(nh), ov: overlapsOf(nh) });
+  allErrs.push(...errs);
+  await ctx.close();
 }
 // T13：JS のエラーなし（全部の場面）
 ok(allErrs.length === 0, 'T13 JS のエラーなし（全部の場面）', allErrs.slice(0, 5));
