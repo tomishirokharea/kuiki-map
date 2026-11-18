@@ -78,8 +78,9 @@
     }
     return c;
   }
-  /* 塊（outer から holes を除いた形）に、辺から half m 以上はなれた広さが needM2 以上あるか。
-     step m 間隔の点を数え、足りた時点で true を返す */
+  /* 塊（outer から holes を除いた形）の、幅が 2×half 以上ある部分の広さが needM2 以上あるか。
+     step m 間隔の点で測る：辺から half m 以上はなれた点（芯）を求め、芯から half m 以内にある点を数える
+     （芯をもとの広さに戻した形）。数×step² が足りた時点で true を返す */
   function coreAreaAtLeast(outer, holes, needM2, step = 10, half = 10) {
     if (!outer || outer.length < 3) return false;
     const cosLat = cosOf(outer), o = outer.map(p => mXY(p, cosLat));
@@ -88,15 +89,30 @@
     [o].concat(hs).forEach(r => { for (let i = 0, j = r.length - 1; i < r.length; j = i++) edges.push([r[j], r[i]]); });
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     o.forEach(q => { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); });
-    let n = 0;
-    for (let x = x0 + step / 2; x <= x1; x += step) {
-      for (let y = y0 + step / 2; y <= y1; y += step) {
-        if (!inXY(x, y, o) || hs.some(h => inXY(x, y, h))) continue;
+    const nx = Math.floor((x1 - x0) / step) + 1, ny = Math.floor((y1 - y0) / step) + 1;
+    const inn = [], core = new Uint8Array(nx * ny);
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < ny; j++) {
+        const x = x0 + step / 2 + i * step, y = y0 + step / 2 + j * step;
+        if (x > x1 || y > y1 || !inXY(x, y, o) || hs.some(h => inXY(x, y, h))) continue;
+        inn.push([i, j]);
         let near = false;
         for (let k = 0; k < edges.length; k++) { if (segDist([x, y], edges[k][0], edges[k][1]) < half) { near = true; break; } }
-        if (near) continue;
-        if (++n * step * step >= needM2) return true;
+        if (!near) core[i * ny + j] = 1;
       }
+    }
+    const r = Math.ceil(half / step), lim = half + step * 0.01;
+    let n = 0;
+    for (const [i, j] of inn) {
+      let hit = false;
+      for (let a = -r; a <= r && !hit; a++) {
+        for (let b = -r; b <= r; b++) {
+          const ii = i + a, jj = j + b;
+          if (ii < 0 || jj < 0 || ii >= nx || jj >= ny || !core[ii * ny + jj]) continue;
+          if (Math.hypot(a, b) * step <= lim) { hit = true; break; }
+        }
+      }
+      if (hit && ++n * step * step >= needM2) return true;
     }
     return false;
   }
