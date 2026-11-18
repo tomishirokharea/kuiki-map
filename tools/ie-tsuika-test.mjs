@@ -58,8 +58,22 @@ await run('?renshu=1', false);
   await pg.goto(ROOT + '/index.html?renshu=1&c=kaitaku');
   await pg.waitForFunction(() => typeof Store !== 'undefined' && Store.data && typeof addAt === 'function'); await pg.waitForTimeout(1000);
   const r = await pg.evaluate(() => { const ts = []; const o = window.toast; window.toast = m => { ts.push(m); }; UI.mode = 'detail'; applyUi();
+    map.setZoom(15, { animate: false });
     const z = map.getZoom(); addAt(L.latLng(26.158, 127.683)); const z2 = map.getZoom(); window.toast = o; return { ts, z, z2 }; });
-  ok(r.z === r.z2 && /自分の区域の中にだけ/.test(r.ts.join()), '自分の区域でない所：大きくせずに今までの案内 ' + JSON.stringify(r));
+  ok(r.z === 15 && r.z === r.z2 && /自分の区域の中にだけ/.test(r.ts.join()), '自分の区域でない所：小さい地図でも大きくせずに今までの案内 ' + JSON.stringify(r));
+  // 消すモード：小さい地図で何もない所を押すと、大きくせずに「消したい家の印を…」
+  const r2 = await pg.evaluate(() => { const ts = []; const o = window.toast; window.toast = m => { ts.push(m); }; window.ask = async () => true;
+    takeTerr('t3'); setMode('add'); addMode = 'del'; map.setZoom(15, { animate: false });
+    const tt = terrById('t3'); const z = map.getZoom(); addAt(L.latLng((tt.polygon[0][0] + tt.polygon[2][0]) / 2, (tt.polygon[0][1] + tt.polygon[2][1]) / 2));
+    const z2 = map.getZoom(); addMode = 'quick'; setMode('normal'); window.toast = o; return { ts: ts.slice(-1), z, z2 }; });
+  ok(r2.z === r2.z2 && /消したい家の印/.test(r2.ts.join()), '消すモード：大きくせずに「消したい家の印をタップ」 ' + JSON.stringify(r2));
+  // ダブルタップ（大きくした直後の2回目）では家を足さない
+  const r3 = await pg.evaluate(async () => { const ts = []; const o = window.toast; window.toast = m => { ts.push(m); };
+    setMode('add'); addMode = 'quick'; map.setZoom(15, { animate: false });
+    const tt = terrById('t3'); const ll = L.latLng((tt.polygon[0][0] + tt.polygon[2][0]) / 2 + 0.0002, (tt.polygon[0][1] + tt.polygon[2][1]) / 2 + 0.0003);
+    const n0 = D().houses.length; addAt(ll); await new Promise(r => setTimeout(r, 120)); addAt(ll);
+    const n1 = D().houses.length; await new Promise(r => setTimeout(r, 700)); const z = map.getZoom(); setMode('normal'); window.toast = o; return { n0, n1, z, ts }; });
+  ok(r3.n1 === r3.n0 && r3.z >= 17, 'ダブルタップでは家を足さず、地図が大きくなるだけ ' + JSON.stringify(r3));
   await ctx.close();
 }
 console.log(fails ? 'NG ' + fails : 'ALL OK');

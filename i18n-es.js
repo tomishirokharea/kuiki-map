@@ -946,6 +946,7 @@ window.KUIKI_I18N.es = {
 "区域の線の外です。区域の中をタップしてください": "Está fuera de la línea del territorio. Toque dentro del territorio",
 "場所がずれないように、もう少し地図を拡大してからタップしてください": "Para que no quede mal ubicada, acerque un poco más el mapa antes de tocar",
 "地図を大きくしました。家の屋根の真ん中を、もう一度押してください": "Se acercó el mapa. Vuelva a tocar el centro del techo de la casa.",
+"家の場所を押してください。地図が小さいときは、押した所が大きくなります": "Toque el lugar de la casa. Si el mapa está lejos, se acercará donde toque.",
 "家は、自分の区域の中にだけ追加できます": "Solo puede agregar casas dentro de su territorio",
 "消したい家の印をタップしてください": "Toque la marca de la casa que quiere borrar",
 "。区域は線を完成すると決まります": ". El territorio se define al terminar la línea",

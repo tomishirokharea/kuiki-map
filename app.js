@@ -4222,11 +4222,11 @@ function renderParents(cur) {
 function onTerrTap(t, e, keep) {
   // 家の場所を直しているときは、区域の中をタップしても、家をその場所に動かす（区域の線が先にタップを受け取り、家が動かなかった・2026-11-04）
   if (moveTap(e)) return;
-  // 家を足しているときは、区域の中をタップしたら家を足す。ふだんの画面で描いた区域の線が、家の追加に切りかえたあとも
-  // タップを受け取ってしまい、区域のえらび直しになって家が足せなかった（2026-11-18 練習で分かった）
-  if (mode === 'add') { if (e && e.latlng) addAt(e.latlng, false); return; }
   // 地図で場所をえらんでいるとき（集まりの場所・目印・グループの中心など）は、区域の中をタップしても、その場所をえらぶ
   if (pickPlace) { const f = pickPlace; pickPlace = null; f(e.latlng); return; }
+  // 家を足しているときは、区域の中をタップしたら家を足す（念のため。setMode で線を描き直すので、ふつうはここに来ない。
+  // 前は、ふだんの画面で描いた区域の線がタップを受け取り、区域のえらび直しになって家が足せなかった・2026-11-18）
+  if (mode === 'add') { if (e && e.latlng) addAt(e.latlng, false); return; }
   const cur = selTerrId();
   // まだだれも持っていない区域は、もう一度押しても外さず、くわしい情報の画面をまた出す（閉じたあとに押し直す人のため）
   if (t.id === cur && !isAdmin() && !myTerr(t) && !t.holder && window.openTerrPick && window.openTerrPick(t.id)) return;
@@ -6915,16 +6915,23 @@ function updateAddBar() {
   $('#addCount').textContent = [addCount ? `追加 ${addCount}件` : '', delCount ? `削除 ${delCount}件` : ''].filter(Boolean).join('　') || '';
   if (map) $('#map').classList.toggle('deleting', mode === 'add' && addMode === 'del');
 }
+let addZoomAt = 0; // 家を足すときに、地図を自動で大きくした時刻（addAt）
 function addAt(ll, inDraw) {
   if (simpleBlock('家を追加')) return;
   const tid = terrOf(ll.lat, ll.lng);
   // 線引き中は、まだ区域が無い場所にも置ける（線を完成したときに区域が決まる）
   if (!tid && !inDraw) { toast('区域の線の外です。区域の中をタップしてください'); return; }
   if (!inDraw && lockOn() && !openTerrIds().has(tid)) { toast('家は、自分の区域の中にだけ追加できます'); return; }
-  // 地図が小さいときは、押した所を大きくして、もう一度押してもらう（前は案内だけで、何も起きないように見えた・2026-11-18 練習で）
-  if (map.getZoom() < 17) { map.setView(ll, 18); toast('地図を大きくしました。家の屋根の真ん中を、もう一度押してください'); return; }
-  if (!inDraw && needTerrConfirm(tid, null)) { guardTerr(tid, null, () => addAt(ll, inDraw)); return; }
   if (!inDraw && addMode === 'del') { toast('消したい家の印をタップしてください'); return; }
+  // 地図が小さいときは、押した所を指の下のまま大きくして、もう一度押してもらう（前は案内だけで、何も起きないように見えた・2026-11-18 練習で）。
+  // 大きくした直後のタップ（ダブルタップ・大きくなっている途中の2回目）は数えない：場所を確かめる前に家が入らないように（監査 I-1）
+  if (Date.now() - addZoomAt < 600) return;
+  if (map.getZoom() < 17) {
+    addZoomAt = Date.now();
+    map.setZoomAround(map.latLngToContainerPoint(ll), 18);
+    toast('地図を大きくしました。家の屋根の真ん中を、もう一度押してください'); return;
+  }
+  if (!inDraw && needTerrConfirm(tid, null)) { guardTerr(tid, null, () => addAt(ll, inDraw)); return; }
   if (inDraw ? drawTap === 'house' : addQuick()) {
     addCount++; updateAddBar();
     const note = !tid && addCount === 1 ? '。区域は線を完成すると決まります' : '';
@@ -16399,7 +16406,7 @@ function bindStatic() {
   $('#btnAdd').onclick = () => {
     if (simpleBlock('家を追加')) return;
     addCount = 0; delCount = 0; addMode = 'quick'; setMode('add'); updateAddBar();
-    if (map.getZoom() < 17) toast('場所がわかるまで地図を拡大してから、タップしてください');
+    if (map.getZoom() < 17) toast('家の場所を押してください。地図が小さいときは、押した所が大きくなります');
   };
   $('#partUndo').onclick = () => {
     if (!partDraw) return;
