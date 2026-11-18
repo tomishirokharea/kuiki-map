@@ -524,12 +524,15 @@ body.simple .lmnear,body.simple .topen .tname small.lmnear{font-size:16px}
   }
   function lmRender() { placeNames(); }
   /* 名前（目印・建物）を描くところ。建物の名前の候補は app.js の houseNameLabels が window.HOUSE_NAMES に出す */
+  let hnMarks = [];   // 建物の名前の印（houseLayer に置く。札をよける schedule.js が houseLayer から読むため）
   function placeNames() {
     lmEnsureLayer();
     if (!map || !lmGroup) return;
     lmGroup.clearLayers();
+    hnMarks.forEach(m => { if (houseLayer) houseLayer.removeLayer(m); });
+    hnMarks = [];
     if (lmOn() && LM.items.length) drawLandmarks();
-    (window.HOUSE_NAMES || []).forEach(c => drawHouseName(c, lmGroup));
+    if (houseLayer) (window.HOUSE_NAMES || []).forEach(c => hnMarks.push(drawHouseName(c, houseLayer)));
   }
   function drawLandmarks() {
     const z = map.getZoom(), b = map.getBounds().pad(0.25), vis = typeof rotVisTest === 'function' ? rotVisTest(0.25) : null;

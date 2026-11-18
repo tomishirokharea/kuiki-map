@@ -26,6 +26,14 @@ const b = await chromium.launch();
     ok(JSON.stringify(names) === JSON.stringify(w.names), `R1 組${g} 拡大18の名前が before と同じ`, { names, want: w.names });
     ok(JSON.stringify(marks) === JSON.stringify(w.marks), `R1 組${g} 拡大18の目印が before と同じ`, { marks, want: w.marks });
   }
+  // R4：建物の名前は houseLayer にあり、lmRender をくり返しても増えない・DOM の数と同じ
+  await goTo(pg, ...fx.groups.A.center, 18);
+  const cnt = () => pg.evaluate(() => ({ layer: houseLayer.getLayers().filter(m => m._icon && m._icon.classList.contains('hname')).length, dom: document.querySelectorAll('.leaflet-marker-icon.hname').length }));
+  const c1 = await cnt();
+  await pg.evaluate(() => { window.lmRepaint(); window.lmRepaint(); });
+  await pg.waitForTimeout(200);
+  const c2 = await cnt();
+  ok(c1.layer > 0 && c1.layer === c2.layer && c2.layer === c2.dom, 'R4 建物の名前は houseLayer にあり、描き直しで増えない', { c1, c2 });
   // R2：線引き中は家の名前が0個、もどすとまた出る
   await goTo(pg, ...fx.groups.A.center, 18);
   const n0 = await pg.evaluate(() => document.querySelectorAll('.hname').length);
