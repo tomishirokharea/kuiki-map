@@ -33,14 +33,17 @@ var DOUGA = {
       again: 'もう一度', next: '次', offline: '電波のある所で、もう一度押してください', seen: '見ました', sec: '秒', min: '分',
       listNote: '音なしでも分かるように、字幕が入っています。', row: '使い方の動画',
       tryTitle: 'やってみること', tryDone: '練習はおしまいです。本番に戻りましょう', exit: '練習をやめる',
-      steps: ['区域カードを開く', '家の丸を押して「会えた」', '別の家で「留守」', 'アパートの部屋を記録', '区域を返す'] },
+      steps: ['区域カードを開く', '家の丸を押して「会えた」', '別の家で「留守」', 'アパートの部屋を記録', '区域を返す'],
+      /* 開拓者の練習（?renshu=1&c=kaitaku）の「やってみること」 */
+      stepsK: ['文字の大きさを変える（右上の歯車）', '「再訪問」と「おすすめのタブ」を使う設定にする', '個人の区域をもらう', '家を記録する（会えた・留守）', '会えた方を再訪問に入れる', '家を足す、または仮の家を消す（くわしい表示）', 'アパートの部屋を足す・直す', '留守宅カードを受け取る、またはおすすめを見る', '区域を返す'] },
     es: { title: 'Videos de ayuda', hello: 'Para quienes empiezan', watch: 'Ver cómo se usa', more: 'Ver más videos', practice: 'Practicar', practiceNote: 'No se guarda en los registros reales',
       later: 'Puede verlos cuando quiera en Ajustes (engranaje) › «Videos de ayuda»', strip: 'Hay un video que explica esta pantalla', see: 'Ver',
       pause: 'Pausar', play: 'Reproducir', slow: 'Más lento', normal: 'Velocidad normal', sound: 'Activar sonido', mute: 'Silenciar', close: 'Cerrar',
       again: 'Otra vez', next: 'Siguiente', offline: 'Vuelva a intentarlo donde haya señal', seen: 'Visto', sec: ' s', min: ' min',
       listNote: 'Los videos tienen subtítulos, para entenderlos sin sonido.', row: 'Videos de ayuda',
       tryTitle: 'Qué probar', tryDone: 'La práctica terminó. Volvamos al uso real', exit: 'Salir de la práctica',
-      steps: ['Abrir una tarjeta de territorio', 'Tocar el círculo de una casa y elegir «Encontré»', 'En otra casa, elegir «Ausente»', 'Registrar un apartamento', 'Devolver el territorio'] }
+      steps: ['Abrir una tarjeta de territorio', 'Tocar el círculo de una casa y elegir «Encontré»', 'En otra casa, elegir «Ausente»', 'Registrar un apartamento', 'Devolver el territorio'],
+      stepsK: ['Cambiar el tamaño de la letra (engranaje arriba a la derecha)', 'Activar «Revisitas» y la pestaña de sugerencias', 'Recibir un territorio personal', 'Registrar casas (Encontré / Ausente)', 'Agregar a revisitas a alguien que encontró', 'Agregar una casa o borrar una casa provisional (vista detallada)', 'Agregar o corregir habitaciones de un apartamento', 'Recibir una tarjeta de ausentes o ver las sugerencias', 'Devolver el territorio'] }
   }
 };
 window.DOUGA = DOUGA;
@@ -56,6 +59,7 @@ window.DOUGA = DOUGA;
   var ready = function () { return typeof Store !== 'undefined' && Store.data && typeof UI !== 'undefined'; };
   var simple = function () { return typeof isSimple === 'function' ? isSimple() : true; };
   var isPractice = function () { return /[?&]renshu=1(&|$)/.test(location.search); };
+  var isKaitaku = function () { return isPractice() && /[?&]c=kaitaku(&|$)/.test(location.search); }; // 開拓者の練習（2026-11-18）
   var today = function () { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); };
   var secText = function (s) { return s >= 60 ? Math.round(s / 60) + T('min') : s + T('sec'); };
   var KEY = 'kuiki_douga', USE_KEY = 'kuiki_use_days';
@@ -158,6 +162,7 @@ window.DOUGA = DOUGA;
 
   /* ---------- 練習モード：「やってみること」（練習の中のデータを見て ✓ を付ける） ---------- */
   function practiceDone() {
+    if (isKaitaku()) return practiceDoneK();
     var me0 = typeof me === 'function' ? me() : null, d = typeof D === 'function' ? D() : null;
     if (!me0 || !d) return [false, false, false, false, false];
     /* 練習を始めたあとに、自分がやったことだけを数える（試作データに入っている記録は数えない） */
@@ -172,8 +177,45 @@ window.DOUGA = DOUGA;
       (d.returns || []).some(function (r) { return r.by === me0.id && since(r.at); })
     ];
   }
+  /* 開拓者の練習：9つの「やってみること」。練習を始めたあとに、自分がやったことだけを数える
+     （はじめの状態は app.js の renshuKaitaku・renshuUi が練習の保存場所に覚えている） */
+  function practiceDoneK() {
+    var me0 = typeof me === 'function' ? me() : null, d = typeof D === 'function' ? D() : null;
+    if (!me0 || !d) return [false, false, false, false, false, false, false, false, false];
+    var get = function (k) { try { return JSON.parse((typeof lsGet === 'function' && lsGet(k)) || 'null'); } catch (e) { return null; } };
+    var t0 = Number(typeof lsGet === 'function' && lsGet('renshu_t0')) || 0;
+    var since = function (x) { var t = typeof x === 'number' ? x : new Date(x).getTime(); return isFinite(t) && t >= t0; };
+    var ui0 = get('renshu_ui0') || {}, k0 = get('renshu_k0') || { prov: [], apts: {} }, u = typeof UI !== 'undefined' ? UI : {};
+    var mine = (d.visits || []).filter(function (v) { return v.by === me0.id && since(v.at); });
+    /* 受け取った区域を覚えておく（返したあとも「返した」と分かるように） */
+    var took = get('renshu_took') || [];
+    (d.territories || []).forEach(function (t) { if (t.holder === me0.id && since(t.lentAt) && took.indexOf(t.id) < 0) took.push(t.id); });
+    if (took.length && typeof lsSet === 'function') lsSet('renshu_took', JSON.stringify(took));
+    var ids = {}; (d.houses || []).forEach(function (h) { ids[h.id] = h; });
+    var recoBtn = q('#tabs button[data-view="reco"]');
+    var aptChanged = (d.houses || []).some(function (h) {
+      if (h.type !== 'apt') return false;
+      if (!(h.id in (k0.apts || {}))) return h.createdBy === me0.id;
+      return (h.units || []).join(',') !== k0.apts[h.id];
+    });
+    return [
+      (u.size !== ui0.size) || (Number(u.pct) || 0) !== (Number(ui0.pct) || 0),
+      u.fFollow === 'on' && !!recoBtn && !recoBtn.hidden,
+      took.length > 0 || (d.returns || []).some(function (r) { return r.by === me0.id && since(r.at); }) ||
+        (d.requests || []).some(function (r) { return r.by === me0.id && since(r.at) && !r.type; }),
+      mine.some(function (v) { return v.result === 'met'; }) && mine.some(function (v) { return v.result === 'away'; }),
+      Object.keys(d.follows || {}).some(function (k) { var f = d.follows[k]; return f && f.by === me0.id && since(f.since); }),
+      (d.houses || []).some(function (h) { return h.createdBy === me0.id && h.type === 'house' && since(h.createdAt); }) ||
+        (k0.prov || []).some(function (id) { return !ids[id]; }),
+      aptChanged,
+      (d.awayCards || []).some(function (c) { return c.by === me0.id && since(c.at); }) || !!(typeof lsGet === 'function' && lsGet('renshu_reco')),
+      (d.returns || []).some(function (r) { return r.by === me0.id && since(r.at); }) ||
+        took.some(function (id) { var t = (d.territories || []).find(function (x) { return x.id === id; }); return t && t.holder !== me0.id; })
+    ];
+  }
   function practiceCard() {
-    var done = practiceDone(), all = done.every(Boolean), steps = (DOUGA.ui[lang()] || DOUGA.ui.ja).steps || DOUGA.ui.ja.steps;
+    var ui0 = DOUGA.ui[lang()] || DOUGA.ui.ja;
+    var done = practiceDone(), all = done.every(Boolean), steps = isKaitaku() ? (ui0.stepsK || DOUGA.ui.ja.stepsK) : (ui0.steps || DOUGA.ui.ja.steps);
     var li = steps.map(function (t, i) { return '<li class="' + (done[i] ? 'done' : '') + '"><i aria-hidden="true">' + (done[i] ? '✓' : '') + '</i><span>' + (i + 1) + '. ' + escH(t) + '</span></li>'; }).join('');
     return '<div class="dg-card" role="region" aria-label="' + escH(T('tryTitle')) + '" data-notr>' +
       '<div class="dg-head"><b>' + escH(all ? T('tryDone') : T('tryTitle')) + '</b></div>' +
@@ -398,6 +440,7 @@ window.DOUGA = DOUGA;
           var n = typeof currentView === 'string' ? currentView : arguments[0];
           if (n === 'cards' || n === 'follow' || n === 'reco') strip(n);
           if (isPractice() && n === 'cards' && typeof lsSet === 'function') lsSet('renshu_cards', '1'); // 練習：「区域カードを開く」のしるし
+          if (isPractice() && n === 'reco' && typeof lsSet === 'function') lsSet('renshu_reco', '1'); // 開拓者の練習：「おすすめを見る」のしるし
         } catch (e) { /* 何もしない */ }
         return r;
       };

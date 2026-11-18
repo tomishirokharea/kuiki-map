@@ -3141,6 +3141,8 @@ window.KUIKI_I18N.es = {
 "区域係が拒否をエクセル・CSVから取り込むとき、必要な行だけをえらべるようになりました。同じ住所がすでにあるときに、上書きするかどうかもえらべます": "Al importar casas «No visitar» desde Excel o CSV, el encargado ahora puede elegir solo las filas necesarias y decidir si se reemplazan las direcciones que ya existen",
 "練習中": "Práctica",
 "練習中です。本番の記録には入りません。": "Está en modo de práctica. Nada se guarda en los registros reales.",
+"開拓者の練習中です。本番の記録には入りません。": "Práctica para precursores. Nada se guarda en los registros reales.",
+"開拓者（練習）": "Precursor (práctica)",
 "練習をやめる": "Salir de la práctica",
 "練習用の地図です（家の印は実在の家ではありません）": "Mapa de práctica (las casas marcadas no son casas reales)",
 "貸出中（紙の記録）": "Asignado (registro en papel)",
