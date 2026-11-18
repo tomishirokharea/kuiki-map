@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.161';
+var APP_JS_VER = '2026.13.162';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -307,6 +307,8 @@ function makeDemo() {
    ・送れなかった変更は端末にためて、つながったときに送る */
 /* 練習モード（URL に ?renshu=1）：サーバーには一切送らず、本番とは別の保存場所（名札 renshu）で、ダミーの区域を使って記録を試せる */
 const RENSHU = /[?&]renshu=1(&|$)/.test(location.search);
+/* 練習のコース（URL に &c=kaitaku）：開拓者向けの練習。区域をもらう・設定を変える・再訪問・家を足す／消す・アパート・留守宅カード・おすすめまで試せる（2026-11-18） */
+const RENSHU_COURSE = RENSHU && /[?&]c=kaitaku(&|$)/.test(location.search) ? 'kaitaku' : '';
 const API_URL = (function () {
   if (RENSHU) return ''; // 練習モードは、サーバーにつながない（＝試作モードと同じ動き）
   const u = window.KUIKI_CONFIG && window.KUIKI_CONFIG.apiUrl;
@@ -16611,9 +16613,11 @@ function renshuUi() {
   const p = Number(q.get('p')); if (p >= 80 && p <= 160) UI.pct = Math.round(p);
   UI.splash = 'off'; UI.hello = 'off';
   uiSave();
+  if (RENSHU_COURSE) lsSet('renshu_ui0', JSON.stringify({ size: UI.size, pct: UI.pct })); // 練習：はじめの文字の大きさ（変えたら ✓）
 }
 function renshuShow() {
   document.body.classList.add('renshu');
+  if (RENSHU_COURSE === 'kaitaku') { const sp = $('#renshuBar span'); if (sp) sp.textContent = '開拓者の練習中です。本番の記録には入りません。'; }
   const pill = $('#modePill'); pill.hidden = false; pill.textContent = '練習中'; pill.style.background = '#C2410C'; pill.style.color = '#fff';
   document.title = '【練習】' + document.title;
   $('#whoSel').hidden = true; $('#whoLabel').hidden = true;
@@ -16622,6 +16626,44 @@ function renshuShow() {
   $('#renshuExit').onclick = renshuExit;
 }
 function renshuExit() { renshuClear(); location.href = location.pathname; } // 練習の保存場所を消して、本番にもどる
+/* 開拓者の練習（c=kaitaku）：練習の中のデータだけを整える（本番・サーバーには何も送らない）
+   ・使う人は、司会者でも監督でもない「開拓者（練習）」（伝道者D）。持っている区域は無し（区域をもらうところから練習する）
+   ・おすすめは、本番の設定にかかわらず、練習の中では使える（あとで出す機能を先に試せるように）
+   ・試作区域 南（自由に受け取れる区域）の、記録の無い家のうち4軒を「仮の家」にする（「ここは家ではない（消す）」を試せるように）
+   ・試作区域 東は、少し前に「留守宅カードにして返した」区域にする（おすすめ・留守宅カードに家が出るように）
+   ・やったことの ✓ のため、はじめの状態を練習の保存場所に覚えておく（douga.js の practiceDone が使う） */
+function renshuKaitaku() {
+  const d = Store.data, now = Date.now(), iso = ms => new Date(ms).toISOString();
+  const u = d.users.find(x => x.id === 'u4');
+  if (!u) return;
+  u.name = window.KI && KI.lang === 'es' ? 'Precursor (práctica)' : '開拓者（練習）'; // スペイン語では、文の中の名前も訳したものにする（名前は訳さないしくみのため）
+  delete u.leader; delete u.overseer;
+  d.currentUser = u.id;
+  d.settings = d.settings || {};
+  d.settings.recoOn = 1;
+  d.territories.forEach(t => { if (t.holder === u.id) { t.holder = null; t.lentAt = null; } });
+  const has = new Set((d.visits || []).map(v => v.houseId));
+  d.houses.filter(h => h.terrId === 't3' && h.type === 'house' && !has.has(h.id)).slice(0, 4).forEach(h => { h.prov = true; }); // 自由に受け取れる南だけ（受け取った区域の仮の家だけ消せるため）
+  const t4 = d.territories.find(t => t.id === 't4'); // 少し前に「留守宅カードにして返した」区域にする（おすすめ・留守宅カードの練習用）
+  if (t4 && !t4.holder) {
+    t4.lastLentAt = iso(now - 45 * DAY); t4.lastFirstAt = iso(now - 30 * DAY); t4.awayPoolAt = iso(now - 3 * DAY);
+    // 1回目（45〜30日前）に、どの家も1度は訪ねたことにする（平日の朝・昼に、7割は留守）。これで、おすすめ・留守宅カードに家が出る
+    let n = 0;
+    d.houses.filter(h => h.terrId === 't4').forEach(h => targets(h).forEach(unit => {
+      const at = new Date(now - (31 + (n % 10)) * DAY); // 土日をよけて前にずらしても、42日前まで（1回目の45日前より後） at.setHours(n % 2 ? 10 : 13, 15, 0, 0);
+      while (dayTypeOf(at) !== '平日') at.setDate(at.getDate() - 1);
+      const v = { id: uid(), houseId: h.id, unit, result: n % 10 < 7 ? 'away' : 'met', at: at.toISOString(), by: 'u2' };
+      if (v.result === 'met') v.age = AGES[0];
+      d.visits.push(v); n++;
+    }));
+  }
+  const apts = {};
+  d.houses.filter(h => h.type === 'apt').forEach(h => { apts[h.id] = (h.units || []).join(','); });
+  lsSet('renshu_k0', JSON.stringify({
+    prov: d.houses.filter(h => h.prov).map(h => h.id),
+    apts
+  }));
+}
 async function init() {
   if (!window.L) {
     document.body.innerHTML = '<p style="padding:24px;font-size:20px">地図の部品を読み込めませんでした。インターネットにつながっているか確認して、もう一度開いてください。</p>';
@@ -16665,6 +16707,7 @@ async function init() {
     if (RENSHU) { // 使う人は伝道者A（係の画面に入れないように）。「使う人」の選びは出さない
       const ru = Store.data.users.find(x => x.id === 'u1') || Store.data.users[0];
       if (ru) Store.data.currentUser = ru.id;
+      if (RENSHU_COURSE === 'kaitaku') renshuKaitaku();
     }
   }
   uiLoad(); if (RENSHU) renshuUi(); applyUi();
