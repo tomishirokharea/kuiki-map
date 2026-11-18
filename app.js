@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.167';
+var APP_JS_VER = '2026.13.168';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2965,6 +2965,7 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.168', role: 'admin', items: [['人', '区域係：「人」で、訪問の記録を付けたことがある人は「登録まだ」に入れないようにしました（前から使っている人が、まちがって「登録まだ」と出ることがありました）。']] },
   { v: '2026.13.167', items: [['通', '通信がうまくいかなかったときの記録を、区域係に自動で送れるようになりました。歯車の設定の「不具合の記録を送る」で「送る」をえらんだスマホだけが送ります（はじめは「送らない」です）。住所や訪問の記録は送りません。']] },
   { v: '2026.13.167', role: 'admin', items: [['人', '区域係：「人」で、まだ登録していない人と、しばらく開いていない人が、うすい色の行と文字の印で分かるようになりました。その人だけにしぼることもできます。'], ['通', '区域係：みんなのスマホから届いた通信の失敗の記録が、「設定」の「こまったこと・提案」の「AIに渡す形でコピー」に、名前を外して入るようになりました。']] },
   { v: '2026.13.166', items: [['通', '開いたときに、電波に問題がなくても「インターネットにつながっていません」と出ることがあったのを見直しました。1回うまくいかなくても自動でやり直し、それでも受け取れないときだけ知らせます。'], ['通', '通信がうまくいかなかったときの記録を、このスマホの中に残すようにしました。上に「未送信」と出ているときに、そこを押した画面から見られます（名前や住所は記録しません）。']] },
@@ -14947,10 +14948,23 @@ let peopleQ = '', peopleGrp = '';
    ・人の id で見る（サーバーの seenBy：人の id → 最後に使った時刻）。グループや並び順は使わないので、グループを変えても変わらない
    ・none ＝使った記録がない（登録まだ）／stale ＝スマホに情報を残す日数（設定の日数。こえるとスマホから情報が消える）より長く開いていない／'' ＝使っている
    ・サーバーが古くて seenBy がないとき・区域係でないときは null（印を出さない。「まだ」とまちがって出さないため） */
+/* 訪問の記録を付けたことがある人（人の id の集まり）。記録の数が変わったときだけ数え直す（2026.13.168）
+   サーバーに「最後に使った時刻」がまだない人（その人だけのリンクで前から使っていて、この版になってから開いていない人）を、
+   まちがって「登録まだ」と出さないため。記録を付けた人は、まちがいなく使ったことがある */
+let recUsers = null, recUsersN = -1, recUsersOf = null;
+function usersWithRecords() {
+  const V = D().visits || [];
+  if (recUsers && recUsersOf === V && recUsersN === V.length) return recUsers;
+  const set = new Set();
+  for (let i = 0; i < V.length; i++) { const b = V[i] && V[i].by; if (b) set.add(b); }
+  recUsers = set; recUsersOf = V; recUsersN = V.length;
+  return set;
+}
 function userUse(u) {
   if (!isAdmin() || !devState.seenBy || !u) return null;
   const at = Date.parse(devState.seenBy[u.id] || '');
-  if (!isFinite(at)) return { k: 'none', days: 0 };
+  // 使った時刻がない人：訪問の記録を付けたことがあれば、印を付けない（いつ開いたかは分からないので、「開いていない」とも決めつけない）
+  if (!isFinite(at)) return usersWithRecords().has(u.id) ? { k: '', days: 0 } : { k: 'none', days: 0 };
   const days = Math.max(0, Math.floor((Date.now() - at) / DAY));
   return { k: days > cacheDaysLimit() ? 'stale' : '', days };
 }
@@ -14987,7 +15001,7 @@ function renderPeople() {
   const lim = cacheDaysLimit();
   const useBox = !(admin && LIVE) || devState.seenNo ? '' : `<div class="usebox" id="adUseBox">${!devState.seenBy ? '<p class="usenote">使っているかを確かめています…</p>'
     : nNone + nStale ? `<div class="chips" id="adUseChips" role="group" aria-label="使っているかの絞り込み"><button type="button" class="chip" data-puse="" aria-pressed="${!peopleUse}">すべて</button>${nNone ? `<button type="button" class="chip" data-puse="none" aria-pressed="${peopleUse === 'none'}">登録まだ（${nNone}）</button>` : ''}${nStale ? `<button type="button" class="chip" data-puse="stale" aria-pressed="${peopleUse === 'stale'}">しばらく開いていない（${nStale}）</button>` : ''}</div>
-      <details class="usehelp"><summary>うすい色の行について</summary><p class="usenote">うすい色の行は、まだ登録していない人（一度も開いていない人）と、${lim}日より長く開いていない人です。${lim}日より長く開いていないスマホからは、区域の情報が消えています（電波のある所で開き直すと、また使えます）。その人だけのリンクで使っている人は、この版になってから一度開くまで「登録まだ」と出ます。</p></details>`
+      <details class="usehelp"><summary>うすい色の行について</summary><p class="usenote">うすい色の行は、まだ登録していない人（開いた記録も、訪問の記録もない人）と、${lim}日より長く開いていない人です。${lim}日より長く開いていないスマホからは、区域の情報が消えています（電波のある所で開き直すと、また使えます）。訪問の記録を付けたことがある人は、「登録まだ」には入れていません。その人だけのリンクで使っていて、まだ記録を付けていない人は、この版で一度開くまで「登録まだ」と出ます。</p></details>`
     : `<p class="usenote">全員が登録していて、この${lim}日のあいだに開いています。</p>`}</div>`;
   const keepFocus = document.activeElement && document.activeElement.id === 'adPeopleQ' ? document.activeElement.selectionStart : null;
   box.innerHTML = `<h2 class="sec">${admin ? '人とグループ' : `${esc(myGroup())}グループの人`}</h2>
@@ -15036,7 +15050,7 @@ function openEditUser(id) {
     const u = userById(id); if (!u) { closeSheet(); return; }
     const ux = userUse(u);
     setSheet(headHtml(null, `${esc(u.name)}さん`, yomiOn() ? '名前・役割・グループ・よみを直します' : '名前・役割・グループを直します') + `
-      ${ux && ux.k ? `<p class="usenote">${ux.k === 'none' ? 'まだ登録していません（一度も開いていません）。下の「リンク・QR」か、共通リンクのQRで登録できます。' : `${ux.days}日 開いていません。${cacheDaysLimit()}日より長く開いていないスマホからは、区域の情報が消えています（電波のある所で開き直すと、また使えます）。`}</p>` : ''}
+      ${ux && ux.k ? `<p class="usenote">${ux.k === 'none' ? 'まだ登録していないようです（開いた記録も、訪問の記録もありません）。下の「リンク・QR」か、共通リンクのQRで登録できます。' : `${ux.days}日 開いていません。${cacheDaysLimit()}日より長く開いていないスマホからは、区域の情報が消えています（電波のある所で開き直すと、また使えます）。`}</p>` : ''}
       <label class="field"><span>名前</span>
         <input type="text" id="euName" maxlength="30" value="${esc(f.name)}" placeholder="例：山田 花子" autocomplete="off" lang="ja"></label>
       <p class="q">役割</p>
