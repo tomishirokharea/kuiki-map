@@ -115,65 +115,123 @@
       return false;
     };
   }
-  /* メートルの座標の輪の辺と、高さ y の横線が交わる x（偶奇判定の式：辺 a=r[i]・b=r[i-1] で、a・b が y をはさむとき）。小さい順 */
-  function crossX(r, y) {
-    const xs = [];
-    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
-      const a = r[i], b = r[j];
-      if ((a[1] > y) !== (b[1] > y)) xs.push((b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]);
-    }
-    return xs.sort((p, q) => p - q);
-  }
-  /* 塊（outer から holes を除いた形）の、幅が 2×half 以上ある部分の広さが needM2 以上あるか。
-     step m 間隔の点で測る：辺から half m 以上はなれた点（芯）を求め、芯から half m 以内にある点を数える
-     （芯をもとの広さに戻した形）。数×step² が足りた時点で true を返す
-     速さ（2026-11-18）：点の内外は、行ごとに辺と交わる x を求めて左から順に決め（点ごとの偶奇判定と同じ答え）、
-     辺から half m 未満かは、まわりの升の辺だけで調べる（edgeIndex）。答えは、全部の辺を1点ずつ調べたときと同じ */
-  function coreAreaAtLeast(outer, holes, needM2, step = 10, half = 10) {
-    if (!outer || outer.length < 3) return false;
+  /* 塊（outer から holes を除いた形）の、幅が約 2×half 以上ある部分の広さが needM2 以上あるか（2026-11-18 見直し）。
+     step m 間隔の点（一辺 step の升の真ん中）で測る：
+       ・芯：辺から (half − step/√2) m 以上はなれた点。升の大きさの分を引くので、幅 2×half 以上の所には、向きや升の位置によらず芯がある
+         （幅が 2×half − √2×step より細い所には、芯はない）
+       ・芯から (half + step/√2) m 以内（まるい範囲）にある点を数える（芯をもとの広さに戻した形。升の分だけ広くとり、角や細い芯でも少なく数えない）
+     数×step² が needM2 に足りた時点で true を返す（上の行から調べ、まわりの行がそろった行から数える。大きな塊はすぐ終わる）
+     速さ：点の内外は、行ごとに辺と交わる x を求め、中にある所の点だけを見る（外の輪と穴を合わせた偶奇判定と同じ答え）。
+     辺から近いかは、まわりの升の辺だけで調べる（edgeIndex）。答えは、全部の点・全部の辺を1つずつ調べたときと同じ */
+  function coreAreaAtLeast(outer, holes, needM2, step = 2, half = 10) {
+    if (!outer || outer.length < 3 || !(step > 0) || !(half >= 0) || !isFinite(half)) return false;
     const cosLat = cosOf(outer), o = outer.map(p => mXY(p, cosLat));
     const hs = (holes || []).filter(h => h && h.length >= 3).map(h => h.map(p => mXY(p, cosLat)));
     const edges = [];
     [o].concat(hs).forEach(r => { for (let i = 0, j = r.length - 1; i < r.length; j = i++) edges.push([r[j], r[i]]); });
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     o.forEach(q => { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); });
+    if (!(x1 - x0 < 1e6 && y1 - y0 < 1e6)) return false; // こわれた形（NaN・1,000km より大きい）
     const nx = Math.floor((x1 - x0) / step) + 1, ny = Math.floor((y1 - y0) / step) + 1;
-    const inn = [], core = new Uint8Array(nx * ny), near = edgeIndex(edges, half);
-    const hb = hs.map(h => { let lo = Infinity, hi = -Infinity; h.forEach(q => { lo = Math.min(lo, q[1]); hi = Math.max(hi, q[1]); }); return { h, lo, hi }; });
-    for (let j = 0; j < ny; j++) {
-      const y = y0 + step / 2 + j * step;
-      if (y > y1) continue;
-      const xo = crossX(o, y);
-      if (!xo.length) continue;
-      const hx = []; // この行と交わる穴（交わらない穴の中に、この行の点はない）
-      hb.forEach(q => { if (y >= q.lo && y < q.hi) { const xs = crossX(q.h, y); if (xs.length) hx.push({ xs, p: 0 }); } });
-      let po = 0;
-      for (let i = 0; i < nx; i++) {
-        const x = x0 + step / 2 + i * step;
-        if (x > x1) break;
-        while (po < xo.length && xo[po] <= x) po++;
-        let inside = (xo.length - po) & 1; // x より右（x < 交わる x）で交わる数が奇数なら中
-        for (const q of hx) { while (q.p < q.xs.length && q.xs[q.p] <= x) q.p++; if ((q.xs.length - q.p) & 1) inside = 0; }
-        if (!inside) continue;
-        inn.push(i * ny + j);
-        if (!near(x, y)) core[i * ny + j] = 1;
-      }
-    }
-    const r = Math.ceil(half / step), lim = half + step * 0.01;
+    const g = step * Math.SQRT1_2, near = edgeIndex(edges, half - g), R = half + g;
+    const X = i => x0 + step / 2 + i * step, Y = j => y0 + step / 2 + j * step;
+    let iMax = nx - 1;
+    while (iMax >= 0 && X(iMax) > x1) iMax--;
+    // 芯を戻す範囲（升の数で、まるく）：近い順
+    const lim = (R / step) * (R / step) + 1e-9, r = Math.ceil(R / step), off = [];
+    for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) if ((a || b) && a * a + b * b <= lim) off.push([a, b, a * a + b * b]);
+    off.sort((p, q) => p[2] - q[2]);
+    // 辺を、その辺の y の範囲にある行に入れておく（行ごとに、その行と交わりうる辺だけを見る。少し広めに入れ、交わるかは行で確かめる）
+    const cnt = new Int32Array(ny + 1), row0 = new Int32Array(edges.length), row1 = new Int32Array(edges.length);
+    edges.forEach(([p, q], k) => {
+      const lo = Math.min(p[1], q[1]), hi = Math.max(p[1], q[1]);
+      row0[k] = Math.max(0, Math.ceil((lo - y0 - step / 2) / step) - 1); row1[k] = Math.min(ny - 1, Math.ceil((hi - y0 - step / 2) / step));
+      for (let j = row0[k]; j <= row1[k]; j++) cnt[j + 1]++;
+    });
+    for (let j = 0; j < ny; j++) cnt[j + 1] += cnt[j];
+    const ids = new Int32Array(cnt[ny]), fill = cnt.slice(0, ny);
+    edges.forEach((_, k) => { for (let j = row0[k]; j <= row1[k]; j++) ids[fill[j]++] = k; });
+    // 行は W 行分だけ持つ（数える行の上下 r 行）。0：外・1：中・2：芯。spans：行の中の点の範囲（i の始め・終わり）
+    const W = 2 * r + 1, buf = new Uint8Array(W * nx), spans = [], nCore = new Int32Array(W);
     let n = 0;
-    for (const idx of inn) {
-      const i = Math.floor(idx / ny), j = idx - i * ny;
-      let hit = false;
-      for (let a = -r; a <= r && !hit; a++) {
-        for (let b = -r; b <= r; b++) {
-          const ii = i + a, jj = j + b;
-          if (ii < 0 || jj < 0 || ii >= nx || jj >= ny || !core[ii * ny + jj]) continue;
-          if (Math.hypot(a, b) * step <= lim) { hit = true; break; }
+    const count = f => { // 行 f の中の点のうち、芯から R 以内の点を数える。足りたら true
+      const sf = f % W, sp = spans[sf];
+      if (!sp.length) return false;
+      let c = 0;
+      for (let b = Math.max(0, f - r), b1 = Math.min(ny - 1, f + r); b <= b1; b++) c += nCore[b % W];
+      if (!c) return false; // まわりに芯がない
+      for (let s = 0; s < sp.length; s += 2) {
+        for (let i = sp[s]; i <= sp[s + 1]; i++) {
+          let hit = buf[sf * nx + i] === 2;
+          for (let k = 0; !hit && k < off.length; k++) {
+            const ii = i + off[k][0], jj = f + off[k][1];
+            if (ii >= 0 && ii < nx && jj >= 0 && jj < ny && buf[(jj % W) * nx + ii] === 2) hit = true;
+          }
+          if (hit && ++n * step * step >= needM2) return true;
         }
       }
-      if (hit && ++n * step * step >= needM2) return true;
+      return false;
+    };
+    for (let j = 0; j < ny; j++) {
+      const sj = j % W, y = Y(j), sp = [];
+      buf.fill(0, sj * nx, sj * nx + nx); nCore[sj] = 0;
+      if (y <= y1) {
+        const xs = [];
+        for (let q = cnt[j]; q < cnt[j + 1]; q++) {
+          const e = edges[ids[q]], a = e[1], b = e[0]; // 偶奇判定の式（a=r[i]・b=r[i-1]）
+          if ((a[1] > y) !== (b[1] > y)) xs.push((b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]);
+        }
+        xs.sort((p, q) => p - q);
+        for (let k = 0; k + 1 < xs.length; k += 2) { // 中：xs[k] ≤ x < xs[k+1]（x より右で交わる数が奇数）
+          let i0 = Math.max(0, Math.ceil((xs[k] - x0 - step / 2) / step) - 1);
+          while (i0 <= iMax && X(i0) < xs[k]) i0++;
+          let i1 = i0;
+          while (i1 <= iMax && X(i1) < xs[k + 1]) i1++;
+          if (--i1 < i0) continue;
+          sp.push(i0, i1);
+          for (let i = i0; i <= i1; i++) {
+            const core = !near(X(i), y);
+            buf[sj * nx + i] = core ? 2 : 1;
+            if (core) nCore[sj]++;
+          }
+        }
+      }
+      spans[sj] = sp;
+      if (j >= r && count(j - r)) return true;
     }
+    for (let f = Math.max(0, ny - r); f < ny; f++) if (count(f)) return true;
     return false;
+  }
+  /* 穴のある形（outer から holes を除いた形）の中の点 [lat, lng]：線（外の輪・穴の線）から遠い点。取りこぼしの「！」を、穴（島のようにある区域など）の外に置くため。
+     横に 128 本の線を引き、形の中を通る所（外の輪と穴を合わせた偶奇判定で中）のまん中の点のうち、いちばん近い線までがいちばん遠い点をえらぶ
+     （中を通る所のまん中なので、かならず形の中で、穴の外。調べる点の数は、辺の数に合わせてへらす）。見つからなければ null */
+  function innerPoint(outer, holes) {
+    if (!outer || outer.length < 3) return null;
+    const cosLat = cosOf(outer), rs = [outer].concat((holes || []).filter(h => h && h.length >= 3)).map(r => r.map(p => mXY(p, cosLat)));
+    let y0 = Infinity, y1 = -Infinity, nE = 0;
+    rs[0].forEach(q => { y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); });
+    rs.forEach(R => { nE += R.length; });
+    if (!(y1 > y0 && y1 - y0 < 1e6)) return null;
+    const N = 128, cand = [];
+    for (let k = 0; k < N; k++) {
+      const y = y0 + (k + 0.5) * (y1 - y0) / N, xs = [];
+      for (const R of rs) {
+        for (let i = 0, j = R.length - 1; i < R.length; j = i++) {
+          const a = R[i], b = R[j];
+          if ((a[1] > y) !== (b[1] > y)) xs.push((b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]);
+        }
+      }
+      xs.sort((p, q) => p - q);
+      for (let m = 0; m + 1 < xs.length; m += 2) if (xs[m + 1] > xs[m]) cand.push([xs[m + 1] - xs[m], (xs[m] + xs[m + 1]) / 2, y]);
+    }
+    cand.sort((p, q) => q[0] - p[0]); // 長く通る所から（多すぎるときは、長いほうだけを調べる）
+    let best = null, bd = -1;
+    for (const [, x, y] of cand.slice(0, Math.max(64, Math.floor(4e6 / nE)))) {
+      let md = Infinity;
+      for (const R of rs) for (let i = 0, j = R.length - 1; i < R.length && md > bd; j = i++) { const d = segDist([x, y], R[i], R[j]); if (d < md) md = d; }
+      if (md > bd) { bd = md; best = [x, y]; }
+    }
+    return best ? [best[1] / 110540, best[0] / (111320 * cosLat)] : null;
   }
 
   /* S-54 の KML の文章 → 名前・更新日・四方の境・輪（[[lat,lng]…]）。こわれた XML は例外 */
@@ -222,7 +280,7 @@
     };
   }
 
-  const SK_API = { capRings, ringsAreaM2, inRing, coreAreaAtLeast, parseS54 };
+  const SK_API = { capRings, ringsAreaM2, inRing, coreAreaAtLeast, innerPoint, parseS54 };
   if (typeof module !== 'undefined' && module.exports) module.exports = SK_API;
   if (typeof window === 'undefined') return;
   window.Sakai = Object.assign(window.Sakai || {}, SK_API);

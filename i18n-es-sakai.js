@@ -57,5 +57,8 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "新しい区域の線を引く": "Dibujar un territorio nuevo",
 "とばす": "Omitir",
 "細い所・小さい所（境とのずれなど）{0}か所・約{1}は出していません": "Zonas estrechas o pequeñas no mostradas (desfases con el límite, etc.): {0}, aprox. {1}",
-"すき間・重なり・取りこぼしが {0}か所 見つかりました": "Huecos, superposiciones o zonas sin territorio encontrados: {0}"
+"すき間・重なり・取りこぼしが {0}か所 見つかりました": "Huecos, superposiciones o zonas sin territorio encontrados: {0}",
+"赤い所が、すき間・重なり・取りこぼしです。赤い「！」をタップすると、直し方をえらべます。": "Lo rojo son huecos, superposiciones y zonas sin territorio. Toque el «！» rojo para elegir cómo corregirlo.",
+"残りの所はありません。とばした所は、もう一度調べると出ます。": "No queda nada más. Las zonas omitidas volverán a aparecer al buscar de nuevo.",
+"取りこぼしを区域{0}に入れました": "Se agregó la zona sin territorio al territorio {0}"
 });

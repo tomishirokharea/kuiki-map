@@ -35,11 +35,12 @@
   const GAP_MIN = 1;          // これより小さいすき間（㎡）は、計算のずれとみなす
   const GAP_MAX = 5000;       // これより大きい囲まれた部分は、わざと区域にしていない所（基地・公園など）とみなす
   const HOLE_DROP = 150;      // 1つにしたとき、これより小さい穴は区域に入れてしまう
-  // 取りこぼし（会衆の境の中で、どの区域にも入っていない所）：家の印がなくても、幅が 2×MISS_HALF_M（20m）以上ある部分が
-  // 合わせて MISS_CORE_M2 以上ある所は出す。幅は MISS_STEP_M 間隔の点で測る（sakai.js の coreAreaAtLeast）。豊見城の境で一覧を作ってから調整する
+  // 取りこぼし（会衆の境の中で、どの区域にも入っていない所）：家の印がなくても、幅が約 2×MISS_HALF_M（20m）以上ある部分が
+  // 合わせて MISS_CORE_M2 以上ある所は出す（仕様 R9 の目安：幅約20m以上・合わせて約1,000㎡以上）。幅は MISS_STEP_M 間隔の点で測る（sakai.js の coreAreaAtLeast）。
+  // この値で、幅 20m 以上の所はかならず測り、幅 約17m より細い所は測らない（升の大きさの分）。豊見城の境で一覧を作ってから調整する
   const MISS_CORE_M2 = 1000;
   const MISS_HALF_M = 10;
-  const MISS_STEP_M = 10;
+  const MISS_STEP_M = 2;
   const COL_A = '#C2410C', COL_B = '#1D4ED8', COL_ISSUE = '#DC2626';
 
   /* ---------- 見た目 ---------- */
@@ -69,7 +70,7 @@
 
   /* ---------- 状態 ---------- */
   // tid：えらんでいる区域／tool：null・split・merge・fit・check
-  const S = { tid: null, tool: null, cut: [], split: null, fit: null, issues: [], ii: -1, scope: null, undo: [], drawSnap: null, skip: new Set() }; // skip：今回「とばす」にした取りこぼし（missKey）
+  const S = { tid: null, tool: null, cut: [], split: null, fit: null, issues: [], ii: -1, scope: null, undo: [], drawSnap: null, skip: new Set(), skipN: 0 }; // skip：今回「とばす」にした取りこぼし（missKey）・skipN：そのうち、まだある数
   let lay = null;
 
   /* ---------- 計算の道具 ---------- */
@@ -354,6 +355,8 @@
       const near = tb.filter(o => bbHit(b1, o.b) && touches(ring, o.t.polygon));
       const x = { k: 'miss', ring, holes, area: ar, houses, adj: near.map(o => o.t.id) };
       x.into = near.filter(o => missCanInto(o.t, x)).map(o => o.t.id); // 「区域○に入れる」を出す区域
+      // 穴（島のようにある区域など）のある所：「！」と地図の真ん中は、穴の外の点（外の輪だけの札の場所は、穴の中＝区域の中になることがある）
+      if (holes.length && typeof SK.innerPoint === 'function') { const lp = SK.innerPoint(ring, holes); if (lp) x.lp = lp; }
       out.push(x);
     }
     out.sort((a, b) => b.houses - a.houses || b.area - a.area);
@@ -474,12 +477,14 @@
     }
     if (S.tool === 'check') paintCheckBar(title, hint, body);
   }
+  const SKIP_LEFT = '残りの所はありません。とばした所は、もう一度調べると出ます。'; // 直す所がなくなり、「とばす」にした取りこぼしだけが残るとき
   /* 出さなかった取りこぼし（細い所・小さい所）の一言。なければ '' */
   const missHidHtml = () => (S.missHidden && S.missHidden.n ? `<p class="senhint">細い所・小さい所（境とのずれなど）${S.missHidden.n}か所・約${m2(S.missHidden.area)}は出していません</p>` : '');
   function paintCheckBar(title, hint, body) {
     const is = S.issues, n = is.length;
     if (!n) {
-      hint.textContent = S.tid ? `区域${tno(S.tid)}のまわりに、すき間や重なりはありません。` : 'すき間や重なりは見つかりませんでした。';
+      // 「とばす」にした取りこぼしだけが残っているとき（次に「調べる」を押すとまた出る）
+      hint.textContent = S.skipN ? SKIP_LEFT : S.tid ? `区域${tno(S.tid)}のまわりに、すき間や重なりはありません。` : 'すき間や重なりは見つかりませんでした。';
       body.innerHTML = `${missHidHtml()}<div class="senrow">${btn('cancel', 'もどる', 'small')}</div>`;
       return;
     }
@@ -489,7 +494,7 @@
     head += missHidHtml();
     if (S.autoN) head += `<div class="senrow">${btn('fixAll', `まとめて直す（${S.autoN}か所）`, 'small primary')}</div>`;
     if (!x) {
-      hint.textContent = '赤い所が、すき間と重なりです。赤い「！」をタップすると、直し方をえらべます。';
+      hint.textContent = miss ? '赤い所が、すき間・重なり・取りこぼしです。赤い「！」をタップすると、直し方をえらべます。' : '赤い所が、すき間と重なりです。赤い「！」をタップすると、直し方をえらべます。';
       body.innerHTML = head + `<div class="senrow">${btn('issue', '1か所目を見る', 'small primary', ' data-i="0"')}${btn('cancel', 'もどる', 'small')}</div>`;
       return;
     }
@@ -587,7 +592,7 @@
       const on = i === S.ii;
       // 取りこぼしの穴（島のようにある区域など）は塗らない
       L.polygon(x.holes && x.holes.length ? [x.ring, ...x.holes] : x.ring, { color: COL_ISSUE, weight: on ? 5 : 3, fillColor: COL_ISSUE, fillOpacity: 0.55, interactive: false, className: on ? 'sen-blink' : '' }).addTo(lay);
-      const m = L.marker(labelPoint(x.ring), { icon: L.divIcon({ className: '', html: `<div class="sen-iss${on ? ' on' : ''}">！</div>`, iconSize: [30, 30], iconAnchor: [15, 15] }), keyboard: false, zIndexOffset: on ? 3000 : 2500 });
+      const m = L.marker(x.lp || labelPoint(x.ring), { icon: L.divIcon({ className: '', html: `<div class="sen-iss${on ? ' on' : ''}">！</div>`, iconSize: [30, 30], iconAnchor: [15, 15] }), keyboard: false, zIndexOffset: on ? 3000 : 2500 });
       m.on('click', () => focusIssue(i));
       m.addTo(lay);
     });
@@ -607,6 +612,11 @@
     const x = S.issues[i]; if (!x) return;
     const bar = $('#senBar'), top = bar && !bar.hidden ? bar.offsetHeight + 20 : 20;
     const b = L.latLngBounds(x.ring).pad(x.area < 50 ? 3 : 0.8);
+    if (x.lp) { // 穴のある取りこぼし：線の範囲が入る拡大のまま、「！」（穴の外の点）を真ん中に（fitBounds と同じ、上下の余白の差の半分をずらす）
+      const z = Math.min(map.getBoundsZoom(b, false, L.point(32, top + 40)), 20);
+      map.setView(map.unproject(map.project(x.lp, z).add(L.point(0, (40 - top) / 2)), z), z);
+      return;
+    }
     map.fitBounds(b, { paddingTopLeft: [16, top], paddingBottomRight: [16, 40], maxZoom: 20 });
   }
 
@@ -667,7 +677,7 @@
       if (!pc() && !await ensurePc()) return;
       toast('調べています…');
       setTimeout(() => {
-        S.skip = new Set(); // 「とばす」は、次に「調べる」を押すまで
+        S.skip = new Set(); S.skipN = 0; // 「とばす」は、次に「調べる」を押すまで
         S.tool = 'check'; S.scope = k === 'check' ? S.tid : null; S.issues = findIssues(S.scope); markAuto(); S.ii = -1;
         paint();
         if (!S.issues.length) toast('すき間や重なりはありませんでした');
@@ -843,13 +853,14 @@
   function reFind() {
     const is = findIssues(S.scope);
     S.issues = S.skip.size ? is.filter(x => x.k !== 'miss' || !S.skip.has(missKey(x))) : is;
+    S.skipN = is.length - S.issues.length; // 一覧から外した（とばした）取りこぼしの数
     markAuto();
   }
   function afterFix() {
     reFind();
     S.ii = S.issues.length ? Math.min(S.ii, S.issues.length - 1) : -1;
     paint();
-    if (S.ii >= 0) focusIssue(S.ii); else toast('すき間・重なりは、すべて直りました');
+    if (S.ii >= 0) focusIssue(S.ii); else toast(S.skipN ? SKIP_LEFT : 'すき間・重なりは、すべて直りました');
   }
   /* すき間を区域 t に入れた新しい線（1か所ずつ・まとめて、同じ処理）。PO：区域の線を返す関数（まとめて直すときは、直したあとの線を返す） */
   function gapRing(t, x, PO) {
@@ -885,7 +896,7 @@
     const t = terrById(tid); if (!x || !t) return;
     const ring = x.k === 'miss' && !missCanInto(t, x) ? null : gapRing(t, x, livePoly);
     if (!ring) { toast('うまく入れられませんでした。「形を直す」で直してください'); return; }
-    doCommit(`すき間を区域${t.no}に入れました`, () => { const y = terrById(tid); if (y) { y.polygon = ring; reassign(); } });
+    doCommit(x.k === 'miss' ? `取りこぼしを区域${t.no}に入れました` : `すき間を区域${t.no}に入れました`, () => { const y = terrById(tid); if (y) { y.polygon = ring; reassign(); } });
     afterFix();
   }
   /* 取りこぼしを「とばす」：今回だけ外して、次の所を出す（次に「調べる」を押すと、また出る） */
@@ -893,6 +904,7 @@
     const x = S.issues[S.ii];
     if (!x || x.k !== 'miss') return;
     S.skip.add(missKey(x)); // 直したあとの作り直しでも出さない（次に「調べる」を押すまで）
+    S.skipN = (S.skipN || 0) + 1;
     S.issues.splice(S.ii, 1);
     if (!S.issues.length) { S.ii = -1; paint(); return; }
     focusIssue(Math.min(S.ii, S.issues.length - 1));
