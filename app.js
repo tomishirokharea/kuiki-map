@@ -15838,6 +15838,8 @@ function openS13Edit(tid, editId) {
     if (!name) { toast('伝道者の名前を入れてください'); return; }
     if (!a) { toast('割り当てた日付を入れてください'); return; }
     if (c && c < a) { toast('完了した日付が、割り当てた日付より前になっています'); return; }
+    if (c && c > ymd(new Date())) { toast('完了した日付が、今日より後になっています'); return; }
+    if (a > ymd(new Date())) { toast('割り当てた日付が、今日より後になっています'); return; }
     const targets = kin.length > 1 && ($('#s13All') || {}).checked ? kin : [t];
     const oldName = ed ? s13Norm(ed.name) : '', oldA = ed ? ed.a : '';
     // この区域で置きかえる紙の記録（直している記録・同じ名前と日付の記録）

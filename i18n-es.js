@@ -3170,6 +3170,7 @@ window.KUIKI_I18N.es = {
 "「{0}」さんは、グループ監督・司会者としてアプリに登録されていません。紙の記録として入ります。": "«{0}» no está registrado en la aplicación como superintendente de grupo o conductor. Se guardará como registro en papel.",
 "区域{0}の枝番すべて（{1}）に入れる": "Agregar a todas las subdivisiones del territorio {0} ({1})",
 "割り当てた日付が、今日より後になっています": "La fecha de asignación es posterior a hoy",
+"完了した日付が、今日より後になっています": "La fecha de finalización es posterior a hoy",
 "渡せる区域がありません。{0}": "No hay territorios para entregar. {0}",
 "区域{0}（アプリで{1}さんが持っています）": "Territorio {0} (lo tiene {1} en la aplicación)",
 "区域{0}（紙の記録で{1}さんが持っています）": "Territorio {0} (lo tiene {1} en papel)",
