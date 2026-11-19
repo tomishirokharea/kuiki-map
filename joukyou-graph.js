@@ -55,23 +55,37 @@
       if (t === undefined) { const x = rsFn ? rsFn(terr) : ''; t = x ? Date.parse(x) : NaN; if (!isFinite(t)) t = NaN; rsMemo.set(terr, t); }
       return t;
     };
-    /* おすすめから訪ねた記録（src の先頭が reco）の振り分け。list は家（部屋）ごとの記録（新しい順）、i はその記録の位置。
-       今の巡回の中で、その訪問より前に訪ねていて まだ会えていない → 'card'（留守宅）／今の巡回で初めて訪ねた → 'area'（回り残し）。
-       今の巡回が分からない・その訪問が巡回の始まりより前なら '' を返し、今までどおり印に従う */
-    const recoKind = (v, list, i, terr) => {
-      const start = roundMs(terr);
-      if (!isFinite(start)) return '';
-      const t = Date.parse(v.at);
-      if (!isFinite(t) || t < start) return '';
+    /* その訪問の直前の記録（拒否を除く）を探す。見つからなければ null（R4・巡回の判定ができないときに使う） */
+    const prevRec = (list, i, t) => {
       for (let j = i + 1; list && j < list.length; j++) {
         const w = list[j];
         if (!w || w.result === 'refused') continue; // 拒否は飛ばす（実際に会えたかどうかの手がかりにしない）
         const tw = Date.parse(w.at);
         if (!isFinite(tw) || tw >= t) continue; // その訪問より新しい記録は見ない（並びが古い順の索引のとき）
-        if (tw < start) return 'area'; // 前の巡回の記録しかない＝この巡回で初めて訪ねた
-        return w.result === 'away' ? 'card' : 'area';
+        return { w: w, t: tw };
       }
-      return 'area'; // 前の記録がない
+      return null;
+    };
+    /* おすすめから訪ねた記録（src の先頭が reco）の振り分け。list は家（部屋）ごとの記録（新しい順）、i はその記録の位置。
+       今の巡回の中で、その訪問より前に訪ねていて まだ会えていない → 'card'（留守宅）／今の巡回で初めて訪ねた → 'area'（回り残し）。
+       区域が分からない・巡回の始まりが読めない区域（完了の記録が1件もない）は、巡回の判定をやめ、
+       直前の記録（拒否を除く）が留守なら 'card'、それ以外・記録なしなら 'area'（R4）。その訪問が巡回の始まりより前のときだけ '' を返し、今までどおり印に従う（R12c・古い棒の数字を塗りかえないため） */
+    const recoKind = (v, list, i, terr) => {
+      const start = roundMs(terr);
+      const t = Date.parse(v.at);
+      if (!isFinite(t)) return '';
+      if (!isFinite(start)) {
+        // 巡回の始まりを教えてもらえない呼び出し（古い呼び出し・roundStart を渡さない試験）は、今までどおり印に従う
+        if (!rsFn) return '';
+        // R4：巡回の始まりが読めない区域（アプリ上で一度も完了していない区域・区域が分からない家）
+        const p = prevRec(list, i, t);
+        return p && p.w.result === 'away' ? 'card' : 'area';
+      }
+      if (t < start) return ''; // R12c：今の巡回より前のおすすめ記録は、今までどおり印に従う
+      const p = prevRec(list, i, t);
+      if (!p) return 'area'; // 前の記録がない
+      if (p.t < start) return 'area'; // 前の巡回の記録しかない＝この巡回で初めて訪ねた
+      return p.w.result === 'away' ? 'card' : 'area';
     };
     const kindOf = (v, key, day, list, i, terr) => {
       const src = v.src ? String(v.src) : '';
