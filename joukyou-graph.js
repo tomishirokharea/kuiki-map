@@ -47,8 +47,35 @@
       }
       return 'area';
     };
-    const kindOf = (v, key, day) => {
+    // 巡回の始まり（区域ごとに覚える）。画面は roundBounds（おすすめの leftOf・umItem と同じ起点）を渡す
+    const rsFn = typeof o.roundStart === 'function' ? o.roundStart : null;
+    const rsMemo = new Map();
+    const roundMs = terr => {
+      let t = rsMemo.get(terr);
+      if (t === undefined) { const x = rsFn ? rsFn(terr) : ''; t = x ? Date.parse(x) : NaN; if (!isFinite(t)) t = NaN; rsMemo.set(terr, t); }
+      return t;
+    };
+    /* おすすめから訪ねた記録（src の先頭が reco）の振り分け。list は家（部屋）ごとの記録（新しい順）、i はその記録の位置。
+       今の巡回の中で、その訪問より前に訪ねていて まだ会えていない → 'card'（留守宅）／今の巡回で初めて訪ねた → 'area'（回り残し）。
+       今の巡回が分からない・その訪問が巡回の始まりより前なら '' を返し、今までどおり印に従う */
+    const recoKind = (v, list, i, terr) => {
+      const start = roundMs(terr);
+      if (!isFinite(start)) return '';
+      const t = Date.parse(v.at);
+      if (!isFinite(t) || t < start) return '';
+      for (let j = i + 1; list && j < list.length; j++) {
+        const w = list[j];
+        if (!w || w.result === 'refused') continue; // 拒否は飛ばす（実際に会えたかどうかの手がかりにしない）
+        const tw = Date.parse(w.at);
+        if (!isFinite(tw) || tw >= t) continue; // その訪問より新しい記録は見ない（並びが古い順の索引のとき）
+        if (tw < start) return 'area'; // 前の巡回の記録しかない＝この巡回で初めて訪ねた
+        return w.result === 'away' ? 'card' : 'area';
+      }
+      return 'area'; // 前の記録がない
+    };
+    const kindOf = (v, key, day, list, i, terr) => {
       const src = v.src ? String(v.src) : '';
+      if (src.indexOf('reco') === 0) { const k = recoKind(v, list, i, terr); if (k) return k; }
       if (src) { // 印：card／area。おすすめの記録は、おすすめの印（reco…）の半角スペースのあとに付く（例：reco:after card）
         const sp = src.lastIndexOf(' '); let mk = sp >= 0 ? src.slice(sp + 1) : src;
         if (mk.slice(-2) === ':p') mk = mk.slice(0, -2); // :p＝個人のカード。数えるときは付かない印と同じ
@@ -89,13 +116,13 @@
     const skipRef = typeof o.skipRefused === 'function' ? o.skipRefused : () => '';
     const skipById = new Map();
     const bumpSkip = (id, why) => { let x = skipById.get(id); if (!x) skipById.set(id, x = { auto: 0, adm: 0, pick: 0 }); if (x[why] !== undefined) x[why]++; };
-    let curKey = '';
+    let curKey = '', curList = null;
     const desc = (a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
     // 日・カード・結果ごとの数に1を足す。o.terr のときだけ、区域ごとの内訳（tDay：日の番号 → 区域 → 9つの数）にも足す
     // （内訳は棒を押したときだけ、その期間の分を作る。ふだんのグラフは今までと同じ速さ。監査 M-3）
     const withTerr = !!o.terr;
-    const bump = (id, terr, first, res) => {
-      const ci = CAT[kindOf(first, curKey, dayStr[id])] * NF, ri = (RES[res] === undefined ? 2 : RES[res]);
+    const bump = (id, terr, first, res, fi) => {
+      const ci = CAT[kindOf(first, curKey, dayStr[id], curList, fi, terr)] * NF, ri = (RES[res] === undefined ? 2 : RES[res]);
       const q = ci + ri, qr = isReco(first) ? ci + 3 + ri : -1; // qr＝おすすめ経由の内数の置き場
       counts[id * 3 * NF + q]++;
       if (qr >= 0) counts[id * 3 * NF + qr]++;
@@ -111,7 +138,8 @@
       if (!terr) return;
       for (let i = 1; i < list.length; i++) if (list[i].at > list[i - 1].at) { list = list.slice().sort(desc); break; } // 新しい順でないときだけ、並べ直す
       curKey = f0.houseId + '|' + (f0.unit || '');
-      let cur = -1, res = '', first = null;
+      curList = list;
+      let cur = -1, res = '', first = null, firstIdx = -1;
       for (let i = 0; i < list.length; i++) {
         const v = list[i], id = dayOf(v.at);
         if (id < 0) continue;
@@ -120,10 +148,10 @@
         if (fl === 2) break;
         // 実際に訪ねていない拒否（自動・取り込み／区域係／係がえらんだ人）は数えない。外した数だけ、理由ごとに残す（2026-11-19）
         if (v.result === 'refused') { const why = skipRef(v); if (why) { bumpSkip(id, why); continue; } }
-        if (id !== cur) { if (first) bump(cur, terr, first, res); cur = id; res = v.result; first = v; }
-        else { if ((rank[v.result] || 0) > (rank[res] || 0)) res = v.result; first = v; } // 新しい順なので、最後に見たものが、その日の最初の訪問
+        if (id !== cur) { if (first) bump(cur, terr, first, res, firstIdx); cur = id; res = v.result; first = v; firstIdx = i; }
+        else { if ((rank[v.result] || 0) > (rank[res] || 0)) res = v.result; first = v; firstIdx = i; } // 新しい順なので、最後に見たものが、その日の最初の訪問
       }
-      if (first) bump(cur, terr, first, res);
+      if (first) bump(cur, terr, first, res, firstIdx);
     };
     if (o.index) { for (const list of o.index) processList(list); }
     else { // 索引がないとき（試験・ほかの使い方）：家（部屋）ごとにまとめてから、同じ数え方をする
@@ -303,7 +331,9 @@
   const MK = () => (window.KI && window.KI.lang === 'es' ? 'R' : '集');
 
   const curIdx = () => (typeof IDX !== 'undefined' ? IDX : null);
-  const inputs = () => { const d = D(); return { index: typeof IDX !== 'undefined' && IDX instanceof Map && IDX.size ? IDX.values() : null, visits: d.visits || [], terrOfHouse: hid => { const h = houseById(hid); return h && h.terrId; }, eligible: terrSet(), cards: d.awayCards || [], schedules: d.schedules || [], now: Date.now(), keepMonths: d.settings && d.settings.keepMonths }; };
+  const inputs = () => { const d = D(); return { index: typeof IDX !== 'undefined' && IDX instanceof Map && IDX.size ? IDX.values() : null, visits: d.visits || [], terrOfHouse: hid => { const h = houseById(hid); return h && h.terrId; }, eligible: terrSet(), cards: d.awayCards || [], schedules: d.schedules || [], now: Date.now(), keepMonths: d.settings && d.settings.keepMonths,
+    // 巡回の始まり：おすすめの「回り残し」「留守宅」と同じ起点（app.js の roundBounds）。完了して誰も持っていない区域は、終わった巡回から続けて見る
+    roundStart: tid => { try { if (typeof roundBounds !== 'function') return ''; const b = roundBounds(tid); return (b && (b.ext ? b.ext.start : b.start)) || ''; } catch (e) { return ''; } } }; };
   function compute(force) {
     const d = D(), sig = dataSig(), a = st.agg;
     if (a && a.sig === sig && a.vref === d.visits && a.iref === curIdx()) return a; // 記録の入れ物（配列・索引）が置きかわったときも、作り直す
