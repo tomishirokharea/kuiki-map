@@ -250,7 +250,13 @@
     return { reco: mk(rn, t.rMet || 0), other: mk(n - rn, t.met - (t.rMet || 0)), use: n ? Math.round(rn / n * 100) : null };
   }
 
-  const api = { build, rollup, compare, detail, rate, recoRate, FEW_BAR, FEW_ROW, SPLIT_DAYS, ymd, addDays };
+  /* 棒の塗り（会えた軒数）の2段：下＝ふつうに会えた・上＝おすすめで会えた。合計は会えた数を超えず、負にもしない */
+  function fillParts(t) {
+    const met = Math.max(0, t.met || 0), reco = Math.min(met, Math.max(0, t.rMet || 0));
+    return { base: met - reco, reco };
+  }
+
+  const api = { build, rollup, compare, detail, rate, recoRate, fillParts, FEW_BAR, FEW_ROW, SPLIT_DAYS, ymd, addDays };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JG = api;
 
@@ -292,7 +298,9 @@
 .jg-cmp{margin:6px 0 12px}
 .jg-cmp p{margin:8px 0 2px;line-height:1.5}
 .jg-mb{display:block;height:14px;margin:4px 0 2px;border:1.5px solid #1565C0;background:#fff;border-radius:3px;box-sizing:border-box;min-width:4px;overflow:hidden}
-.jg-mb i{display:block;height:100%;background:#1565C0}
+.jg-mb i{position:relative;display:block;height:100%;background:#1565C0}
+.jg-mb i em{position:absolute;right:0;top:0;height:100%;background-color:#0D3C78;background-image:radial-gradient(#fff 0.8px,transparent 1px);background-size:4px 4px}
+.jg-mb.card i em{background-color:#8A3700}
 .jg-mb.card{border-color:#A84300}
 .jg-mb.card i{background:repeating-linear-gradient(135deg,#E07000 0 4px,#fff 4px 6px)}
 .jg-mb.none{border-style:dashed;border-color:#8a97a8}
@@ -376,12 +384,18 @@
 
   const DEFS = `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <pattern id="jgCardM" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#E07000"/><rect x="4" width="2" height="6" fill="#fff"/></pattern>
+<pattern id="jgRecoA" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="4" fill="#0D3C78"/><circle cx="1" cy="1" r="0.9" fill="#fff"/></pattern>
+<pattern id="jgRecoC" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="4" fill="#8A3700"/><circle cx="1" cy="1" r="0.9" fill="#fff"/></pattern>
 <pattern id="jgNo" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#F2F2F2"/><path d="M0,0 L8,8 M8,0 L0,8" stroke="#BDBDBD" stroke-width=".8"/></pattern></defs></svg>`;
   const MFILL = { area: COL.area, card: 'url(#jgCardM)' };
+  const RFILL = { area: 'url(#jgRecoA)', card: 'url(#jgRecoC)' }; // おすすめで会えた分（濃い色＋白い水玉。色だけに頼らない）
   // 凡例・数の行の小さな見本：枠＝訪ねた、塗り＝会えた
   const swatch = c => `<svg width="24" height="18" aria-hidden="true"><rect x="1" y="1" width="22" height="16" fill="#fff" stroke="${COL[c]}" stroke-width="1.5"/><rect x="1" y="9" width="22" height="8" fill="${MFILL[c]}" stroke="${COL[c]}" stroke-width="1"/></svg>`;
+  // おすすめで会えた分の見本（枠＋上の段だけを塗る）
+  const rSwatch = c => `<svg width="24" height="18" aria-hidden="true"><rect x="1" y="1" width="22" height="16" fill="#fff" stroke="${COL[c]}" stroke-width="1.5"/><rect x="1" y="5" width="22" height="6" fill="${RFILL[c]}" stroke="${COL[c]}" stroke-width="1"/><rect x="1" y="11" width="22" height="6" fill="${MFILL[c]}" stroke="${COL[c]}" stroke-width="1"/></svg>`;
   const LEGEND = () => `<div class="jg-leg" aria-label="凡例"><span>${swatch('area')}左：区域カード（青）</span><span>${swatch('card')}右：留守宅カード（橙の斜線）</span>
 <span>枠の高さ＝訪ねた軒数・塗った部分＝会えた軒数・棒の上の数字＝会えた割合</span>
+<span>${rSwatch('area')}${rSwatch('card')}塗った部分の上側（濃い色＋白い水玉）＝おすすめから訪ねて会えた軒数。下側（無地・斜線）＝おすすめ以外で会えた軒数</span>
 <span><svg width="22" height="16" aria-hidden="true"><rect x="1" y="1" width="20" height="14" fill="#FFE9A8" stroke="#C99A00"/></svg><b data-notr>${MK()}</b> 集まりのあった日</span>
 <span><svg width="22" height="16" aria-hidden="true"><rect x="2" y="2" width="18" height="12" fill="#fff" stroke="#17324D" stroke-dasharray="3 2"/></svg>途中（今日をふくむ）</span></div>`;
 
@@ -419,7 +433,12 @@
         const h = Math.max(2, n / max * PH), y = Y(0) - h;
         top = Math.min(top, y);
         out.push(`<rect x="${x}" y="${y}" width="${bw}" height="${h}" fill="#fff" stroke="${COL[c]}" stroke-width="1.5"/>`);
-        if (t.met) { const hm = Math.max(1.5, t.met / max * PH); out.push(`<rect x="${x}" y="${Y(0) - hm}" width="${bw}" height="${hm}" fill="${MFILL[c]}" stroke="${COL[c]}" stroke-width="1"/>`); }
+        if (t.met) { // 塗り（会えた）は下＝ふつう・上＝おすすめの2段。全体の高さは今までと同じ式
+          const hm = Math.max(1.5, t.met / max * PH), fp = fillParts(t);
+          const hr = fp.reco ? Math.min(hm, Math.max(1.5, fp.reco / max * PH)) : 0, hb = Math.max(0, hm - hr);
+          if (hb > 0) out.push(`<rect x="${x}" y="${Y(0) - hb}" width="${bw}" height="${hb}" fill="${MFILL[c]}" stroke="${COL[c]}" stroke-width="1"/>`);
+          if (hr > 0) out.push(`<rect x="${x}" y="${Y(0) - hm}" width="${bw}" height="${hr}" fill="${RFILL[c]}" stroke="${COL[c]}" stroke-width="1"/>`);
+        }
         const rr = rate(t, FEW_BAR);
         if (!rr.few) out.push(`<text x="${x + bw / 2}" y="${y - 4}" font-size="11" font-weight="700" text-anchor="middle" style="fill:${COL[c]}">${rr.pct}%</text>`);
       });
@@ -531,7 +550,12 @@
   /* ---- 棒を押したとき：下から区域ごとの内訳（カード2つのくらべ → 区域カード・留守宅カードの区域ごと → 分けられない記録） ---- */
   const barHead = (b, unit) => unit === 'day' ? jpDay(b.key)
     : unit === 'week' ? `${jpDay(b.start).replace(/（.）/, '')}〜${jpDay(b.end).replace(/（.）/, '')}の週` : `${Number(b.key.slice(0, 4))}年${Number(b.key.slice(5))}月`;
-  const mini = (t, max, c) => { const n = visN(t); return `<span class="jg-mb ${n ? c : 'none'}" style="width:${n ? Math.max(4, Math.round(n / max * 100)) : 100}%" aria-hidden="true"><i style="width:${n ? Math.round(t.met / n * 100) : 0}%"></i></span>`; };
+  const mini = (t, max, c) => { // 枠＝訪ねた・塗り＝会えた。塗りの右側（濃い色＋白い水玉）＝おすすめで会えた
+    const n = visN(t), fp = fillParts(t);
+    const w = n ? Math.max(4, Math.round(n / max * 100)) : 100, fw = n ? Math.round(t.met / n * 100) : 0;
+    const rw = t.met ? Math.round(fp.reco / t.met * 100) : 0;
+    return `<span class="jg-mb ${n ? c : 'none'}" style="width:${w}%" aria-hidden="true"><i style="width:${fw}%">${rw ? `<em style="width:${rw}%"></em>` : ''}</i></span>`;
+  };
   const numLine = t => { const r = rate(t, FEW_BAR); return r.n ? `訪ねた ${r.n}軒・会えた ${r.met}軒（${r.few ? 'データ少' : r.pct + '%'}）・留守 ${r.away}軒・拒否 ${r.refused}軒` : '訪ねた 0軒'; };
   function rowHtml(x, c, max) {
     const t = typeof terrById === 'function' ? terrById(x.terr) : null, ok = !!(t && window.KM && KM.openKarte);
