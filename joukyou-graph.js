@@ -13,7 +13,10 @@
   const ymd = x => { const d = x instanceof Date ? x : new Date(x); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
   const parseYmd = s => { const a = String(s).split('-').map(Number); return new Date(a[0], a[1] - 1, a[2], 12, 0, 0); }; // 正午にして、夏時間などでずれないようにする
   const addDays = (s, n) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
-  const tally = () => ({ met: 0, refused: 0, away: 0 });
+  const tally = () => ({ met: 0, refused: 0, away: 0, rMet: 0, rRef: 0, rAway: 0 }); // rMet・rRef・rAway＝おすすめ経由（src の先頭が reco）の内数（2026-11-19）
+  const FIELDS = ['met', 'refused', 'away', 'rMet', 'rRef', 'rAway'], NF = 6;
+  const addT = (dst, src) => { for (let i = 0; i < NF; i++) dst[FIELDS[i]] += src[FIELDS[i]] || 0; };
+  const isReco = v => !!(v && v.src) && String(v.src).indexOf('reco') === 0;
   const empty = () => ({ area: tally(), card: tally(), unsplit: tally() });
   const CATS = ['area', 'card', 'unsplit'];
   const rank = { met: 3, refused: 2, away: 1 };
@@ -59,10 +62,10 @@
     // 同じ日・同じ家（部屋）を1軒にまとめる。家（部屋）ごとの記録の索引（新しい順）を使い、1年より前は読まずに止める（速さ・指示書5.）
     // 日は番号（dayId）で扱う：日付の文字から番号を引くのは、1時間ごとに1回だけ。数は配列にためて、最後に日付ごとの Map にする
     const dayIds = new Map(), dayStr = [], dayFlag = [], hourDay = new Map(), okHouse = new Map(), tDay = [];
-    let counts = new Int32Array(9 * 64);
+    let counts = new Int32Array(3 * NF * 64);
     const idOf = str => { // 日の番号。flag：0＝数える／1＝今日より先（飛ばす）／2＝期間より前（ここで止める）
       let id = dayIds.get(str);
-      if (id === undefined) { id = dayStr.length; dayIds.set(str, id); dayStr.push(str); dayFlag.push(str > today ? 1 : str < from ? 2 : 0); if (counts.length < 9 * dayStr.length) { const n = new Int32Array(counts.length * 2); n.set(counts); counts = n; } }
+      if (id === undefined) { id = dayStr.length; dayIds.set(str, id); dayStr.push(str); dayFlag.push(str > today ? 1 : str < from ? 2 : 0); if (counts.length < 3 * NF * dayStr.length) { const n = new Int32Array(counts.length * 2); n.set(counts); counts = n; } }
       return id;
     };
     const dayOf = at => { // 時刻の文字を切り出さず、数字だけで1時間ごとの見出しを作る（記録30万件でも、文字のごみを作らない）。-1＝日付でない
@@ -82,18 +85,25 @@
     // 家の区域（数える区域でなければ ''）。家ごとに1回だけ引く
     const terrOf = hid => { let b = okHouse.get(hid); if (b === undefined) { const terr = o.terrOfHouse(hid); okHouse.set(hid, b = terr && o.eligible.has(terr) ? String(terr) : ''); } return b; };
     const RES = { met: 0, refused: 1, away: 2 }, CAT = { area: 0, card: 1, unsplit: 2 };
+    // 数えない拒否の判定（画面から渡す。渡されなければ、今までどおり全部数える）と、外した数（日の番号ごと）
+    const skipRef = typeof o.skipRefused === 'function' ? o.skipRefused : () => '';
+    const skipById = new Map();
+    const bumpSkip = (id, why) => { let x = skipById.get(id); if (!x) skipById.set(id, x = { auto: 0, adm: 0, pick: 0 }); if (x[why] !== undefined) x[why]++; };
     let curKey = '';
     const desc = (a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
     // 日・カード・結果ごとの数に1を足す。o.terr のときだけ、区域ごとの内訳（tDay：日の番号 → 区域 → 9つの数）にも足す
     // （内訳は棒を押したときだけ、その期間の分を作る。ふだんのグラフは今までと同じ速さ。監査 M-3）
     const withTerr = !!o.terr;
     const bump = (id, terr, first, res) => {
-      const q = CAT[kindOf(first, curKey, dayStr[id])] * 3 + (RES[res] === undefined ? 2 : RES[res]);
-      counts[id * 9 + q]++;
+      const ci = CAT[kindOf(first, curKey, dayStr[id])] * NF, ri = (RES[res] === undefined ? 2 : RES[res]);
+      const q = ci + ri, qr = isReco(first) ? ci + 3 + ri : -1; // qr＝おすすめ経由の内数の置き場
+      counts[id * 3 * NF + q]++;
+      if (qr >= 0) counts[id * 3 * NF + qr]++;
       if (!withTerr) return;
       let m = tDay[id]; if (!m) tDay[id] = m = new Map();
-      let a = m.get(terr); if (!a) m.set(terr, a = new Int32Array(9));
+      let a = m.get(terr); if (!a) m.set(terr, a = new Int32Array(3 * NF));
       a[q]++;
+      if (qr >= 0) a[qr]++;
     };
     const processList = list => {
       const f0 = list[0];
@@ -108,6 +118,8 @@
         const fl = dayFlag[id];
         if (fl === 1) continue;
         if (fl === 2) break;
+        // 実際に訪ねていない拒否（自動・取り込み／区域係／係がえらんだ人）は数えない。外した数だけ、理由ごとに残す（2026-11-19）
+        if (v.result === 'refused') { const why = skipRef(v); if (why) { bumpSkip(id, why); continue; } }
         if (id !== cur) { if (first) bump(cur, terr, first, res); cur = id; res = v.result; first = v; }
         else { if ((rank[v.result] || 0) > (rank[res] || 0)) res = v.result; first = v; } // 新しい順なので、最後に見たものが、その日の最初の訪問
       }
@@ -123,10 +135,10 @@
     for (let id = 0; id < dayStr.length; id++) {
       if (dayFlag[id] !== 0) continue;
       let any = false;
-      for (let q = 0; q < 9; q++) if (counts[id * 9 + q]) { any = true; break; }
+      for (let q = 0; q < 3 * NF; q++) if (counts[id * 3 * NF + q]) { any = true; break; }
       if (!any) continue;
       const d = empty();
-      CATS.forEach((c, ci) => { d[c].met = counts[id * 9 + ci * 3]; d[c].refused = counts[id * 9 + ci * 3 + 1]; d[c].away = counts[id * 9 + ci * 3 + 2]; });
+      CATS.forEach((c, ci) => { for (let f = 0; f < NF; f++) d[c][FIELDS[f]] = counts[id * 3 * NF + ci * NF + f]; });
       days.set(dayStr[id], d);
       if (tDay[id]) terrDays.set(dayStr[id], tDay[id]);
     }
@@ -139,7 +151,10 @@
       a.push({ group: s.group || '', time: s.time || '' });
     });
     gather.forEach(a => a.sort((x, y) => (x.time < y.time ? -1 : x.time > y.time ? 1 : 0)));
-    return { days, terrDays, gather, from, today, unsplitBefore, thinBefore };
+    // 外した拒否の数（日ごと）。棒を作らない日もあるので、days とは別に持つ
+    const skipDays = new Map();
+    skipById.forEach((x, id) => { if (dayFlag[id] === 0 && (x.auto || x.adm || x.pick)) skipDays.set(dayStr[id], x); });
+    return { days, terrDays, gather, from, today, unsplitBefore, thinBefore, skipDays };
   }
 
   const bucketKey = (day, unit) => {
@@ -154,10 +169,12 @@
     for (let d = p.from; d <= p.to; d = addDays(d, 1)) {
       const k = bucketKey(d, unit);
       let b = by.get(k);
-      if (!b) { by.set(k, b = { key: k, start: d, end: d, area: tally(), card: tally(), unsplit: tally(), gatherDays: 0, days: 0, current: k === bucketKey(today, unit) }); bars.push(b); }
+      if (!b) { by.set(k, b = { key: k, start: d, end: d, area: tally(), card: tally(), unsplit: tally(), skip: { auto: 0, adm: 0, pick: 0 }, gatherDays: 0, days: 0, current: k === bucketKey(today, unit) }); bars.push(b); }
       b.end = d; b.days++;
       const x = r.days.get(d);
-      if (x) CATS.forEach(c => { b[c].met += x[c].met; b[c].refused += x[c].refused; b[c].away += x[c].away; });
+      if (x) CATS.forEach(c => addT(b[c], x[c]));
+      const sk = r.skipDays && r.skipDays.get(d);
+      if (sk) { b.skip.auto += sk.auto; b.skip.adm += sk.adm; b.skip.pick += sk.pick; }
       if (r.gather.has(d)) b.gatherDays++;
     }
     return bars;
@@ -171,7 +188,7 @@
       const g = r.gather.has(d) ? 'gather' : 'nogather', x = r.days.get(d);
       ['area', 'card'].forEach(c => {
         const t = out[c][g]; t.days++;
-        if (x) { t.met += x[c].met; t.refused += x[c].refused; t.away += x[c].away; }
+        if (x) addT(t, x[c]);
       });
     }
     return out;
@@ -185,7 +202,7 @@
       if (!m) continue;
       m.forEach((a, terr) => {
         let x = by.get(terr); if (!x) by.set(terr, x = { terr, area: tally(), card: tally(), unsplit: tally() });
-        CATS.forEach((c, ci) => { x[c].met += a[ci * 3]; x[c].refused += a[ci * 3 + 1]; x[c].away += a[ci * 3 + 2]; });
+        CATS.forEach((c, ci) => { for (let f = 0; f < NF; f++) x[c][FIELDS[f]] += a[ci * NF + f]; });
       });
     }
     return [...by.values()];
@@ -197,7 +214,15 @@
     return { n, met: t.met, refused: t.refused, away: t.away, few, pct: few ? null : Math.round(t.met / n * 100) };
   }
 
-  const api = { build, rollup, compare, detail, rate, FEW_BAR, FEW_ROW, SPLIT_DAYS, ymd, addDays };
+  /* おすすめのききめ：おすすめ経由とそれ以外の「訪ねた・会えた・割合」と、訪ねた家のうちおすすめ経由の割合（使用率）。
+     訪ねた数が minN 未満の組は割合を出さない（データ少） */
+  function recoRate(t, minN) {
+    const n = t.met + t.refused + t.away, rn = (t.rMet || 0) + (t.rRef || 0) + (t.rAway || 0);
+    const mk = (x, m) => { const few = x < minN; return { n: x, met: m, few, pct: few ? null : Math.round(m / x * 100) }; };
+    return { reco: mk(rn, t.rMet || 0), other: mk(n - rn, t.met - (t.rMet || 0)), use: n ? Math.round(rn / n * 100) : null };
+  }
+
+  const api = { build, rollup, compare, detail, rate, recoRate, FEW_BAR, FEW_ROW, SPLIT_DAYS, ymd, addDays };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JG = api;
 
