@@ -372,7 +372,7 @@
   function openNoRefPick(all) {
     if (typeof setSheet !== 'function') return;
     const cnt = refCountByUser(), picked = new Set(noRef());
-    const rows = (D().people || []).map(p => ({ id: String(p.id), name: p.name || '', adm: p.role === 'admin', n: cnt.get(String(p.id)) || 0 }))
+    const rows = (D().users || []).map(p => ({ id: String(p.id), name: p.name || '', adm: p.role === 'admin', n: cnt.get(String(p.id)) || 0 }))
       .sort((a, b) => b.n - a.n || String(a.name).localeCompare(String(b.name), 'ja'));
     const show = all ? rows : rows.filter(x => x.n > 0 || x.adm || picked.has(x.id));
     const row = x => `<button type="button" class="jg-row" data-jgnr="${esc(x.id)}"${x.adm ? ' disabled' : ''} aria-pressed="${x.adm || picked.has(x.id)}">
@@ -401,7 +401,7 @@
     const d = D(), vs = d.visits || [], cs = d.awayCards || [], sc = d.schedules || [];
     const cards = cs.map(x => [x.id, x.by, x.at, x.endedAt || '', x.expiresAt || '', x.dummy ? 1 : 0, keyHash(x.keys), (x.helpers || []).map(h => h.uid + '@' + h.until).join('/')].join(',')).join(';');
     return [vs.length, vs.length ? vs[vs.length - 1].id : '', (d.houses || []).length, terrSet().size, cards, sc.map(x => x.date + x.group + x.time).join(','), d.settings && d.settings.keepMonths, ymd(Date.now()),
-      noRef().join(','), (d.people || []).map(p => p.id + (p.role === 'admin' ? '!' : '')).join(',')].join('|');
+      noRef().join(','), (d.users || []).map(p => p.id + (p.role === 'admin' ? '!' : '')).join(',')].join('|');
   };
   const rangeOf = (period, today) => {
     if (period === 30) return { from: addDays(today, -29), to: today, unit: 'day' };
@@ -424,7 +424,7 @@
   const inputs = () => { const d = D(); return { index: typeof IDX !== 'undefined' && IDX instanceof Map && IDX.size ? IDX.values() : null, visits: d.visits || [], terrOfHouse: hid => { const h = houseById(hid); return h && h.terrId; }, eligible: terrSet(), cards: d.awayCards || [], schedules: d.schedules || [], now: Date.now(), keepMonths: d.settings && d.settings.keepMonths,
     // 巡回の始まり：おすすめの「回り残し」「留守宅」と同じ起点（app.js の roundBounds）。完了して誰も持っていない区域は、終わった巡回から続けて見る
     roundStart: tid => { try { if (typeof roundBounds !== 'function') return ''; const b = roundBounds(tid); return (b && (b.ext ? b.ext.start : b.start)) || ''; } catch (e) { return ''; } },
-    skipRefused: skipRefusedOf(d.people || [], noRef()) }; };
+    skipRefused: skipRefusedOf(d.users || [], noRef()) }; };
   function compute(force) {
     const d = D(), sig = dataSig(), a = st.agg;
     if (a && a.sig === sig && a.vref === d.visits && a.iref === curIdx()) return a; // 記録の入れ物（配列・索引）が置きかわったときも、作り直す
@@ -702,8 +702,7 @@
     if (!box) {
       box = document.createElement('div'); box.id = 'adJG';
       box.innerHTML = '<h2 class="sec" data-hqk="joukyouGraph">区域カードと留守宅カード</h2><div id="jgBody"><p class="hint">集計しています…</p></div><p id="jgSel" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0"></p>'; // 読み上げの場所は描き直さない
-      const ref = $id('adAch');
-      if (ref && ref.parentNode) ref.parentNode.insertBefore(box, ref.nextSibling); else pane.appendChild(box);
+      pane.insertBefore(box, pane.firstElementChild); // 状況タブのいちばん上（期限の見張りより上。2026-11-19）
       box.addEventListener('click', e => {
         const per = e.target.closest('[data-jgper]');
         if (per) { st.period = Number(per.dataset.jgper); st.selKey = ''; st.drawn = ''; st.drawnPer = 0; st.scrollX = null; draw(false); return; }
@@ -729,6 +728,7 @@
       let rt = 0;
       window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { try { if (document.body.contains(box) && shown()) draw(false); } catch (e) { console.error(e); } }, 150); });
     }
+    if (box.parentNode === pane && pane.firstElementChild !== box) pane.insertBefore(box, pane.firstElementChild); // ほかの箱が先に入っても、いちばん上に保つ
     if (st.pending) return;
     st.pending = true;
     setTimeout(() => { // 画面を先に出し、計算はそのあと
