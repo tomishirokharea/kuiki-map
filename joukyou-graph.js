@@ -13,7 +13,10 @@
   const ymd = x => { const d = x instanceof Date ? x : new Date(x); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
   const parseYmd = s => { const a = String(s).split('-').map(Number); return new Date(a[0], a[1] - 1, a[2], 12, 0, 0); }; // 正午にして、夏時間などでずれないようにする
   const addDays = (s, n) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
-  const tally = () => ({ met: 0, refused: 0, away: 0 });
+  const tally = () => ({ met: 0, refused: 0, away: 0, rMet: 0, rRef: 0, rAway: 0 }); // rMet・rRef・rAway＝おすすめ経由（src の先頭が reco）の内数（2026-11-19）
+  const FIELDS = ['met', 'refused', 'away', 'rMet', 'rRef', 'rAway'], NF = 6;
+  const addT = (dst, src) => { for (let i = 0; i < NF; i++) dst[FIELDS[i]] += src[FIELDS[i]] || 0; };
+  const isReco = v => !!(v && v.src) && String(v.src).indexOf('reco') === 0;
   const empty = () => ({ area: tally(), card: tally(), unsplit: tally() });
   const CATS = ['area', 'card', 'unsplit'];
   const rank = { met: 3, refused: 2, away: 1 };
@@ -44,8 +47,49 @@
       }
       return 'area';
     };
-    const kindOf = (v, key, day) => {
+    // 巡回の始まり（区域ごとに覚える）。画面は roundBounds（おすすめの leftOf・umItem と同じ起点）を渡す
+    const rsFn = typeof o.roundStart === 'function' ? o.roundStart : null;
+    const rsMemo = new Map();
+    const roundMs = terr => {
+      let t = rsMemo.get(terr);
+      if (t === undefined) { const x = rsFn ? rsFn(terr) : ''; t = x ? Date.parse(x) : NaN; if (!isFinite(t)) t = NaN; rsMemo.set(terr, t); }
+      return t;
+    };
+    /* その訪問の直前の記録（拒否を除く）を探す。見つからなければ null（R4・巡回の判定ができないときに使う） */
+    const prevRec = (list, i, t) => {
+      for (let j = i + 1; list && j < list.length; j++) {
+        const w = list[j];
+        if (!w || w.result === 'refused') continue; // 拒否は飛ばす（実際に会えたかどうかの手がかりにしない）
+        const tw = Date.parse(w.at);
+        if (!isFinite(tw) || tw >= t) continue; // その訪問より新しい記録は見ない（並びが古い順の索引のとき）
+        return { w: w, t: tw };
+      }
+      return null;
+    };
+    /* おすすめから訪ねた記録（src の先頭が reco）の振り分け。list は家（部屋）ごとの記録（新しい順）、i はその記録の位置。
+       今の巡回の中で、その訪問より前に訪ねていて まだ会えていない → 'card'（留守宅）／今の巡回で初めて訪ねた → 'area'（回り残し）。
+       区域が分からない・巡回の始まりが読めない区域（完了の記録が1件もない）は、巡回の判定をやめ、
+       直前の記録（拒否を除く）が留守なら 'card'、それ以外・記録なしなら 'area'（R4）。その訪問が巡回の始まりより前のときだけ '' を返し、今までどおり印に従う（R12c・古い棒の数字を塗りかえないため） */
+    const recoKind = (v, list, i, terr) => {
+      const start = roundMs(terr);
+      const t = Date.parse(v.at);
+      if (!isFinite(t)) return '';
+      if (!isFinite(start)) {
+        // 巡回の始まりを教えてもらえない呼び出し（古い呼び出し・roundStart を渡さない試験）は、今までどおり印に従う
+        if (!rsFn) return '';
+        // R4：巡回の始まりが読めない区域（アプリ上で一度も完了していない区域・区域が分からない家）
+        const p = prevRec(list, i, t);
+        return p && p.w.result === 'away' ? 'card' : 'area';
+      }
+      if (t < start) return ''; // R12c：今の巡回より前のおすすめ記録は、今までどおり印に従う
+      const p = prevRec(list, i, t);
+      if (!p) return 'area'; // 前の記録がない
+      if (p.t < start) return 'area'; // 前の巡回の記録しかない＝この巡回で初めて訪ねた
+      return p.w.result === 'away' ? 'card' : 'area';
+    };
+    const kindOf = (v, key, day, list, i, terr) => {
       const src = v.src ? String(v.src) : '';
+      if (src.indexOf('reco') === 0) { const k = recoKind(v, list, i, terr); if (k) return k; }
       if (src) { // 印：card／area。おすすめの記録は、おすすめの印（reco…）の半角スペースのあとに付く（例：reco:after card）
         const sp = src.lastIndexOf(' '); let mk = sp >= 0 ? src.slice(sp + 1) : src;
         if (mk.slice(-2) === ':p') mk = mk.slice(0, -2); // :p＝個人のカード。数えるときは付かない印と同じ
@@ -59,10 +103,10 @@
     // 同じ日・同じ家（部屋）を1軒にまとめる。家（部屋）ごとの記録の索引（新しい順）を使い、1年より前は読まずに止める（速さ・指示書5.）
     // 日は番号（dayId）で扱う：日付の文字から番号を引くのは、1時間ごとに1回だけ。数は配列にためて、最後に日付ごとの Map にする
     const dayIds = new Map(), dayStr = [], dayFlag = [], hourDay = new Map(), okHouse = new Map(), tDay = [];
-    let counts = new Int32Array(9 * 64);
+    let counts = new Int32Array(3 * NF * 64);
     const idOf = str => { // 日の番号。flag：0＝数える／1＝今日より先（飛ばす）／2＝期間より前（ここで止める）
       let id = dayIds.get(str);
-      if (id === undefined) { id = dayStr.length; dayIds.set(str, id); dayStr.push(str); dayFlag.push(str > today ? 1 : str < from ? 2 : 0); if (counts.length < 9 * dayStr.length) { const n = new Int32Array(counts.length * 2); n.set(counts); counts = n; } }
+      if (id === undefined) { id = dayStr.length; dayIds.set(str, id); dayStr.push(str); dayFlag.push(str > today ? 1 : str < from ? 2 : 0); if (counts.length < 3 * NF * dayStr.length) { const n = new Int32Array(counts.length * 2); n.set(counts); counts = n; } }
       return id;
     };
     const dayOf = at => { // 時刻の文字を切り出さず、数字だけで1時間ごとの見出しを作る（記録30万件でも、文字のごみを作らない）。-1＝日付でない
@@ -82,18 +126,25 @@
     // 家の区域（数える区域でなければ ''）。家ごとに1回だけ引く
     const terrOf = hid => { let b = okHouse.get(hid); if (b === undefined) { const terr = o.terrOfHouse(hid); okHouse.set(hid, b = terr && o.eligible.has(terr) ? String(terr) : ''); } return b; };
     const RES = { met: 0, refused: 1, away: 2 }, CAT = { area: 0, card: 1, unsplit: 2 };
-    let curKey = '';
+    // 数えない拒否の判定（画面から渡す。渡されなければ、今までどおり全部数える）と、外した数（日の番号ごと）
+    const skipRef = typeof o.skipRefused === 'function' ? o.skipRefused : () => '';
+    const skipById = new Map();
+    const bumpSkip = (id, why) => { let x = skipById.get(id); if (!x) skipById.set(id, x = { auto: 0, adm: 0, pick: 0 }); if (x[why] !== undefined) x[why]++; };
+    let curKey = '', curList = null;
     const desc = (a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
     // 日・カード・結果ごとの数に1を足す。o.terr のときだけ、区域ごとの内訳（tDay：日の番号 → 区域 → 9つの数）にも足す
     // （内訳は棒を押したときだけ、その期間の分を作る。ふだんのグラフは今までと同じ速さ。監査 M-3）
     const withTerr = !!o.terr;
-    const bump = (id, terr, first, res) => {
-      const q = CAT[kindOf(first, curKey, dayStr[id])] * 3 + (RES[res] === undefined ? 2 : RES[res]);
-      counts[id * 9 + q]++;
+    const bump = (id, terr, first, res, fi) => {
+      const ci = CAT[kindOf(first, curKey, dayStr[id], curList, fi, terr)] * NF, ri = (RES[res] === undefined ? 2 : RES[res]);
+      const q = ci + ri, qr = isReco(first) ? ci + 3 + ri : -1; // qr＝おすすめ経由の内数の置き場
+      counts[id * 3 * NF + q]++;
+      if (qr >= 0) counts[id * 3 * NF + qr]++;
       if (!withTerr) return;
       let m = tDay[id]; if (!m) tDay[id] = m = new Map();
-      let a = m.get(terr); if (!a) m.set(terr, a = new Int32Array(9));
+      let a = m.get(terr); if (!a) m.set(terr, a = new Int32Array(3 * NF));
       a[q]++;
+      if (qr >= 0) a[qr]++;
     };
     const processList = list => {
       const f0 = list[0];
@@ -101,17 +152,20 @@
       if (!terr) return;
       for (let i = 1; i < list.length; i++) if (list[i].at > list[i - 1].at) { list = list.slice().sort(desc); break; } // 新しい順でないときだけ、並べ直す
       curKey = f0.houseId + '|' + (f0.unit || '');
-      let cur = -1, res = '', first = null;
+      curList = list;
+      let cur = -1, res = '', first = null, firstIdx = -1;
       for (let i = 0; i < list.length; i++) {
         const v = list[i], id = dayOf(v.at);
         if (id < 0) continue;
         const fl = dayFlag[id];
         if (fl === 1) continue;
         if (fl === 2) break;
-        if (id !== cur) { if (first) bump(cur, terr, first, res); cur = id; res = v.result; first = v; }
-        else { if ((rank[v.result] || 0) > (rank[res] || 0)) res = v.result; first = v; } // 新しい順なので、最後に見たものが、その日の最初の訪問
+        // 実際に訪ねていない拒否（自動・取り込み／区域係／係がえらんだ人）は数えない。外した数だけ、理由ごとに残す（2026-11-19）
+        if (v.result === 'refused') { const why = skipRef(v); if (why) { bumpSkip(id, why); continue; } }
+        if (id !== cur) { if (first) bump(cur, terr, first, res, firstIdx); cur = id; res = v.result; first = v; firstIdx = i; }
+        else { if ((rank[v.result] || 0) > (rank[res] || 0)) res = v.result; first = v; firstIdx = i; } // 新しい順なので、最後に見たものが、その日の最初の訪問
       }
-      if (first) bump(cur, terr, first, res);
+      if (first) bump(cur, terr, first, res, firstIdx);
     };
     if (o.index) { for (const list of o.index) processList(list); }
     else { // 索引がないとき（試験・ほかの使い方）：家（部屋）ごとにまとめてから、同じ数え方をする
@@ -123,10 +177,10 @@
     for (let id = 0; id < dayStr.length; id++) {
       if (dayFlag[id] !== 0) continue;
       let any = false;
-      for (let q = 0; q < 9; q++) if (counts[id * 9 + q]) { any = true; break; }
+      for (let q = 0; q < 3 * NF; q++) if (counts[id * 3 * NF + q]) { any = true; break; }
       if (!any) continue;
       const d = empty();
-      CATS.forEach((c, ci) => { d[c].met = counts[id * 9 + ci * 3]; d[c].refused = counts[id * 9 + ci * 3 + 1]; d[c].away = counts[id * 9 + ci * 3 + 2]; });
+      CATS.forEach((c, ci) => { for (let f = 0; f < NF; f++) d[c][FIELDS[f]] = counts[id * 3 * NF + ci * NF + f]; });
       days.set(dayStr[id], d);
       if (tDay[id]) terrDays.set(dayStr[id], tDay[id]);
     }
@@ -139,7 +193,10 @@
       a.push({ group: s.group || '', time: s.time || '' });
     });
     gather.forEach(a => a.sort((x, y) => (x.time < y.time ? -1 : x.time > y.time ? 1 : 0)));
-    return { days, terrDays, gather, from, today, unsplitBefore, thinBefore };
+    // 外した拒否の数（日ごと）。棒を作らない日もあるので、days とは別に持つ
+    const skipDays = new Map();
+    skipById.forEach((x, id) => { if (dayFlag[id] === 0 && (x.auto || x.adm || x.pick)) skipDays.set(dayStr[id], x); });
+    return { days, terrDays, gather, from, today, unsplitBefore, thinBefore, skipDays };
   }
 
   const bucketKey = (day, unit) => {
@@ -154,10 +211,12 @@
     for (let d = p.from; d <= p.to; d = addDays(d, 1)) {
       const k = bucketKey(d, unit);
       let b = by.get(k);
-      if (!b) { by.set(k, b = { key: k, start: d, end: d, area: tally(), card: tally(), unsplit: tally(), gatherDays: 0, days: 0, current: k === bucketKey(today, unit) }); bars.push(b); }
+      if (!b) { by.set(k, b = { key: k, start: d, end: d, area: tally(), card: tally(), unsplit: tally(), skip: { auto: 0, adm: 0, pick: 0 }, gatherDays: 0, days: 0, current: k === bucketKey(today, unit) }); bars.push(b); }
       b.end = d; b.days++;
       const x = r.days.get(d);
-      if (x) CATS.forEach(c => { b[c].met += x[c].met; b[c].refused += x[c].refused; b[c].away += x[c].away; });
+      if (x) CATS.forEach(c => addT(b[c], x[c]));
+      const sk = r.skipDays && r.skipDays.get(d);
+      if (sk) { b.skip.auto += sk.auto; b.skip.adm += sk.adm; b.skip.pick += sk.pick; }
       if (r.gather.has(d)) b.gatherDays++;
     }
     return bars;
@@ -171,7 +230,7 @@
       const g = r.gather.has(d) ? 'gather' : 'nogather', x = r.days.get(d);
       ['area', 'card'].forEach(c => {
         const t = out[c][g]; t.days++;
-        if (x) { t.met += x[c].met; t.refused += x[c].refused; t.away += x[c].away; }
+        if (x) addT(t, x[c]);
       });
     }
     return out;
@@ -185,7 +244,7 @@
       if (!m) continue;
       m.forEach((a, terr) => {
         let x = by.get(terr); if (!x) by.set(terr, x = { terr, area: tally(), card: tally(), unsplit: tally() });
-        CATS.forEach((c, ci) => { x[c].met += a[ci * 3]; x[c].refused += a[ci * 3 + 1]; x[c].away += a[ci * 3 + 2]; });
+        CATS.forEach((c, ci) => { for (let f = 0; f < NF; f++) x[c][FIELDS[f]] += a[ci * NF + f]; });
       });
     }
     return [...by.values()];
@@ -197,7 +256,62 @@
     return { n, met: t.met, refused: t.refused, away: t.away, few, pct: few ? null : Math.round(t.met / n * 100) };
   }
 
-  const api = { build, rollup, compare, detail, rate, FEW_BAR, FEW_ROW, SPLIT_DAYS, ymd, addDays };
+  /* おすすめのききめ：おすすめ経由とそれ以外の「訪ねた・会えた・割合」と、訪ねた家のうちおすすめ経由の割合（使用率）。
+     訪ねた数が minN 未満の組は割合を出さない（データ少） */
+  function recoRate(t, minN) {
+    const n = t.met + t.refused + t.away, rn = (t.rMet || 0) + (t.rRef || 0) + (t.rAway || 0);
+    const mk = (x, m) => { const few = x < minN; return { n: x, met: m, few, pct: few ? null : Math.round(m / x * 100) }; };
+    return { reco: mk(rn, t.rMet || 0), other: mk(n - rn, t.met - (t.rMet || 0)), use: n ? Math.round(rn / n * 100) : null };
+  }
+
+  /* 棒の塗り（会えた軒数）の2段：下＝ふつうに会えた・上＝おすすめで会えた。合計は会えた数を超えず、負にもしない */
+  function fillParts(t) {
+    const met = Math.max(0, t.met || 0), reco = Math.min(met, Math.max(0, t.rMet || 0));
+    return { base: met - reco, reco };
+  }
+
+  /* おすすめのききめ（3行）。おすすめ経由が0軒なら空。esc は要らない（数字と決まった言葉だけ） */
+  function recoLines(t, minN) {
+    const x = recoRate(t, minN);
+    if (!x.reco.n) return '';
+    const ln = (name, y) => `<p><b>${name}</b>　${visLine(y)}</p>`;
+    return `${ln('おすすめ経由', x.reco)}${ln('おすすめ以外', x.other)}<p><span>訪ねた家のうち、おすすめ経由 ${x.use}%</span></p>`;
+  }
+  /* 数えない拒否の判定を作る。people＝名簿 [{id,name,role}]、picked＝係がえらんだ人の id。
+     自動で取り込まれた・記録した人が分からない → 'auto'／区域係 → 'adm'／えらんだ人 → 'pick'／ほかは ''（今までどおり数える） */
+  function skipRefusedOf(people, picked) {
+    const role = new Map();
+    (people || []).forEach(p => { if (p && p.id) role.set(String(p.id), p.role === 'admin' ? 'adm' : 'pub'); });
+    const pick = new Set((picked || []).map(String));
+    return v => {
+      if (!v || v.result !== 'refused') return '';
+      if (v.auto) return 'auto';
+      const by = v.by ? String(v.by) : '', r = by ? role.get(by) : undefined;
+      if (!by || r === undefined) return 'auto';
+      if (r === 'adm') return 'adm';
+      return pick.has(by) ? 'pick' : '';
+    };
+  }
+  /* 期間の合計に出す1行（おすすめ経由。0軒なら空） */
+  function recoSumLine(t, minN) {
+    const x = recoRate(t, minN);
+    if (!x.reco.n) return '';
+    return `<p><b>うちおすすめ経由</b>　${visLine(x.reco)}<span>・</span><span>訪ねた家のうち ${x.use}%</span></p>`;
+  }
+  /* 訪ねた・会えた・割合の1行（言葉ごとに span。辞書で訳せるように） */
+  const visLine = y => `<span>訪ねた ${y.n}軒・会えた ${y.met}軒（${y.few ? 'データ少' : y.pct + '%'}）</span>`;
+  /* 数えなかった拒否の1行（0軒なら空）。理由ごとに span に分ける */
+  function skipLine(sk) {
+    const a = sk || {}, n = (a.auto || 0) + (a.adm || 0) + (a.pick || 0);
+    if (!n) return '';
+    const parts = [];
+    if (a.auto) parts.push(`<span>自動・取り込み ${a.auto}軒</span>`);
+    if (a.adm) parts.push(`<span>区域係 ${a.adm}軒</span>`);
+    if (a.pick) parts.push(`<span>えらんだ人 ${a.pick}軒</span>`);
+    return `<span>数えなかった拒否 ${n}軒</span><span>（</span>${parts.join('<span>／</span>')}<span>）</span>`;
+  }
+
+  const api = { build, rollup, compare, detail, rate, recoRate, fillParts, recoLines, recoSumLine, skipLine, skipRefusedOf, FEW_BAR, FEW_ROW, SPLIT_DAYS, ymd, addDays };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JG = api;
 
@@ -239,7 +353,9 @@
 .jg-cmp{margin:6px 0 12px}
 .jg-cmp p{margin:8px 0 2px;line-height:1.5}
 .jg-mb{display:block;height:14px;margin:4px 0 2px;border:1.5px solid #1565C0;background:#fff;border-radius:3px;box-sizing:border-box;min-width:4px;overflow:hidden}
-.jg-mb i{display:block;height:100%;background:#1565C0}
+.jg-mb i{position:relative;display:block;height:100%;background:#1565C0}
+.jg-mb i em{position:absolute;right:0;top:0;height:100%;background-color:#0D3C78;background-image:radial-gradient(#fff 0.8px,transparent 1px);background-size:4px 4px}
+.jg-mb.card i em{background-color:#8A3700}
 .jg-mb.card{border-color:#A84300}
 .jg-mb.card i{background:repeating-linear-gradient(135deg,#E07000 0 4px,#fff 4px 6px)}
 .jg-mb.none{border-style:dashed;border-color:#8a97a8}
@@ -254,13 +370,54 @@
 .jg-nav .btn{flex:1}`;
   document.head.appendChild(css);
 
+  /* 「拒否を数えない人」：この端末だけに覚える（サーバーには送らない）。区域係は、えらばなくても自動で外れる */
+  const NOREF_KEY = () => 'kuiki_jg_noref_' + (me() && me().id ? me().id : '');
+  function noRef() {
+    try { const a = JSON.parse(lsGet(NOREF_KEY()) || '[]'); return Array.isArray(a) ? a.map(String) : []; } catch (e) { return []; }
+  }
+  function saveNoRef(ids) {
+    try { lsSet(NOREF_KEY(), JSON.stringify([...new Set((ids || []).map(String))])); } catch (e) { /* 覚えられなくても、数え方は動く */ }
+    st.agg = null; st.drawn = '';
+  }
+  /* 拒否の記録の件数を、記録した人ごとに数える（区域係の画面だけ。奉仕の成績・順位は出さない） */
+  function refCountByUser() {
+    const m = new Map();
+    (D().visits || []).forEach(v => { if (v && v.result === 'refused') { const k = v.by ? String(v.by) : ''; m.set(k, (m.get(k) || 0) + 1); } });
+    return m;
+  }
+  function openNoRefPick(all) {
+    if (typeof setSheet !== 'function') return;
+    const cnt = refCountByUser(), picked = new Set(noRef());
+    const rows = (D().users || []).map(p => ({ id: String(p.id), name: p.name || '', adm: p.role === 'admin', n: cnt.get(String(p.id)) || 0 }))
+      .sort((a, b) => b.n - a.n || String(a.name).localeCompare(String(b.name), 'ja'));
+    const show = all ? rows : rows.filter(x => x.n > 0 || x.adm || picked.has(x.id));
+    const row = x => `<button type="button" class="jg-row" data-jgnr="${esc(x.id)}"${x.adm ? ' disabled' : ''} aria-pressed="${x.adm || picked.has(x.id)}">
+      <span class="stamp sm">${x.adm || picked.has(x.id) ? '✓' : ''}</span><span class="jg-rb"><b>${esc(x.name)}</b><small>${x.adm ? '区域係（自動で外します）' : '拒否の記録 ' + x.n + '件'}</small></span><span></span></button>`;
+    const html = (typeof headHtml === 'function' ? headHtml(null, '拒否を数えない人', '') : '<h2>拒否を数えない人</h2>') + `
+      <p class="hint"><span>紙の報告などから、区域係や手伝いの人が代わりに入れた拒否は、実際に訪ねていないので、グラフでは数えません。</span><span>区域係が入れた拒否は、えらばなくても外れます。</span><span>えらんだ人は、この端末だけに覚えます（ほかの人の画面は変わりません）。</span></p>
+      ${show.length ? show.map(row).join('') : '<div class="empty">名簿に人がいません</div>'}
+      ${all || show.length === rows.length ? '' : '<button type="button" class="btn block" data-jgnrall>ほかの人をすべて見る</button>'}
+      <button type="button" class="btn block primary" data-close>閉じる</button>`;
+    setSheet(html);
+    const S = $id('sheet'); if (!S) return;
+    S.querySelectorAll('[data-jgnr]').forEach(b => { b.onclick = () => {
+      const id = b.dataset.jgnr, cur = noRef(), i = cur.indexOf(id);
+      if (i >= 0) cur.splice(i, 1); else cur.push(id);
+      saveNoRef(cur);
+      openNoRefPick(all);
+      if (shown()) draw(true);
+    }; });
+    const more = S.querySelector('[data-jgnrall]'); if (more) more.onclick = () => openNoRefPick(true);
+  }
+
   const terrSet = () => new Set(D().territories.filter(t => !t.dummy && !isSpecial(t)).map(t => t.id));
   // 覚えた結果を作り直すかどうかの見分け（監査 L-2）：記録の数と最後の記録、家・区域の数、予定、留守宅カードの中身（持ち主・期間・終わった日・家・今日回る人）
   const keyHash = ks => { let h = ks ? ks.length : 0; if (ks) for (let i = 0; i < ks.length; i++) { const k = String(ks[i]); for (let j = 0; j < k.length; j++) h = (h * 31 + k.charCodeAt(j)) | 0; } return h; };
   const dataSig = () => {
     const d = D(), vs = d.visits || [], cs = d.awayCards || [], sc = d.schedules || [];
     const cards = cs.map(x => [x.id, x.by, x.at, x.endedAt || '', x.expiresAt || '', x.dummy ? 1 : 0, keyHash(x.keys), (x.helpers || []).map(h => h.uid + '@' + h.until).join('/')].join(',')).join(';');
-    return [vs.length, vs.length ? vs[vs.length - 1].id : '', (d.houses || []).length, terrSet().size, cards, sc.map(x => x.date + x.group + x.time).join(','), d.settings && d.settings.keepMonths, ymd(Date.now())].join('|');
+    return [vs.length, vs.length ? vs[vs.length - 1].id : '', (d.houses || []).length, terrSet().size, cards, sc.map(x => x.date + x.group + x.time).join(','), d.settings && d.settings.keepMonths, ymd(Date.now()),
+      noRef().join(','), (d.users || []).map(p => p.id + (p.role === 'admin' ? '!' : '')).join(',')].join('|');
   };
   const rangeOf = (period, today) => {
     if (period === 30) return { from: addDays(today, -29), to: today, unit: 'day' };
@@ -270,7 +427,9 @@
   const md = k => { const a = k.split('-'); return `${Number(a[1])}/${Number(a[2])}`; };
   const jpDay = k => { const d = parseYmd(k); return `${d.getMonth() + 1}月${d.getDate()}日（${WD[d.getDay()]}）`; };
   const visN = t => t.met + t.refused + t.away;
-  const tot = (bars, c) => bars.reduce((a, b) => { a.met += b[c].met; a.refused += b[c].refused; a.away += b[c].away; return a; }, tally());
+  const tot = (bars, c) => bars.reduce((a, b) => { addT(a, b[c]); return a; }, tally());
+  const sumAll = bars => bars.reduce((a, b) => { CATS.forEach(c => addT(a, b[c])); return a; }, tally()); // 区域カード・留守宅カード・分けられないを合わせた合計
+  const sumSkip = bars => bars.reduce((a, b) => { if (b.skip) { a.auto += b.skip.auto; a.adm += b.skip.adm; a.pick += b.skip.pick; } return a; }, { auto: 0, adm: 0, pick: 0 });
   const sumLine = t => { const r = rate(t, FEW_BAR); return `訪ねた ${r.n}軒・会えた ${r.met}軒（${r.few ? 'データ少' : r.pct + '%'}）・留守 ${r.away}軒・拒否 ${r.refused}軒`; };
   // 集まりの名前は1つずつ別の部品にする（スペイン語に訳すとき、組み合わせごとの辞書を作らなくてよいように）
   const gatherText = a => (a && a.length ? a.map(g => `<span>${g.group ? esc(g.group) + 'グループ' : '全体の集まり'}${g.time ? ' ' + esc(g.time) : ''}</span>`).join('<span>・</span>') : '<span>なし</span>');
@@ -278,7 +437,10 @@
   const MK = () => (window.KI && window.KI.lang === 'es' ? 'R' : '集');
 
   const curIdx = () => (typeof IDX !== 'undefined' ? IDX : null);
-  const inputs = () => { const d = D(); return { index: typeof IDX !== 'undefined' && IDX instanceof Map && IDX.size ? IDX.values() : null, visits: d.visits || [], terrOfHouse: hid => { const h = houseById(hid); return h && h.terrId; }, eligible: terrSet(), cards: d.awayCards || [], schedules: d.schedules || [], now: Date.now(), keepMonths: d.settings && d.settings.keepMonths }; };
+  const inputs = () => { const d = D(); return { index: typeof IDX !== 'undefined' && IDX instanceof Map && IDX.size ? IDX.values() : null, visits: d.visits || [], terrOfHouse: hid => { const h = houseById(hid); return h && h.terrId; }, eligible: terrSet(), cards: d.awayCards || [], schedules: d.schedules || [], now: Date.now(), keepMonths: d.settings && d.settings.keepMonths,
+    // 巡回の始まり：おすすめの「回り残し」「留守宅」と同じ起点（app.js の roundBounds）。完了して誰も持っていない区域は、終わった巡回から続けて見る
+    roundStart: tid => { try { if (typeof roundBounds !== 'function') return ''; const b = roundBounds(tid); return (b && (b.ext ? b.ext.start : b.start)) || ''; } catch (e) { return ''; } },
+    skipRefused: skipRefusedOf(d.users || [], noRef()) }; };
   function compute(force) {
     const d = D(), sig = dataSig(), a = st.agg;
     if (a && a.sig === sig && a.vref === d.visits && a.iref === curIdx()) return a; // 記録の入れ物（配列・索引）が置きかわったときも、作り直す
@@ -321,12 +483,18 @@
 
   const DEFS = `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <pattern id="jgCardM" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#E07000"/><rect x="4" width="2" height="6" fill="#fff"/></pattern>
+<pattern id="jgRecoA" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="4" fill="#0D3C78"/><circle cx="1" cy="1" r="0.9" fill="#fff"/></pattern>
+<pattern id="jgRecoC" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="4" fill="#8A3700"/><circle cx="1" cy="1" r="0.9" fill="#fff"/></pattern>
 <pattern id="jgNo" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#F2F2F2"/><path d="M0,0 L8,8 M8,0 L0,8" stroke="#BDBDBD" stroke-width=".8"/></pattern></defs></svg>`;
   const MFILL = { area: COL.area, card: 'url(#jgCardM)' };
+  const RFILL = { area: 'url(#jgRecoA)', card: 'url(#jgRecoC)' }; // おすすめで会えた分（濃い色＋白い水玉。色だけに頼らない）
   // 凡例・数の行の小さな見本：枠＝訪ねた、塗り＝会えた
   const swatch = c => `<svg width="24" height="18" aria-hidden="true"><rect x="1" y="1" width="22" height="16" fill="#fff" stroke="${COL[c]}" stroke-width="1.5"/><rect x="1" y="9" width="22" height="8" fill="${MFILL[c]}" stroke="${COL[c]}" stroke-width="1"/></svg>`;
+  // おすすめで会えた分の見本（枠＋上の段だけを塗る）
+  const rSwatch = c => `<svg width="24" height="18" aria-hidden="true"><rect x="1" y="1" width="22" height="16" fill="#fff" stroke="${COL[c]}" stroke-width="1.5"/><rect x="1" y="5" width="22" height="6" fill="${RFILL[c]}" stroke="${COL[c]}" stroke-width="1"/><rect x="1" y="11" width="22" height="6" fill="${MFILL[c]}" stroke="${COL[c]}" stroke-width="1"/></svg>`;
   const LEGEND = () => `<div class="jg-leg" aria-label="凡例"><span>${swatch('area')}左：区域カード（青）</span><span>${swatch('card')}右：留守宅カード（橙の斜線）</span>
 <span>枠の高さ＝訪ねた軒数・塗った部分＝会えた軒数・棒の上の数字＝会えた割合</span>
+<span>${rSwatch('area')}${rSwatch('card')}塗った部分の上側（濃い色＋白い水玉）＝おすすめから訪ねて会えた軒数。下側（無地・斜線）＝おすすめ以外で会えた軒数</span>
 <span><svg width="22" height="16" aria-hidden="true"><rect x="1" y="1" width="20" height="14" fill="#FFE9A8" stroke="#C99A00"/></svg><b data-notr>${MK()}</b> 集まりのあった日</span>
 <span><svg width="22" height="16" aria-hidden="true"><rect x="2" y="2" width="18" height="12" fill="#fff" stroke="#17324D" stroke-dasharray="3 2"/></svg>途中（今日をふくむ）</span></div>`;
 
@@ -364,7 +532,12 @@
         const h = Math.max(2, n / max * PH), y = Y(0) - h;
         top = Math.min(top, y);
         out.push(`<rect x="${x}" y="${y}" width="${bw}" height="${h}" fill="#fff" stroke="${COL[c]}" stroke-width="1.5"/>`);
-        if (t.met) { const hm = Math.max(1.5, t.met / max * PH); out.push(`<rect x="${x}" y="${Y(0) - hm}" width="${bw}" height="${hm}" fill="${MFILL[c]}" stroke="${COL[c]}" stroke-width="1"/>`); }
+        if (t.met) { // 塗り（会えた）は下＝ふつう・上＝おすすめの2段。全体の高さは今までと同じ式
+          const hm = Math.max(1.5, t.met / max * PH), fp = fillParts(t);
+          const hr = fp.reco ? Math.min(hm, Math.max(1.5, fp.reco / max * PH)) : 0, hb = Math.max(0, hm - hr);
+          if (hb > 0) out.push(`<rect x="${x}" y="${Y(0) - hb}" width="${bw}" height="${hb}" fill="${MFILL[c]}" stroke="${COL[c]}" stroke-width="1"/>`);
+          if (hr > 0) out.push(`<rect x="${x}" y="${Y(0) - hm}" width="${bw}" height="${hr}" fill="${RFILL[c]}" stroke="${COL[c]}" stroke-width="1"/>`);
+        }
         const rr = rate(t, FEW_BAR);
         if (!rr.few) out.push(`<text x="${x + bw / 2}" y="${y - 4}" font-size="11" font-weight="700" text-anchor="middle" style="fill:${COL[c]}">${rr.pct}%</text>`);
       });
@@ -412,6 +585,7 @@
     const cmp = compare(r, { from: g.from, to: g.to }), gd = cmp.area.gather.days, nd = cmp.area.nogather.days;
     const label = (PERIODS.find(x => x[0] === st.period) || PERIODS[0])[1];
     const notes = [];
+    const skipHtml = skipLine(sumSkip(all)); // 数えなかった拒否（実際に訪ねていない拒否）。span に分かれた HTML なので esc しない
     if (g.from < r.unsplitBefore) notes.push(`${jpDay(r.unsplitBefore).replace(/（.）/, '')}より前は、印のない記録を区域カードか留守宅カードか分けられません（斜めの網の部分）。印のある記録だけ棒に出ています。`);
     if (r.thinBefore && g.from < r.thinBefore) notes.push(`${jpDay(r.thinBefore).replace(/（.）/, '')}より前は、記録が整理されていて数が少なめです（訪問記録を残す期間：${Number(D().settings.keepMonths)}か月）。`);
     const line = c => `<p>${swatch(c)}<span><b>${c === 'area' ? '区域カード' : '留守宅カード'}</b>　${sumLine(tot(all, c))}</span></p>`;
@@ -419,11 +593,13 @@
     body.innerHTML = `${DEFS}
       <p class="hint">会衆全体の「訪ねた家の数」です。日ごとに、区域カード（左）と留守宅カード（右）の棒を並べて、どちらがよく会えているかをくらべます。</p>
       <div class="seg jg-seg" role="group" aria-label="期間">${PERIODS.map(p => `<button type="button" data-jgper="${p[0]}" aria-pressed="${p[0] === st.period}">${p[1]}</button>`).join('')}</div>
-      <div class="jg-sum">${line('area')}${line('card')}</div>
+      <div class="jg-sum">${line('area')}${line('card')}${recoSumLine(sumAll(all), FEW_BAR)}</div>
       ${has ? `<div class="jg-wrap">${axisSvg(geo, mx)}<div class="jg-sc" id="jgSc">${chartSvg(bars, mx, geo, g.unit, r)}</div></div>` : '<div class="empty">この期間に、訪ねた記録はありません</div>'}
       ${LEGEND()}
       ${has ? `<p class="hint"><span>棒（その日の列）を押すと、区域ごとの内訳が出ます。内訳の区域を押すと、その区域のカルテが開きます。</span>${geo.W > geo.plotW ? '<span>入りきらない日は、グラフを横に動かすと見られます。</span>' : ''}${g.unit === 'day' ? '<span>訪ねた記録のない日は、のせていません。</span>' : ''}</p>` : ''}
       ${notes.map(x => `<p class="hint">${esc(x)}</p>`).join('')}
+      ${skipHtml ? `<p class="hint">${skipHtml}</p>` : ''}
+      <p><button type="button" class="btn small" data-jgnoref>拒否を数えない人</button></p>
       <h3>くらべ（${label}）</h3>
       <p class="hint">集まりのあった日 ${gd}日・集まりのなかった日 ${nd}日。「会えた割合」は、会えた÷訪ねた です。</p>
       <div class="scroll"><table class="slots narrow jg-tbl" aria-label="集まりのあった日となかった日の会えた割合"><tr><th></th><th>集まりのあった日</th><th>集まりのなかった日</th></tr>
@@ -476,7 +652,12 @@
   /* ---- 棒を押したとき：下から区域ごとの内訳（カード2つのくらべ → 区域カード・留守宅カードの区域ごと → 分けられない記録） ---- */
   const barHead = (b, unit) => unit === 'day' ? jpDay(b.key)
     : unit === 'week' ? `${jpDay(b.start).replace(/（.）/, '')}〜${jpDay(b.end).replace(/（.）/, '')}の週` : `${Number(b.key.slice(0, 4))}年${Number(b.key.slice(5))}月`;
-  const mini = (t, max, c) => { const n = visN(t); return `<span class="jg-mb ${n ? c : 'none'}" style="width:${n ? Math.max(4, Math.round(n / max * 100)) : 100}%" aria-hidden="true"><i style="width:${n ? Math.round(t.met / n * 100) : 0}%"></i></span>`; };
+  const mini = (t, max, c) => { // 枠＝訪ねた・塗り＝会えた。塗りの右側（濃い色＋白い水玉）＝おすすめで会えた
+    const n = visN(t), fp = fillParts(t);
+    const w = n ? Math.max(4, Math.round(n / max * 100)) : 100, fw = n ? Math.round(t.met / n * 100) : 0;
+    const rw = t.met ? Math.round(fp.reco / t.met * 100) : 0;
+    return `<span class="jg-mb ${n ? c : 'none'}" style="width:${w}%" aria-hidden="true"><i style="width:${fw}%">${rw ? `<em style="width:${rw}%"></em>` : ''}</i></span>`;
+  };
   const numLine = t => { const r = rate(t, FEW_BAR); return r.n ? `訪ねた ${r.n}軒・会えた ${r.met}軒（${r.few ? 'データ少' : r.pct + '%'}）・留守 ${r.away}軒・拒否 ${r.refused}軒` : '訪ねた 0軒'; };
   function rowHtml(x, c, max) {
     const t = typeof terrById === 'function' ? terrById(x.terr) : null, ok = !!(t && window.KM && KM.openKarte);
@@ -513,6 +694,8 @@
         <p><b>区域カード</b></p>${mini(b.area, top, 'area')}<small>${numLine(b.area)}</small>
         <p><b>留守宅カード</b></p>${mini(b.card, top, 'card')}<small>${numLine(b.card)}</small>
       </div>
+      ${(() => { const h = recoLines(sumAll([b]), FEW_BAR); return h ? `<h3 class="sub">おすすめのききめ</h3><div class="jg-cmp">${h}</div><p class="hint">おすすめから訪ねた分と、それ以外の分で、会えた割合をくらべられます。</p>` : ''; })()}
+      ${(() => { const sl = skipLine(b.skip); return sl ? `<p class="hint">${sl}</p>` : ''; })()}
       ${det.length ? '<p class="hint">区域を押すと、その区域のカルテが開きます。多く訪ねた区域から並べています。</p>' : '<div class="empty">訪ねた記録はありません</div>'}
       ${sec('area', '区域カード')}${sec('card', '留守宅カード')}${un ? `${sec('unsplit', '分けられない記録')}<p class="hint">印のない古い記録です。区域カードか留守宅カードかは分けられません。</p>` : ''}
       <div class="jg-nav"><button type="button" class="btn" data-jgnav="-1"${i > 0 ? '' : ' disabled'}>‹ 前の${unitName}</button><button type="button" class="btn" data-jgnav="1"${i < bars.length - 1 ? '' : ' disabled'}>次の${unitName} ›</button></div>
@@ -536,11 +719,11 @@
     if (!box) {
       box = document.createElement('div'); box.id = 'adJG';
       box.innerHTML = '<h2 class="sec" data-hqk="joukyouGraph">区域カードと留守宅カード</h2><div id="jgBody"><p class="hint">集計しています…</p></div><p id="jgSel" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0"></p>'; // 読み上げの場所は描き直さない
-      const ref = $id('adAch');
-      if (ref && ref.parentNode) ref.parentNode.insertBefore(box, ref.nextSibling); else pane.appendChild(box);
+      pane.insertBefore(box, pane.firstElementChild); // 状況タブのいちばん上（期限の見張りより上。2026-11-19）
       box.addEventListener('click', e => {
         const per = e.target.closest('[data-jgper]');
         if (per) { st.period = Number(per.dataset.jgper); st.selKey = ''; st.drawn = ''; st.drawnPer = 0; st.scrollX = null; draw(false); return; }
+        if (e.target.closest('[data-jgnoref]')) { openNoRefPick(false); return; }
         const svg = e.target.closest('svg.jg-chart');
         if (svg && st.bars && st.geo) {
           const rc = svg.getBoundingClientRect(), x = (e.clientX - rc.left) / rc.width * st.geo.W;
@@ -562,6 +745,7 @@
       let rt = 0;
       window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { try { if (document.body.contains(box) && shown()) draw(false); } catch (e) { console.error(e); } }, 150); });
     }
+    if (box.parentNode === pane && pane.firstElementChild !== box) pane.insertBefore(box, pane.firstElementChild); // ほかの箱が先に入っても、いちばん上に保つ
     if (st.pending) return;
     st.pending = true;
     setTimeout(() => { // 画面を先に出し、計算はそのあと

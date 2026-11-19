@@ -352,7 +352,7 @@
   const FOLD = 'kuiki_kr_fold';
   let foldState = null;
   const folds = () => { if (!foldState) { try { foldState = JSON.parse(lsGet(FOLD) || '{}') || {}; } catch (e) { foldState = {}; } } return foldState; };
-  const isOpen = id => { const f = folds(); return f[id] != null ? !!f[id] : id === 'due' || id === 'ops'; }; // 毎月の点検（いちばん下）も、はじめは開いておく
+  const isOpen = id => { const f = folds(); return f[id] != null ? !!f[id] : id === 'due' || id === 'ops' || id === 'jg'; }; // 毎月の点検（いちばん下）と、区域カードと留守宅カードのグラフ（いちばん上・2026-11-19）も、はじめは開いておく
   const setOpenF = (id, v) => { folds()[id] = v ? 1 : 0; try { lsSet(FOLD, JSON.stringify(foldState)); } catch (e) { /* 何もしない */ } };
   // 見出しごとの、たたんだときの要点
   const dueNum = k => num(`#adDue [data-duetl="${k}"] b`), tileNum = k => num(`#adTiles [data-tl="${k}"] b`);
