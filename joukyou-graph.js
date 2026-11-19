@@ -260,8 +260,8 @@
   function recoLines(t, minN) {
     const x = recoRate(t, minN);
     if (!x.reco.n) return '';
-    const ln = (name, y) => `<p><b>${name}</b>　訪ねた ${y.n}軒・会えた ${y.met}軒（${y.few ? 'データ少' : y.pct + '%'}）</p>`;
-    return `${ln('おすすめ経由', x.reco)}${ln('おすすめ以外', x.other)}<p>訪ねた家のうち、おすすめ経由 ${x.use}%</p>`;
+    const ln = (name, y) => `<p><b>${name}</b>　${visLine(y)}</p>`;
+    return `${ln('おすすめ経由', x.reco)}${ln('おすすめ以外', x.other)}<p><span>訪ねた家のうち、おすすめ経由 ${x.use}%</span></p>`;
   }
   /* 数えない拒否の判定を作る。people＝名簿 [{id,name,role}]、picked＝係がえらんだ人の id。
      自動で取り込まれた・記録した人が分からない → 'auto'／区域係 → 'adm'／えらんだ人 → 'pick'／ほかは ''（今までどおり数える） */
@@ -282,17 +282,19 @@
   function recoSumLine(t, minN) {
     const x = recoRate(t, minN);
     if (!x.reco.n) return '';
-    return `<p><b>うちおすすめ経由</b>　訪ねた ${x.reco.n}軒・会えた ${x.reco.met}軒（${x.reco.few ? 'データ少' : x.reco.pct + '%'}）・訪ねた家のうち ${x.use}%</p>`;
+    return `<p><b>うちおすすめ経由</b>　${visLine(x.reco)}<span>・</span><span>訪ねた家のうち ${x.use}%</span></p>`;
   }
-  /* 数えなかった拒否の1行（0軒なら空） */
+  /* 訪ねた・会えた・割合の1行（言葉ごとに span。辞書で訳せるように） */
+  const visLine = y => `<span>訪ねた ${y.n}軒・会えた ${y.met}軒（${y.few ? 'データ少' : y.pct + '%'}）</span>`;
+  /* 数えなかった拒否の1行（0軒なら空）。理由ごとに span に分ける */
   function skipLine(sk) {
     const a = sk || {}, n = (a.auto || 0) + (a.adm || 0) + (a.pick || 0);
     if (!n) return '';
     const parts = [];
-    if (a.auto) parts.push(`自動・取り込み ${a.auto}軒`);
-    if (a.adm) parts.push(`区域係 ${a.adm}軒`);
-    if (a.pick) parts.push(`えらんだ人 ${a.pick}軒`);
-    return `数えなかった拒否 ${n}軒（${parts.join('／')}）`;
+    if (a.auto) parts.push(`<span>自動・取り込み ${a.auto}軒</span>`);
+    if (a.adm) parts.push(`<span>区域係 ${a.adm}軒</span>`);
+    if (a.pick) parts.push(`<span>えらんだ人 ${a.pick}軒</span>`);
+    return `<span>数えなかった拒否 ${n}軒</span><span>（</span>${parts.join('<span>／</span>')}<span>）</span>`;
   }
 
   const api = { build, rollup, compare, detail, rate, recoRate, fillParts, recoLines, recoSumLine, skipLine, skipRefusedOf, FEW_BAR, FEW_ROW, SPLIT_DAYS, ymd, addDays };
@@ -569,7 +571,7 @@
     const cmp = compare(r, { from: g.from, to: g.to }), gd = cmp.area.gather.days, nd = cmp.area.nogather.days;
     const label = (PERIODS.find(x => x[0] === st.period) || PERIODS[0])[1];
     const notes = [];
-    { const sl = skipLine(sumSkip(all)); if (sl) notes.push(sl); } // 数えなかった拒否（実際に訪ねていない拒否）
+    const skipHtml = skipLine(sumSkip(all)); // 数えなかった拒否（実際に訪ねていない拒否）。span に分かれた HTML なので esc しない
     if (g.from < r.unsplitBefore) notes.push(`${jpDay(r.unsplitBefore).replace(/（.）/, '')}より前は、印のない記録を区域カードか留守宅カードか分けられません（斜めの網の部分）。印のある記録だけ棒に出ています。`);
     if (r.thinBefore && g.from < r.thinBefore) notes.push(`${jpDay(r.thinBefore).replace(/（.）/, '')}より前は、記録が整理されていて数が少なめです（訪問記録を残す期間：${Number(D().settings.keepMonths)}か月）。`);
     const line = c => `<p>${swatch(c)}<span><b>${c === 'area' ? '区域カード' : '留守宅カード'}</b>　${sumLine(tot(all, c))}</span></p>`;
@@ -582,6 +584,7 @@
       ${LEGEND()}
       ${has ? `<p class="hint"><span>棒（その日の列）を押すと、区域ごとの内訳が出ます。内訳の区域を押すと、その区域のカルテが開きます。</span>${geo.W > geo.plotW ? '<span>入りきらない日は、グラフを横に動かすと見られます。</span>' : ''}${g.unit === 'day' ? '<span>訪ねた記録のない日は、のせていません。</span>' : ''}</p>` : ''}
       ${notes.map(x => `<p class="hint">${esc(x)}</p>`).join('')}
+      ${skipHtml ? `<p class="hint">${skipHtml}</p>` : ''}
       <p><button type="button" class="btn small" data-jgnoref>拒否を数えない人</button></p>
       <h3>くらべ（${label}）</h3>
       <p class="hint">集まりのあった日 ${gd}日・集まりのなかった日 ${nd}日。「会えた割合」は、会えた÷訪ねた です。</p>

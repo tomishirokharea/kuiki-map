@@ -85,5 +85,31 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "いちばん新しいもの：": "Lo más reciente: ",
 /* 更新のお知らせ（2026.13.124） */
 "区域係の状況の「区域カードと留守宅カード」のグラフを、日ごとに2本の棒を並べる形にしました。棒を押すと区域ごとの内訳、区域を押すとカルテが開きます。": "La gráfica «Tarjetas de territorio y de ausentes» de la situación del encargado ahora muestra dos barras juntas por día. Toque una barra para ver el detalle por territorio y un territorio para abrir su ficha.",
-"「こまったこと・提案」に、まだ対応していない声があるときは、区域係の「今日」にお知らせが出ます。押すと一覧に進みます。": "Cuando hay problemas o sugerencias sin atender, aparece un aviso en «Hoy» del encargado de territorios. Tóquelo para ir a la lista."
+"「こまったこと・提案」に、まだ対応していない声があるときは、区域係の「今日」にお知らせが出ます。押すと一覧に進みます。": "Cuando hay problemas o sugerencias sin atender, aparece un aviso en «Hoy» del encargado de territorios. Tóquelo para ir a la lista.",
+/* おすすめの色分け・数えない拒否・いちばん上へ（2026.13.170・2026-11-19） */
+"おすすめ経由": "Desde las sugerencias",
+"おすすめ以外": "Sin las sugerencias",
+"うちおすすめ経由": "De ellas, desde las sugerencias",
+"訪ねた {0}軒・会えた {1}軒（{2}%）": "Visitadas {0} · En casa {1} ({2}%)",
+"訪ねた {0}軒・会えた {1}軒（データ少）": "Visitadas {0} · En casa {1} (pocos datos)",
+"訪ねた家のうち、おすすめ経由 {0}%": "Del total de casas visitadas, {0}% desde las sugerencias",
+"訪ねた家のうち {0}%": "{0}% del total de casas visitadas",
+"おすすめのききめ": "Resultado de las sugerencias",
+"おすすめから訪ねた分と、それ以外の分で、会えた割合をくらべられます。": "Permite comparar el porcentaje de personas encontradas al visitar desde las sugerencias y sin ellas.",
+"塗った部分の上側（濃い色＋白い水玉）＝おすすめから訪ねて会えた軒数。下側（無地・斜線）＝おすすめ以外で会えた軒数": "Parte superior del relleno (color oscuro con puntos blancos) = casas donde se encontró a alguien visitando desde las sugerencias. Parte inferior (liso o rayado) = casas donde se encontró a alguien sin las sugerencias.",
+"数えなかった拒否 {0}軒": "No visitar sin contar: {0}",
+"自動・取り込み {0}軒": "Automáticas o importadas: {0}",
+"区域係 {0}軒": "Encargado de territorios: {0}",
+"えらんだ人 {0}軒": "Personas elegidas: {0}",
+"拒否を数えない人": "Personas cuyas «no visitar» no se cuentan",
+"紙の報告などから、区域係や手伝いの人が代わりに入れた拒否は、実際に訪ねていないので、グラフでは数えません。": "Las «no visitar» que el encargado u otra persona registra en nombre de otros (por ejemplo, desde informes en papel) no se cuentan en la gráfica, porque no se visitó la casa.",
+"区域係が入れた拒否は、えらばなくても外れます。": "Las «no visitar» registradas por el encargado de territorios se excluyen sin necesidad de elegirlas.",
+"えらんだ人は、この端末だけに覚えます（ほかの人の画面は変わりません）。": "Las personas elegidas se guardan solo en este dispositivo (no cambia la pantalla de los demás).",
+"区域係（自動で外します）": "Encargado de territorios (se excluye automáticamente)",
+"拒否の記録 {0}件": "Registros de «no visitar»: {0}",
+"ほかの人をすべて見る": "Ver a todas las demás personas",
+"名簿に人がいません": "No hay personas en la lista",
+"区域係の状況の「区域カードと留守宅カード」のグラフを、状況のいちばん上に移しました。おすすめから訪ねて会えた分が、濃い色と白い水玉で分かります。棒を押すと「おすすめのききめ」も出ます。": "La gráfica «Tarjetas de territorio y de ausentes» se movió al principio de la situación. Las casas donde se encontró a alguien visitando desde las sugerencias se ven en color oscuro con puntos blancos. Al tocar una barra también aparece «Resultado de las sugerencias».",
+"実際に訪ねていない拒否（自動の取り込み・区域係や手伝いの人が代わりに入れた分）は、グラフで数えないようにしました。「拒否を数えない人」でえらべます。": "Las «no visitar» que no corresponden a una visita real (importaciones automáticas o registros hechos por el encargado u otra persona en nombre de otros) ya no se cuentan en la gráfica. Se pueden elegir en «Personas cuyas no visitar no se cuentan».",
+"おすすめから訪ねた記録は、留守の家なら留守宅カード、まだ訪ねていなかった家（回り残し）なら区域カードとして数えます。": "Los registros hechos desde las sugerencias se cuentan como tarjeta de ausentes si la casa estaba ausente, y como tarjeta de territorio si aún no se había visitado en esta ronda."
 });
