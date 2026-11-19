@@ -9539,7 +9539,8 @@ function lowSweep() {
   const adopt = lowAdoptList(); // 印のない正式返却のうち、まだ受け取れない・記録が少ない区域
   for (const r of D().returns) {
     if (!r.low || r.lowOk || r.lowAuto || r.lowSkip || !r.completed) continue;
-    if (now - Date.parse(r.at) < wait) continue;                              // まだ待つ
+    const at = Date.parse(r.at);
+    if (at <= now && now - at < wait) continue;                               // まだ待つ（日付が未来の記録は待たない：待つと now - at がマイナスのまま確かめから外れる）
     const t = terrById(r.terrId);
     if (!t) continue;
     if (t.holder || t.awayPoolAt || t.completedAt !== r.at) { skip.push(r); continue; } // あとの動きがあるので、何も変えない
