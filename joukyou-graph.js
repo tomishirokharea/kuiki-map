@@ -102,7 +102,7 @@
     };
     // 同じ日・同じ家（部屋）を1軒にまとめる。家（部屋）ごとの記録の索引（新しい順）を使い、1年より前は読まずに止める（速さ・指示書5.）
     // 日は番号（dayId）で扱う：日付の文字から番号を引くのは、1時間ごとに1回だけ。数は配列にためて、最後に日付ごとの Map にする
-    const dayIds = new Map(), dayStr = [], dayFlag = [], hourDay = new Map(), okHouse = new Map(), tDay = [];
+    const dayIds = new Map(), dayStr = [], dayFlag = [], hourDay = new Map(), okHouse = new Map(), tDay = [], tSpan = [];
     let counts = new Int32Array(3 * NF * 64);
     const idOf = str => { // 日の番号。flag：0＝数える／1＝今日より先（飛ばす）／2＝期間より前（ここで止める）
       let id = dayIds.get(str);
@@ -135,7 +135,10 @@
     // 日・カード・結果ごとの数に1を足す。o.terr のときだけ、区域ごとの内訳（tDay：日の番号 → 区域 → 9つの数）にも足す
     // （内訳は棒を押したときだけ、その期間の分を作る。ふだんのグラフは今までと同じ速さ。監査 M-3）
     const withTerr = !!o.terr;
-    const bump = (id, terr, first, res, fi) => {
+    // 時刻（span）を作る最後の日。日の内訳（棒1本＝1日）のときだけ画面から渡す。渡されなければ作らない（週・月の内訳の速さを変えないため。2026-11-21）
+    const spanTo = withTerr && o.spanTo ? String(o.spanTo) : '';
+    // newest：その日のその家（部屋）の最後の記録。first（最初の記録）と合わせて、区域×欄ごとの時刻の最小・最大にする（o.terr のときだけ。2026-11-21）
+    const bump = (id, terr, first, res, fi, newest) => {
       const ci = CAT[kindOf(first, curKey, dayStr[id], curList, fi, terr)] * NF, ri = (RES[res] === undefined ? 2 : RES[res]);
       const q = ci + ri, qr = isReco(first) ? ci + 3 + ri : -1; // qr＝おすすめ経由の内数の置き場
       counts[id * 3 * NF + q]++;
@@ -145,6 +148,12 @@
       let a = m.get(terr); if (!a) m.set(terr, a = new Int32Array(3 * NF));
       a[q]++;
       if (qr >= 0) a[qr]++;
+      if (!spanTo || dayStr[id] > spanTo) return;
+      let sm = tSpan[id]; if (!sm) tSpan[id] = sm = new Map();
+      let sp = sm.get(terr); if (!sp) sm.set(terr, sp = Float64Array.of(Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity));
+      const lo = Date.parse(first.at), hi = Date.parse((newest || first).at), si = ci / NF * 2;
+      if (lo < sp[si]) sp[si] = lo;
+      if (hi > sp[si + 1]) sp[si + 1] = hi;
     };
     const processList = list => {
       const f0 = list[0];
@@ -153,7 +162,7 @@
       for (let i = 1; i < list.length; i++) if (list[i].at > list[i - 1].at) { list = list.slice().sort(desc); break; } // 新しい順でないときだけ、並べ直す
       curKey = f0.houseId + '|' + (f0.unit || '');
       curList = list;
-      let cur = -1, res = '', first = null, firstIdx = -1;
+      let cur = -1, res = '', first = null, firstIdx = -1, newest = null;
       for (let i = 0; i < list.length; i++) {
         const v = list[i], id = dayOf(v.at);
         if (id < 0) continue;
@@ -162,10 +171,10 @@
         if (fl === 2) break;
         // 実際に訪ねていない拒否（自動・取り込み／区域係／係がえらんだ人）は数えない。外した数だけ、理由ごとに残す（2026-11-19）
         if (v.result === 'refused') { const why = skipRef(v); if (why) { bumpSkip(id, why); continue; } }
-        if (id !== cur) { if (first) bump(cur, terr, first, res, firstIdx); cur = id; res = v.result; first = v; firstIdx = i; }
+        if (id !== cur) { if (first) bump(cur, terr, first, res, firstIdx, newest); cur = id; res = v.result; first = v; firstIdx = i; newest = v; }
         else { if ((rank[v.result] || 0) > (rank[res] || 0)) res = v.result; first = v; firstIdx = i; } // 新しい順なので、最後に見たものが、その日の最初の訪問
       }
-      if (first) bump(cur, terr, first, res, firstIdx);
+      if (first) bump(cur, terr, first, res, firstIdx, newest);
     };
     if (o.index) { for (const list of o.index) processList(list); }
     else { // 索引がないとき（試験・ほかの使い方）：家（部屋）ごとにまとめてから、同じ数え方をする
@@ -173,7 +182,7 @@
       for (let i = 0; i < vs.length; i++) { const v = vs[i], k = v.houseId + '|' + (v.unit || ''); let a = byKey.get(k); if (!a) byKey.set(k, a = []); a.push(v); }
       byKey.forEach(a => processList(a.sort(desc)));
     }
-    const days = new Map(), terrDays = new Map();
+    const days = new Map(), terrDays = new Map(), terrSpan = new Map();
     for (let id = 0; id < dayStr.length; id++) {
       if (dayFlag[id] !== 0) continue;
       let any = false;
@@ -183,6 +192,7 @@
       CATS.forEach((c, ci) => { for (let f = 0; f < NF; f++) d[c][FIELDS[f]] = counts[id * 3 * NF + ci * NF + f]; });
       days.set(dayStr[id], d);
       if (tDay[id]) terrDays.set(dayStr[id], tDay[id]);
+      if (tSpan[id]) terrSpan.set(dayStr[id], tSpan[id]);
     }
     // 集まりのあった日（予定にあるものは、掃除などもすべて集まりとして数える）
     const gather = new Map();
@@ -196,7 +206,7 @@
     // 外した拒否の数（日ごと）。棒を作らない日もあるので、days とは別に持つ
     const skipDays = new Map();
     skipById.forEach((x, id) => { if (dayFlag[id] === 0 && (x.auto || x.adm || x.pick)) skipDays.set(dayStr[id], x); });
-    return { days, terrDays, gather, from, today, unsplitBefore, thinBefore, skipDays };
+    return { days, terrDays, terrSpan, gather, from, today, unsplitBefore, thinBefore, skipDays };
   }
 
   const bucketKey = (day, unit) => {
@@ -236,18 +246,34 @@
     return out;
   }
 
-  /* 区域ごとの内訳：build({ terr: true }) の結果の from〜to の日を足して、区域ごとに 区域カード・留守宅カード・分けられない の数を返す（棒を押したときだけ作る） */
+  /* 区域ごとの内訳：build({ terr: true }) の結果の from〜to の日を足して、区域ごとに 区域カード・留守宅カード・分けられない の数を返す（棒を押したときだけ作る）
+     span：欄ごとに、その期間に数えた記録の最初と最後の時刻（ms の [最小, 最大]）。記録のない欄は null（2026-11-21） */
   function detail(r, p) {
     const by = new Map();
     for (let d = p.from; d <= p.to; d = addDays(d, 1)) {
       const m = r.terrDays && r.terrDays.get(d);
       if (!m) continue;
+      const sm = r.terrSpan && r.terrSpan.get(d);
       m.forEach((a, terr) => {
-        let x = by.get(terr); if (!x) by.set(terr, x = { terr, area: tally(), card: tally(), unsplit: tally() });
+        let x = by.get(terr); if (!x) by.set(terr, x = { terr, area: tally(), card: tally(), unsplit: tally(), span: { area: null, card: null, unsplit: null } });
         CATS.forEach((c, ci) => { for (let f = 0; f < NF; f++) x[c][FIELDS[f]] += a[ci * NF + f]; });
+        const sp = sm && sm.get(terr);
+        if (sp) CATS.forEach((c, ci) => {
+          const lo = sp[ci * 2], hi = sp[ci * 2 + 1];
+          if (!(lo <= hi)) return;
+          const o = x.span[c];
+          x.span[c] = o ? [Math.min(o[0], lo), Math.max(o[1], hi)] : [lo, hi];
+        });
       });
     }
     return [...by.values()];
+  }
+
+  /* おおよその時間：最初と最後の時刻を「17〜18時台」（同じ時なら「17時台」）にする。時は端末の時刻。どちらかが時刻でなければ ''（2026-11-21） */
+  function hourSpan(lo, hi) {
+    if (!isFinite(lo) || !isFinite(hi)) return '';
+    const a = new Date(lo).getHours(), b = new Date(hi).getHours();
+    return a === b ? `${a}時台` : `${a}〜${b}時台`;
   }
 
   /* 訪ねた数・会えた割合（会えた÷訪ねた。拒否は会えたに入れない）。訪ねた数が minN 未満なら割合は出さない（データ少） */
@@ -311,7 +337,7 @@
     return `<span>数えなかった拒否 ${n}軒</span><span>（</span>${parts.join('<span>／</span>')}<span>）</span>`;
   }
 
-  const api = { build, rollup, compare, detail, rate, recoRate, fillParts, recoLines, recoSumLine, skipLine, skipRefusedOf, FEW_BAR, FEW_ROW, SPLIT_DAYS, ymd, addDays };
+  const api = { build, rollup, compare, detail, hourSpan, rate, recoRate, fillParts, recoLines, recoSumLine, skipLine, skipRefusedOf, FEW_BAR, FEW_ROW, SPLIT_DAYS, ymd, addDays };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.JG = api;
 
