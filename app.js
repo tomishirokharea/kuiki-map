@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.171';
+var APP_JS_VER = '2026.13.172';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2966,6 +2966,7 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.172', role: 'admin', items: [['人', '係の画面：「人」でその人を開くと、登録済みのスマホ（共通QR・ホーム画面に追加の分）が見られるようになりました。承認待ちの知らせは、今までどおり「今日」に出ます。']] },
   { v: '2026.13.171', items: [
     ['薦', 'おすすめの家を「地図で見る」とき、2つの区域にまたがっていても、両方の区域の家の印が出るようにしました（前は、番号の小さい区域の家しか出ず、もう1つの区域の家や仮の家が地図に見つかりませんでした）。'],
     ['薦', '1つのおすすめには、近い家どうし（はじめは500m以内）だけをまとめるようにしました。離れた区域の家がいっしょに出なくなります。そのぶん、軒数の少ないおすすめが出ることがあります。']] },
@@ -15060,6 +15061,20 @@ function renderPeople() {
     $$('[data-uedit]', box).forEach(b => b.onclick = () => openEditUser(b.dataset.uedit));
   }
 }
+/* 人の画面：その人の登録済みのスマホ（表示だけ・2026-11-20）。
+   一覧に出るのは、共通QRで登録したスマホと「ホーム画面に追加」したスマホ（サーバーの devices）。
+   本人用のリンクで開いただけのスマホは devices に残らないので、ここには出ない（最後に使った日は上の usenote が別に見ている）。
+   承認・使えなくするの操作は、今までどおり「今日」のタブ（入口を増やさない） */
+function euDevHtml(id) {
+  if (!devState.list) return LIVE ? '<p class="muted">スマホの登録の状況を読み込んでいます…</p>' : '';
+  const mine = devState.list.filter(d => d.uid === id && d.status === 'active');
+  const rows = mine.map(d => {
+    const when = [d.decAt ? `${fmtDay(d.decAt)}に承認` : '', d.seen ? `最後に使った日 ${fmtDay(d.seen)}` : ''].filter(Boolean).join('　');
+    return `<p class="devline"><b>${esc(d.label)}</b>　<span class="muted">${when}</span></p>`;
+  }).join('');
+  return `<p class="q">登録済みのスマホ（${mine.length}台）</p>${rows || '<p class="muted">この一覧に出るスマホはありません。</p>'}
+    <p class="hint">出るのは、共通QRで登録したスマホと「ホーム画面に追加」したスマホです。本人用のリンクで開いただけのスマホは、ここに出ません。使えなくするのは「今日」のタブからです。</p>`;
+}
 /* 1人の役割・グループを直す（係の画面「人」の行を押したとき・改善案A5）。直して「保存する」を押したときだけ保存する */
 function openEditUser(id) {
   const u0 = userById(id); if (!u0 || !isAdmin()) return;
@@ -15089,6 +15104,7 @@ function openEditUser(id) {
       <p class="hint">家の削除・拒否の削除・家の編集ができます。記録のある家や拒否も消せます。信頼できる人にだけ任せてください。</p>`}
       <button class="btn primary block" id="euSave">保存する</button>
       <button class="btn block" id="euLink">リンク・QR</button>
+      <div id="euDevs" data-uid="${esc(id)}">${euDevHtml(id)}</div>
       ${u.id === me().id ? '' : '<div class="kops"><details><summary>この人が使うのをやめる</summary><p class="hint">この人のスマホでは、次に開いたときに区域の情報が消えます。</p><button class="btn block danger" id="euOff">使うのをやめる</button></details></div>'}
       <button class="btn block" data-close>やめる</button>`);
     const keep = () => { if ($('#euName')) f.name = $('#euName').value; f.group = $('#euGroup').value; f.overseer = $('#euOver').checked; f.leader = $('#euLead').checked; if ($('#euYomi')) f.yomi = $('#euYomi').value; if ($('#euMgr')) f.mgr = $('#euMgr').checked; };
@@ -15116,6 +15132,15 @@ function openEditUser(id) {
       setUserGroup(u, g, f.overseer, f.leader, roleCh ? f.role : undefined, undefined, yomiCh ? y : undefined, mgrCh ? mgrNow : undefined, nameCh ? nm : undefined);
     };
     $('#euLink').onclick = () => { const u = userById(id); if (u) openUserLink(u, false); };
+    // 一覧がまだ届いていないとき：読み込みが終わったら、この部分だけ描き直す（入力中の欄には手をふれない）。
+    // 描くのは「今ひらいている人」（el.dataset.uid）。読み込みのあいだに別の人をひらいても、前の人の一覧を出さない（監査1）
+    if (LIVE && !devState.list) {
+      Promise.resolve(devState.busy && devState.p ? devState.p : fetchDevices(true)).then(() => {
+        const el = $('#euDevs'); if (!el) return;
+        el.innerHTML = devState.list ? euDevHtml(el.dataset.uid)
+          : '<p class="muted">スマホの登録の状況を読み込めませんでした。少し待ってから、もう一度この人を開いてください。</p>';
+      }).catch(() => {});
+    }
     if ($('#euOff')) $('#euOff').onclick = async () => {
       const u = userById(id); if (!u) return;
       if (!await ask('', { title: `${u.name}さんが区域マップを使うのをやめますか？`,
