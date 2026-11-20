@@ -10580,7 +10580,7 @@ function extSetHtml(rrow, stpd) {
   const set = `<p class="hint">留守宅カードにして返した区域（だれも持っていない区域）で、まだ訪ねていない家と、まだ会えていない家を、全員の「おすすめ」タブに近くの数軒ずつ出します。区域をまたいでまとめます。</p>
     <p class="hint">1回目が目安（${th}%）に届かずに返した区域・だれかが留守宅カードを受け取っている区域・特別区域・試験用の区域は出しません。完了した区域も出しません（残りの家は、次に区域カードとして受け取った人が回ります）。</p>
     <p class="hint">区域ごとに止めるときは、状況の「留守宅の状況」の「区域ごと」の表の「おすすめ」の欄で「止める」を押します（苦情のあった地域など）。止めた区域は、「出す」を押すまで、次の巡回でも止まったままです。</p>` +
-    `<div class="setrow"><span>1つのおすすめに入れる家の数<br><small class="hint">近い家どうしを、この軒数ずつまとめて出します。家どうしが${Math.max(100, Math.min(3000, Number(st.recoDist) || 500))}mより離れているときは、いっしょにしません</small></span><div class="stepper">
+    `<div class="setrow"><span>1つのおすすめに入れる家の数<br><small class="hint">近い家どうしを、この軒数ずつまとめて出します。家どうしが${recoDistM()}mより離れているときは、いっしょにしません</small></span><div class="stepper">
       <button type="button" data-kset="recoCount" data-d="-1" aria-label="家の数を減らす">−</button><output class="wide">${rc}軒まで</output>
       <button type="button" data-kset="recoCount" data-d="1" aria-label="家の数を増やす">＋</button></div></div>` +
     rrow('回り残しの家も出す', '留守宅カードの区域で、この巡回の中で一度も訪ねていない家（1回目の目安に届いたので回らなかった家など）を出します。仮の家は、家かどうか確かめてもらい、家でなければ、その場で消せます',
@@ -14163,6 +14163,11 @@ const RECO_KINDS2 = [
   ['fresh', 32, 'まだ一度も訪ねていない家', '仮の家の確認にもなります']
 ];
 const RECO_LIM = { recoCount: [1, 5], recoDist: [100, 3000], recoLongDays: [30, 730], recoSkipDays: [0, 60] };
+/* 1つのおすすめにまとめる家どうしの距離の上限（m）。kangaeru.js の buildClusters と、係の設定のヒントで同じ値を使う（2026-11-20） */
+function recoDistM() {
+  const v = D().settings.recoDist, n = v === undefined || v === null || v === '' || !isFinite(Number(v)) ? 500 : Number(v);
+  return Math.max(RECO_LIM.recoDist[0], Math.min(RECO_LIM.recoDist[1], n));
+}
 const recoOn = () => !!Store.data && Number(D().settings.recoOn) !== 0;
 function recoLabel(src) {
   if (!src || String(src).indexOf('reco') !== 0) return '';

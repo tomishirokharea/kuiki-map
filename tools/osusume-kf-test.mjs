@@ -161,6 +161,7 @@ for (const w of [390, 1280]) {
     const hint = d => { D().settings.recoDist = d; return extSetHtml((l, h, c) => '', () => ''); };
     res.hint500 = /家どうしが500mより離れているときは/.test(hint(500));
     res.hint1200 = /家どうしが1200mより離れているときは/.test(hint(1200));
+    res.hint0 = /家どうしが100mより離れているときは/.test(hint(0)) && recoDistM() === 100; // 0 で保存されていても、ヒントと計算は同じ100m
     D().settings.recoDist = 500;
     return res;
   });
@@ -192,9 +193,10 @@ for (const w of [390, 1280]) {
   console.log(`INFO まとめる計算（候補3,000軒）：${r.perf}ms`);
   ok(r.perf < 400, 'MT 速さ：候補3,000軒のまとめる計算が0.4秒未満');
   ok(r.rainMax <= 505 && r.rainTotal > 0, `MT-1 雨の日（集合住宅を先に）でも、家どうしは500m以内（最大 ${r.rainMax}m・おすすめ ${r.rainN}件）`);
-  ok(r.hint500 && r.hint1200, 'MT-4 係の設定のヒントに、今の上限（500m・1200m）が出る');
+  ok(r.hint500 && r.hint1200 && r.hint0, 'MT-4 係の設定のヒントに、今の上限（500m・1200m）が出る。0 のときも計算と同じ100m');
   console.log(`INFO まとめる計算（CPU 4倍遅く）：3,000軒/2km/500m ${perf.a}ms・5,000軒/2km/1000m ${perf.b}ms・5,000軒/3km/3000m ${perf.c}ms・10,000軒/5km/3000m ${perf.d}ms`);
   ok(Math.max(perf.a, perf.b, perf.c) < 300, 'MT 速さ：CPU 4倍遅くても、候補5,000軒までは0.3秒未満（距離の上限 3000m でも）');
+  ok(perf.d < 500, 'MT 速さ：CPU 4倍遅くても、候補10,000軒・上限3000m で0.5秒未満');
   ok(pg.errs.length === 0, 'ページのエラーなし ' + JSON.stringify(pg.errs.slice(0, 3)));
   await ctx.close();
 }

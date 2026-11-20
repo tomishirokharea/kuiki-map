@@ -575,7 +575,7 @@
     const N = recoN(), out = [], stops = new Map();
     // 1つのおすすめにまとめる家どうしの距離の上限：係の設定「『近く』とする距離」（recoDist・はじめ500m・100〜3000m）。
     // 上限がないと、近くの家が先のおすすめで使われたあと、離れた区域の家がまとめられていた（2026-11-20 の声）
-    const R = Math.max(100, Math.min(3000, num(D().settings.recoDist, 500))), R2 = R * R;
+    const R = recoDistM(), R2 = R * R; // app.js（係の設定のヒントと同じ値）
     items.forEach(x => {
       let s = stops.get(x.h.id);
       if (!s) stops.set(x.h.id, s = { h: x.h, xs: [], last: x.lastAt, rank: rainRank(x.h) });
@@ -694,7 +694,7 @@
   let GL = null; // 作った一覧：家の候補（afterItems の結果）と、起点・雨が同じあいだは使い回す
   function getList(slot) {
     const pos = orgPos(), rain = rainy(), items = afterItems(slot);  // afterItems は、記録・区域・カード・再訪問・設定が変わると作り直す
-    const sig = [slot, pos ? pos[0].toFixed(5) + ',' + pos[1].toFixed(5) : '', rain ? 1 : 0, recoN(), num(D().settings.recoDist, 500)].join('|'); // 家どうしの距離の上限が変わったら作り直す
+    const sig = [slot, pos ? pos[0].toFixed(5) + ',' + pos[1].toFixed(5) : '', rain ? 1 : 0, recoN(), recoDistM()].join('|'); // 家どうしの距離の上限が変わったら作り直す
     if (GL && GL.items === items && GL.sig === sig) return GL.list;
     const list = buildClusters(items, pos, rain);
     list.anyPool = !!items.anyPool;
