@@ -118,13 +118,23 @@
 
   /* ---------- 区域ごとの期限 ---------- */
   const eligible = () => D().territories.filter(t => !t.dummy && !isSpecial(t));
-  /* 前回回り終えた日：アプリの記録・紙の記録の完了日（t.paperDone）・S-13に転記した紙の記録のうち、いちばん新しいもの */
-  function lastDone(t) {
+  /* 完了日の候補：アプリの記録・紙の記録の完了日（t.paperDone）・S-13に転記した紙の記録（入力ミスの未来日も含む。S-13の表には、直せるようそのまま見せる） */
+  function doneDates(t) {
     const c = [];
     if (t.completedAt) c.push(dstr(t.completedAt));
     if (t.paperDone) c.push(String(t.paperDone)); // 係のスマホが書く、紙の記録の完了日（伝道者のスマホにはS-13がないため）
     (D().s13 || []).forEach(x => { if (x && x.terrId === t.id && x.c) c.push(String(x.c)); });
-    return c.filter(Boolean).sort().pop() || '';
+    return c.filter(Boolean);
+  }
+  /* 前回回り終えた日：候補のうち、いちばん新しいもの。今日より後の日付は、入力ミスなので数えない（今日は数える） */
+  function lastDone(t) {
+    const today = ymd(new Date());
+    return doneDates(t).filter(s => s <= today).sort().pop() || '';
+  }
+  /* 今日より後の完了日のうち、いちばん新しいもの（無ければ ''）。係に入力ミスを知らせるために使う */
+  function futureDone(t) {
+    const today = ymd(new Date());
+    return doneDates(t).filter(s => s > today).sort().pop() || '';
   }
   function dueInfo(t) {
     return memo('d' + t.id, () => {
