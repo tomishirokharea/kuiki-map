@@ -5913,7 +5913,7 @@ const MemoSync = {
       if (isMyKey(k)) { // 自分の記録（奉仕時間・予定など）
         if (!myOn) continue;
         if (!myInWin(win, k)) { // 窓の外：サーバーからだけ消す（この端末の中の記録は残す）
-          if (r && !r.del) { items.push({ k, base: r.v, del: 1 }); sent[k] = ''; }
+          if (r && !r.del) { if (st.myChecked) { items.push({ k, base: r.v, del: 1 }); sent[k] = ''; } }
           else if (r) delete st.rows[k];
           delete st.pend[k];
           continue;
@@ -5925,7 +5925,7 @@ const MemoSync = {
           if (!st.pend[k] || st.pend[k].h !== h) st.pend[k] = { h, at: Date.now() }; // 書きかえた時刻（送れるまで覚えておく）
           const d = await memoEnc(key, k, Object.assign({ at: st.pend[k].at }, pl));
           items.push({ k, base: r ? r.v : 0, d }); sent[k] = h; size += d.length;
-        } else if (r && !r.del) { items.push({ k, base: r.v, del: 1 }); sent[k] = ''; } // この端末で消した
+        } else if (r && !r.del && st.myChecked) { items.push({ k, base: r.v, del: 1 }); sent[k] = ''; } // この端末で消した（初回の取り込みがすむ前は消したと判断しない）
         continue;
       }
       const pl = memoPl(memos, pins, k), h = memoPlHash(pl);
@@ -5942,7 +5942,7 @@ const MemoSync = {
     }
     if (!items.length && !full && !this.pull) { this.save(st); return false; }
     this.pull = false;
-    const j = await api('memo_sync', { since: full ? 0 : st.since, items }, { timeout: 60000 });
+    const j = await api('memo_sync', { since: full ? 0 : st.since, items, my: 1 }, { timeout: 60000 }); // my:1＝my|（自分の記録）が分かる端末。サーバーは、これを付けた端末にだけ my| の行を返す
     if (j.kid && key.kid && j.kid !== key.kid) { this.reset(); return true; } // 鍵が作り直された：もう一度はじめから
     if (j.kid && !key.kid) key.kid = j.kid;
     st.kid = key.kid || j.kid || '';
