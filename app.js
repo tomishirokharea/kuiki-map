@@ -2967,7 +2967,8 @@ function terrStats(t, sinceMs) {
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
   { v: '2026.13.171', role: 'admin', items: [
-    ['記', '区域係：S-13 の紙の記録の「直す」を押すと、その記録だけの画面が開くようになりました。名前・割り当てた日付・完了した日付を直して「保存する」を押すと、変わる前と後を見せて確かめます。直るのはその区域の1件だけで、枝番は変わりません。']] },
+    ['記', '区域係：S-13 の紙の記録の「直す」を押すと、その記録だけの画面が開くようになりました。名前・割り当てた日付・完了した日付を直して「保存する」を押すと、変わる前と後を見せて確かめます。直るのはその区域の1件だけで、枝番は変わりません。'],
+    ['記', '区域係：S-13 の紙の記録に、今日より後の日付を入れられないようにしました（押しまちがいで先の日付が入ると、完了していない区域が完了したように見えていました）。']] },
   { v: '2026.13.170', role: 'admin', items: [
     ['状', '区域係の状況の「区域カードと留守宅カード」のグラフを、状況のいちばん上に移しました。おすすめから訪ねて会えた分が、濃い色と白い水玉で分かります。棒を押すと「おすすめのききめ」も出ます。'],
     ['状', '実際に訪ねていない拒否（自動の取り込み・区域係や手伝いの人が代わりに入れた分）は、グラフで数えないようにしました。「拒否を数えない人」でえらべます。'],
@@ -15803,7 +15804,7 @@ function openS13RowEdit(tid, editId) {
   const y = s13Y, t = terrById(tid); if (!t) return;
   const back = () => { openS13(y); openS13Edit(tid); };
   const ed = (D().s13 || []).find(x => x && x.id === editId && x.kind === 'a' && x.terrId === tid);
-  if (!ed) { toast('この記録は見つかりませんでした'); back(); return; }
+  if (!ed) { back(); toast('この記録は見つかりませんでした'); return; } // 描き直したあとに出す（setSheet は、ただのお知らせを消すため）
   const names = [...new Set(D().users.map(u => u.name).concat((D().s13 || []).filter(x => x.name).map(x => x.name)))];
   setSheet(headHtml(t, `区域${esc(t.no)}の記録を直す`, '紙から転記した記録') + `
     <label class="field"><span>伝道者の名前</span><input type="text" id="s13rName" list="s13rNames" maxlength="30" value="${esc(ed.name || '')}" placeholder="例：山田 花子"></label>
@@ -15821,15 +15822,23 @@ function openS13RowEdit(tid, editId) {
     if (c && c < a) { toast('完了した日付が、割り当てた日付より前になっています'); return; }
     if (c && c > ymd(new Date())) { toast('完了した日付が、今日より後になっています'); return; }
     if (a > ymd(new Date())) { toast('割り当てた日付が、今日より後になっています'); return; }
+    // この画面は、アプリへの受け渡し（グループ奉仕・全体の集まり）をしない。
+    // 名前を「グループ奉仕（◯◯）」にしても黙って紙の記録のままになるので、先に行き先を知らせる
+    if (!c && s13GroupOf(name)) { toast('アプリに渡すときは、区域の画面の「紙の記録を転記する」から同じ名前で入れてください'); return; }
+    // 開いたあとに、ほかの人の変更が届いて記録が入れかわることがある。ここで取り直し、確認の文もその記録から作る
+    const fresh = () => (D().s13 || []).find(x => x && x.id === editId && x.kind === 'a' && x.terrId === tid);
+    const z0 = fresh();
+    if (!z0) { back(); toast('この記録は見つかりませんでした'); return; }
     const T = s => (window.KI ? window.KI.t(s) : s); // 名前や日付が入る行は、1つずつ訳す（ひとかたまりの文字になるため。meibo.js と同じ）
     const row = (nm, aa, cc) => `${nm} ${s13Fmt(aa)} 〜 ${cc ? s13Fmt(cc) : T('（完了日なし）')}`;
     if (!await ask('', { title: '紙の記録を上書きしますか？',
-      body: [T('今の記録'), row(ed.name, ed.a, ed.c), '', T('直したあとの記録'), row(name, a, c)].join('\n'),
+      body: [T('今の記録'), row(z0.name, z0.a, z0.c), '', T('直したあとの記録'), row(name, a, c)].join('\n'),
       ok: '上書きする', danger: false })) return;
+    const z = fresh(); // 確かめているあいだに入れかわっていないか、もう一度見る（s13DelMany と同じ考え方）
+    if (!z) { back(); toast('この記録は見つかりませんでした'); return; }
     commit('記録を直しました', () => {
-      const z = (D().s13 || []).find(x => x && x.id === ed.id); // 直す1件だけ（枝番は変えない）
-      if (z) Object.assign(z, { name, a, c, at: new Date().toISOString() });
-    });
+      Object.assign(z, { name, a, c, at: new Date().toISOString() }); // 直す1件だけ（枝番は変えない）
+    }, () => setTimeout(() => { if (!$('#s13View').hidden) openS13(y); }, 0)); // 取り消したら、表も描き直す
     back();
   };
 }
