@@ -2968,7 +2968,7 @@ const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).c
 const CHANGELOG = [
   { v: '2026.13.171', items: [
     ['薦', 'おすすめの家を「地図で見る」とき、2つの区域にまたがっていても、両方の区域の家の印が出るようにしました（前は、番号の小さい区域の家しか出ず、もう1つの区域の家や仮の家が地図に見つかりませんでした）。'],
-    ['薦', '1つのおすすめにまとめる家は、どの家どうしも「近く」とする距離（はじめ500m）の中にしました。離れた区域の家がいっしょに出なくなります。そのぶん、軒数の少ないおすすめが出ることがあります。']] },
+    ['薦', '1つのおすすめには、近い家どうし（はじめは500m以内）だけをまとめるようにしました。離れた区域の家がいっしょに出なくなります。そのぶん、軒数の少ないおすすめが出ることがあります。']] },
   { v: '2026.13.170', role: 'admin', items: [
     ['状', '区域係の状況の「区域カードと留守宅カード」のグラフを、状況のいちばん上に移しました。おすすめから訪ねて会えた分が、濃い色と白い水玉で分かります。棒を押すと「おすすめのききめ」も出ます。'],
     ['状', '実際に訪ねていない拒否（自動の取り込み・区域係や手伝いの人が代わりに入れた分）は、グラフで数えないようにしました。「拒否を数えない人」でえらべます。'],
@@ -4479,7 +4479,12 @@ function selectTerr(id, opts) {
   } else if (t && o.toast && beginner()) toast(`区域${t.no}をえらびました`);
 }
 /* えらんだ区域と同じく濃く出す区域（おすすめの「地図で見る」で、区域をまたぐとき。kangaeru.js が包む。ふだんは null） */
-function kfOnTerrs() { return null; }
+function kfOnTerrs() { return null; } // おすすめの家を地図で見ているとき（kangaeru.js の KF）は、入っている区域の Set。区域の線を濃く出す・家の印と建物の名前を、入っている区域ぜんぶにする（inSelTerr）
+/* えらんでいる区域の家か。おすすめの家を地図で見ているときは、入っている区域のどれかの家（2つめ以降の区域も・2026-11-20） */
+function inSelTerr(h, sel, more) {
+  if (more && more.size) { for (const id of more) if (houseInTerr(h, id)) return true; return false; }
+  return houseInTerr(h, sel);
+}
 /* 今えらんでいる区域（選んでいないときは null） */
 function selTerrId() {
   const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
@@ -4543,13 +4548,11 @@ function renderHouses() {
   const fade = fkeys ? 1 : iconFade();
   const b = map.getBounds().pad(0.2), vis = rotVisTest(0.2); // vis：地図を回しているときの、画面に入っているかの確かめ
   const sel = mode === 'normal' ? selTerrId() : null; // 区域をえらんでいるときは、その区域の家だけ
-  // おすすめの家を地図で見ているとき（kangaeru.js の KF）は、入っている区域ぜんぶの家（2つめ以降の区域の家も出す・2026-11-20）
-  const selMore = sel ? kfOnTerrs() : null;
-  const inSel = selMore && selMore.size ? (h => { for (const id of selMore) if (houseInTerr(h, id)) return true; return false; }) : (h => houseInTerr(h, sel));
+  const selMore = sel ? kfOnTerrs() : null; // おすすめの家を地図で見ているときは、入っている区域ぜんぶの家（inSelTerr）
   const list = fkeys
     ? D().houses.filter(h => targets(h).some(u => fkeys.has(K(h.id, u)))) // 再訪問を地図で見る：自分の再訪問だけ
     : fade > 0.05
-      ? D().houses.filter(h => (!sel || inSel(h)) && b.contains([h.lat, h.lng]) && (!vis || vis(h.lat, h.lng)))
+      ? D().houses.filter(h => (!sel || inSelTerr(h, sel, selMore)) && b.contains([h.lat, h.lng]) && (!vis || vis(h.lat, h.lng)))
       : null;
   const show = !!list && list.length <= 4000; // 小さな点なら多くても軽い。それ以上は拡大してから出す
   setZoomHint(!show);
@@ -4641,7 +4644,7 @@ function houseNameLabels(list, dense) {
     dense = dense && list.some(h => onMap.has(h.id));
   }
   if (!list) return done();
-  const sel = selTerrId();
+  const sel = selTerrId(), selMore = sel ? kfOnTerrs() : null;
   let n = 0;
   for (const h of list) {
     if (!h.label || n > 300) continue;
@@ -4653,7 +4656,7 @@ function houseNameLabels(list, dense) {
     const dot = out || (dense && !(roundNums && roundNums.has(h.id)));
     cands.push({
       lat: h.lat, lng: h.lng, text: h.label, cls: 'hname' + (out ? ' out dot' : dot ? ' dot' : ''), fc: isFc,
-      out, dot, inSel: !!sel && houseInTerr(h, sel), zOff: out ? -1000 : 0
+      out, dot, inSel: !!sel && inSelTerr(h, sel, selMore), zOff: out ? -1000 : 0
     });
   }
   done();
@@ -10577,7 +10580,7 @@ function extSetHtml(rrow, stpd) {
   const set = `<p class="hint">留守宅カードにして返した区域（だれも持っていない区域）で、まだ訪ねていない家と、まだ会えていない家を、全員の「おすすめ」タブに近くの数軒ずつ出します。区域をまたいでまとめます。</p>
     <p class="hint">1回目が目安（${th}%）に届かずに返した区域・だれかが留守宅カードを受け取っている区域・特別区域・試験用の区域は出しません。完了した区域も出しません（残りの家は、次に区域カードとして受け取った人が回ります）。</p>
     <p class="hint">区域ごとに止めるときは、状況の「留守宅の状況」の「区域ごと」の表の「おすすめ」の欄で「止める」を押します（苦情のあった地域など）。止めた区域は、「出す」を押すまで、次の巡回でも止まったままです。</p>` +
-    `<div class="setrow"><span>1つのおすすめに入れる家の数<br><small class="hint">近い家どうしを、この軒数ずつまとめて出します。家どうしが「近く」とする距離（はじめ500m）より離れているときは、いっしょにしません</small></span><div class="stepper">
+    `<div class="setrow"><span>1つのおすすめに入れる家の数<br><small class="hint">近い家どうしを、この軒数ずつまとめて出します。家どうしが${Math.max(100, Math.min(3000, Number(st.recoDist) || 500))}mより離れているときは、いっしょにしません</small></span><div class="stepper">
       <button type="button" data-kset="recoCount" data-d="-1" aria-label="家の数を減らす">−</button><output class="wide">${rc}軒まで</output>
       <button type="button" data-kset="recoCount" data-d="1" aria-label="家の数を増やす">＋</button></div></div>` +
     rrow('回り残しの家も出す', '留守宅カードの区域で、この巡回の中で一度も訪ねていない家（1回目の目安に届いたので回らなかった家など）を出します。仮の家は、家かどうか確かめてもらい、家でなければ、その場で消せます',

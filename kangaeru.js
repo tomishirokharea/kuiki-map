@@ -603,14 +603,25 @@
           const d = d2(seed.x, seed.y, s);
           if (d <= R2) { s._d = d; cand.push(s); }
         }
-        cand.sort((a, b) => a._d - b._d);
         const sp = [seed.h.lat, seed.h.lng];
         const sel = [], put = []; let n = 0;
-        for (const s of [seed].concat(cand)) {
-          if (n >= N) break;
-          if (put.some(p => d2(p.x, p.y, s) > R2)) continue;
+        const take = s => {
           const xs = s.xs.splice(0, N - n);                                        // 集合住宅の残りの部屋は、次のおすすめに回す
           sel.push({ h: s.h, xs }); put.push(s); n += xs.length;
+        };
+        take(seed);
+        // 全部を並べかえずに、毎回「入れた家すべてから上限以内で、種にいちばん近い家」をさがす（車で回る地域で上限を広げても重くしない）。
+        // 一度とどかなかった家は、入れる家が増えてもとどかないので、もう見ない（off）
+        const off = new Set();
+        while (n < N) {
+          let best = null;
+          for (const s of cand) {
+            if (off.has(s) || (best && s._d >= best._d)) continue;
+            if (put.some(p => d2(p.x, p.y, s) > R2)) { off.add(s); continue; }
+            best = s;
+          }
+          if (!best) break;
+          off.add(best); take(best);
         }
         rest = rest.filter(s => s.xs.length);
         const route = [], left = sel.slice();
@@ -683,7 +694,7 @@
   let GL = null; // 作った一覧：家の候補（afterItems の結果）と、起点・雨が同じあいだは使い回す
   function getList(slot) {
     const pos = orgPos(), rain = rainy(), items = afterItems(slot);  // afterItems は、記録・区域・カード・再訪問・設定が変わると作り直す
-    const sig = [slot, pos ? pos[0].toFixed(5) + ',' + pos[1].toFixed(5) : '', rain ? 1 : 0, recoN()].join('|');
+    const sig = [slot, pos ? pos[0].toFixed(5) + ',' + pos[1].toFixed(5) : '', rain ? 1 : 0, recoN(), num(D().settings.recoDist, 500)].join('|'); // 家どうしの距離の上限が変わったら作り直す
     if (GL && GL.items === items && GL.sig === sig) return GL.list;
     const list = buildClusters(items, pos, rain);
     list.anyPool = !!items.anyPool;

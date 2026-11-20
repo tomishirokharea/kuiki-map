@@ -99,7 +99,7 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "次の新規の前に止める日数を増やす": "Aumentar los días antes del próximo turno",
 "1つのおすすめに入れる家の数": "Casas por recomendación",
 "近い家どうしを、この軒数ずつまとめて出します": "Se juntan casas cercanas, hasta este número",
-"近い家どうしを、この軒数ずつまとめて出します。家どうしが「近く」とする距離（はじめ500m）より離れているときは、いっしょにしません": "Se juntan casas cercanas, hasta este número. Las casas que estén más lejos entre sí que la distancia de «cerca» (al principio, 500 m) no se juntan",
+"近い家どうしを、この軒数ずつまとめて出します。家どうしが{0}mより離れているときは、いっしょにしません": "Se juntan casas cercanas, hasta este número. Las casas a más de {0} m entre sí no se juntan",
 "家の数を減らす": "Reducir el número de casas",
 "家の数を増やす": "Aumentar el número de casas",
 "オートロックの建物も出す": "Mostrar también edificios con portero automático",
@@ -196,5 +196,5 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "区域{0}を、おすすめに出さないようにしました": "El territorio {0} ya no sale en recomendaciones",
 "区域ごとに止めるときは、状況の「留守宅の状況」の「区域ごと」の表の「おすすめ」の欄で「止める」を押します（苦情のあった地域など）。止めた区域は、「出す」を押すまで、次の巡回でも止まったままです。": "Para detener un territorio, pulse «Detener» en la columna «Recomendadas» de la tabla «Por territorio» en «Situación de ausentes» (por ejemplo, zonas con quejas). Un territorio detenido sigue detenido en la siguiente vuelta hasta que pulse «Mostrar».",
 "おすすめの家を「地図で見る」とき、2つの区域にまたがっていても、両方の区域の家の印が出るようにしました（前は、番号の小さい区域の家しか出ず、もう1つの区域の家や仮の家が地図に見つかりませんでした）。": "Al usar «Ver en el mapa» en una recomendación que abarca dos territorios, ahora salen las marcas de las casas de los dos (antes solo salían las del territorio de número menor, y no se encontraban en el mapa las casas ni las casas provisionales del otro territorio).",
-"1つのおすすめにまとめる家は、どの家どうしも「近く」とする距離（はじめ500m）の中にしました。離れた区域の家がいっしょに出なくなります。そのぶん、軒数の少ないおすすめが出ることがあります。": "Las casas de una recomendación ahora están todas a menos de la distancia de «cerca» (al principio, 500 m) entre sí. Ya no salen juntas casas de territorios alejados. Por eso, a veces una recomendación tiene menos casas.",
+"1つのおすすめには、近い家どうし（はじめは500m以内）だけをまとめるようにしました。離れた区域の家がいっしょに出なくなります。そのぶん、軒数の少ないおすすめが出ることがあります。": "Ahora una recomendación solo junta casas cercanas entre sí (al principio, a menos de 500 m). Ya no salen juntas casas de territorios alejados. Por eso, a veces una recomendación tiene menos casas.",
 });

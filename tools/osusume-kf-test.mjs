@@ -152,9 +152,36 @@ for (const w of [390, 1280]) {
     ms.sort((a, b) => a - b); res.perf = Math.round(ms[1]);
     const cb = run(500, big.map(x => Object.assign({}, x)));
     res.bigMax = Math.max(...cb.map(span)); res.bigN = cb.length;
+    // 雨の日（集合住宅を先にまとめる組）でも、家どうしは上限以内
+    const wet = Array.from({ length: 400 }, (_, i) => { const h = { id: 'rw' + i, lat: lat0 + rnd() * 0.02, lng: lng0 + rnd() * 0.02, type: rnd() < 0.4 ? 'apt' : 'home', ac: rnd() < 0.5 ? 'ev' : '' }; return { h, k: h.id + '|', t, lastAt: '2026-0' + (1 + i % 9) + '-01', focus: false, left: false }; });
+    D().settings.recoCount = 5; D().settings.recoDist = 500;
+    const cw = KGReco.buildClusters(wet, at(0), true);
+    res.rainMax = Math.max(...cw.map(span)); res.rainN = cw.length; res.rainTotal = cw.reduce((a, c) => a + c.n, 0);
+    // 係の設定のヒントに、今の上限の値が出る（係の画面に距離の行はないため）
+    const hint = d => { D().settings.recoDist = d; return extSetHtml((l, h, c) => '', () => ''); };
+    res.hint500 = /家どうしが500mより離れているときは/.test(hint(500));
+    res.hint1200 = /家どうしが1200mより離れているときは/.test(hint(1200));
     D().settings.recoDist = 500;
     return res;
   });
+  // 速さ（古いスマホの代わりに CPU を4倍遅く）：距離の上限を広げた車の地域・候補が多いとき
+  const cdp = await ctx.newCDPSession(pg);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  const perf = await pg.evaluate(() => {
+    const t = { id: 'tx', no: '99' };
+    let seed = 13; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const mk = (n, km) => Array.from({ length: n }, (_, i) => { const h = { id: 'pp' + i, lat: 26.18 + rnd() * km * 0.009, lng: 127.68 + rnd() * km * 0.01, type: rnd() < 0.1 ? 'apt' : 'home' }; return { h, k: h.id + '|', t, lastAt: '2026-0' + (1 + i % 9) + '-01', focus: false, left: false }; });
+    const one = (n, km, dist) => {
+      D().settings.recoCount = 5; D().settings.recoDist = dist;
+      const base = mk(n, km), ms = [];
+      for (let i = 0; i < 3; i++) { const its = base.map(x => Object.assign({}, x)); const t0 = performance.now(); KGReco.buildClusters(its, [26.18, 127.68], false); ms.push(performance.now() - t0); }
+      ms.sort((a, b) => a - b); return Math.round(ms[1]);
+    };
+    const r = { a: one(3000, 2, 500), b: one(5000, 2, 1000), c: one(5000, 3, 3000), d: one(10000, 5, 3000) };
+    D().settings.recoDist = 500;
+    return r;
+  });
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   ok(r.d500.spans.every(s => s <= 505), 'MT-1 上限500m：どのおすすめも家どうしが500m以内 ' + JSON.stringify(r.d500.spans));
   ok(r.d500.total === 11, 'MT-2 家を落とさない（11軒すべてどれかのおすすめに入る）・軒数 ' + JSON.stringify(r.d500.sizes));
   ok(JSON.stringify(r.d500.first) === JSON.stringify(['sa0', 'sa1', 'sa2', 'sa3', 'sa4']), 'MT-3 はじめのおすすめ（近い5軒）は今までと同じ ' + JSON.stringify(r.d500.first));
@@ -164,6 +191,10 @@ for (const w of [390, 1280]) {
   ok(r.bigMax <= 505, `MT-1 候補3,000軒でも、家どうしは500m以内（最大 ${r.bigMax}m・おすすめ ${r.bigN}件）`);
   console.log(`INFO まとめる計算（候補3,000軒）：${r.perf}ms`);
   ok(r.perf < 400, 'MT 速さ：候補3,000軒のまとめる計算が0.4秒未満');
+  ok(r.rainMax <= 505 && r.rainTotal > 0, `MT-1 雨の日（集合住宅を先に）でも、家どうしは500m以内（最大 ${r.rainMax}m・おすすめ ${r.rainN}件）`);
+  ok(r.hint500 && r.hint1200, 'MT-4 係の設定のヒントに、今の上限（500m・1200m）が出る');
+  console.log(`INFO まとめる計算（CPU 4倍遅く）：3,000軒/2km/500m ${perf.a}ms・5,000軒/2km/1000m ${perf.b}ms・5,000軒/3km/3000m ${perf.c}ms・10,000軒/5km/3000m ${perf.d}ms`);
+  ok(Math.max(perf.a, perf.b, perf.c) < 300, 'MT 速さ：CPU 4倍遅くても、候補5,000軒までは0.3秒未満（距離の上限 3000m でも）');
   ok(pg.errs.length === 0, 'ページのエラーなし ' + JSON.stringify(pg.errs.slice(0, 3)));
   await ctx.close();
 }
