@@ -2967,7 +2967,7 @@ function terrStats(t, sinceMs) {
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
   { v: '2026.13.172', role: 'admin', items: [
-    ['記', '区域係：S-13 に、今日より後の完了日（入力ミス）が入っている区域を、毎月の点検に区域の番号つきで出すようにしました（記録なしの区域は、「前回の記録なし」の一覧にも「完了した日付が未来になっています」と出ます）。S-13の紙の記録の「直す」で日付を直してください。区域の一覧の「前回回り終えた日」にも、今日より後の日付は出しません。'],
+    ['記', '区域係：S-13 に、今日より後の完了日（入力ミス）が入っている区域を、毎月の点検に区域の番号つきで出すようにしました（記録なしの区域は、「前回の記録なし」の一覧にも「完了した日付が未来になっています」と出ます）。S-13の紙の記録の「直す」で日付を直してください。区域の一覧の「前回回り終えた日」にも、今日より後の日付は出さず、S-13 にある前の完了日（紙の記録）を出します。'],
   ] },
   { v: '2026.13.171', role: 'admin', items: [
     ['記', '区域係：S-13 の紙の記録の「直す」を押すと、その記録だけの画面が開くようになりました。名前・割り当てた日付・完了した日付を直して「保存する」を押すと、変わる前と後を見せて確かめます。直るのはその区域の1件だけで、枝番は変わりません。'],
@@ -8733,7 +8733,15 @@ function lastBackOf(t) {
 /* 前回回り終えた日（係の区域一覧）：アプリの記録と紙の記録（S-13）の新しいほう。紙の記録なら、そう書く */
 function lastDoneTxt(t) {
   const today = ymd(new Date()); // 今日より後の日付は入力ミスなので、「前回回り終えた日」に出さない（今日は出す）
-  const app = t.completedAt && dstr(t.completedAt) <= today ? dstr(t.completedAt) : '', paper = t.paperDone && String(t.paperDone) <= today ? String(t.paperDone) : '';
+  const app = t.completedAt && dstr(t.completedAt) <= today ? dstr(t.completedAt) : '';
+  let paper = t.paperDone && String(t.paperDone) <= today ? String(t.paperDone) : '';
+  /* t.paperDone が今日より後（入力ミス）で落ちたときは、S-13 にある前の完了日（今日まで）を使う。
+     期限の画面（KM.dueInfo）と点検と同じ日付になるようにするため（同じ区域で画面ごとに違う答えが出ないように）。
+     S-13 は区域係のスマホにだけある（伝道者のスマホでは D().s13 が空なので、これまでどおり t.paperDone だけを見る） */
+  if (!paper && window.KM && KM.dueInfo && Array.isArray(D().s13) && D().s13.length) {
+    const last = KM.dueInfo(t).last; // 今日までの完了日のいちばん新しいもの（アプリ・紙の両方から）
+    if (last && last > app) paper = last; // app より新しいなら、紙の記録（S-13）から来た日付
+  }
   if (paper && paper > app) { const [y, m, d] = paper.split('-').map(Number); return `${fmtDay(new Date(y, m - 1, d).toISOString())}（紙の記録）`; }
   if (app) return fmtDay(t.completedAt) + (t.completedPct != null && t.completedPct < 100 ? `（${t.completedPct}%）` : '');
   return '記録なし';

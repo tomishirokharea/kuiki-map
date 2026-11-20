@@ -126,21 +126,22 @@
     (D().s13 || []).forEach(x => { if (x && x.terrId === t.id && x.c) c.push(String(x.c)); });
     return c.filter(Boolean);
   }
+  /* 完了日の候補を「今日まで」と「今日より後」に1回で分ける（候補を集めるのは1回だけ。区域の数が多いときの重さを増やさないため）
+     past＝前回回り終えた日（今日までのいちばん新しいもの）／fut＝今日より後のいちばん新しいもの（入力ミス）。無ければ '' */
+  function doneSplit(t) {
+    const today = ymd(new Date()), past = [], fut = [];
+    doneDates(t).forEach(s => (s <= today ? past : fut).push(s));
+    return { past: past.sort().pop() || '', fut: fut.sort().pop() || '' };
+  }
   /* 前回回り終えた日：候補のうち、いちばん新しいもの。今日より後の日付は、入力ミスなので数えない（今日は数える） */
-  function lastDone(t) {
-    const today = ymd(new Date());
-    return doneDates(t).filter(s => s <= today).sort().pop() || '';
-  }
+  function lastDone(t) { return doneSplit(t).past; }
   /* 今日より後の完了日のうち、いちばん新しいもの（無ければ ''）。係に入力ミスを知らせるために使う */
-  function futureDone(t) {
-    const today = ymd(new Date());
-    return doneDates(t).filter(s => s > today).sort().pop() || '';
-  }
+  function futureDone(t) { return doneSplit(t).fut; }
   function dueInfo(t) {
     return memo('d' + t.id, () => {
-      const last = lastDone(t), left = last ? YEAR - daysFrom(last) : null;
+      const dd = doneSplit(t), last = dd.past, left = last ? YEAR - daysFrom(last) : null; // 候補を集めるのは1回だけ（lastDone と futureDone を別々に呼ばない）
       const st = left == null ? 'none' : left < 0 ? 'over' : left <= PIN_DAYS ? 'warn' : left <= 120 ? 'soon' : 'ok';
-      return { t, last, fut: futureDone(t), left, st, deadline: last ? addDays(last, YEAR) : '', startBy: last ? addDays(last, YEAR - lendDays()) : '' };
+      return { t, last, fut: dd.fut, left, st, deadline: last ? addDays(last, YEAR) : '', startBy: last ? addDays(last, YEAR - lendDays()) : '' };
     });
   }
   /* 前回会えなかった家の割合（訪ねたことのある家のうち、まだ一度も会えていない家） */
@@ -1376,7 +1377,7 @@ button.ktag{cursor:pointer}
   function coverInfo() {
     const ds = eligible().map(dueInfo);
     const known = ds.filter(d => d.last), over = ds.filter(d => d.st === 'over'), warn = ds.filter(d => d.st === 'warn'), none = ds.filter(d => d.st === 'none');
-    const futureTs = ds.filter(d => d.fut).map(d => d.t); // 完了日が今日より後（入力ミス）の区域すべて（過去の完了日もある区域を含む。点検用）
+    const futureTs = ds.filter(d => d.fut).map(d => d.t).sort((a, b) => cmpNo(a.no, b.no)); // 完了日が今日より後（入力ミス）の区域すべて（過去の完了日もある区域を含む。点検用）。区域の番号の順に出す
     let cls = 'cv-ok', mark = '✓', word = '順調';
     if (!known.length) { cls = 'cv-none'; mark = '？'; word = 'まだ判定できません'; }
     else if (over.length) { cls = 'cv-bad'; mark = '▲'; word = '遅れ気味'; }
@@ -1461,7 +1462,9 @@ button.ktag{cursor:pointer}
     }
     // 10 毎月の点検で要確認のもの
     const warns = opsItems().filter(i => i.state === 'warn' && i.id !== 's13'); // S-13の「記録なし」は、上の年1回のカバーの1行に出す（1回だけ）
-    if (warns.length) row('#8A6D00', `点検で要確認　${warns.length}件`, warns.map(i => esc(i.title) + (i.detail ? `（${i.detail}）` : '')).join('、'), go('status', 'adOps', '点検を見る')); // 点検は状況のいちばん下（KS-13）
+    // 「今日」タブは項目を「、」でつなげた1つの文にするので、点検の中の改行（<br>）は全角の空白に変える（文のとちゅうで行が折れないように）
+    const flat = s => String(s == null ? '' : s).replace(/<br\s*\/?>/gi, '　');
+    if (warns.length) row('#8A6D00', `点検で要確認　${warns.length}件`, warns.map(i => esc(i.title) + (i.detail ? `（${flat(i.detail)}）` : '')).join('、'), go('status', 'adOps', '点検を見る')); // 点検は状況のいちばん下（KS-13）
     return out;
   }
   window.todayCount = () => todayItems().length; // 下のタブ（係の画面）の数字も、「今日」の数字と同じこの数にする
@@ -1755,7 +1758,7 @@ button.ktag{cursor:pointer}
   }
   function opsItems() {
     const items = [], od = opsState.data;
-    const add = (id, title, state, detail) => items.push({ id, title, state, detail });
+    const add = (id, title, state, detail, open) => items.push({ id, title, state, detail, open }); // open='s13'：その行に「S-13を開く」ボタンを出す（直す場所へ行けるように）
     const wait = !LIVE ? '試作版では見られません' : opsState.fail === 'old' ? 'サーバー（Code.gs）がまだ新しい版になっていません' : opsState.fail === 'net' ? '読み込めませんでした。あとでもう一度ためしてください' : '確かめています…';
     // 年齢データ
     if (typeof AGE_ON !== 'undefined' && AGE_ON) {
@@ -1767,7 +1770,7 @@ button.ktag{cursor:pointer}
     // S-13
     const cv = coverInfo();
     add('s13', 'S-13の「記録なし」の区域', cv.none ? 'warn' : 'ok', cv.none ? `${cv.none}区域 → S-13に転記してください` : 'ありません');
-    if (cv.future) add('s13f', 'S-13の完了日が未来の区域', 'warn', `${cv.future}区域 → S-13の「直す」で日付を直してください<br>区域：<span data-notr>${cv.futureTs.slice(0, 8).map(t => esc(t.no)).join(', ')}</span>${cv.future > 8 ? ` <span>ほか${cv.future - 8}区域</span>` : ''}`); // 過去の完了日もある区域を含む。0区域のときは項目を出さない
+    if (cv.future) add('s13f', 'S-13の完了日が未来の区域', 'warn', `${cv.future}区域 → S-13の「直す」で日付を直してください<br>区域：<span data-notr>${cv.futureTs.slice(0, 8).map(t => esc(t.no)).join(', ')}</span>${cv.future > 8 ? ` <span>ほか${cv.future - 8}区域</span>` : ''}`, 's13'); // 過去の完了日もある区域を含む。0区域のときは項目を出さない。この区域は他の一覧に出ないので、行から直せる場所（S-13）へ行けるようにする
     // 保存期間（個人情報の方針は2年まで）
     const km = Number(D().settings.keepMonths) || 12;
     add('keep', '訪問記録を残す期間', km > 24 ? 'warn' : 'ok', km > 24 ? `${km}か月です。個人情報の方針（2年）をこえています。24か月以下にしてください` : `${km}か月`);
@@ -1815,7 +1818,8 @@ button.ktag{cursor:pointer}
       box.id = 'adOpsBox';
       pane.appendChild(box);
       box.addEventListener('click', async e => {
-        const c = e.target.closest('[data-opschk]'), r = e.target.closest('[data-opsre]');
+        const c = e.target.closest('[data-opschk]'), r = e.target.closest('[data-opsre]'), s13 = e.target.closest('[data-tls13]');
+        if (s13) { openS13(); return; } // 「S-13を開く」（「前回の記録なし」の一覧と同じしかけ）
         if (c) {
           try {
             const j = await api('ops_check', { id: c.dataset.opschk, on: c.dataset.on === '1' });
@@ -1832,7 +1836,8 @@ button.ktag{cursor:pointer}
       <div class="cover ${warn ? 'cv-warn' : 'cv-ok'}" role="status"><i aria-hidden="true">${warn ? '！' : '✓'}</i><div><b>${warn ? `要確認が${warn}件あります` : 'いまのところ、問題はありません'}</b><small>月が変わると、係のチェックは空に戻ります</small></div></div>
       ${items.map(i => `<div class="duerow opsrow" data-ops="${esc(i.state)}" style="border-left-color:${MK[i.state][0]}"><div><p><b>${MK[i.state][1]}</b>　${esc(i.title)}</p><p class="muted">${i.detail}</p></div>
         ${i.state === 'todo' ? `<div class="duebtns"><button type="button" class="btn small primary" data-opschk="${esc(i.id)}" data-on="1">確認した</button></div>`
-          : i.state === 'done' ? `<div class="duebtns"><button type="button" class="btn small" data-opschk="${esc(i.id)}" data-on="0">取り消す</button></div>` : '<div></div>'}</div>`).join('')}
+          : i.state === 'done' ? `<div class="duebtns"><button type="button" class="btn small" data-opschk="${esc(i.id)}" data-on="0">取り消す</button></div>`
+          : i.open === 's13' ? `<div class="duebtns"><button type="button" class="btn small primary" data-tls13>S-13を開く</button></div>` : '<div></div>'}</div>`).join('')}
       <details class="dueset"><summary>設定の変更・書き出しの履歴（新しい順・${hist.length}件）</summary>
         ${hist.length ? `<ul class="opsh">${hist.map(h => /^書き出し：/.test(h.name)
           ? `<li>${esc(h.at)}　${esc(h.who)}さん：<b>${esc(h.name)}</b>${h.to ? `（${esc(h.to)}）` : ''}</li>`
