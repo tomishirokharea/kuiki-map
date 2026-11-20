@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.171';
+var APP_JS_VER = '2026.13.172';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2966,6 +2966,9 @@ function terrStats(t, sinceMs) {
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
 const CHANGELOG = [
+  { v: '2026.13.172', role: 'admin', items: [
+    ['記', '区域係：S-13 に、今日より後の完了日（入力ミス）が入っている区域は、「前回の記録なし」の一覧に「完了した日付が未来になっています」と出し、毎月の点検にも出すようにしました。S-13の紙の記録の「直す」で日付を直してください。区域の一覧の「前回回り終えた日」にも、今日より後の日付は出しません。'],
+  ] },
   { v: '2026.13.171', role: 'admin', items: [
     ['記', '区域係：S-13 の紙の記録の「直す」を押すと、その記録だけの画面が開くようになりました。名前・割り当てた日付・完了した日付を直して「保存する」を押すと、変わる前と後を見せて確かめます。直るのはその区域の1件だけで、枝番は変わりません。'],
     ['記', '区域係：S-13 の紙の記録に、今日より後の日付を入れられないようにしました（押しまちがいで先の日付が入ると、完了していない区域が完了したように見えていました）。'],
@@ -8729,7 +8732,8 @@ function lastBackOf(t) {
 }
 /* 前回回り終えた日（係の区域一覧）：アプリの記録と紙の記録（S-13）の新しいほう。紙の記録なら、そう書く */
 function lastDoneTxt(t) {
-  const app = t.completedAt ? dstr(t.completedAt) : '', paper = t.paperDone ? String(t.paperDone) : '';
+  const today = ymd(new Date()); // 今日より後の日付は入力ミスなので、「前回回り終えた日」に出さない（今日は出す）
+  const app = t.completedAt && dstr(t.completedAt) <= today ? dstr(t.completedAt) : '', paper = t.paperDone && String(t.paperDone) <= today ? String(t.paperDone) : '';
   if (paper && paper > app) { const [y, m, d] = paper.split('-').map(Number); return `${fmtDay(new Date(y, m - 1, d).toISOString())}（紙の記録）`; }
   if (app) return fmtDay(t.completedAt) + (t.completedPct != null && t.completedPct < 100 ? `（${t.completedPct}%）` : '');
   return '記録なし';

@@ -3373,4 +3373,9 @@ window.KUIKI_I18N.es = {
 "ほかの人が再訪問している家でも、記録を止めず、「ほかの人が再訪問している家です」も出さないようにしました（最近会えた家は、今までどおり「最近会えた家」と出ます）。": "En casas donde otra persona hace revisitas, ya no se detiene el registro ni se muestra «Otra persona hace revisitas en esta casa» (las casas encontradas hace poco siguen mostrándose como «Casa encontrada hace poco»).",
 "訪問の記録に、年代と★（また訪ねたい）を残さないようにしました。前の記録に残っていた年代と★も、区域係が消します。": "Los registros de visitas ya no guardan la edad ni la ★ (volver a visitar). El encargado de territorios también borrará las que quedaban en registros anteriores.",
 "「区域をもらう」の「若い世代が多い順」は、市の年齢データだけで並べるようにしました（記録の年代は使いません）。記録の書き出し（CSV）から、年代と再訪問の列をなくしました。": "En «Pedir territorio», el orden «Más gente joven» usa solo los datos de edad del municipio (no las edades de los registros). Se quitaron las columnas de edad y revisita del archivo CSV.",
+"完了した日付が未来になっています（{0}）。S-13で直してください": "La fecha de terminado está en el futuro ({0}). Corríjala en el S-13",
+"「完了した日付が未来になっています」の区域は、S-13の紙の記録の「直す」で日付を直してください。": "Los territorios con «fecha de terminado en el futuro» se corrigen con «Corregir» en el registro en papel del S-13.",
+"S-13の完了日が未来の区域": "Territorios del S-13 con fecha de terminado en el futuro",
+"{0}区域 → S-13の「直す」で日付を直してください": "{0} territorios → corrija la fecha con «Corregir» en el S-13",
+"区域係：S-13 に、今日より後の完了日（入力ミス）が入っている区域は、「前回の記録なし」の一覧に「完了した日付が未来になっています」と出し、毎月の点検にも出すようにしました。S-13の紙の記録の「直す」で日付を直してください。区域の一覧の「前回回り終えた日」にも、今日より後の日付は出しません。": "Encargados: si el S-13 tiene una fecha de terminado posterior a hoy (error de captura), ahora aparece en la lista «Sin registro anterior» como «La fecha de terminado está en el futuro» y también en la revisión mensual. Corrija la fecha con «Corregir» en el registro en papel del S-13. Además, la lista de territorios ya no muestra fechas posteriores a hoy como «Última vez completado»."
 };
