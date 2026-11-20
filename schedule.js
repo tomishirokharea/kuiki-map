@@ -140,7 +140,7 @@
     return memo('d' + t.id, () => {
       const last = lastDone(t), left = last ? YEAR - daysFrom(last) : null;
       const st = left == null ? 'none' : left < 0 ? 'over' : left <= PIN_DAYS ? 'warn' : left <= 120 ? 'soon' : 'ok';
-      return { t, last, left, st, deadline: last ? addDays(last, YEAR) : '', startBy: last ? addDays(last, YEAR - lendDays()) : '' };
+      return { t, last, fut: futureDone(t), left, st, deadline: last ? addDays(last, YEAR) : '', startBy: last ? addDays(last, YEAR - lendDays()) : '' };
     });
   }
   /* 前回会えなかった家の割合（訪ねたことのある家のうち、まだ一度も会えていない家） */
@@ -222,7 +222,7 @@
     });
     return { ts, ds, need, given: given.size, givenList, avg: Math.ceil(ts.length / 12), months,
       over: ds.filter(d => d.st === 'over'), warn: ds.filter(d => d.st === 'warn'), none: ds.filter(d => d.st === 'none'),
-      future: ds.filter(d => d.st === 'none' && futureDone(d.t)) }; // 記録なしのうち、完了日が今日より後（入力ミス）の区域
+      noneFuture: ds.filter(d => d.st === 'none' && d.fut) }; // 「記録なし」の中で、完了日が今日より後（入力ミス）の区域（点検の全件は coverInfo の futureTs）
   }
 
   /* 区域の大きさの見直し候補：これまで回り終えるのに、返却の目安より長くかかっている区域（直近3回の平均） */
@@ -419,7 +419,7 @@
   /* 期限の見張りのタイル：押すと内訳（その区域の一覧）が下から出る。閉じると、元の画面のまま */
   const dueTile = (k, n, label, small, alert) => `<button type="button" class="tile${alert ? ' alert' : ''}" data-duetl="${k}"><b>${n}</b>${label}${small ? `<br><small>${small}</small>` : ''}<span class="tmore">内訳 ›</span></button>`;
   const dueLine = d => {
-    const t = d.t, fut = d.last ? '' : futureDone(t); // 記録なしの区域で、完了日が今日より後のもの（入力ミス）
+    const t = d.t, fut = d.last ? '' : d.fut; // 記録なしの区域で、完了日が今日より後のもの（入力ミス）
     return `<div class="tlrow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span><div>
       <p>${chip(d.st)} <b>${esc(t.name || '')}</b></p>
       ${fut ? `<p class="tag-warn">完了した日付が未来になっています（${showDay(fut)}）。S-13で直してください</p>` : `<p class="muted">前回回り終えた日 ${showDay(d.last)}・${leftTxt(d)}</p>`}
@@ -435,7 +435,7 @@
     if (key === 'over') { title = `年1回の期限を過ぎた区域 ${m.over.length}`; hint = '前回回り終えた日から1年を過ぎています。期限を過ぎた日数の多い順です。'; body = ord(m.over).map(dueLine).join(''); }
     else if (key === 'warn') { title = `期限まで${PIN_DAYS}日以内 ${m.warn.length}`; hint = '年1回の期限が近い区域です。急ぐ順です。'; body = ord(m.warn).map(dueLine).join(''); }
     else if (key === 'need') { title = `今月中に出したい区域 ${m.need.length}`; hint = `返却の目安（${lendDays()}日）を考えると、今月中に貸し出さないと年1回の期限に間に合わない区域です。急ぐ順です。`; body = m.need.map(dueLine).join(''); }
-    else if (key === 'none') { title = `前回の記録なし ${m.none.length}`; hint = '前回回り終えた日が分からない区域です。S-13に紙の記録（前回完了した日付）を転記すると、期限が出ます。' + (m.future.length ? '「完了した日付が未来になっています」の区域は、S-13の紙の記録の「直す」で日付を直してください。' : ''); body = `<button type="button" class="btn block" data-tls13>S-13を開く</button>` + m.none.map(dueLine).join(''); }
+    else if (key === 'none') { title = `前回の記録なし ${m.none.length}`; hint = '前回回り終えた日が分からない区域です。S-13に紙の記録（前回完了した日付）を転記すると、期限が出ます。' + (m.noneFuture.length ? '<br>「完了した日付が未来になっています」の区域は、S-13の紙の記録の「直す」で日付を直してください。' : ''); body = `<button type="button" class="btn block" data-tls13>S-13を開く</button>` + m.none.map(dueLine).join(''); }
     else if (key === 'given') {
       title = `今月出した区域 ${m.given}`; hint = `今月、貸し出した（受け取られた）区域です。目安は毎月 約${m.avg}区域です。`;
       body = m.givenList.sort((a, b) => (a.at < b.at ? 1 : -1)).map(g => `<div class="tlrow"><span class="stamp sm${noCls(g.t.no)}">${esc(g.t.no)}</span><div>
@@ -1376,7 +1376,7 @@ button.ktag{cursor:pointer}
   function coverInfo() {
     const ds = eligible().map(dueInfo);
     const known = ds.filter(d => d.last), over = ds.filter(d => d.st === 'over'), warn = ds.filter(d => d.st === 'warn'), none = ds.filter(d => d.st === 'none');
-    const futureTs = ds.filter(d => futureDone(d.t)).map(d => d.t); // 完了日が今日より後（入力ミス）の区域すべて（過去の完了日もある区域を含む。点検用）
+    const futureTs = ds.filter(d => d.fut).map(d => d.t); // 完了日が今日より後（入力ミス）の区域すべて（過去の完了日もある区域を含む。点検用）
     let cls = 'cv-ok', mark = '✓', word = '順調';
     if (!known.length) { cls = 'cv-none'; mark = '？'; word = 'まだ判定できません'; }
     else if (over.length) { cls = 'cv-bad'; mark = '▲'; word = '遅れ気味'; }
@@ -1767,7 +1767,7 @@ button.ktag{cursor:pointer}
     // S-13
     const cv = coverInfo();
     add('s13', 'S-13の「記録なし」の区域', cv.none ? 'warn' : 'ok', cv.none ? `${cv.none}区域 → S-13に転記してください` : 'ありません');
-    if (cv.future) add('s13f', 'S-13の完了日が未来の区域', 'warn', `${cv.future}区域（${listNos(cv.futureTs)}）→ S-13の「直す」で日付を直してください`); // 過去の完了日もある区域を含む。0区域のときは項目を出さない
+    if (cv.future) add('s13f', 'S-13の完了日が未来の区域', 'warn', `${cv.future}区域 → S-13の「直す」で日付を直してください<br>区域：<span data-notr>${cv.futureTs.slice(0, 8).map(t => esc(t.no)).join(', ')}</span>${cv.future > 8 ? ` <span>ほか${cv.future - 8}区域</span>` : ''}`); // 過去の完了日もある区域を含む。0区域のときは項目を出さない
     // 保存期間（個人情報の方針は2年まで）
     const km = Number(D().settings.keepMonths) || 12;
     add('keep', '訪問記録を残す期間', km > 24 ? 'warn' : 'ok', km > 24 ? `${km}か月です。個人情報の方針（2年）をこえています。24か月以下にしてください` : `${km}か月`);

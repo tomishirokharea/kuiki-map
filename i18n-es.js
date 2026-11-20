@@ -3376,6 +3376,8 @@ window.KUIKI_I18N.es = {
 "完了した日付が未来になっています（{0}）。S-13で直してください": "La fecha de terminado está en el futuro ({0}). Corríjala en el S-13",
 "「完了した日付が未来になっています」の区域は、S-13の紙の記録の「直す」で日付を直してください。": "Los territorios con «fecha de terminado en el futuro» se corrigen con «Corregir» en el registro en papel del S-13.",
 "S-13の完了日が未来の区域": "Territorios del S-13 con fecha de terminado en el futuro",
-"{0}区域（{1}）→ S-13の「直す」で日付を直してください": "{0} territorios ({1}) → corrija la fecha con «Corregir» en el S-13",
-"区域係：S-13 に、今日より後の完了日（入力ミス）が入っている区域は、「前回の記録なし」の一覧に「完了した日付が未来になっています」と出し、毎月の点検にも出すようにしました。S-13の紙の記録の「直す」で日付を直してください。区域の一覧の「前回回り終えた日」にも、今日より後の日付は出しません。": "Encargados: si el S-13 tiene una fecha de terminado posterior a hoy (error de captura), ahora aparece en la lista «Sin registro anterior» como «La fecha de terminado está en el futuro» y también en la revisión mensual. Corrija la fecha con «Corregir» en el registro en papel del S-13. Además, la lista de territorios ya no muestra fechas posteriores a hoy como «Última vez completado»."
+"{0}区域 → S-13の「直す」で日付を直してください": "{0} territorios → corrija la fecha con «Corregir» en el S-13",
+"区域：": "Territorios:",
+"ほか{0}区域": "y {0} más",
+"区域係：S-13 に、今日より後の完了日（入力ミス）が入っている区域を、毎月の点検に区域の番号つきで出すようにしました（記録なしの区域は、「前回の記録なし」の一覧にも「完了した日付が未来になっています」と出ます）。S-13の紙の記録の「直す」で日付を直してください。区域の一覧の「前回回り終えた日」にも、今日より後の日付は出しません。": "Encargados: si el S-13 tiene una fecha de terminado posterior a hoy (error de captura), ahora aparece en la revisión mensual con el número del territorio (los territorios sin registro anterior también salen en la lista «Sin registro anterior» como «La fecha de terminado está en el futuro»). Corrija la fecha con «Corregir» en el registro en papel del S-13. Además, la lista de territorios ya no muestra fechas posteriores a hoy como «Última vez completado»."
 };
