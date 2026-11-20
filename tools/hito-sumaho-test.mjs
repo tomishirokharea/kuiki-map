@@ -64,6 +64,18 @@ for (const w of [390, 1280]) {
   await openUser(pg, 'u1');
   t = await sheetText(pg);
   ok(!/登録済みのスマホ/.test(t) && !/読み込んでいます/.test(t), `[${w}] H-6 試作・練習（一覧なし）では、この項目を出さない`);
+  // H-8：読み込みが遅れて届いたとき、描き直すのは「今ひらいている人」（前にひらいた人の一覧を出さない）
+  await pg.evaluate(() => { devState.list = null; });
+  await openUser(pg, 'u1');                       // u1 をひらく（一覧はまだ）
+  await pg.evaluate(() => {
+    devState.list = [{ id: 'd1', uid: 'u1', name: '伝道者A', status: 'active', label: 'iPhone', reqAt: '2026-11-01T00:00:00Z', decAt: '2026-11-01T00:10:00Z', seen: '2026-11-19T06:00:00Z', code: '1111', hint: '' }];
+  });
+  await openUser(pg, 'u4');                       // 一覧が届く前に u4 にひらき直した、という場面
+  const race = await pg.evaluate(() => {          // 遅れて届いたときの描き直しと同じ処理（el.dataset.uid で描く）
+    const el = document.querySelector('#euDevs'); el.innerHTML = euDevHtml(el.dataset.uid);
+    return el.innerText;
+  });
+  ok(/登録済みのスマホ（0台）/.test(race) && !/iPhone/.test(race), `[${w}] H-8 遅れて届いた一覧は、今ひらいている人（u4）の分で描く`);
   // H-7：伝道者の画面からは開けない（今までどおり）
   await pg.evaluate(() => { if (typeof closeSheet === 'function') closeSheet(); Store.data.currentUser = 'u1'; Store.save(); renderAll(); });
   await pg.waitForTimeout(300);
@@ -83,6 +95,7 @@ for (const w of [390, 1280]) {
   await openUser(pg, 'u1');
   const t = await sheetText(pg);
   ok(/Teléfonos registrados \(1\)/.test(t), 'ES 見出しが訳されて出る（Teléfonos registrados (1)）');
+  ok(/Aprobado: .*Último uso: /.test(t) && !/に承認/.test(t), 'ES 承認日と最後に使った日が両方あっても訳される ' + JSON.stringify((t.match(/Aprobado[^\n]*/) || [''])[0]));
   ok(/Los que solo abrieron el enlace personal no salen aquí/.test(t), 'ES 説明が訳されて出る');
   ok(pg.errs.length === 0, 'ES ページのエラーなし');
   await ctx.close();

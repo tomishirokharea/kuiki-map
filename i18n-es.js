@@ -1957,6 +1957,8 @@ window.KUIKI_I18N.es = {
 "共通リンクを作り直す": "Renovar el enlace común",
 "登録済みのスマホ": "Teléfonos registrados",
 "登録済みのスマホ（{0}台）": "Teléfonos registrados ({0})",
+"{0}に承認　最後に使った日 {1}": "Aprobado: {0} · Último uso: {1}",
+"スマホの登録の状況を読み込めませんでした。少し待ってから、もう一度この人を開いてください。": "No se pudo cargar el estado de los teléfonos registrados. Espere un poco y vuelva a abrir a esta persona.",
 "この一覧に出るスマホはありません。": "No hay teléfonos en esta lista.",
 "出るのは、共通QRで登録したスマホと「ホーム画面に追加」したスマホです。本人用のリンクで開いただけのスマホは、ここに出ません。使えなくするのは「今日」のタブからです。": "Salen los teléfonos registrados con el QR común y los añadidos a la pantalla de inicio. Los que solo abrieron el enlace personal no salen aquí. Para desactivarlos, use la pestaña «Hoy».",
 "会衆の全員に同じリンクを配れます。名前をえらんだあと、ここで承認したスマホだけが使えます。リンクが外に広まったときは「作り直す」を押してください（登録済みのスマホは、そのまま使えます）。": "Puede dar el mismo enlace a toda la congregación. Solo funcionan los teléfonos que usted apruebe aquí. Si el enlace se difunde fuera, toque «Crear de nuevo» (los teléfonos registrados siguen funcionando).",

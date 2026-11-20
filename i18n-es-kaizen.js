@@ -277,4 +277,5 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "「区域をもらう」と「留守宅カードをえらぶ」は、はじめは5件だけ出すようにしました（くわしい表示でも）。ほかは下の「もっと見る」で見られます。": "«Pedir territorio» y «Elegir tarjeta de ausentes» ahora muestran primero solo 5 (también en la vista detallada). Los demás se ven con «Ver más» abajo.",
 "「留守宅カードをえらぶ」にも「地図」を付けました。受け取る前に、その区域とカードの家の場所を地図で確かめられます。": "«Elegir tarjeta de ausentes» ahora también tiene «Mapa». Antes de recibirla, puede ver en el mapa el territorio y dónde están las casas de la tarjeta.",
 "地図で確かめて「一覧にもどる」を押すと、もとの一覧の同じところにもどるようにしました（区域をもらう・留守宅カード、個人・集まりとも）。": "Al ver el mapa y tocar «Volver a la lista», ahora vuelve al mismo lugar de la lista (Pedir territorio y tarjetas de ausentes, personales y de grupo).",
+"係の画面：「人」でその人を開くと、登録済みのスマホ（共通QR・ホーム画面に追加の分）が見られるようになりました。承認待ちの知らせは、今までどおり「今日」に出ます。": "Encargado: al abrir a una persona en «Personas», ahora se ven sus teléfonos registrados (QR común y añadidos a la pantalla de inicio). Las solicitudes pendientes siguen en «Hoy».",
 });
