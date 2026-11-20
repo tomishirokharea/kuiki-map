@@ -2968,7 +2968,8 @@ const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).c
 const CHANGELOG = [
   { v: '2026.13.171', role: 'admin', items: [
     ['記', '区域係：S-13 の紙の記録の「直す」を押すと、その記録だけの画面が開くようになりました。名前・割り当てた日付・完了した日付を直して「保存する」を押すと、変わる前と後を見せて確かめます。直るのはその区域の1件だけで、枝番は変わりません。'],
-    ['記', '区域係：S-13 の紙の記録に、今日より後の日付を入れられないようにしました（押しまちがいで先の日付が入ると、完了していない区域が完了したように見えていました）。']] },
+    ['記', '区域係：S-13 の紙の記録に、今日より後の日付を入れられないようにしました（押しまちがいで先の日付が入ると、完了していない区域が完了したように見えていました）。'],
+    ['状', '区域係：返却した日が今日より後になっている正式な返却が、記録の少ない返却の自動の確かめをすり抜けていたのを直しました。これからは待たずに確かめるので、その区域は思ったより早く「途中の返却」になることがあります。']] },
   { v: '2026.13.170', role: 'admin', items: [
     ['状', '区域係の状況の「区域カードと留守宅カード」のグラフを、状況のいちばん上に移しました。おすすめから訪ねて会えた分が、濃い色と白い水玉で分かります。棒を押すと「おすすめのききめ」も出ます。'],
     ['状', '実際に訪ねていない拒否（自動の取り込み・区域係や手伝いの人が代わりに入れた分）は、グラフで数えないようにしました。「拒否を数えない人」でえらべます。'],
@@ -15806,7 +15807,8 @@ function openS13RowEdit(tid, editId) {
   const ed = (D().s13 || []).find(x => x && x.id === editId && x.kind === 'a' && x.terrId === tid);
   if (!ed) { back(); toast('この記録は見つかりませんでした'); return; } // 描き直したあとに出す（setSheet は、ただのお知らせを消すため）
   const names = [...new Set(D().users.map(u => u.name).concat((D().s13 || []).filter(x => x.name).map(x => x.name)))];
-  setSheet(headHtml(t, `区域${esc(t.no)}の記録を直す`, '紙から転記した記録') + `
+  // 同じ名前の紙の記録が何件もある区域では、見出しだけではどの行か分からない。割り当てた日付も出す
+  setSheet(headHtml(t, `区域${esc(t.no)}の記録を直す`, `紙から転記した記録<br>割り当てた日付 ${esc(s13Fmt(ed.a))}`) + `
     <label class="field"><span>伝道者の名前</span><input type="text" id="s13rName" list="s13rNames" maxlength="30" value="${esc(ed.name || '')}" placeholder="例：山田 花子"></label>
     <datalist id="s13rNames">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
     <label class="field"><span>割り当てた日付</span><input type="date" id="s13rA" value="${esc(ed.a || '')}"></label>
@@ -15822,18 +15824,28 @@ function openS13RowEdit(tid, editId) {
     if (c && c < a) { toast('完了した日付が、割り当てた日付より前になっています'); return; }
     if (c && c > ymd(new Date())) { toast('完了した日付が、今日より後になっています'); return; }
     if (a > ymd(new Date())) { toast('割り当てた日付が、今日より後になっています'); return; }
-    // この画面は、アプリへの受け渡し（グループ奉仕・全体の集まり）をしない。
-    // 名前を「グループ奉仕（◯◯）」にしても黙って紙の記録のままになるので、先に行き先を知らせる
-    if (!c && s13GroupOf(name)) { toast('アプリに渡すときは、区域の画面の「紙の記録を転記する」から同じ名前で入れてください'); return; }
+    // この画面は、アプリへの受け渡し（グループ奉仕・全体の集まり）をしない（渡すのは「紙の記録を転記する」の欄だけ）。
+    // 名前を「グループ奉仕（◯◯）」にしても紙の記録のままになるので、確認の文で行き先を知らせる。
+    // ことわってしまうと、その行の日付や名前のまちがいを直せなくなる（登録されていない名前もふくむ）ので、確認して保存する
+    const gp = !c && !!s13GroupOf(name);
     // 開いたあとに、ほかの人の変更が届いて記録が入れかわることがある。ここで取り直し、確認の文もその記録から作る
     const fresh = () => (D().s13 || []).find(x => x && x.id === editId && x.kind === 'a' && x.terrId === tid);
     const z0 = fresh();
     if (!z0) { back(); toast('この記録は見つかりませんでした'); return; }
     const T = s => (window.KI ? window.KI.t(s) : s); // 名前や日付が入る行は、1つずつ訳す（ひとかたまりの文字になるため。meibo.js と同じ）
     const row = (nm, aa, cc) => `${nm} ${s13Fmt(aa)} 〜 ${cc ? s13Fmt(cc) : T('（完了日なし）')}`;
+    // どこが変わるのかを、前と後を見くらべなくても分かるように書く（変わる欄が2つ以上あるときは、その数だけ出す）
+    const chg = [
+      name !== z0.name ? T('伝道者の名前が変わります') : '',
+      a !== (z0.a || '') ? T('割り当てた日付が変わります') : '',
+      c !== (z0.c || '') ? T('完了した日付が変わります') : ''
+    ].filter(Boolean);
     if (!await ask('', { title: '紙の記録を上書きしますか？',
-      body: [T('今の記録'), row(z0.name, z0.a, z0.c), '', T('直したあとの記録'), row(name, a, c)].join('\n'),
-      ok: '上書きする', danger: false })) return;
+      body: [chg.length ? chg.join('\n') : T('中身は変わりません'), '',
+        T('今の記録'), row(z0.name, z0.a, z0.c), '', T('直したあとの記録'), row(name, a, c),
+        ...(gp ? ['', T('この画面で保存すると、アプリには渡さず紙の記録のままになります。'),
+          T('アプリに渡すときは、区域の画面の「紙の記録を転記する」から同じ名前で入れてください')] : [])].join('\n'),
+      ok: gp ? '紙の記録のまま直す' : '上書きする', danger: false })) return;
     const z = fresh(); // 確かめているあいだに入れかわっていないか、もう一度見る（s13DelMany と同じ考え方）
     if (!z) { back(); toast('この記録は見つかりませんでした'); return; }
     commit('記録を直しました', () => {
@@ -15956,6 +15968,7 @@ function openS13Edit(tid) {
   $('#s13PSave').onclick = () => {
     const c = $('#s13P').value;
     if (!c) { toast('日付を入れてください'); return; }
+    if (c > ymd(new Date())) { toast('前回完了した日付が、今日より後になっています'); return; } // 上の2つの欄と同じように、先の日付は入れない
     commit('前回完了した日付を保存しました', () => {
       if (man) Object.assign(man, { c, at: new Date().toISOString() });
       else D().s13.push({ id: 's' + uid(), kind: 'p', terrId: tid, year: y, c, at: new Date().toISOString(), by: me().id });
