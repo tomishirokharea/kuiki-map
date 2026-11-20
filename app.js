@@ -2237,7 +2237,7 @@ async function logout() {
   const q = n
     ? `まだ送っていない記録が${n}件あります。消すと送られません。それでもこの端末から消しますか？`
     : memoSyncOn()
-      ? 'この端末から、区域マップの情報と招待リンクを消します。よろしいですか？（奉仕時間・自分の予定・再訪問のメモは、もう一度登録すると戻ります）'
+      ? 'この端末から、区域マップの情報と招待リンクを消します。よろしいですか？（送り終えた奉仕時間・自分の予定・再訪問のメモは、もう一度登録すると戻ります）'
       : 'この端末から、区域マップの情報と招待リンクを消します。奉仕時間、自分の予定（このスマホだけの記録）も消えます。よろしいですか？';
   if (!await ask(q)) return;
   [TOKEN_KEY, QUEUE_KEY, OLD_CACHE_KEY, SYNC_KEY, PENDING_KEY, JOIN_KEY, FAILED_KEY, ME_KEY, ORPHAN_KEY, HF_KEY, AR_KEY, SYNC_NOTE_KEY].forEach(lsDel); // 取っておいた変更も消す（監査5 M-2）
@@ -5726,6 +5726,7 @@ async function memoDec(key, k, s) {
        my|s|1         … 回る曜日（w）・タイマー（t）・前回の研究の数（ll）
    ・中身は端末の中で暗号化してから送る。サーバー・係の画面・シートでは読めない
    ・同じものを2つの端末で別々に書きかえたときは、あとから書きかえたほう（at が新しいほう）を残す
+   ・消す操作は at を持たない：書きかえと消すがぶつかったときは、書きかえ（残すほう）が勝つ
    ・サーバーが対応していると分かってから送る（返事の my:1。古いサーバーと混ざっても壊れない）
    ・サーバーに置くのは、今日から前後450日（MY_WIN_DAYS）の分だけ。古い分は各端末の中に残るが、新しい端末には引き継がれない */
 const MY_WIN_DAYS = 450;
@@ -5905,6 +5906,7 @@ const MemoSync = {
     const myMap = myOn ? myPlAll() : {};
     const all = new Set(Object.keys(memos).concat([...pins], Object.keys(st.rows), Object.keys(myMap)));
     const win = myWin();
+    const winDel = { lo: ymd(new Date(Date.now() - (MY_WIN_DAYS - 2) * 864e5)), hi: win.hi }; // 受け取った「消した」にだけ使う、2日せまい窓
     const items = [], sent = {};
     let size = 0;
     for (const k of all) {
@@ -5942,6 +5944,7 @@ const MemoSync = {
     }
     if (!items.length && !full && !this.pull) { this.save(st); return false; }
     this.pull = false;
+    this.save(st); // 送る前に保存：通信に失敗しても、書きかえた時刻（pend の at）が残る（あとから書きかえたほうが勝つ、を守るため）
     const j = await api('memo_sync', { since: full ? 0 : st.since, items, my: 1 }, { timeout: 60000 }); // my:1＝my|（自分の記録）が分かる端末。サーバーは、これを付けた端末にだけ my| の行を返す
     if (j.kid && key.kid && j.kid !== key.kid) { this.reset(); return true; } // 鍵が作り直された：もう一度はじめから
     if (j.kid && !key.kid) key.kid = j.kid;
@@ -5969,9 +5972,11 @@ const MemoSync = {
           srv = myPlOk(k, raw);
           srvAt = Number(raw && raw.at) || 0;
           if (!srv) continue; // 形がおかしいものはとばす
-        }
-        const p = st.pend[k];
-        if (p && p.at > srvAt) again = true; // この端末の書きかえのほうが新しい：次の回に送り直す
+        } else if (!myInWin(winDel, k)) { delete st.rows[k]; delete st.pend[k]; continue; } // 窓のふち近くの「消した」は取り込まない（端末の日付が1日ずれていても、窓の中の記録を消さないため）
+        const lp = myMap[k], p = st.pend[k];
+        if (del ? !lp : (lp && myPlHash(lp) === myPlHash(srv))) { // この端末の中身と同じ：入れ直さない（おすすめ由来の予定の付加情報（tid など）を消さない・無駄な保存をしない）
+          delete st.pend[k];
+        } else if (p && p.at > srvAt) again = true; // この端末の書きかえのほうが新しい：次の回に送り直す（消す操作は at を持たないので、書きかえと消すがぶつかったときは書きかえが残る）
         else { myApply(my2, k, del ? null : srv); touchedMy = true; delete st.pend[k]; }
         st.rows[k] = { v, h: srv ? myPlHash(srv) : '', del: del ? 1 : 0 };
         continue;
@@ -5988,9 +5993,9 @@ const MemoSync = {
       st.rows[k] = { v, h: memoPlHash(srv), del: del ? 1 : 0 };
     }
     if (touched) { memoSaveRaw(memos2); pinsSaveRaw(pins2); }
-    if (touchedMy) mySave(my2);
+    const myOk = touchedMy ? mySave(my2) !== false : true; // 保存に失敗したら、全部を取り込めた印は立てない（「消した」と誤解しないため）
     st.since = Number(j.now) || st.since;
-    if (full) { st.checked = myKeys; if (myOn) st.myChecked = 1; }
+    if (full) { st.checked = myKeys; if (myOn && myOk) st.myChecked = 1; }
     this.save(st);
     this.seenMv = j.mv || this.seenMv;
     this.lastAt = Date.now();
@@ -13220,7 +13225,7 @@ function myData() {
   o.plan = o.plan || {}; o.reports = o.reports || {}; o.repAsk = o.repAsk || {}; // 日ごとの計画（分）・送った報告・報告の画面を出した日
   return o;
 }
-const mySave = o => { if (!lsSet(myKey(), JSON.stringify(o))) toast('このスマホに保存できませんでした'); else if (onMemoVer) MemoSync.soon(); }; // 保存したら、同じ人のほかの端末とも合わせる（memoSync が「使う」のとき）
+const mySave = o => { const ok = lsSet(myKey(), JSON.stringify(o)); if (!ok) toast('このスマホに保存できませんでした'); else if (onMemoVer) MemoSync.soon(); return ok; }; // 保存したら、同じ人のほかの端末とも合わせる（memoSync が「使う」のとき）
 const monthMin = (o, ym) => Object.entries(o.log).filter(([d]) => d.startsWith(ym)).reduce((a, [, m]) => a + m, 0);
 const monthDays = (o, ym) => Object.entries(o.log).filter(([d, m]) => d.startsWith(ym) && m > 0).length;
 

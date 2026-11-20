@@ -3360,7 +3360,7 @@ window.KUIKI_I18N.es = {
 "上下にスワイプして合わせると、すぐ保存されます（本人の端末だけ）。ほかの日は、下のカレンダーの日にちを押して入れられます。": "Al deslizar arriba o abajo se guarda al instante (solo en sus dispositivos). Para otros días, toque la fecha en el calendario de abajo.",
 "本人の端末だけに保存されます": "Se guarda solo en sus dispositivos",
 "本人の端末の記録": "Registros de sus dispositivos",
-"この端末から、区域マップの情報と招待リンクを消します。よろしいですか？（奉仕時間・自分の予定・再訪問のメモは、もう一度登録すると戻ります）": "Se borrarán de este teléfono la información del Mapa de Territorios y el enlace de invitación. ¿Continuar? (Las horas, su agenda y las notas de revisitas vuelven al registrarse de nuevo)",
+"この端末から、区域マップの情報と招待リンクを消します。よろしいですか？（送り終えた奉仕時間・自分の予定・再訪問のメモは、もう一度登録すると戻ります）": "Se borrarán de este teléfono la información del Mapa de Territorios y el enlace de invitación. ¿Continuar? (Las horas, la agenda y las notas de revisitas ya enviadas vuelven al registrarse de nuevo)",
 "自分で入れた予定や時間は、暗号にして保管し、本人の端末（スマホ・iPadなど）だけで見られます。係の画面やシートでは読めません。": "Las citas y horas que usted anote se guardan cifradas y solo se ven en sus dispositivos (teléfono, iPad, etc.). No se pueden leer en la pantalla del encargado ni en la hoja.",
 "アイコンの絵は、ホーム画面に追加するときにえらびます。": "El dibujo del icono se elige al agregarlo a la pantalla de inicio.",
 "再訪問のメモと自分の記録をほかの端末でも使う": "Usar las notas de revisitas y los registros personales en otros dispositivos",
