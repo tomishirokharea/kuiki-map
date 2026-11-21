@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.174';
+var APP_JS_VER = '2026.13.175';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2969,8 +2969,11 @@ function terrStats(t, sinceMs) {
 
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
+/* 起動時のお知らせに出すのは news: 1 の印がある変更だけ（見た目や使い方が大きく変わるとき。出すかは毎回 R A さんに確かめる・2026-11-21）。
+   印の無い変更も、設定のいちばん下の版を押すと「変更の一覧」で見られる */
 const CHANGELOG = [
-  { v: '2026.13.174', role: 'admin', items: [['状', '区域係の状況のグラフで、棒（1日）を押したときの区域ごとの内訳に、その区域を回ったおおよその時間（例：17〜18時台）を出すようにしました。記録ボタンを押した時刻から出しています。家が10軒未満の区域と、週・月の内訳には出しません。']] },
+  { v: '2026.13.175', role: 'admin', items: [['状', '区域係の状況のグラフで、棒（1日）を押したときの区域ごとの内訳に、その区域を回ったおおよその時間（例：17〜18時台）を出すようにしました。記録ボタンを押した時刻から出しています。家が10軒未満の区域と、週・月の内訳には出しません。']] },
+  { v: '2026.13.174', items: [['版', '設定のいちばん下の版を押すと、これまでの変更の一覧が見られるようになりました。起動したときのお知らせは、見た目や使い方が大きく変わるときだけ出します。']] },
   { v: '2026.13.173', items: [['時', '奉仕時間・日ごとの計画・自分の予定・月の目標・奉仕報告の控えが、同じ人のほかの端末（iPadなど）でも同じになるようにしました。中身は端末の中で暗号化してから保管するので、係の画面やシートでは読めません。会衆の設定「再訪問のメモと、奉仕時間・自分の予定などの自分の記録を、同じ人のほかの端末（iPadなど）でも使えるようにする」が「使う」のときに働きます。']] },
   { v: '2026.13.172', role: 'admin', items: [['人', '係の画面：「人」でその人を開くと、登録済みのスマホ（共通QR・ホーム画面に追加の分）が見られるようになりました。承認待ちの知らせは、今までどおり「今日」に出ます。']] },
   { v: '2026.13.171', items: [
@@ -3395,13 +3398,26 @@ function watchUpdate() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(false); });
   setInterval(() => { if (!document.hidden) checkUpdate(true); }, 30 * 60000);
 }
+// お知らせ・変更の一覧に出してよい変更か（only：テスト版・本番版のどちらかだけ／role：係だけ）
+function clShow(c) {
+  const who = NS ? 'test' : 'prod';
+  return (!c.only || c.only === who) && (!c.role || (c.role === 'admin' && (() => { try { return isAdmin(); } catch (e) { return false; } })()));
+}
+// 設定の「変更の一覧」：版の新しい順。同じ版の変更（係向け・ほかのファイルが足した分）は1つの見出しにまとめる
+function changelogHtml() {
+  const by = new Map();
+  CHANGELOG.filter(clShow).forEach(c => { if (!by.has(c.v)) by.set(c.v, []); by.get(c.v).push(...c.items); });
+  const vs = [...by.keys()].sort((a, b) => verCmp(b, a));
+  return `<p class="hint">新しい順に、これまでの変更を出しています。</p>` + vs.map(v =>
+    `<h3 class="sub cl-ver">版 ${esc(v)}</h3><ul class="newslist cllist">${by.get(v).map(([i, t]) => `<li><i>${esc(i)}</i><span>${esc(t)}</span></li>`).join('')}</ul>`).join('');
+}
 function showNewsIfAny(then) {
   const seen = lsGet(SEEN_VER);
   // 見た版として残すのは、今の版とお知らせの中で一番新しい番号（古い画面を開いても下がらない）
   lsSet(SEEN_VER, verMax([seen || '0', APP_VERSION].concat(CHANGELOG.map(c => c.v))));
   if (!seen) { then(); return; } // はじめて使う人には出さない
-  const who = NS ? 'test' : 'prod'; // only のあるお知らせは、テスト版・本番版のどちらかだけに出す
-  const items = CHANGELOG.filter(c => verCmp(c.v, seen) > 0 && (!c.only || c.only === who) && (!c.role || (c.role === 'admin' && (() => { try { return isAdmin(); } catch (e) { return false; } })()))).flatMap(c => c.items);
+  // 起動時に出すのは news の印がある変更だけ。印の無い変更は、設定の版を押したときの「変更の一覧」で見る
+  const items = CHANGELOG.filter(c => c.news && verCmp(c.v, seen) > 0 && clShow(c)).flatMap(c => c.items);
   if (!items.length) { then(); return; }
   const el = $('#news');
   el.innerHTML = `<div class="newsbox"><div class="newshead"><p>アップデートのお知らせ</p><h2>区域マップが新しくなりました</h2></div>
@@ -11435,7 +11451,7 @@ function openUiSheet() {
   let page = 'top', lastCat = null;
   const paint = keep => {
     const top = keep ? $('#sheet').scrollTop : 0, det = UI.mode === 'detail';
-    if (!det) page = 'top'; // かんたんモードは目次にしない（1画面）
+    if (!det && page !== 'ver') page = 'top'; // かんたんモードは目次にしない（1画面）。版を押したときの「変更の一覧」だけは開く
     const seg = (key, opts, cur, cls) => `<div class="seg uiseg${cls ? ' ' + cls : ''}" role="group">${opts.map(([v, l]) =>
       `<button type="button" data-ui="${key}" data-v="${v}" aria-pressed="${(cur === undefined ? UI[key] : cur) === v}">${l}</button>`).join('')}</div>`;
     const sizeOpts = (det ? ['small', 'normal', 'large', 'xlarge'] : ['normal', 'large', 'xlarge']).map(k => [k, SIZES[k][1]]);
@@ -11492,9 +11508,9 @@ function openUiSheet() {
     const S_GUIDE_SIMPLE = `<p class="q">はじめの案内（使い方の動画のお知らせなど）</p>${seg('guide', [['auto', '最初の数日だけ'], ['on', 'いつも出す'], ['off', '出さない']], UI.guide || 'auto')}`;
     const tail = `<button class="btn block" id="uiReset">見え方を最初にもどす</button><button class="btn primary block" data-close>閉じる</button>` +
       // この端末で動いているアプリの版（更新が届いたかを、だれでも確かめられるように。2026-10-29）
-      `<p class="muted appver" style="text-align:center;margin-top:12px;font-size:15px">区域マップ 版 ${esc(APP_VERSION)}</p>`; // hint は「説明を出さない」で消えるので使わない
+      `<button type="button" class="appver" data-page="ver">区域マップ 版 ${esc(APP_VERSION)}<span class="vh"> 変更の一覧を見る</span><span aria-hidden="true"> ›</span></button>`; // hint は「説明を出さない」で消えるので使わない。押すと変更の一覧（2026.13.174）。読み上げでも版の番号が伝わるように、aria-label は使わない
     let b;
-    if (!det) {
+    if (!det && page !== 'ver') {
       // かんたんモード：目次にせず1画面（地図の見た目・画面の見え方・文字の大きさ・番号と線の濃さ・機能をふやす・はじめの案内・使い方の動画・言語）
       b = `<h2 id="sheetTitle" class="uititle" tabindex="-1">設定</h2>` + S_BASE + S_VIEW + S_TEXT + S_NOUDO +
         `<details class="kmore"${uiKOpen ? ' open' : ''}><summary>機能をふやす</summary>${F_FEAT}</details>` +
@@ -11558,8 +11574,10 @@ function openUiSheet() {
         ${uiSlot('start')}${diagSetHtml()}`;
       } else if (page === 'lang') {
         body = window.KI ? KI.picker(false, { noHead: true }) : '';
+      } else if (page === 'ver') {
+        body = changelogHtml();
       }
-      b = `<button type="button" class="btn back" data-uiback>‹ 設定</button><h2 id="sheetTitle" class="uititle" tabindex="-1"${page === 'lang' ? ' data-notr' : ''}>${cat ? cat[1] : '設定'}</h2>` + body +
+      b = `<button type="button" class="btn back" data-uiback>‹ 設定</button><h2 id="sheetTitle" class="uititle" tabindex="-1"${page === 'lang' ? ' data-notr' : ''}>${cat ? cat[1] : page === 'ver' ? '変更の一覧' : '設定'}</h2>` + body +
         `<button class="btn primary block" data-close>閉じる</button>`;
     }
     b = `<div class="grabrow"><span class="grab" aria-hidden="true"></span><button type="button" class="xmini" data-close aria-label="閉じる">×</button></div><p class="grabhint">下にスワイプすると、設定を残して閉じます</p>` + b;
