@@ -11508,7 +11508,7 @@ function openUiSheet() {
     const S_GUIDE_SIMPLE = `<p class="q">はじめの案内（使い方の動画のお知らせなど）</p>${seg('guide', [['auto', '最初の数日だけ'], ['on', 'いつも出す'], ['off', '出さない']], UI.guide || 'auto')}`;
     const tail = `<button class="btn block" id="uiReset">見え方を最初にもどす</button><button class="btn primary block" data-close>閉じる</button>` +
       // この端末で動いているアプリの版（更新が届いたかを、だれでも確かめられるように。2026-10-29）
-      `<button type="button" class="appver" data-page="ver">区域マップ 版 ${esc(APP_VERSION)}<span class="vh"> 変更の一覧を見る</span><span aria-hidden="true"> ›</span></button>`; // hint は「説明を出さない」で消えるので使わない。押すと変更の一覧（2026.13.174）。読み上げでも版の番号が伝わるように、aria-label は使わない
+      `<button type="button" class="appverbtn" data-page="ver"><span class="appver">区域マップ 版 ${esc(APP_VERSION)}</span><span class="vh"> 変更の一覧を見る</span><span aria-hidden="true"> ›</span></button>`; // hint は「説明を出さない」で消えるので使わない。押すと変更の一覧（2026.13.174）。読み上げでも版の番号が伝わるように、aria-label は使わない。.appver の中は版の文字だけ（auto の ban.e2e.js が見ている）
     let b;
     if (!det && page !== 'ver') {
       // かんたんモード：目次にせず1画面（地図の見た目・画面の見え方・文字の大きさ・番号と線の濃さ・機能をふやす・はじめの案内・使い方の動画・言語）
