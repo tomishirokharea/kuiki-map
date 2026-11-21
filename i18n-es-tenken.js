@@ -304,4 +304,9 @@ window.KUIKI_I18N.es = Object.assign(window.KUIKI_I18N.es || {}, {
 "司会": "Dirige",
 "ほか{0}人": "{0} más",
 "「今日回る人」にえらばれた人の画面にも、同じカードを今日回る人（司会と仲間）が出るようにしました。": "Ahora, en la pantalla de quienes fueron elegidos en «Van hoy», también aparece quién más recorre hoy la misma tarjeta (quien dirige y los compañeros).",
+"変更の一覧": "Lista de cambios",
+"変更の一覧を見る": "Ver la lista de cambios",
+"版 {0}": "Versión {0}",
+"新しい順に、これまでの変更を出しています。": "Se muestran todos los cambios, del más reciente al más antiguo.",
+"設定のいちばん下の版を押すと、これまでの変更の一覧が見られるようになりました。起動したときのお知らせは、見た目や使い方が大きく変わるときだけ出します。": "Ahora, al tocar la versión al final de Ajustes, se ve la lista de todos los cambios. El aviso de novedades al abrir la aplicación solo aparece cuando cambian mucho el aspecto o la forma de usarla.",
 });
