@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const VER = '2026.13.174';
+// 設定の版のボタンに出る今の版（index.html の app-version）。版を上げるたびに試験を書きかえなくてよいように（2026.13.175・2026-11-21）
+const APPV = (fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').match(/name="app-version" content="([^"]+)"/) || [])[1] || VER;
 const CFG = "window.KUIKI_CONFIG={apiUrl:'',lang:'ja',homeView:[26.33,127.80],homeZoom:10,ageData:true};";
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.json': 'application/json', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml' };
 // 係向けだけの変更（2026.13.172・role:'admin'）と、みんなへの変更（2026.13.173）の文の一部
@@ -110,7 +112,7 @@ async function main() {
     // V6：読み上げでも版の番号と「変更の一覧を見る」の両方が伝わる（aria-label で版の番号を消さない）
     await pg.evaluate(() => { UI.mode = 'detail'; applyUi(); try { closeSheet(); } catch (e) { /* なにもしない */ } openUiSheet(); });
     await pg.waitForTimeout(150);
-    const v6 = await pg.getByRole('button', { name: /区域マップ 版 2026\.13\.174.*変更の一覧を見る/ }).count();
+    const v6 = await pg.getByRole('button', { name: new RegExp('区域マップ 版 ' + APPV.replace(/\./g, '\\.') + '.*変更の一覧を見る') }).count();
     ok(v6 === 1, 'V6 版のボタンの読み上げに、版の番号と「変更の一覧を見る」の両方が入る', v6);
     await pg.evaluate(() => { try { closeSheet(); } catch (e) { /* なにもしない */ } });
 
