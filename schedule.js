@@ -118,19 +118,30 @@
 
   /* ---------- 区域ごとの期限 ---------- */
   const eligible = () => D().territories.filter(t => !t.dummy && !isSpecial(t));
-  /* 前回回り終えた日：アプリの記録・紙の記録の完了日（t.paperDone）・S-13に転記した紙の記録のうち、いちばん新しいもの */
-  function lastDone(t) {
+  /* 完了日の候補：アプリの記録・紙の記録の完了日（t.paperDone）・S-13に転記した紙の記録（入力ミスの未来日も含む。S-13の表には、直せるようそのまま見せる） */
+  function doneDates(t) {
     const c = [];
     if (t.completedAt) c.push(dstr(t.completedAt));
     if (t.paperDone) c.push(String(t.paperDone)); // 係のスマホが書く、紙の記録の完了日（伝道者のスマホにはS-13がないため）
     (D().s13 || []).forEach(x => { if (x && x.terrId === t.id && x.c) c.push(String(x.c)); });
-    return c.filter(Boolean).sort().pop() || '';
+    return c.filter(Boolean);
   }
+  /* 完了日の候補を「今日まで」と「今日より後」に1回で分ける（候補を集めるのは1回だけ。区域の数が多いときの重さを増やさないため）
+     past＝前回回り終えた日（今日までのいちばん新しいもの）／fut＝今日より後のいちばん新しいもの（入力ミス）。無ければ '' */
+  function doneSplit(t) {
+    const today = ymd(new Date()), past = [], fut = [];
+    doneDates(t).forEach(s => (s <= today ? past : fut).push(s));
+    return { past: past.sort().pop() || '', fut: fut.sort().pop() || '' };
+  }
+  /* 前回回り終えた日：候補のうち、いちばん新しいもの。今日より後の日付は、入力ミスなので数えない（今日は数える） */
+  function lastDone(t) { return doneSplit(t).past; }
+  /* 今日より後の完了日のうち、いちばん新しいもの（無ければ ''）。係に入力ミスを知らせるために使う */
+  function futureDone(t) { return doneSplit(t).fut; }
   function dueInfo(t) {
     return memo('d' + t.id, () => {
-      const last = lastDone(t), left = last ? YEAR - daysFrom(last) : null;
+      const dd = doneSplit(t), last = dd.past, left = last ? YEAR - daysFrom(last) : null; // 候補を集めるのは1回だけ（lastDone と futureDone を別々に呼ばない）
       const st = left == null ? 'none' : left < 0 ? 'over' : left <= PIN_DAYS ? 'warn' : left <= 120 ? 'soon' : 'ok';
-      return { t, last, left, st, deadline: last ? addDays(last, YEAR) : '', startBy: last ? addDays(last, YEAR - lendDays()) : '' };
+      return { t, last, fut: dd.fut, left, st, deadline: last ? addDays(last, YEAR) : '', startBy: last ? addDays(last, YEAR - lendDays()) : '' };
     });
   }
   /* 前回会えなかった家の割合（訪ねたことのある家のうち、まだ一度も会えていない家） */
@@ -211,7 +222,8 @@
       if (m) m.list.push(d);
     });
     return { ts, ds, need, given: given.size, givenList, avg: Math.ceil(ts.length / 12), months,
-      over: ds.filter(d => d.st === 'over'), warn: ds.filter(d => d.st === 'warn'), none: ds.filter(d => d.st === 'none') };
+      over: ds.filter(d => d.st === 'over'), warn: ds.filter(d => d.st === 'warn'), none: ds.filter(d => d.st === 'none'),
+      noneFuture: ds.filter(d => d.st === 'none' && d.fut) }; // 「記録なし」の中で、完了日が今日より後（入力ミス）の区域（点検の全件は coverInfo の futureTs）
   }
 
   /* 区域の大きさの見直し候補：これまで回り終えるのに、返却の目安より長くかかっている区域（直近3回の平均） */
@@ -408,10 +420,10 @@
   /* 期限の見張りのタイル：押すと内訳（その区域の一覧）が下から出る。閉じると、元の画面のまま */
   const dueTile = (k, n, label, small, alert) => `<button type="button" class="tile${alert ? ' alert' : ''}" data-duetl="${k}"><b>${n}</b>${label}${small ? `<br><small>${small}</small>` : ''}<span class="tmore">内訳 ›</span></button>`;
   const dueLine = d => {
-    const t = d.t;
+    const t = d.t, fut = d.last ? '' : d.fut; // 記録なしの区域で、完了日が今日より後のもの（入力ミス）
     return `<div class="tlrow"><span class="stamp sm${noCls(t.no)}">${esc(t.no)}</span><div>
       <p>${chip(d.st)} <b>${esc(t.name || '')}</b></p>
-      <p class="muted">前回回り終えた日 ${showDay(d.last)}・${leftTxt(d)}</p>
+      ${fut ? `<p class="tag-warn">完了した日付が未来になっています（${showDay(fut)}）。S-13で直してください</p>` : `<p class="muted">前回回り終えた日 ${showDay(d.last)}・${leftTxt(d)}</p>`}
       <p class="muted">${t.holder ? `貸出中：${esc(uname(t.holder))}さん` : paperLent(t) ? paperHoldTxt(t) : t.awayPoolAt ? '留守宅カードで回っています' : '空いています'}</p></div>
       <div class="btns"><button type="button" class="btn small" data-tlmap="${esc(t.id)}">地図</button><button type="button" class="btn small primary" data-tlkarte="${esc(t.id)}">カルテ</button></div></div>`;
   };
@@ -424,7 +436,7 @@
     if (key === 'over') { title = `年1回の期限を過ぎた区域 ${m.over.length}`; hint = '前回回り終えた日から1年を過ぎています。期限を過ぎた日数の多い順です。'; body = ord(m.over).map(dueLine).join(''); }
     else if (key === 'warn') { title = `期限まで${PIN_DAYS}日以内 ${m.warn.length}`; hint = '年1回の期限が近い区域です。急ぐ順です。'; body = ord(m.warn).map(dueLine).join(''); }
     else if (key === 'need') { title = `今月中に出したい区域 ${m.need.length}`; hint = `返却の目安（${lendDays()}日）を考えると、今月中に貸し出さないと年1回の期限に間に合わない区域です。急ぐ順です。`; body = m.need.map(dueLine).join(''); }
-    else if (key === 'none') { title = `前回の記録なし ${m.none.length}`; hint = '前回回り終えた日が分からない区域です。S-13に紙の記録（前回完了した日付）を転記すると、期限が出ます。'; body = `<button type="button" class="btn block" data-tls13>S-13を開く</button>` + m.none.map(dueLine).join(''); }
+    else if (key === 'none') { title = `前回の記録なし ${m.none.length}`; hint = '前回回り終えた日が分からない区域です。S-13に紙の記録（前回完了した日付）を転記すると、期限が出ます。' + (m.noneFuture.length ? '<br>「完了した日付が未来になっています」の区域は、S-13の紙の記録の「直す」で日付を直してください。' : ''); body = `<button type="button" class="btn block" data-tls13>S-13を開く</button>` + m.none.map(dueLine).join(''); }
     else if (key === 'given') {
       title = `今月出した区域 ${m.given}`; hint = `今月、貸し出した（受け取られた）区域です。目安は毎月 約${m.avg}区域です。`;
       body = m.givenList.sort((a, b) => (a.at < b.at ? 1 : -1)).map(g => `<div class="tlrow"><span class="stamp sm${noCls(g.t.no)}">${esc(g.t.no)}</span><div>
@@ -1365,12 +1377,13 @@ button.ktag{cursor:pointer}
   function coverInfo() {
     const ds = eligible().map(dueInfo);
     const known = ds.filter(d => d.last), over = ds.filter(d => d.st === 'over'), warn = ds.filter(d => d.st === 'warn'), none = ds.filter(d => d.st === 'none');
+    const futureTs = ds.filter(d => d.fut).map(d => d.t).sort((a, b) => cmpNo(a.no, b.no)); // 完了日が今日より後（入力ミス）の区域すべて（過去の完了日もある区域を含む。点検用）。区域の番号の順に出す
     let cls = 'cv-ok', mark = '✓', word = '順調';
     if (!known.length) { cls = 'cv-none'; mark = '？'; word = 'まだ判定できません'; }
     else if (over.length) { cls = 'cv-bad'; mark = '▲'; word = '遅れ気味'; }
     else if (warn.length) { cls = 'cv-warn'; mark = '！'; word = '要注意'; }
     // total・covered は会衆の目標（kangaeru.js）が使う：前回回り終えて365日以内の区域の数
-    return { cls, mark, word, known: known.length, over: over.length, warn: warn.length, none: none.length, total: ds.length, covered: known.length - over.length };
+    return { cls, mark, word, known: known.length, over: over.length, warn: warn.length, none: none.length, future: futureTs.length, futureTs, total: ds.length, covered: known.length - over.length };
   }
   const listNos = (ts, max) => {
     const a = ts.slice(0, max || 8).map(t => esc(t.no));
@@ -1449,7 +1462,9 @@ button.ktag{cursor:pointer}
     }
     // 10 毎月の点検で要確認のもの
     const warns = opsItems().filter(i => i.state === 'warn' && i.id !== 's13'); // S-13の「記録なし」は、上の年1回のカバーの1行に出す（1回だけ）
-    if (warns.length) row('#8A6D00', `点検で要確認　${warns.length}件`, warns.map(i => esc(i.title) + (i.detail ? `（${i.detail}）` : '')).join('、'), go('status', 'adOps', '点検を見る')); // 点検は状況のいちばん下（KS-13）
+    // 「今日」タブは項目を「、」でつなげた1つの文にするので、点検の中の改行（<br>）は全角の空白に変える（文のとちゅうで行が折れないように）
+    const flat = s => String(s == null ? '' : s).replace(/<br\s*\/?>/gi, '　');
+    if (warns.length) row('#8A6D00', `点検で要確認　${warns.length}件`, warns.map(i => esc(i.title) + (i.detail ? `（${flat(i.detail)}）` : '')).join('、'), go('status', 'adOps', '点検を見る')); // 点検は状況のいちばん下（KS-13）
     return out;
   }
   window.todayCount = () => todayItems().length; // 下のタブ（係の画面）の数字も、「今日」の数字と同じこの数にする
@@ -1743,7 +1758,7 @@ button.ktag{cursor:pointer}
   }
   function opsItems() {
     const items = [], od = opsState.data;
-    const add = (id, title, state, detail) => items.push({ id, title, state, detail });
+    const add = (id, title, state, detail, open) => items.push({ id, title, state, detail, open }); // open='s13'：その行に「S-13を開く」ボタンを出す（直す場所へ行けるように）
     const wait = !LIVE ? '試作版では見られません' : opsState.fail === 'old' ? 'サーバー（Code.gs）がまだ新しい版になっていません' : opsState.fail === 'net' ? '読み込めませんでした。あとでもう一度ためしてください' : '確かめています…';
     // 年齢データ
     if (typeof AGE_ON !== 'undefined' && AGE_ON) {
@@ -1755,6 +1770,7 @@ button.ktag{cursor:pointer}
     // S-13
     const cv = coverInfo();
     add('s13', 'S-13の「記録なし」の区域', cv.none ? 'warn' : 'ok', cv.none ? `${cv.none}区域 → S-13に転記してください` : 'ありません');
+    if (cv.future) add('s13f', 'S-13の完了日が未来の区域', 'warn', `${cv.future}区域 → S-13の「直す」で日付を直してください<br>区域：<span data-notr>${cv.futureTs.slice(0, 8).map(t => esc(t.no)).join(', ')}</span>${cv.future > 8 ? ` <span>ほか${cv.future - 8}区域</span>` : ''}`, 's13'); // 過去の完了日もある区域を含む。0区域のときは項目を出さない。この区域は他の一覧に出ないので、行から直せる場所（S-13）へ行けるようにする
     // 保存期間（個人情報の方針は2年まで）
     const km = Number(D().settings.keepMonths) || 12;
     add('keep', '訪問記録を残す期間', km > 24 ? 'warn' : 'ok', km > 24 ? `${km}か月です。個人情報の方針（2年）をこえています。24か月以下にしてください` : `${km}か月`);
@@ -1802,7 +1818,8 @@ button.ktag{cursor:pointer}
       box.id = 'adOpsBox';
       pane.appendChild(box);
       box.addEventListener('click', async e => {
-        const c = e.target.closest('[data-opschk]'), r = e.target.closest('[data-opsre]');
+        const c = e.target.closest('[data-opschk]'), r = e.target.closest('[data-opsre]'), s13 = e.target.closest('[data-tls13]');
+        if (s13) { openS13(); return; } // 「S-13を開く」（「前回の記録なし」の一覧と同じしかけ）
         if (c) {
           try {
             const j = await api('ops_check', { id: c.dataset.opschk, on: c.dataset.on === '1' });
@@ -1819,7 +1836,8 @@ button.ktag{cursor:pointer}
       <div class="cover ${warn ? 'cv-warn' : 'cv-ok'}" role="status"><i aria-hidden="true">${warn ? '！' : '✓'}</i><div><b>${warn ? `要確認が${warn}件あります` : 'いまのところ、問題はありません'}</b><small>月が変わると、係のチェックは空に戻ります</small></div></div>
       ${items.map(i => `<div class="duerow opsrow" data-ops="${esc(i.state)}" style="border-left-color:${MK[i.state][0]}"><div><p><b>${MK[i.state][1]}</b>　${esc(i.title)}</p><p class="muted">${i.detail}</p></div>
         ${i.state === 'todo' ? `<div class="duebtns"><button type="button" class="btn small primary" data-opschk="${esc(i.id)}" data-on="1">確認した</button></div>`
-          : i.state === 'done' ? `<div class="duebtns"><button type="button" class="btn small" data-opschk="${esc(i.id)}" data-on="0">取り消す</button></div>` : '<div></div>'}</div>`).join('')}
+          : i.state === 'done' ? `<div class="duebtns"><button type="button" class="btn small" data-opschk="${esc(i.id)}" data-on="0">取り消す</button></div>`
+          : i.open === 's13' ? `<div class="duebtns"><button type="button" class="btn small primary" data-tls13>S-13を開く</button></div>` : '<div></div>'}</div>`).join('')}
       <details class="dueset"><summary>設定の変更・書き出しの履歴（新しい順・${hist.length}件）</summary>
         ${hist.length ? `<ul class="opsh">${hist.map(h => /^書き出し：/.test(h.name)
           ? `<li>${esc(h.at)}　${esc(h.who)}さん：<b>${esc(h.name)}</b>${h.to ? `（${esc(h.to)}）` : ''}</li>`
