@@ -107,6 +107,13 @@ async function main() {
     }, [ALL_TXT]);
     ok(n2.shown && n2.big && !n2.small && n2.n === 1, 'N2 news:1 の変更だけをお知らせに出す（印の無い 13.171〜は出さない）', n2);
 
+    // V6：読み上げでも版の番号と「変更の一覧を見る」の両方が伝わる（aria-label で版の番号を消さない）
+    await pg.evaluate(() => { UI.mode = 'detail'; applyUi(); try { closeSheet(); } catch (e) { /* なにもしない */ } openUiSheet(); });
+    await pg.waitForTimeout(150);
+    const v6 = await pg.getByRole('button', { name: /区域マップ 版 2026\.13\.174.*変更の一覧を見る/ }).count();
+    ok(v6 === 1, 'V6 版のボタンの読み上げに、版の番号と「変更の一覧を見る」の両方が入る', v6);
+    await pg.evaluate(() => { try { closeSheet(); } catch (e) { /* なにもしない */ } });
+
     for (const mode of ['simple', 'detail']) {
       // V1：版を押すと変更の一覧（かんたんでも最初の画面にもどらない）
       const a = await openList(pg, mode, 'u1');
