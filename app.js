@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.172';
+var APP_JS_VER = '2026.13.176';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -979,7 +979,9 @@ const ADDHOME_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 async function openHomeGuide() {
   if (isStandalone()) { // すでにホーム画面から開いている：アイコンの絵は、追加するときにしかえらべない（2026.13.82）
     infoSheet('ホーム画面から開いています', 'このアプリは、すでにホーム画面のアイコンから開いています。' +
-      (isIOS() ? '<br><br>アイコンの絵は、ホーム画面に追加するときにえらびます。iPhoneでは、アイコンを作り直すと、このアイコンの中だけに保存している奉仕時間や自分の予定が消えることがあるので、今のアイコンのまま使うことをおすすめします。'
+      (isIOS() ? (memoSyncOn()
+        ? '<br><br>アイコンの絵は、ホーム画面に追加するときにえらびます。'
+        : '<br><br>アイコンの絵は、ホーム画面に追加するときにえらびます。iPhoneでは、アイコンを作り直すと、このアイコンの中だけに保存している奉仕時間や自分の予定が消えることがあるので、今のアイコンのまま使うことをおすすめします。')
         : '<br><br>アイコンの絵は、ホーム画面に追加するときにえらびます。変えたいときは、今のアイコンを長押しして削除し、Chromeで区域マップを開いて、もう一度「ホーム画面に追加」をします。'));
     return;
   }
@@ -2234,7 +2236,9 @@ async function logout() {
   const n = Store.queue.length;
   const q = n
     ? `まだ送っていない記録が${n}件あります。消すと送られません。それでもこの端末から消しますか？`
-    : 'この端末から、区域マップの情報と招待リンクを消します。奉仕時間、自分の予定（このスマホだけの記録）も消えます。よろしいですか？';
+    : memoSyncOn()
+      ? 'この端末から、区域マップの情報と招待リンクを消します。よろしいですか？（送り終えた奉仕時間・自分の予定・再訪問のメモは、もう一度登録すると戻ります）'
+      : 'この端末から、区域マップの情報と招待リンクを消します。奉仕時間、自分の予定（このスマホだけの記録）も消えます。よろしいですか？';
   if (!await ask(q)) return;
   [TOKEN_KEY, QUEUE_KEY, OLD_CACHE_KEY, SYNC_KEY, PENDING_KEY, JOIN_KEY, FAILED_KEY, ME_KEY, ORPHAN_KEY, HF_KEY, AR_KEY, SYNC_NOTE_KEY].forEach(lsDel); // 取っておいた変更も消す（監査5 M-2）
   clearAllMemos(true);
@@ -2965,14 +2969,22 @@ function terrStats(t, sinceMs) {
 
 /* ---------- 更新のお知らせ：前に開いたとき以降の変更を、起動したときに見せる ---------- */
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '0';
+/* 起動時のお知らせに出すのは news: 1 の印がある変更だけ（見た目や使い方が大きく変わるとき。出すかは毎回 R A さんに確かめる・2026-11-21）。
+   印の無い変更も、設定のいちばん下の版を押すと「変更の一覧」で見られる */
 const CHANGELOG = [
-  { v: '2026.13.172', role: 'admin', items: [
-    ['記', '区域係：S-13 に、今日より後の完了日（入力ミス）が入っている区域を、毎月の点検に区域の番号つきで出すようにしました（記録なしの区域は、「前回の記録なし」の一覧にも「完了した日付が未来になっています」と出ます）。S-13の紙の記録の「直す」で日付を直してください。区域の一覧の「前回回り終えた日」にも、今日より後の日付は出さず、S-13 にある前の完了日（紙の記録）を出します。'],
-  ] },
-  { v: '2026.13.171', role: 'admin', items: [
+  { v: '2026.13.176', role: 'admin', items: [
     ['記', '区域係：S-13 の紙の記録の「直す」を押すと、その記録だけの画面が開くようになりました。名前・割り当てた日付・完了した日付を直して「保存する」を押すと、変わる前と後を見せて確かめます。直るのはその区域の1件だけで、枝番は変わりません。'],
     ['記', '区域係：S-13 の紙の記録に、今日より後の日付を入れられないようにしました（押しまちがいで先の日付が入ると、完了していない区域が完了したように見えていました）。'],
-    ['状', '区域係：返却した日が今日より後になっている正式な返却が、記録の少ない返却の自動の確かめをすり抜けていたのを直しました。これからは待たずに確かめるので、その区域は思ったより早く「途中の返却」になることがあります。']] },
+    ['状', '区域係：返却した日が今日より後になっている正式な返却が、記録の少ない返却の自動の確かめをすり抜けていたのを直しました。これからは待たずに確かめるので、その区域は思ったより早く「途中の返却」になることがあります。'],
+    ['記', '区域係：S-13 に、今日より後の完了日（入力ミス）が入っている区域を、毎月の点検に区域の番号つきで出すようにしました（記録なしの区域は、「前回の記録なし」の一覧にも「完了した日付が未来になっています」と出ます）。S-13の紙の記録の「直す」で日付を直してください。区域の一覧の「前回回り終えた日」にも、今日より後の日付は出さず、S-13 にある前の完了日（紙の記録）を出します。']
+  ] },
+  { v: '2026.13.175', role: 'admin', items: [['状', '区域係の状況のグラフで、棒（1日）を押したときの区域ごとの内訳に、その区域を回ったおおよその時間（例：17〜18時台）を出すようにしました。午前と夕方のように記録のない時間が1時間以上あくと、「9〜10時台・17〜18時台」のように分けて出します。記録ボタンを押した時刻から出しています。家が10軒未満の区域と、週・月の内訳には出しません。']] },
+  { v: '2026.13.174', items: [['版', '設定のいちばん下の版を押すと、これまでの変更の一覧が見られるようになりました。起動したときのお知らせは、見た目や使い方が大きく変わるときだけ出します。']] },
+  { v: '2026.13.173', items: [['時', '奉仕時間・日ごとの計画・自分の予定・月の目標・奉仕報告の控えが、同じ人のほかの端末（iPadなど）でも同じになるようにしました。中身は端末の中で暗号化してから保管するので、係の画面やシートでは読めません。会衆の設定「再訪問のメモと、奉仕時間・自分の予定などの自分の記録を、同じ人のほかの端末（iPadなど）でも使えるようにする」が「使う」のときに働きます。']] },
+  { v: '2026.13.172', role: 'admin', items: [['人', '係の画面：「人」でその人を開くと、登録済みのスマホ（共通QR・ホーム画面に追加の分）が見られるようになりました。承認待ちの知らせは、今までどおり「今日」に出ます。']] },
+  { v: '2026.13.171', items: [
+    ['薦', 'おすすめの家を「地図で見る」とき、2つの区域にまたがっていても、両方の区域の家の印が出るようにしました（前は、番号の小さい区域の家しか出ず、もう1つの区域の家や仮の家が地図に見つかりませんでした）。'],
+    ['薦', '1つのおすすめには、近い家どうし（はじめは500m以内）だけをまとめるようにしました。離れた区域の家がいっしょに出なくなります。そのぶん、軒数の少ないおすすめが出ることがあります。']] },
   { v: '2026.13.170', role: 'admin', items: [
     ['状', '区域係の状況の「区域カードと留守宅カード」のグラフを、状況のいちばん上に移しました。おすすめから訪ねて会えた分が、濃い色と白い水玉で分かります。棒を押すと「おすすめのききめ」も出ます。'],
     ['状', '実際に訪ねていない拒否（自動の取り込み・区域係や手伝いの人が代わりに入れた分）は、グラフで数えないようにしました。「拒否を数えない人」でえらべます。'],
@@ -3392,13 +3404,26 @@ function watchUpdate() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(false); });
   setInterval(() => { if (!document.hidden) checkUpdate(true); }, 30 * 60000);
 }
+// お知らせ・変更の一覧に出してよい変更か（only：テスト版・本番版のどちらかだけ／role：係だけ）
+function clShow(c) {
+  const who = NS ? 'test' : 'prod';
+  return (!c.only || c.only === who) && (!c.role || (c.role === 'admin' && (() => { try { return isAdmin(); } catch (e) { return false; } })()));
+}
+// 設定の「変更の一覧」：版の新しい順。同じ版の変更（係向け・ほかのファイルが足した分）は1つの見出しにまとめる
+function changelogHtml() {
+  const by = new Map();
+  CHANGELOG.filter(clShow).forEach(c => { if (!by.has(c.v)) by.set(c.v, []); by.get(c.v).push(...c.items); });
+  const vs = [...by.keys()].sort((a, b) => verCmp(b, a));
+  return `<p class="hint">新しい順に、これまでの変更を出しています。</p>` + vs.map(v =>
+    `<h3 class="sub cl-ver">版 ${esc(v)}</h3><ul class="newslist cllist">${by.get(v).map(([i, t]) => `<li><i>${esc(i)}</i><span>${esc(t)}</span></li>`).join('')}</ul>`).join('');
+}
 function showNewsIfAny(then) {
   const seen = lsGet(SEEN_VER);
   // 見た版として残すのは、今の版とお知らせの中で一番新しい番号（古い画面を開いても下がらない）
   lsSet(SEEN_VER, verMax([seen || '0', APP_VERSION].concat(CHANGELOG.map(c => c.v))));
   if (!seen) { then(); return; } // はじめて使う人には出さない
-  const who = NS ? 'test' : 'prod'; // only のあるお知らせは、テスト版・本番版のどちらかだけに出す
-  const items = CHANGELOG.filter(c => verCmp(c.v, seen) > 0 && (!c.only || c.only === who) && (!c.role || (c.role === 'admin' && (() => { try { return isAdmin(); } catch (e) { return false; } })()))).flatMap(c => c.items);
+  // 起動時に出すのは news の印がある変更だけ。印の無い変更は、設定の版を押したときの「変更の一覧」で見る
+  const items = CHANGELOG.filter(c => c.news && verCmp(c.v, seen) > 0 && clShow(c)).flatMap(c => c.items);
   if (!items.length) { then(); return; }
   const el = $('#news');
   el.innerHTML = `<div class="newsbox"><div class="newshead"><p>アップデートのお知らせ</p><h2>区域マップが新しくなりました</h2></div>
@@ -4483,7 +4508,12 @@ function selectTerr(id, opts) {
   } else if (t && o.toast && beginner()) toast(`区域${t.no}をえらびました`);
 }
 /* えらんだ区域と同じく濃く出す区域（おすすめの「地図で見る」で、区域をまたぐとき。kangaeru.js が包む。ふだんは null） */
-function kfOnTerrs() { return null; }
+function kfOnTerrs() { return null; } // おすすめの家を地図で見ているとき（kangaeru.js の KF）は、入っている区域の Set。区域の線を濃く出す・家の印と建物の名前を、入っている区域ぜんぶにする（inSelTerr）
+/* えらんでいる区域の家か。おすすめの家を地図で見ているときは、入っている区域のどれかの家（2つめ以降の区域も・2026-11-20） */
+function inSelTerr(h, sel, more) {
+  if (more && more.size) { for (const id of more) if (houseInTerr(h, id)) return true; return false; }
+  return houseInTerr(h, sel);
+}
 /* 今えらんでいる区域（選んでいないときは null） */
 function selTerrId() {
   const c = focusCard ? activeCards().find(x => x.id === focusCard) : null;
@@ -4547,10 +4577,11 @@ function renderHouses() {
   const fade = fkeys ? 1 : iconFade();
   const b = map.getBounds().pad(0.2), vis = rotVisTest(0.2); // vis：地図を回しているときの、画面に入っているかの確かめ
   const sel = mode === 'normal' ? selTerrId() : null; // 区域をえらんでいるときは、その区域の家だけ
+  const selMore = sel ? kfOnTerrs() : null; // おすすめの家を地図で見ているときは、入っている区域ぜんぶの家（inSelTerr）
   const list = fkeys
     ? D().houses.filter(h => targets(h).some(u => fkeys.has(K(h.id, u)))) // 再訪問を地図で見る：自分の再訪問だけ
     : fade > 0.05
-      ? D().houses.filter(h => (!sel || houseInTerr(h, sel)) && b.contains([h.lat, h.lng]) && (!vis || vis(h.lat, h.lng)))
+      ? D().houses.filter(h => (!sel || inSelTerr(h, sel, selMore)) && b.contains([h.lat, h.lng]) && (!vis || vis(h.lat, h.lng)))
       : null;
   const show = !!list && list.length <= 4000; // 小さな点なら多くても軽い。それ以上は拡大してから出す
   setZoomHint(!show);
@@ -4642,7 +4673,7 @@ function houseNameLabels(list, dense) {
     dense = dense && list.some(h => onMap.has(h.id));
   }
   if (!list) return done();
-  const sel = selTerrId();
+  const sel = selTerrId(), selMore = sel ? kfOnTerrs() : null;
   let n = 0;
   for (const h of list) {
     if (!h.label || n > 300) continue;
@@ -4654,7 +4685,7 @@ function houseNameLabels(list, dense) {
     const dot = out || (dense && !(roundNums && roundNums.has(h.id)));
     cands.push({
       lat: h.lat, lng: h.lng, text: h.label, cls: 'hname' + (out ? ' out dot' : dot ? ' dot' : ''), fc: isFc,
-      out, dot, inSel: !!sel && houseInTerr(h, sel), zOff: out ? -1000 : 0
+      out, dot, inSel: !!sel && inSelTerr(h, sel, selMore), zOff: out ? -1000 : 0
     });
   }
   done();
@@ -5699,13 +5730,105 @@ async function memoEnc(key, k, pl) {
   const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: mAad(key.uid, k) }, key.ck, new TextEncoder().encode(JSON.stringify(pl)));
   return 'v1.' + mB64(iv) + '.' + mB64(new Uint8Array(ct));
 }
-async function memoDec(key, k, s) {
+async function memoDecRaw(key, k, s) {
   const p = String(s || '').split('.');
   if (p.length !== 3 || p[0] !== 'v1') throw new Error('fmt');
   const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: mUnB64(p[1]), additionalData: mAad(key.uid, k) }, key.ck, mUnB64(p[2]));
-  const o = JSON.parse(new TextDecoder().decode(pt)) || {};
+  return JSON.parse(new TextDecoder().decode(pt)) || {};
+}
+async function memoDec(key, k, s) {
+  const o = await memoDecRaw(key, k, s);
   const n = o.n && /^\d{4}-\d{2}-\d{2}$/.test(String(o.n.date || '')) ? { date: String(o.n.date), time: /^\d{1,2}:\d{2}$/.test(String(o.n.time || '')) ? String(o.n.time) : '' } : null;
   return { t: String(o.t || '').slice(0, 3000), at: String(o.at || ''), n, p: o.p ? 1 : 0 };
+}
+/* ---------- 自分の記録（奉仕時間・計画・自分の予定・目標・タイマーなど）も、同じ人のほかの端末と合わせる（2026.13.173） ----------
+   ・再訪問メモと同じ暗号化のしくみ（MemoSync・サーバーは memo.gs）に相乗りする。鍵は my| で始まる：
+       my|ev|日付|id … 自分の予定1件（足す・消すだけで、書きかえはない）
+       my|d|日付      … その日の奉仕時間（m 分）と計画（p 分）
+       my|g|年-月     … その月の目標（g 分）・送った報告（r）・報告の画面を出した日（a）
+       my|s|1         … 回る曜日（w）・タイマー（t）・前回の研究の数（ll）
+   ・中身は端末の中で暗号化してから送る。サーバー・係の画面・シートでは読めない
+   ・同じものを2つの端末で別々に書きかえたときは、あとから書きかえたほう（at が新しいほう）を残す
+   ・消す操作は at を持たない：書きかえと消すがぶつかったときは、書きかえ（残すほう）が勝つ
+   ・サーバーが対応していると分かってから送る（返事の my:1。古いサーバーと混ざっても壊れない）
+   ・サーバーに置くのは、今日から前後450日（MY_WIN_DAYS）の分だけ。古い分は各端末の中に残るが、新しい端末には引き継がれない */
+const MY_WIN_DAYS = 450;
+const isMyKey = k => String(k).indexOf('my|') === 0;
+function myWin() { const n = Date.now(); return { lo: ymd(new Date(n - MY_WIN_DAYS * 864e5)), hi: ymd(new Date(n + MY_WIN_DAYS * 864e5)) }; }
+const myInWin = (w, k) => { // 鍵が、サーバーに置く期間（窓）の中か。my|s| はいつも中
+  const kind = k.split('|')[1], ds = k.split('|')[2] || '';
+  if (kind === 's') return true;
+  if (kind === 'g') return ds >= w.lo.slice(0, 7) && ds <= w.hi.slice(0, 7);
+  return ds >= w.lo && ds <= w.hi;
+};
+const myPlHash = pl => { // 中身の印（at は入れない：書きかえ時刻がちがっても、中身が同じなら同じ印）
+  const s = JSON.stringify(pl);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36) + '.' + s.length;
+};
+/* 受け取った（または送る前の）中身を、形をたしかめてそろえる。おかしければ null */
+function myPlOk(k, o) {
+  if (!o || typeof o !== 'object') return null;
+  const kind = String(k).split('|')[1];
+  if (kind === 'ev') {
+    const d = String(o.d || ''), t = String(o.t || ''), x = String(o.x || '').slice(0, 40);
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) && x ? { d, t: /^\d{1,2}:\d{2}$/.test(t) ? t : '', x } : null;
+  }
+  if (kind === 'd') {
+    const m = Math.max(0, Math.min(24 * 60, Math.round(Number(o.m) || 0))), p = Math.max(0, Math.min(24 * 60, Math.round(Number(o.p) || 0)));
+    return m || p ? { m, p } : null;
+  }
+  if (kind === 'g') {
+    const g = Math.max(0, Math.min(200 * 60, Math.round(Number(o.g) || 0)));
+    const r = o.r && typeof o.r === 'object' && JSON.stringify(o.r).length <= 2000 ? o.r : null;
+    const a = /^\d{4}-\d{2}-\d{2}$/.test(String(o.a || '')) ? String(o.a) : '';
+    return g || r || a ? { g, r, a } : null;
+  }
+  if (kind === 's') {
+    const w = Array.isArray(o.w) ? o.w.map(Number).filter(n => n >= 0 && n <= 6).slice(0, 7) : [0, 6];
+    const tt = o.t && typeof o.t === 'object' && /^(run|pause)$/.test(String(o.t.state || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(o.t.day || ''))
+      ? { state: String(o.t.state), startAt: Number(o.t.startAt) || 0, acc: Math.max(0, Number(o.t.acc) || 0), day: String(o.t.day) } : null;
+    const ll = Math.max(0, Math.min(999, Math.round(Number(o.ll) || 0)));
+    return { w, t: tt, ll };
+  }
+  return null;
+}
+/* いま送るべき自分の記録：鍵 → 中身（窓の中の分だけ） */
+function myPlAll() {
+  const o = myData(), w = myWin(), map = {};
+  const add = (k, raw) => { const pl = myPlOk(k, raw); if (pl && myInWin(w, k)) map[k] = pl; };
+  (o.events || []).forEach(e => { if (e && e.id && /^\d{4}-\d{2}-\d{2}$/.test(String(e.date || ''))) add('my|ev|' + e.date + '|' + e.id, { d: e.date, t: e.time, x: e.title }); });
+  const days = {};
+  Object.keys(o.log).forEach(d => { if (o.log[d]) days[d] = 1; });
+  Object.keys(o.plan).forEach(d => { if (o.plan[d]) days[d] = 1; });
+  Object.keys(days).forEach(d => { if (/^\d{4}-\d{2}-\d{2}$/.test(d)) add('my|d|' + d, { m: o.log[d], p: o.plan[d] }); });
+  const yms = {};
+  [o.goals, o.reports, o.repAsk].forEach(x => Object.keys(x || {}).forEach(ym => { if (x[ym]) yms[ym] = 1; }));
+  Object.keys(yms).forEach(ym => { if (/^\d{4}-\d{2}$/.test(ym)) add('my|g|' + ym, { g: o.goals[ym], r: o.reports[ym] || null, a: o.repAsk[ym] || '' }); });
+  if (o.timer || o.lastLes || JSON.stringify(o.days) !== JSON.stringify([0, 6])) add('my|s|1', { w: o.days, t: o.timer, ll: o.lastLes });
+  return map;
+}
+/* 受け取った1件を、この端末の記録（o）に入れる。pl が null（または del）のときは消す */
+function myApply(o, k, pl) {
+  const kind = k.split('|')[1], ds = k.split('|')[2] || '';
+  if (kind === 'ev') {
+    const id = k.split('|')[3] || '';
+    if (!id) return;
+    o.events = (o.events || []).filter(e => e && e.id !== id);
+    if (pl) o.events.push({ id, date: pl.d, time: pl.t, title: pl.x });
+  } else if (kind === 'd') {
+    if (pl && pl.m) o.log[ds] = pl.m; else delete o.log[ds];
+    if (pl && pl.p) o.plan[ds] = pl.p; else delete o.plan[ds];
+  } else if (kind === 'g') {
+    if (pl && pl.g) o.goals[ds] = pl.g; else delete o.goals[ds];
+    if (pl && pl.r) o.reports[ds] = pl.r; else delete o.reports[ds];
+    if (pl && pl.a) o.repAsk[ds] = pl.a; else delete o.repAsk[ds];
+  } else if (kind === 's') {
+    o.days = pl ? pl.w : [0, 6];
+    o.timer = pl ? pl.t : null;
+    if (pl && pl.ll) o.lastLes = pl.ll; else delete o.lastLes;
+  }
 }
 const MemoSync = {
   busy: false,
@@ -5720,8 +5843,15 @@ const MemoSync = {
   offDone: false,
   stKey() { return MSYNC_PREFIX + me().id; },
   load() {
-    try { const o = JSON.parse(lsGet(this.stKey()) || 'null'); if (o && o.rows) { o.checked = Array.isArray(o.checked) ? o.checked : []; return o; } } catch (e) { /* 作り直す */ }
-    return { since: 0, rows: {}, checked: [], kid: '' };
+    try {
+      const o = JSON.parse(lsGet(this.stKey()) || 'null');
+      if (o && o.rows) {
+        o.checked = Array.isArray(o.checked) ? o.checked : [];
+        o.pend = o.pend && typeof o.pend === 'object' ? o.pend : {}; // 自分の記録：まだ送れていない書きかえの時刻（my|）
+        return o;
+      }
+    } catch (e) { /* 作り直す */ }
+    return { since: 0, rows: {}, checked: [], kid: '', pend: {} };
   },
   save(st) { lsSet(this.stKey(), JSON.stringify(st)); },
   reset() { lsDel(MSYNC_PREFIX + me().id); lsDel(MKEY_PREFIX + me().id); this.key = null; },
@@ -5790,17 +5920,40 @@ const MemoSync = {
     const uid = me().id;
     let key = await this.getKey(false);
     let st = this.load();
-    if (st.kid && key.kid && st.kid !== key.kid) st = { since: 0, rows: {}, checked: [], kid: '' }; // 鍵が作り直された
+    if (st.kid && key.kid && st.kid !== key.kid) st = { since: 0, rows: {}, checked: [], kid: '', pend: {} }; // 鍵が作り直された
     const fs = D().follows || {};
     const myKeys = Object.keys(fs).filter(k => fs[k] && fs[k].by === uid);
-    const full = myKeys.some(k => st.checked.indexOf(k) < 0) || !st.since;
+    const myOn = !!st.my; // サーバーが my|（自分の記録）に対応していると分かってから送る
+    const full = myKeys.some(k => st.checked.indexOf(k) < 0) || !st.since || (myOn && !st.myChecked);
     const memos = memoAll(), pins = pinsAll();
-    const all = new Set(Object.keys(memos).concat([...pins], Object.keys(st.rows)));
+    const myMap = myOn ? myPlAll() : {};
+    const all = new Set(Object.keys(memos).concat([...pins], Object.keys(st.rows), Object.keys(myMap)));
+    const win = myWin();
+    const winDel = { lo: ymd(new Date(Date.now() - (MY_WIN_DAYS - 2) * 864e5)), hi: win.hi }; // 受け取った「消した」にだけ使う、2日せまい窓
     const items = [], sent = {};
     let size = 0;
     for (const k of all) {
       if (size > 400000 || items.length >= 200) { this.soon(500); break; } // 多いときは分けて送る
-      const pl = memoPl(memos, pins, k), h = memoPlHash(pl), r = st.rows[k];
+      const r = st.rows[k];
+      if (isMyKey(k)) { // 自分の記録（奉仕時間・予定など）
+        if (!myOn) continue;
+        if (!myInWin(win, k)) { // 窓の外：サーバーからだけ消す（この端末の中の記録は残す）
+          if (r && !r.del) { if (st.myChecked) { items.push({ k, base: r.v, del: 1 }); sent[k] = ''; } }
+          else if (r) delete st.rows[k];
+          delete st.pend[k];
+          continue;
+        }
+        const pl = myMap[k];
+        if (pl) {
+          const h = myPlHash(pl);
+          if (r && !r.del && r.h === h) { delete st.pend[k]; continue; } // 前回合わせたときから変わっていない
+          if (!st.pend[k] || st.pend[k].h !== h) st.pend[k] = { h, at: Date.now() }; // 書きかえた時刻（送れるまで覚えておく）
+          const d = await memoEnc(key, k, Object.assign({ at: st.pend[k].at }, pl));
+          items.push({ k, base: r ? r.v : 0, d }); sent[k] = h; size += d.length;
+        } else if (r && !r.del && st.myChecked) { items.push({ k, base: r.v, del: 1 }); sent[k] = ''; } // この端末で消した（初回の取り込みがすむ前は消したと判断しない）
+        continue;
+      }
+      const pl = memoPl(memos, pins, k), h = memoPlHash(pl);
       const f = fs[k], mine = !!(f && f.by === uid);
       if (pl) {
         if (r && !r.del && r.h === h) continue;           // 前回合わせたときから変わっていない
@@ -5814,18 +5967,41 @@ const MemoSync = {
     }
     if (!items.length && !full && !this.pull) { this.save(st); return false; }
     this.pull = false;
-    const j = await api('memo_sync', { since: full ? 0 : st.since, items }, { timeout: 60000 });
+    this.save(st); // 送る前に保存：通信に失敗しても、書きかえた時刻（pend の at）が残る（あとから書きかえたほうが勝つ、を守るため）
+    const j = await api('memo_sync', { since: full ? 0 : st.since, items, my: 1 }, { timeout: 60000 }); // my:1＝my|（自分の記録）が分かる端末。サーバーは、これを付けた端末にだけ my| の行を返す
     if (j.kid && key.kid && j.kid !== key.kid) { this.reset(); return true; } // 鍵が作り直された：もう一度はじめから
     if (j.kid && !key.kid) key.kid = j.kid;
     st.kid = key.kid || j.kid || '';
+    st.my = j.my ? 1 : 0; // サーバーが my|（自分の記録）に対応しているか
     const conf = new Set(j.conflicts || []);
-    (j.gone || []).forEach(k => { delete st.rows[k]; }); // ほかの人の受け持ちになった・もうない家
+    (j.gone || []).forEach(k => { delete st.rows[k]; delete st.pend[k]; }); // ほかの人の受け持ちになった・もうない家
     const memos2 = memoAll(), pins2 = pinsAll(); // 返事を待つあいだに書きかえたかもしれないので、読み直す
-    let touched = false, again = conf.size > 0;
+    const my2 = myData();
+    let touched = false, touchedMy = false, again = conf.size > 0;
+    if (st.my && !myOn) again = true; // 対応していると分かった：次の回から自分の記録も合わせる
     for (const row of (Array.isArray(j.rows) ? j.rows : [])) {
       const [k, v, , del, data] = row;
       if (Object.prototype.hasOwnProperty.call(sent, k) && !conf.has(k)) { // 送った内容が受け付けられた
         st.rows[k] = { v, h: sent[k], del: del ? 1 : 0 };
+        delete st.pend[k];
+        continue;
+      }
+      if (isMyKey(k)) { // 自分の記録（奉仕時間・予定など）
+        if (!myInWin(win, k)) { delete st.rows[k]; delete st.pend[k]; continue; } // 窓の外は取り込まない
+        let srv = null, srvAt = 0;
+        if (!del) {
+          let raw;
+          try { raw = await memoDecRaw(key, k, data); } catch (e) { continue; } // 読めない（鍵が合わない）ものはとばす
+          srv = myPlOk(k, raw);
+          srvAt = Number(raw && raw.at) || 0;
+          if (!srv) continue; // 形がおかしいものはとばす
+        } else if (!myInWin(winDel, k)) { delete st.rows[k]; delete st.pend[k]; continue; } // 窓のふち近くの「消した」は取り込まない（端末の日付が1日ずれていても、窓の中の記録を消さないため）
+        const lp = myMap[k], p = st.pend[k];
+        if (del ? !lp : (lp && myPlHash(lp) === myPlHash(srv))) { // この端末の中身と同じ：入れ直さない（おすすめ由来の予定の付加情報（tid など）を消さない・無駄な保存をしない）
+          delete st.pend[k];
+        } else if (p && p.at > srvAt) again = true; // この端末の書きかえのほうが新しい：次の回に送り直す（消す操作は at を持たないので、書きかえと消すがぶつかったときは書きかえが残る）
+        else { myApply(my2, k, del ? null : srv); touchedMy = true; delete st.pend[k]; }
+        st.rows[k] = { v, h: srv ? myPlHash(srv) : '', del: del ? 1 : 0 };
         continue;
       }
       let srv = null;
@@ -5840,12 +6016,13 @@ const MemoSync = {
       st.rows[k] = { v, h: memoPlHash(srv), del: del ? 1 : 0 };
     }
     if (touched) { memoSaveRaw(memos2); pinsSaveRaw(pins2); }
+    const myOk = touchedMy ? mySave(my2) !== false : true; // 保存に失敗したら、全部を取り込めた印は立てない（「消した」と誤解しないため）
     st.since = Number(j.now) || st.since;
-    if (full) st.checked = myKeys;
+    if (full) { st.checked = myKeys; if (myOn && myOk) st.myChecked = 1; }
     this.save(st);
     this.seenMv = j.mv || this.seenMv;
     this.lastAt = Date.now();
-    if (touched) {
+    if (touched || touchedMy) {
       if (currentView === 'follow') renderFollowList();
       else if (currentView === 'home') renderHome();
     }
@@ -9138,8 +9315,8 @@ function renderInbox() {
         <button type="button" data-sset="obiOn" data-v="1" aria-pressed="${st.obiOn !== 0}">使う</button>
         <button type="button" data-sset="obiOn" data-v="0" aria-pressed="${st.obiOn === 0}">使わない</button></div></div>`,
     memoSync: `<div class="setrow">
-      <span>再訪問のメモを、同じ人のほかの端末（iPadなど）でも使えるようにする<br><small class="hint">メモは各自の端末の中で暗号化してから保管するので、係の画面やシートでは読めません。「使わない」にすると、保管しているメモをサーバーから消し、これまでどおり各自のスマホの中だけになります（スマホの中のメモは消えません）</small></span>
-      <div class="seg" role="group" aria-label="再訪問のメモをほかの端末でも使う">
+      <span>再訪問のメモと、奉仕時間・自分の予定などの自分の記録を、同じ人のほかの端末（iPadなど）でも使えるようにする<br><small class="hint">メモや記録は各自の端末の中で暗号化してから保管するので、係の画面やシートでは読めません。「使わない」にすると、保管しているメモと記録をサーバーから消し、これまでどおり各自のスマホの中だけになります（スマホの中のメモと記録は消えません）</small></span>
+      <div class="seg" role="group" aria-label="再訪問のメモと自分の記録をほかの端末でも使う">
         <button type="button" data-sset="memoSync" data-v="1" aria-pressed="${st.memoSync !== 0}">使う</button>
         <button type="button" data-sset="memoSync" data-v="0" aria-pressed="${st.memoSync === 0}">使わない</button></div></div>`,
   };
@@ -10588,7 +10765,7 @@ function extSetHtml(rrow, stpd) {
   const set = `<p class="hint">留守宅カードにして返した区域（だれも持っていない区域）で、まだ訪ねていない家と、まだ会えていない家を、全員の「おすすめ」タブに近くの数軒ずつ出します。区域をまたいでまとめます。</p>
     <p class="hint">1回目が目安（${th}%）に届かずに返した区域・だれかが留守宅カードを受け取っている区域・特別区域・試験用の区域は出しません。完了した区域も出しません（残りの家は、次に区域カードとして受け取った人が回ります）。</p>
     <p class="hint">区域ごとに止めるときは、状況の「留守宅の状況」の「区域ごと」の表の「おすすめ」の欄で「止める」を押します（苦情のあった地域など）。止めた区域は、「出す」を押すまで、次の巡回でも止まったままです。</p>` +
-    `<div class="setrow"><span>1つのおすすめに入れる家の数<br><small class="hint">近い家どうしを、この軒数ずつまとめて出します</small></span><div class="stepper">
+    `<div class="setrow"><span>1つのおすすめに入れる家の数<br><small class="hint">近い家どうしを、この軒数ずつまとめて出します。家どうしが${recoDistM()}mより離れているときは、いっしょにしません</small></span><div class="stepper">
       <button type="button" data-kset="recoCount" data-d="-1" aria-label="家の数を減らす">−</button><output class="wide">${rc}軒まで</output>
       <button type="button" data-kset="recoCount" data-d="1" aria-label="家の数を増やす">＋</button></div></div>` +
     rrow('回り残しの家も出す', '留守宅カードの区域で、この巡回の中で一度も訪ねていない家（1回目の目安に届いたので回らなかった家など）を出します。仮の家は、家かどうか確かめてもらい、家でなければ、その場で消せます',
@@ -11290,7 +11467,7 @@ function openUiSheet() {
   let page = 'top', lastCat = null;
   const paint = keep => {
     const top = keep ? $('#sheet').scrollTop : 0, det = UI.mode === 'detail';
-    if (!det) page = 'top'; // かんたんモードは目次にしない（1画面）
+    if (!det && page !== 'ver') page = 'top'; // かんたんモードは目次にしない（1画面）。版を押したときの「変更の一覧」だけは開く
     const seg = (key, opts, cur, cls) => `<div class="seg uiseg${cls ? ' ' + cls : ''}" role="group">${opts.map(([v, l]) =>
       `<button type="button" data-ui="${key}" data-v="${v}" aria-pressed="${(cur === undefined ? UI[key] : cur) === v}">${l}</button>`).join('')}</div>`;
     const sizeOpts = (det ? ['small', 'normal', 'large', 'xlarge'] : ['normal', 'large', 'xlarge']).map(k => [k, SIZES[k][1]]);
@@ -11347,9 +11524,9 @@ function openUiSheet() {
     const S_GUIDE_SIMPLE = `<p class="q">はじめの案内（使い方の動画のお知らせなど）</p>${seg('guide', [['auto', '最初の数日だけ'], ['on', 'いつも出す'], ['off', '出さない']], UI.guide || 'auto')}`;
     const tail = `<button class="btn block" id="uiReset">見え方を最初にもどす</button><button class="btn primary block" data-close>閉じる</button>` +
       // この端末で動いているアプリの版（更新が届いたかを、だれでも確かめられるように。2026-10-29）
-      `<p class="muted appver" style="text-align:center;margin-top:12px;font-size:15px">区域マップ 版 ${esc(APP_VERSION)}</p>`; // hint は「説明を出さない」で消えるので使わない
+      `<button type="button" class="appverbtn" data-page="ver"><span class="appver">区域マップ 版 ${esc(APP_VERSION)}</span><span class="vh"> 変更の一覧を見る</span><span aria-hidden="true"> ›</span></button>`; // hint は「説明を出さない」で消えるので使わない。押すと変更の一覧（2026.13.174）。読み上げでも版の番号が伝わるように、aria-label は使わない。.appver の中は版の文字だけ（auto の ban.e2e.js が見ている）
     let b;
-    if (!det) {
+    if (!det && page !== 'ver') {
       // かんたんモード：目次にせず1画面（地図の見た目・画面の見え方・文字の大きさ・番号と線の濃さ・機能をふやす・はじめの案内・使い方の動画・言語）
       b = `<h2 id="sheetTitle" class="uititle" tabindex="-1">設定</h2>` + S_BASE + S_VIEW + S_TEXT + S_NOUDO +
         `<details class="kmore"${uiKOpen ? ' open' : ''}><summary>機能をふやす</summary>${F_FEAT}</details>` +
@@ -11413,8 +11590,10 @@ function openUiSheet() {
         ${uiSlot('start')}${diagSetHtml()}`;
       } else if (page === 'lang') {
         body = window.KI ? KI.picker(false, { noHead: true }) : '';
+      } else if (page === 'ver') {
+        body = changelogHtml();
       }
-      b = `<button type="button" class="btn back" data-uiback>‹ 設定</button><h2 id="sheetTitle" class="uititle" tabindex="-1"${page === 'lang' ? ' data-notr' : ''}>${cat ? cat[1] : '設定'}</h2>` + body +
+      b = `<button type="button" class="btn back" data-uiback>‹ 設定</button><h2 id="sheetTitle" class="uititle" tabindex="-1"${page === 'lang' ? ' data-notr' : ''}>${cat ? cat[1] : page === 'ver' ? '変更の一覧' : '設定'}</h2>` + body +
         `<button class="btn primary block" data-close>閉じる</button>`;
     }
     b = `<div class="grabrow"><span class="grab" aria-hidden="true"></span><button type="button" class="xmini" data-close aria-label="閉じる">×</button></div><p class="grabhint">下にスワイプすると、設定を残して閉じます</p>` + b;
@@ -13009,7 +13188,8 @@ function exportCsv() {
 
 /* =========================================================
    ホーム：奉仕の集まりの予定・自分の予定・奉仕時間
-   ・奉仕時間と自分の予定は、本人のスマホの中だけに保存（サーバーには送らない）
+   ・奉仕時間と自分の予定は、本人のスマホの中に保存。会衆の設定（memoSync）が「使う」のときは、
+     端末の中で暗号化して、同じ人のほかの端末とも合わせる（myPlAll・MemoSync。2026.13.173）
    ・奉仕の集まりの予定は、グループ監督・区域係が入れ、グループの人に届く
    ========================================================= */
 const normGroup = g => String(g || '').normalize('NFKC').replace(/\s+/g, '').slice(0, 30);
@@ -13080,7 +13260,7 @@ function myData() {
   o.plan = o.plan || {}; o.reports = o.reports || {}; o.repAsk = o.repAsk || {}; // 日ごとの計画（分）・送った報告・報告の画面を出した日
   return o;
 }
-const mySave = o => { if (!lsSet(myKey(), JSON.stringify(o))) toast('このスマホに保存できませんでした'); };
+const mySave = o => { const ok = lsSet(myKey(), JSON.stringify(o)); if (!ok) toast('このスマホに保存できませんでした'); else if (onMemoVer) MemoSync.soon(); return ok; }; // 保存したら、同じ人のほかの端末とも合わせる（memoSync が「使う」のとき）
 const monthMin = (o, ym) => Object.entries(o.log).filter(([d]) => d.startsWith(ym)).reduce((a, [, m]) => a + m, 0);
 const monthDays = (o, ym) => Object.entries(o.log).filter(([d, m]) => d.startsWith(ym) && m > 0).length;
 
@@ -13128,7 +13308,7 @@ function openTimerStop(warn) {
       <div class="stepper" style="justify-content:center"><button type="button" data-tm="-15" aria-label="15分へらす">−</button>
         <output class="wide" style="min-width:170px">${fmtMin(min)}</output><button type="button" data-tm="15" aria-label="15分ふやす">＋</button></div>
       <div class="row" style="justify-content:center"><button type="button" class="btn small" data-tm="-60" data-keep>−1時間</button><button type="button" class="btn small" data-tm="60" data-keep>＋1時間</button></div>
-      <p class="hint">記録は、このスマホの中だけに保存されます。ホームのカレンダーの${fmtYmd(t.day)}に足されます。</p>
+      <p class="hint">${memoSyncOn() ? '記録は、本人の端末（スマホ・iPadなど）だけに保存されます。' : '記録は、このスマホの中だけに保存されます。'}ホームのカレンダーの${fmtYmd(t.day)}に足されます。</p>
       <button class="btn primary block" id="tmSave">記録して終わる</button>
       <button class="btn block" id="tmDiscard">記録しないで終わる</button>
       <button class="btn block" data-close>もどる（続ける）</button>`);
@@ -13162,7 +13342,7 @@ function manualTodayHtml(o) {
   return `<div class="mtoday"><p class="q">今日の奉仕時間</p>
     <div class="tdial">${col('h', TD_H, H, '時間', '時間')}${col('m', tdMins(Mi), Mi, '分', '分')}</div>
     <p class="muted" id="tdSum">${m ? `今日 ${fmtMin(m)}` : 'まだ入れていません'}${p ? `　今日の計画 ${fmtMin(p)}${m >= p ? '　✓ 達成しました' : ''}` : ''}</p>
-    <p class="hint">上下にスワイプして合わせると、すぐ保存されます（このスマホだけ）。ほかの日は、下のカレンダーの日にちを押して入れられます。</p></div>`;
+    <p class="hint">上下にスワイプして合わせると、すぐ保存されます（${memoScope()}）。ほかの日は、下のカレンダーの日にちを押して入れられます。</p></div>`;
 }
 function bindTodayDial() {
   const box = $('#homeTimer .tdial'); if (!box) return;
@@ -13374,7 +13554,7 @@ function openGoalPlan(ymArg) {
       : plan >= goal ? `<p class="st ok">✓ 目標に届く計画です${plan > goal ? `（${fmtMin(plan - goal)} 多め）` : ''}</p>`
         : `<p class="st short">あと ${fmtMin(goal - plan)} 計画に入れると、目標に届きます</p>`;
     if (keep) sheetKeep = true; // 見ていた位置をそのままにする
-    setSheet(headHtml(null, '目標と計画', 'このスマホの中だけに保存されます') + `
+    setSheet(headHtml(null, '目標と計画', memoSyncOn() ? '本人の端末だけに保存されます' : 'このスマホの中だけに保存されます') + `
       <div class="calhead"><button type="button" class="btn small" data-pm="-1" aria-label="前の月">‹</button><b>${Y}年${M}月</b><button type="button" class="btn small" data-pm="1" aria-label="次の月">›</button></div>
       <div class="pgoal"><p class="q" style="margin:0">${M}月の目標</p>
         <div class="stepper"><button type="button" data-pg="-60" aria-label="1時間へらす">−</button><output class="wide">${goal ? fmtMin(goal) : 'なし'}</output><button type="button" data-pg="60" aria-label="1時間ふやす">＋</button></div></div>
@@ -13552,7 +13732,7 @@ function monthEndHtml(o) {
 function openMonthHist() {
   const o = myData();
   const yms = [...new Set(Object.keys(o.log).map(d => d.slice(0, 7)).concat(Object.keys(o.goals)))].sort().reverse();
-  setSheet(headHtml(null, '月ごとの奉仕時間', 'このスマホの記録') + (yms.length
+  setSheet(headHtml(null, '月ごとの奉仕時間', memoSyncOn() ? '本人の端末の記録' : 'このスマホの記録') + (yms.length
     ? `<table class="slots narrow"><tr><th>月</th><th>時間</th><th>日数</th><th>目標</th><th>報告</th></tr>${yms.map(ym => {
         const m = monthMin(o, ym), g = o.goals[ym] || 0, r = o.reports[ym];
         return `<tr><th>${Number(ym.slice(0, 4))}年${Number(ym.slice(5))}月</th><td><b>${fmtMin(m)}</b></td><td>${monthDays(o, ym)}日</td><td>${g ? `${fmtMin(g)}（${Math.round(m / g * 100)}%）` : '—'}</td>
@@ -13640,7 +13820,7 @@ function openReportLine(ym, opt) {
       ${ok ? `<a class="btn line block" id="rpLine" href="https://line.me/R/share?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">LINEで送る</a>
       ${navigator.share ? '<button class="btn block" id="rpShare">ほかのアプリで送る（メールなど）</button>' : ''}
       <button class="btn block" id="rpCopy">文をコピーする</button>` : '<p class="notice info">「1カ月間に何らかの形で伝道した」の「はい」か「いいえ」を選ぶと、送れるようになります。</p>'}
-      <p class="hint">送る相手は、グループのトークではなく、報告を受け取る人との個別のトークがおすすめです。報告の内容は、このスマホの中だけに保存され、区域係やサーバーには送られません（iPhoneでホーム画面に追加するときだけ、暗号にして15分間サーバーを通し、ホーム画面のアプリに移します。サーバーは中身を読めません）。</p>
+      <p class="hint">送る相手は、グループのトークではなく、報告を受け取る人との個別のトークがおすすめです。${memoSyncOn() ? '報告の内容は、暗号にして保管し、本人の端末（スマホ・iPadなど）だけで見られます。係の画面やシートでは読めません。' : '報告の内容は、このスマホの中だけに保存され、区域係やサーバーには送られません（iPhoneでホーム画面に追加するときだけ、暗号にして15分間サーバーを通し、ホーム画面のアプリに移します。サーバーは中身を読めません）。'}</p>
       ${rep ? `<p class="okmsg">${fmtDate(rep.at)}に報告しました（${esc(repSummary(rep))}）。直したときは、もう一度送ってください。</p>`
         : ok ? '<button class="btn block" id="rpDone">もう報告した（送らずに閉じる）</button>' : ''}
       <button class="btn block" data-close>${rep ? '閉じる' : 'あとで'}</button>`);
@@ -14067,7 +14247,7 @@ function openDay(date) {
       ${sc.length ? swipeHint(sc) + sc.map(s => schedRow(s, false)).join('')
         : '<p class="muted">この日の集まりはありません。</p>'}
       ${canAddSched() ? `<button class="btn small" id="dAddSched">＋ この日に集まりを入れる</button>` : ''}
-      <h3 class="sub">自分の予定 <span class="muted" style="font-size:14px">（このスマホだけ）</span></h3>
+      <h3 class="sub">自分の予定 <span class="muted" style="font-size:14px">（${memoScope()}）</span></h3>
       ${ev.length ? ev.map(e => `<article class="ritem k-young evrow"><div><p class="rt">${e.time ? esc(e.time) + '　' : ''}${esc(e.title)}</p></div>
         <span class="actions" style="margin:0"><a class="btn small" href="${gcalUrl(e.title, e.date, e.time, '', '', '')}" target="_blank" rel="noopener">Googleカレンダーへ</a>
         <button class="btn small danger" data-evdel="${esc(e.id)}">消す</button></span></article>`).join('') : '<p class="muted">予定はありません。</p>'}
@@ -14075,7 +14255,7 @@ function openDay(date) {
       <div class="inline" style="margin-top:8px"><input type="time" id="evTime" aria-label="時刻" style="min-height:52px;border-radius:12px;border:2px solid var(--ink2);padding:0 8px;max-width:130px">
         <input type="text" id="evTitle" maxlength="40" placeholder="例：〇〇さんと奉仕" style="min-height:52px;border-radius:12px;border:2px solid var(--ink2);padding:0 10px;font-size:18px"></div>
       <button class="btn block" id="evAdd">予定を入れる</button>
-      ${featTime() ? `<h3 class="sub">この日の奉仕時間 <span class="muted" style="font-size:14px">（このスマホだけ）</span></h3>
+      ${featTime() ? `<h3 class="sub">この日の奉仕時間 <span class="muted" style="font-size:14px">（${memoScope()}）</span></h3>
       ${dminHtml(min)}
       <button class="btn primary block" id="dMinSave">奉仕時間を保存する</button>` : ''}
       <button class="btn block" data-close>${featTime() ? 'やめる' : '閉じる'}</button>`);
@@ -14171,6 +14351,11 @@ const RECO_KINDS2 = [
   ['fresh', 32, 'まだ一度も訪ねていない家', '仮の家の確認にもなります']
 ];
 const RECO_LIM = { recoCount: [1, 5], recoDist: [100, 3000], recoLongDays: [30, 730], recoSkipDays: [0, 60] };
+/* 1つのおすすめにまとめる家どうしの距離の上限（m）。kangaeru.js の buildClusters と、係の設定のヒントで同じ値を使う（2026-11-20） */
+function recoDistM() {
+  const v = D().settings.recoDist, n = v === undefined || v === null || v === '' || !isFinite(Number(v)) ? 500 : Number(v);
+  return Math.max(RECO_LIM.recoDist[0], Math.min(RECO_LIM.recoDist[1], n));
+}
 const recoOn = () => !!Store.data && Number(D().settings.recoOn) !== 0;
 function recoLabel(src) {
   if (!src || String(src).indexOf('reco') !== 0) return '';
@@ -14395,6 +14580,10 @@ function todayTodoHtml(todays) {
 
 function renderHome() {
   const box = $('#view-home'); if (!box || box.hidden) return;
+  const hm = $('#homeMyHint'); // カレンダーの下の説明：自分の記録がどこに保存されるか（同期が効いているときは文を変える）
+  if (hm) hm.textContent = memoSyncOn()
+    ? '自分で入れた予定や時間は、暗号にして保管し、本人の端末（スマホ・iPadなど）だけで見られます。係の画面やシートでは読めません。'
+    : '自分で入れた予定や時間は、このスマホの中だけに保存されます。係やほかの人には送られません（iPhoneでホーム画面に追加するときだけ、暗号にして15分間サーバーを通し、ホーム画面のアプリに移します。サーバーは中身を読めません）。';
   const o = myData(), t = o.timer, h = new Date().getHours();
   const hi = h < 5 ? 'こんばんは' : h < 10 ? 'おはようございます' : h < 17 ? 'こんにちは' : 'こんばんは';
   const todays = schedsOn(ymd(new Date()));
@@ -15063,6 +15252,20 @@ function renderPeople() {
     $$('[data-uedit]', box).forEach(b => b.onclick = () => openEditUser(b.dataset.uedit));
   }
 }
+/* 人の画面：その人の登録済みのスマホ（表示だけ・2026-11-20）。
+   一覧に出るのは、共通QRで登録したスマホと「ホーム画面に追加」したスマホ（サーバーの devices）。
+   本人用のリンクで開いただけのスマホは devices に残らないので、ここには出ない（最後に使った日は上の usenote が別に見ている）。
+   承認・使えなくするの操作は、今までどおり「今日」のタブ（入口を増やさない） */
+function euDevHtml(id) {
+  if (!devState.list) return LIVE ? '<p class="muted">スマホの登録の状況を読み込んでいます…</p>' : '';
+  const mine = devState.list.filter(d => d.uid === id && d.status === 'active');
+  const rows = mine.map(d => {
+    const when = [d.decAt ? `${fmtDay(d.decAt)}に承認` : '', d.seen ? `最後に使った日 ${fmtDay(d.seen)}` : ''].filter(Boolean).join('　');
+    return `<p class="devline"><b>${esc(d.label)}</b>　<span class="muted">${when}</span></p>`;
+  }).join('');
+  return `<p class="q">登録済みのスマホ（${mine.length}台）</p>${rows || '<p class="muted">この一覧に出るスマホはありません。</p>'}
+    <p class="hint">出るのは、共通QRで登録したスマホと「ホーム画面に追加」したスマホです。本人用のリンクで開いただけのスマホは、ここに出ません。使えなくするのは「今日」のタブからです。</p>`;
+}
 /* 1人の役割・グループを直す（係の画面「人」の行を押したとき・改善案A5）。直して「保存する」を押したときだけ保存する */
 function openEditUser(id) {
   const u0 = userById(id); if (!u0 || !isAdmin()) return;
@@ -15092,6 +15295,7 @@ function openEditUser(id) {
       <p class="hint">家の削除・拒否の削除・家の編集ができます。記録のある家や拒否も消せます。信頼できる人にだけ任せてください。</p>`}
       <button class="btn primary block" id="euSave">保存する</button>
       <button class="btn block" id="euLink">リンク・QR</button>
+      <div id="euDevs" data-uid="${esc(id)}">${euDevHtml(id)}</div>
       ${u.id === me().id ? '' : '<div class="kops"><details><summary>この人が使うのをやめる</summary><p class="hint">この人のスマホでは、次に開いたときに区域の情報が消えます。</p><button class="btn block danger" id="euOff">使うのをやめる</button></details></div>'}
       <button class="btn block" data-close>やめる</button>`);
     const keep = () => { if ($('#euName')) f.name = $('#euName').value; f.group = $('#euGroup').value; f.overseer = $('#euOver').checked; f.leader = $('#euLead').checked; if ($('#euYomi')) f.yomi = $('#euYomi').value; if ($('#euMgr')) f.mgr = $('#euMgr').checked; };
@@ -15119,6 +15323,15 @@ function openEditUser(id) {
       setUserGroup(u, g, f.overseer, f.leader, roleCh ? f.role : undefined, undefined, yomiCh ? y : undefined, mgrCh ? mgrNow : undefined, nameCh ? nm : undefined);
     };
     $('#euLink').onclick = () => { const u = userById(id); if (u) openUserLink(u, false); };
+    // 一覧がまだ届いていないとき：読み込みが終わったら、この部分だけ描き直す（入力中の欄には手をふれない）。
+    // 描くのは「今ひらいている人」（el.dataset.uid）。読み込みのあいだに別の人をひらいても、前の人の一覧を出さない（監査1）
+    if (LIVE && !devState.list) {
+      Promise.resolve(devState.busy && devState.p ? devState.p : fetchDevices(true)).then(() => {
+        const el = $('#euDevs'); if (!el) return;
+        el.innerHTML = devState.list ? euDevHtml(el.dataset.uid)
+          : '<p class="muted">スマホの登録の状況を読み込めませんでした。少し待ってから、もう一度この人を開いてください。</p>';
+      }).catch(() => {});
+    }
     if ($('#euOff')) $('#euOff').onclick = async () => {
       const u = userById(id); if (!u) return;
       if (!await ask('', { title: `${u.name}さんが区域マップを使うのをやめますか？`,
@@ -16873,7 +17086,7 @@ function bindStatic() {
       const key = x.dataset.sset, v = Number(x.dataset.v);
       const go = () => { D().settings[key] = v; Store.save(); renderAll(); toast('設定を変えました'); };
       if (key === 'memoSync' && v === 0 && D().settings.memoSync !== 0) {
-        ask('再訪問のメモを、ほかの端末で使えないようにします。\nサーバーに保管している全員のメモを消します（各自のスマホの中のメモは残ります）。よろしいですか？')
+        ask('再訪問のメモと、奉仕時間・自分の予定などの自分の記録を、ほかの端末で使えないようにします。\nサーバーに保管している全員のメモと記録を消します（各自のスマホの中のメモと記録は残ります）。よろしいですか？')
           .then(ok => { if (ok) go(); });
       } else go();
     }

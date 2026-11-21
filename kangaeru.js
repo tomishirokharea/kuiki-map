@@ -573,6 +573,9 @@
      雨の日は、集合住宅の部屋（エレベーターありが先）を先にまとめ、そのあとでほかの家をまとめる（ほかの家も消さない） */
   function buildClusters(items, pos, rain) {
     const N = recoN(), out = [], stops = new Map();
+    // 1つのおすすめにまとめる家どうしの距離の上限：係の設定「『近く』とする距離」（recoDist・はじめ500m・100〜3000m）。
+    // 上限がないと、近くの家が先のおすすめで使われたあと、離れた区域の家がまとめられていた（2026-11-20 の声）
+    const R = recoDistM(), R2 = R * R; // app.js（係の設定のヒントと同じ値）
     items.forEach(x => {
       let s = stops.get(x.h.id);
       if (!s) stops.set(x.h.id, s = { h: x.h, xs: [], last: x.lastAt, rank: rainRank(x.h) });
@@ -592,24 +595,33 @@
       while (rest.length && out.length < lim) {
         const seeds = rain && rest.some(s => s.rank === 0) ? rest.filter(s => s.rank === 0) : rest;
         const seed = pos ? seeds.reduce((a, s) => (d2(px, py, s) < d2(px, py, a) ? s : a)) : seeds.reduce((a, s) => (s.last < a.last ? s : a));
-        // 種から近い家を N 軒ぶん（1軒の家に部屋が多いこともあるので、家は N 軒まで見れば足りる）。全部を並べかえずに、近いものだけ残す
-        const near = [seed];
+        // 種から近い順に N 軒ぶん（1軒の家に部屋が多いこともあるので、部屋の数で数える）。
+        // 家どうしの距離は上限（R）まで：種から R より遠い家は候補にしない。入れた家のどれかから R より遠い家もとばす（2026-11-20）
+        const cand = [];
         for (const s of rest) {
           if (s === seed) continue;
           const d = d2(seed.x, seed.y, s);
-          if (near.length < N + 1 || d < near[near.length - 1]._d) {
-            s._d = d; let i = near.length;
-            while (i > 1 && near[i - 1]._d > d) i--;
-            near.splice(i, 0, s);
-            if (near.length > N + 1) near.pop();
-          }
+          if (d <= R2) { s._d = d; cand.push(s); }
         }
         const sp = [seed.h.lat, seed.h.lng];
-        const sel = []; let n = 0;
-        for (const s of near) {
-          if (n >= N) break;
+        const sel = [], put = []; let n = 0;
+        const take = s => {
           const xs = s.xs.splice(0, N - n);                                        // 集合住宅の残りの部屋は、次のおすすめに回す
-          sel.push({ h: s.h, xs }); n += xs.length;
+          sel.push({ h: s.h, xs }); put.push(s); n += xs.length;
+        };
+        take(seed);
+        // 全部を並べかえずに、毎回「入れた家すべてから上限以内で、種にいちばん近い家」をさがす（車で回る地域で上限を広げても重くしない）。
+        // 一度とどかなかった家は、入れる家が増えてもとどかないので、もう見ない（off）
+        const off = new Set();
+        while (n < N) {
+          let best = null;
+          for (const s of cand) {
+            if (off.has(s) || (best && s._d >= best._d)) continue;
+            if (put.some(p => d2(p.x, p.y, s) > R2)) { off.add(s); continue; }
+            best = s;
+          }
+          if (!best) break;
+          off.add(best); take(best);
         }
         rest = rest.filter(s => s.xs.length);
         const route = [], left = sel.slice();
@@ -682,7 +694,7 @@
   let GL = null; // 作った一覧：家の候補（afterItems の結果）と、起点・雨が同じあいだは使い回す
   function getList(slot) {
     const pos = orgPos(), rain = rainy(), items = afterItems(slot);  // afterItems は、記録・区域・カード・再訪問・設定が変わると作り直す
-    const sig = [slot, pos ? pos[0].toFixed(5) + ',' + pos[1].toFixed(5) : '', rain ? 1 : 0, recoN()].join('|');
+    const sig = [slot, pos ? pos[0].toFixed(5) + ',' + pos[1].toFixed(5) : '', rain ? 1 : 0, recoN(), recoDistM()].join('|'); // 家どうしの距離の上限が変わったら作り直す
     if (GL && GL.items === items && GL.sig === sig) return GL.list;
     const list = buildClusters(items, pos, rain);
     list.anyPool = !!items.anyPool;

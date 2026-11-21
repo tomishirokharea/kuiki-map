@@ -70,7 +70,7 @@ function collectInPage() {
   S.querySelectorAll('h2,h3,p.q,.featrow b,.featrow small,.hint,summary,button,.nzlabel,.nzends span').forEach(e => {
     if (e.closest('.setcats') || e.matches('[data-uiback]')) return;   // 目次の行と「‹ 設定」は新しい形だけのもの
     const t = norm(e.textContent || '').replace(/\(\d+\)/g, '(n)'); // 「翻訳されていない文字のコピー（39）」の数は、そのときどきで変わる
-    if (t && !/版 \d{4}\.\d+\.\d+/.test(t)) add('text:' + t);
+    if (t && !/(版|[Vv]ersión) \d{4}\.\d+\.\d+/.test(t)) add('text:' + t); // 版の番号が入った文（スペイン語の版のボタン・変更の一覧の見出しも）は、版を上げるたびに変わるので数えない
   });
   return [...out];
 }

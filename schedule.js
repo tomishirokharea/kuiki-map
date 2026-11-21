@@ -3093,7 +3093,7 @@ body.duemode .terr-label:not(.duelab){display:none}
   }
 
   /* ほかの部品（kangaeru.js）が同じ計算を使うための窓口。写さずに、ここの関数をそのまま使ってもらう */
-  window.KM = { coverInfo, lastDone, dueInfo, eligible, PIN_DAYS, slotQuery, slotTableHtml, openKarte, SL_FEW, SL_BEST, triesAll, memoClear: () => { MEMO.clear(); TMEMO.clear(); } };
+  window.KM = { coverInfo, lastDone, dueInfo, eligible, PIN_DAYS, slotQuery, slotTableHtml, openKarte, SL_FEW, SL_BEST, SL_AZA_MIN, karteHomes, triesAll, memoClear: () => { MEMO.clear(); TMEMO.clear(); } }; // SL_AZA_MIN・karteHomes：状況グラフの内訳の時間も、カルテと同じきまり（10軒未満は出さない。2026-11-21）
 
   /* 試作版などで、この部品より先に画面ができていたときは描き直す */
   if (Store.data && typeof map !== 'undefined' && map) { try { renderAll(); } catch (e) { console.error(e); } }
