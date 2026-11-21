@@ -390,6 +390,9 @@
 .jg-row:disabled{cursor:default;opacity:.75}
 .jg-row .jg-rb{min-width:0;display:block}
 .jg-row .jg-rb b{display:block;overflow-wrap:anywhere}
+.jg-row .jg-nm{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 10px}
+.jg-row .jg-nm b{min-width:0}
+.jg-row .jg-tm{color:var(--ink2,#44546a);font-size:.88rem;white-space:nowrap}
 .jg-row small{display:block;color:var(--ink2,#44546a);font-size:.88rem;line-height:1.5;overflow-wrap:anywhere}
 .jg-row .tl-go{font-size:1.4rem;color:#5b6b80}
 .jg-nav{display:flex;gap:8px;margin:4px 0 10px}
@@ -663,12 +666,13 @@
     if (i >= 0) { reveal(i); const lv = $id('jgSel'); const b = st.bars[i]; if (lv) lv.innerHTML = `<span>${barHead(b, st.unit)}</span> <span>区域カード：</span><span>${numLine(b.area)}</span> <span>留守宅カード：</span><span>${numLine(b.card)}</span>`; }
   }
   // 区域ごとの内訳：棒を押したときに、その期間の分だけ数える（覚えておき、記録が変わったら作り直す）
-  function detailOf(b) {
-    const a = st.agg, k = b.start + '|' + b.end;
+  // day：日の内訳（棒1本＝1日）のときだけ、区域ごとの時刻も作る（spanTo。2026-11-21）
+  function detailOf(b, day) {
+    const a = st.agg, spanTo = day ? b.end : '', k = b.start + '|' + b.end + '|' + spanTo; // 月の1日目の月の棒と、その日の棒は start・end が同じなので、spanTo も鍵に入れる
     if (!a.det) a.det = new Map();
     let det = a.det.get(k);
     if (!det) {
-      const r2 = build(Object.assign(inputs(), { terr: true, from: b.start, now: a.now }));
+      const r2 = build(Object.assign(inputs(), { terr: true, from: b.start, now: a.now, spanTo }));
       det = detail(r2, { from: b.start, to: b.end });
       a.det.set(k, det);
     }
@@ -685,10 +689,17 @@
     return `<span class="jg-mb ${n ? c : 'none'}" style="width:${w}%" aria-hidden="true"><i style="width:${fw}%">${rw ? `<em style="width:${rw}%"></em>` : ''}</i></span>`;
   };
   const numLine = t => { const r = rate(t, FEW_BAR); return r.n ? `訪ねた ${r.n}軒・会えた ${r.met}軒（${r.few ? 'データ少' : r.pct + '%'}）・留守 ${r.away}軒・拒否 ${r.refused}軒` : '訪ねた 0軒'; };
-  function rowHtml(x, c, max) {
+  /* おおよその時間（日の内訳だけ）：その欄の最初と最後の記録の時刻。家・部屋がカルテのきまり（SL_AZA_MIN）に満たない区域は出さない（特定の家の様子が推測できるため。2026-11-21） */
+  const timeOf = (x, c, t) => {
+    const sp = x.span && x.span[c], K = window.KM;
+    if (!sp || !t || !K || typeof K.karteHomes !== 'function' || !(K.karteHomes(t) >= K.SL_AZA_MIN)) return '';
+    return hourSpan(sp[0], sp[1]);
+  };
+  function rowHtml(x, c, max, day) {
     const t = typeof terrById === 'function' ? terrById(x.terr) : null, ok = !!(t && window.KM && KM.openKarte);
     const stamp = t ? `<span class="stamp sm${typeof noCls === 'function' ? noCls(t.no) : ''}">${esc(t.no)}</span>` : '<span class="stamp sm">-</span>';
-    return `<button type="button" class="jg-row" ${ok ? `data-jgt="${esc(x.terr)}"` : 'disabled'}>${stamp}<span class="jg-rb"><b>${t ? esc(t.name || '区域' + t.no) : '今はない区域'}</b>${mini(x[c], max, c)}<small>${numLine(x[c])}</small></span>${ok ? '<span class="tl-go" aria-hidden="true">›</span>' : '<span></span>'}</button>`;
+    const nm = `<b>${t ? esc(t.name || '区域' + t.no) : '今はない区域'}</b>`, tm = day ? timeOf(x, c, t) : '';
+    return `<button type="button" class="jg-row" ${ok ? `data-jgt="${esc(x.terr)}"` : 'disabled'}>${stamp}<span class="jg-rb">${tm ? `<span class="jg-nm">${nm}<span class="jg-tm">${esc(tm)}</span></span>` : nm}${mini(x[c], max, c)}<small>${numLine(x[c])}</small></span>${ok ? '<span class="tl-go" aria-hidden="true">›</span>' : '<span></span>'}</button>`;
   }
   // 内訳を開く。key：棒の key（日付）。その日がもうないとき（日をまたいだ・記録を取り消した）は、その前でいちばん近い棒
   function openBar(key, keep) {
@@ -703,13 +714,13 @@
     if (i < 0) i = Math.max(0, nearIdx(key));
     const b = bars[i];
     key = b.key;
-    const det = detailOf(b);
+    const det = detailOf(b, unit === 'day');
     const byNo = (a, b2) => { const ta = terrById(a.terr), tb = terrById(b2.terr); return String(ta ? ta.no : '').localeCompare(String(tb ? tb.no : ''), 'ja', { numeric: true }); };
     const sec = (c, name) => {
       const L = det.filter(x => visN(x[c]) > 0).sort((a, b2) => visN(b2[c]) - visN(a[c]) || byNo(a, b2));
       if (!L.length) return '';
       const max = Math.max(...L.map(x => visN(x[c])));
-      return `<h3 class="sub">${name}（${L.length}区域）</h3>${L.map(x => rowHtml(x, c, max)).join('')}`;
+      return `<h3 class="sub">${name}（${L.length}区域）</h3>${L.map(x => rowHtml(x, c, max, unit === 'day')).join('')}`;
     };
     const top = Math.max(1, visN(b.area), visN(b.card));
     const unitName = unit === 'day' ? '日' : unit === 'week' ? '週' : '月';
