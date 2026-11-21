@@ -60,8 +60,8 @@ async function openList(pg, mode, user) {
     try { closeSheet(); } catch (e) { /* なにもしない */ }
     openUiSheet();
     await new Promise(r => setTimeout(r, 150));
-    const b = document.querySelector('#sheet .appver');
-    const r = { isButton: !!b && b.tagName === 'BUTTON', h: b ? Math.round(b.getBoundingClientRect().height) : 0, admin: isAdmin() };
+    const b = document.querySelector('#sheet .appver'), btn = b && b.closest('button[data-page="ver"]');
+    const r = { isButton: !!btn, h: btn ? Math.round(btn.getBoundingClientRect().height) : 0, admin: isAdmin() };
     if (b) b.click();
     await new Promise(res => setTimeout(res, 400));
     const t = document.getElementById('sheetTitle');
@@ -134,7 +134,7 @@ async function main() {
         back.click();
         await new Promise(r => setTimeout(r, 200));
         const t = document.getElementById('sheetTitle');
-        return { back: true, title: t ? t.textContent.trim() : '', focus: !!(document.activeElement && document.activeElement.matches('.appver')) };
+        return { back: true, title: t ? t.textContent.trim() : '', focus: !!(document.activeElement && document.activeElement.matches('button[data-page="ver"]')) };
       });
       ok(c.back && c.title === '設定' && c.focus, `V3 ${mode}：「‹ 設定」で設定の最初にもどり、版のボタンにフォーカス`, c);
       await pg.evaluate(() => { D().currentUser = 'u1'; try { closeSheet(); } catch (e) { /* なにもしない */ } });
