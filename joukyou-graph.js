@@ -696,7 +696,7 @@
   const timeOf = (x, c, t) => {
     const m = x.hours ? x.hours[c] : 0, K = window.KM;
     if (!m || !t || !K || typeof K.karteHomes !== 'function' || !(K.karteHomes(t) >= K.SL_AZA_MIN)) return '';
-    return hourRuns(m).map(s => `<span>${esc(s)}</span>`).join('<span>・</span>');
+    return hourRuns(m).map(s => `<span>${esc(s)}</span>`).join('<span>・</span><wbr>'); // <wbr>：区切りのあとで折り返せるように（スペイン語の「 · 」は空白ごと折り返さないため。監査 2回目）
   };
   function rowHtml(x, c, max, day) {
     const t = typeof terrById === 'function' ? terrById(x.terr) : null, ok = !!(t && window.KM && KM.openKarte);
