@@ -139,8 +139,13 @@ await scene({ recs: [[3, 'met', 'me']], pd: 10, apt: true });
 {
   const r = await pg.evaluate(() => { const h = houseById(__t.hid); return { left: aptTodo(h, periodStart(h)), n: targets(h).filter(u => !dncAt(K(h.id, u))).length }; });
   ok(r.left === r.n - 1, 'T8 集合住宅：紙のあとに会えた部屋は、残りの数に入らない', r);
-  const c = await pg.evaluate(() => { openAptSeq(__t.hid); const e = document.querySelector('#sheet .uchip[data-jump="0"]'); const cl = e ? e.className : ''; closeSheet(); return cl; });
-  ok(/st-met/.test(c), 'T8 集合住宅：部屋のボタンも「会えた」', c);
+}
+{ // 部屋のボタン：会えた → あとで留守。紙のあとなら今回会えているので「会」、日付が何もなければ今までどおり「留」
+  const chip = () => pg.evaluate(() => { openAptSeq(__t.hid); const e = document.querySelector('#sheet .uchip[data-jump="0"]'); const cl = e ? e.className : ''; closeSheet(); return cl; });
+  await scene({ recs: [[5, 'met', 'me'], [3, 'away', 'other']], pd: 10, apt: true });
+  const a = await chip(); ok(/st-met/.test(a), 'T8d 集合住宅：紙のあとに会えた部屋は、あとで留守でもボタンは「会えた」', a);
+  await scene({ recs: [[5, 'met', 'me'], [3, 'away', 'other']], apt: true });
+  const n = await chip(); ok(/st-away/.test(n), 'T8e 集合住宅：日付が何もない区域は、今までどおり「留守」', n);
 }
 await scene({ recs: [[3, 'met', 'me']], apt: true });
 {
