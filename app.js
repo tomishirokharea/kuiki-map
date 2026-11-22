@@ -4,7 +4,7 @@
    ・index.html の版（app-version）を上げるときは、下の APP_JS_VER も同じ番号にする（新しい画面と古い本体がまざっていないかを確かめるため）
    ========================================================= */
 'use strict'; // 本体の全体を strict にする（以前と同じ。この行は、ファイルの最初の文でなければならない）
-var APP_JS_VER = '2026.13.176';
+var APP_JS_VER = '2026.13.177';
 (function () { // 電波が弱く、新しい index.html と前の版の本体がまざって読み込まれたときは、少し待って1回だけ読み直す
   var m = document.querySelector('meta[name="app-version"]'), hv = m ? m.content : '';
   if (!hv || hv === APP_JS_VER) return;
@@ -2972,6 +2972,10 @@ const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).c
 /* 起動時のお知らせに出すのは news: 1 の印がある変更だけ（見た目や使い方が大きく変わるとき。出すかは毎回 R A さんに確かめる・2026-11-21）。
    印の無い変更も、設定のいちばん下の版を押すと「変更の一覧」で見られる */
 const CHANGELOG = [
+  { v: '2026.13.177', items: [
+    ['地', '再訪問の「地図で見る」の印を、再訪問の一覧とそろえました。一度でも会えた家は「会」、まだ会えていない家は「留」、記録のない家は白い丸で出ます（前は、区域を今回回りはじめてから会えた家だけが「会」になり、会えた家でも白い丸で出ることがありました）。ふつうの地図の印は変わりません。'],
+    ['地', 'アプリで受け取り・返却をしたことがなく、紙の S-13 だけで回った区域では、紙で回り終えた日の翌日（紙で貸し出し中なら、貸した日）からの記録を「今回」として地図の印に出すようにしました（前は、その区域で会えたと記録しても、地図の印が白い丸のままでした）。']
+  ] },
   { v: '2026.13.176', role: 'admin', items: [
     ['記', '区域係：S-13 の紙の記録の「直す」を押すと、その記録だけの画面が開くようになりました。名前・割り当てた日付・完了した日付を直して「保存する」を押すと、変わる前と後を見せて確かめます。直るのはその区域の1件だけで、枝番は変わりません。'],
     ['記', '区域係：S-13 の紙の記録に、今日より後の日付を入れられないようにしました（押しまちがいで先の日付が入ると、完了していない区域が完了したように見えていました）。'],
@@ -4022,10 +4026,42 @@ function bldMemoHtml(h) {
   if (!h || h.type !== 'apt' || (!h.bn && !h.ac)) return '';
   return `<div class="notice bmemo">${h.ac ? `<span class="bmac">${AC_NAME[h.ac] || ''}</span>` : ''}${h.bn ? `<span class="bmtx"><b>建物のメモ</b>${esc(h.bn)}</span>` : ''}</div>`;
 }
+/* 紙の S-13 から決める「今回」の始まり（2026.13.177・こまったこと pn2o9o）。アプリで受け取り・返却・完了の日がない区域だけで使う。
+   ・紙で貸し出し中（paperLentAt）が、紙で回り終えた日（paperDone）と同じ日か後なら、貸した日の0時から
+     （回り終えたその日に、次の人へ紙で貸すことがある。その日に回った記録も今回に入れる）
+   ・そうでなければ、回り終えた日の翌日の0時から（どちらも端末の時刻）
+   ・今より先の日付（入力ミス）・読めない日付・ない日（2月30日・13月）は使わない。どれもなければ ''（今までどおり）
+   ・地図を動かすたびに家の数だけ呼ばれるので、区域ごとに結果を覚えておく（日付が変わったら計算し直す）
+   dstr・ymd（後ろで const の定義）は使わない（読み込みの途中で呼ばれても止まらないように） */
+const PAPER_START = new Map(); // 区域id → { key, v, exp }
+/* 'YYYY-MM-DD'、または ISO の日時（端末の時刻の日付として読む）→ その日の0時（Date）。読めない・ない日なら null */
+function paperDay(v) {
+  if (typeof v !== 'string') return null;
+  let y, mo, d;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else if (/^\d{4}-\d{2}-\d{2}T/.test(v)) { const x = new Date(v); if (isNaN(x)) return null; y = x.getFullYear(); mo = x.getMonth() + 1; d = x.getDate(); }
+  else return null;
+  const r = new Date(y, mo - 1, d);
+  return r.getFullYear() === y && r.getMonth() === mo - 1 && r.getDate() === d ? r : null;
+}
+function paperStart(t) {
+  if (!t) return '';
+  const now = Date.now(), key = (t.paperLentAt || '') + '|' + (t.paperDone || ''), c = t.id ? PAPER_START.get(t.id) : null;
+  if (c && c.key === key && now < c.exp) return c.v;
+  const past = x => (x && x.getTime() <= now ? x : null);
+  const l = past(paperDay(t.paperLentAt)), d = past(paperDay(t.paperDone));
+  let v = '';
+  if (l && (!d || l.getTime() >= d.getTime())) v = l.toISOString();
+  else if (d) v = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).toISOString();
+  if (t.id) { const e = new Date(now); PAPER_START.set(t.id, { key, v, exp: new Date(e.getFullYear(), e.getMonth(), e.getDate() + 1).getTime() }); }
+  return v;
+}
 function periodStart(h) {
   const t = h.terrId ? terrById(h.terrId) : null;
-  return t ? (t.lentAt || t.returnedAt || t.completedAt || '') : ''; // 担当者のいない区域は、返却・回り終えた日から
+  return t ? (t.lentAt || t.returnedAt || t.completedAt || paperStart(t)) : ''; // 担当者のいない区域は、返却・回り終えた日から（アプリの日付がなければ紙の S-13 の日付から）
 }
+const FOLLOW_SINCE = '0'; // pinState に渡す「全部の記録」（どの記録の日時もこれより後）
 function pinState(k, since) {
   if (dncAt(k)) return 'dnc';
   const v = sum(k).last;
@@ -4141,7 +4177,9 @@ function houseIcon(h, ff, locked) {
     const nameTag = ''; // 名前は、renderHouses で別の札として出す（小さな点のときも出せるように）
     return L.divIcon({ className: '', html: `<div class="pin apt${h.prov ? ' prov' : ''}${ak !== 'home' ? ' biz' : ''}${focusCls(st)}${lk}">集${left && !nb && !locked ? `<i>${left}</i>` : ''}${fo}${doneMark(st)}${nb}${rj}${sk}${cau}${locked ? '' : kindBadge(ak) + lockBadge(h) + banBadge(h)}${nameTag}</div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
   }
-  const k = K(h.id, ''), s = pinState(k, since), fo = '';
+  // 再訪問の地図（自分の再訪問だけ）は、再訪問の一覧と同じく、区域の巡回に関係なく全部の記録で決める
+  // （一度でも会えた→会・会えていない→留・記録なし→白。2026.13.177・こまったこと pn2o9o）
+  const k = K(h.id, ''), s = pinState(k, followMap ? FOLLOW_SINCE : since), fo = '';
   // 選んでいないときも、今回訪ねた家（会えた・留守）は薄く＋緑のチェックにする
   const st = locked ? null : ff ? ff(k) : (s === 'met' || s === 'away') ? (otherDone(h, k, since) ? 'prev' : 'done') : (s === 'plain' && recentMet(k) ? 'prev' : null);
   const hk = dispKind(h);
