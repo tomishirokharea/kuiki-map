@@ -13,7 +13,7 @@ const b = await chromium.launch(process.env.PW_CHANNEL ? { channel: process.env.
 let ng = 0;
 const ok = (c, name, got) => { if (!c) ng++; console.log((c ? 'OK  ' : 'NG  ') + name + (c ? '' : `  → ${JSON.stringify(got)}`)); };
 
-const ctx = await b.newContext({ viewport: { width: 820, height: 1180 } }); // iPad の幅
+const ctx = await b.newContext({ viewport: { width: 820, height: 1180 }, timezoneId: 'Asia/Tokyo' }); // iPad の幅・本番と同じ日本の時刻
 const pg = await ctx.newPage();
 const errs = []; pg.on('pageerror', e => errs.push(String(e)));
 await pg.route('**/*', r => /gsi\.go\.jp|fonts\.g|script\.google|open-meteo/.test(r.request().url()) ? r.abort() : r.continue());
@@ -101,15 +101,22 @@ await scene({ recs: [[3, 'met', 'me']], pd: -1 });
 ok(await since() === '', 'T5a 紙の完了日が明日（入力ミス）なら使わない', await since());
 await scene({ recs: [[0, 'met', 'me']], pd: 0 });
 ok(await since() === await dayIso(-1), 'T5b 紙の完了日が今日なら、明日の0時から（今日の記録は前の巡回）', await since());
-for (const bad of ['2026-7-1', '', 'あいう', '2026/11/01', '2026-02-30']) {
+for (const bad of ['2026-7-1', '', 'あいう', '2026/11/01', '2026-02-30', '2025-13-01', '2025-00-10']) {
   await scene({ recs: [[3, 'met', 'me']], pd: bad });
   ok(await since() === '', `T5c 形のくずれた紙の日付（${JSON.stringify(bad)}）は使わない`, await since());
 }
+// T5d：ISO の形（2026-10-31T15:00:00.000Z＝日本の 11月1日0時）は、端末の時刻の日付として読む
+await scene({ recs: [[3, 'met', 'me']], pd: '2026-10-31T15:00:00.000Z' });
+ok(await since() === await pg.evaluate(() => new Date(2026, 10, 2).toISOString()), 'T5d ISO の形の日付は、端末の時刻の日付（11月1日）の翌日から', await since());
 // T6：紙で貸した日のほうが新しい → その日の0時から
 await scene({ recs: [[2, 'met', 'me']], pd: 10, pl: 3 });
 ok(await since() === await dayIso(3), 'T6 紙で貸した日のほうが新しければ、その日の0時から', await since());
 await scene({ recs: [[2, 'met', 'me']], pd: 3, pl: 10 });
 ok(await since() === await dayIso(2), 'T6b 紙で回り終えた日のほうが新しければ、その翌日から', await since());
+// T6d：紙で回り終えた日に、同じ日に次の人に紙で貸した → その日の0時から（その日の記録は今回）
+await scene({ recs: [[2, 'met', 'me']], pd: 2, pl: 2 });
+ok(await since() === await dayIso(2), 'T6d 回り終えた日と同じ日に紙で貸したら、その日の0時から', await since());
+{ const h = await icon(false); ok(glyph(h) === '会', 'T6d 貸した日に会えた家は「会」', h); }
 await scene({ recs: [[2, 'met', 'me']], pl: -2 });
 ok(await since() === '', 'T6c 紙で貸した日が先の日付なら使わない', await since());
 // T7：アプリの日付がある区域 → 紙の日付があってもアプリの日付
@@ -120,11 +127,20 @@ await scene({ recs: [[2, 'met', 'me']] });
 ok(await since() === '', 'T7b 日付が何もない区域は今までどおり空', await since());
 { const h = await icon(false); ok(glyph(h) === '', 'T7b 日付が何もない区域の印は今までどおり字なし', h); }
 
-// ---------- R4：集合住宅の残りの数・部屋のボタン ----------
+// ---------- R4：小さな点・集合住宅の残りの数・部屋のボタン ----------
+{
+  const dot = () => pg.evaluate(() => JSON.stringify(dotStyle(houseById(__t.hid), null, false)));
+  await scene({ recs: [[3, 'met', 'me']], ret: 5 }); const dRet = await dot();
+  await scene({ recs: [[3, 'met', 'me']], pd: 10 }); const dPaper = await dot();
+  await scene({ recs: [[3, 'met', 'me']] }); const dNone = await dot();
+  ok(dPaper === dRet && dPaper !== dNone, 'T8c 小さな点：紙のあとに会えた家は、アプリで返したあとに会えた家と同じ', { dRet, dPaper, dNone });
+}
 await scene({ recs: [[3, 'met', 'me']], pd: 10, apt: true });
 {
   const r = await pg.evaluate(() => { const h = houseById(__t.hid); return { left: aptTodo(h, periodStart(h)), n: targets(h).filter(u => !dncAt(K(h.id, u))).length }; });
   ok(r.left === r.n - 1, 'T8 集合住宅：紙のあとに会えた部屋は、残りの数に入らない', r);
+  const c = await pg.evaluate(() => { openAptSeq(__t.hid); const e = document.querySelector('#sheet .uchip[data-jump="0"]'); const cl = e ? e.className : ''; closeSheet(); return cl; });
+  ok(/st-met/.test(c), 'T8 集合住宅：部屋のボタンも「会えた」', c);
 }
 await scene({ recs: [[3, 'met', 'me']], apt: true });
 {

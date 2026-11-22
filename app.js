@@ -4027,20 +4027,35 @@ function bldMemoHtml(h) {
   return `<div class="notice bmemo">${h.ac ? `<span class="bmac">${AC_NAME[h.ac] || ''}</span>` : ''}${h.bn ? `<span class="bmtx"><b>建物のメモ</b>${esc(h.bn)}</span>` : ''}</div>`;
 }
 /* 紙の S-13 から決める「今回」の始まり（2026.13.177・こまったこと pn2o9o）。アプリで受け取り・返却・完了の日がない区域だけで使う。
-   紙で貸し出し中（paperLentAt）はその日の0時、紙で回り終えた日（paperDone）はその翌日の0時（端末の時刻）。両方あれば新しいほう。
-   今より先の日付（入力ミス）と、YYYY-MM-DD で始まらない値は使わない。なければ ''（今までどおり）。
+   ・紙で貸し出し中（paperLentAt）が、紙で回り終えた日（paperDone）と同じ日か後なら、貸した日の0時から
+     （回り終えたその日に、次の人へ紙で貸すことがある。その日に回った記録も今回に入れる）
+   ・そうでなければ、回り終えた日の翌日の0時から（どちらも端末の時刻）
+   ・今より先の日付（入力ミス）・読めない日付・ない日（2月30日・13月）は使わない。どれもなければ ''（今までどおり）
+   ・地図を動かすたびに家の数だけ呼ばれるので、区域ごとに結果を覚えておく（日付が変わったら計算し直す）
    dstr・ymd（後ろで const の定義）は使わない（読み込みの途中で呼ばれても止まらないように） */
+const PAPER_START = new Map(); // 区域id → { key, v, exp }
+/* 'YYYY-MM-DD'、または ISO の日時（端末の時刻の日付として読む）→ その日の0時（Date）。読めない・ない日なら null */
+function paperDay(v) {
+  if (typeof v !== 'string') return null;
+  let y, mo, d;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else if (/^\d{4}-\d{2}-\d{2}T/.test(v)) { const x = new Date(v); if (isNaN(x)) return null; y = x.getFullYear(); mo = x.getMonth() + 1; d = x.getDate(); }
+  else return null;
+  const r = new Date(y, mo - 1, d);
+  return r.getFullYear() === y && r.getMonth() === mo - 1 && r.getDate() === d ? r : null;
+}
 function paperStart(t) {
   if (!t) return '';
-  const now = Date.now();
-  const at = (v, add) => {
-    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(typeof v === 'string' ? v : '');
-    if (!m) return '';
-    const d0 = new Date(+m[1], +m[2] - 1, +m[3]);
-    if (isNaN(d0) || d0.getDate() !== +m[3] || d0.getTime() > now) return ''; // 2月30日のような、ない日も使わない
-    return new Date(+m[1], +m[2] - 1, +m[3] + add).toISOString();
-  };
-  return [at(t.paperLentAt, 0), at(t.paperDone, 1)].filter(Boolean).sort().pop() || '';
+  const now = Date.now(), key = (t.paperLentAt || '') + '|' + (t.paperDone || ''), c = t.id ? PAPER_START.get(t.id) : null;
+  if (c && c.key === key && now < c.exp) return c.v;
+  const past = x => (x && x.getTime() <= now ? x : null);
+  const l = past(paperDay(t.paperLentAt)), d = past(paperDay(t.paperDone));
+  let v = '';
+  if (l && (!d || l.getTime() >= d.getTime())) v = l.toISOString();
+  else if (d) v = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).toISOString();
+  if (t.id) { const e = new Date(now); PAPER_START.set(t.id, { key, v, exp: new Date(e.getFullYear(), e.getMonth(), e.getDate() + 1).getTime() }); }
+  return v;
 }
 function periodStart(h) {
   const t = h.terrId ? terrById(h.terrId) : null;
