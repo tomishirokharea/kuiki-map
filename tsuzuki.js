@@ -86,7 +86,7 @@
     if (!t) return '';
     if (t.holder && t.roundFrom) return t.roundFrom;
     if (!t.holder && t.lastRoundFrom && isPartial(t)) return t.lastRoundFrom; // 担当者のいない途中返却：どこまで回ったかが分かる
-    return t.lentAt || t.returnedAt || t.completedAt || '';
+    return t.lentAt || t.returnedAt || t.completedAt || (typeof paperStart === 'function' ? paperStart(t) : ''); // アプリの日付がなければ紙の S-13 の日付から（app.js paperStart・2026.13.177）
   };
   window.unitDoneSince = function (h) {
     const t = terrById(h.terrId);
