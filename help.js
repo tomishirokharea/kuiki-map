@@ -868,6 +868,8 @@
     open(b.getAttribute('data-qhelp'), b);
   }, true);
 
+  window.KUIKI_HELP = HELP; // 分析用に書き出す（bunseki.js・2026-11-28）が、設定の名前と「変えると」の文を使う
+
   function start() {
     watch(document.getElementById('view-admin'), false);
     watch(document.getElementById('sheetBody'), true);
