@@ -112,7 +112,7 @@ async function main() {
       return c;
     });
     const sec = (txt, head) => { const i = txt.indexOf(head); if (i < 0) return ''; const j = txt.indexOf('\n## ', i + 1); return txt.slice(i, j < 0 ? undefined : j); };
-    const allSlot = sec(t12, '## 3.');
+    const allSlot = sec(t12, '## 4.');
     const mism = Object.entries(b3).filter(([k, [n, m]]) => !allSlot.includes(`${k},${n},${m},`));
     ok(Object.keys(b3).length > 0 && mism.length === 0, 'B3 全体の時間帯の数が記録と一致', mism.slice(0, 3));
     ok(t4.includes('直近4か月') && t12.includes('直近12か月'), 'B3 期間が書かれる');
@@ -127,12 +127,12 @@ async function main() {
       rows.forEach(x => ['area', 'card'].forEach(c => { const t = x[c]; s[c][0] += t.met + t.refused + t.away; s[c][1] += t.met; }));
       return s;
     });
-    const jg = sec(t12, '## 5.');
+    const jg = sec(t12, '## 6.');
     ok(jg.includes(`区域カード,${b4.area[0]},${b4.area[1]},`) && jg.includes(`留守宅カード,${b4.card[0]},${b4.card[1]},`), 'B4 区域カード・留守宅カードの合計がグラフと一致', { b4, jg: jg.slice(0, 300) });
 
     // B5 区域の決まり
     const b5 = await pg.evaluate(() => ({ lendDays: Number(D().settings.lendDays) || 120, t: KUIKI_HELP.ja.lendDays.t, ch: KUIKI_HELP.ja.lendDays.change }));
-    const st = sec(t12, '## 8.');
+    const st = sec(t12, '## 10.');
     ok(st.includes(`${b5.t},lendDays,${b5.lendDays},`) && st.includes(b5.ch.slice(0, 15)), 'B5 区域の決まり：今の値と「変えると」', st.slice(0, 300));
     ok(!st.includes('syncGroupSec') && !st.includes('cacheDays'), 'B5 通信・表示だけの設定は出さない');
 
@@ -146,18 +146,19 @@ async function main() {
       try { return { no: String(t.no), txt: BUNSEKI.text(12) }; } finally { KM.karteHomes = keep; }
     });
     const rowsOf = (txt, head) => sec(txt, head).split('\n').filter(l => l.split(',')[0] === f1.no);
-    ok(rowsOf(f1.txt, '## 4.').length === 0, 'F1 10軒未満の区域：区域ごとの時間帯を出さない', rowsOf(f1.txt, '## 4.').slice(0, 2));
-    ok(rowsOf(f1.txt, '## 5.').length === 0, 'F1 10軒未満の区域：区域ごとのカードの数を出さない', rowsOf(f1.txt, '## 5.'));
-    const r6 = rowsOf(f1.txt, '## 6.')[0] || '';
+    ok(rowsOf(f1.txt, '## 5.').length === 0, 'F1 10軒未満の区域：区域ごとの時間帯を出さない', rowsOf(f1.txt, '## 5.').slice(0, 2));
+    ok(rowsOf(f1.txt, '## 6.').length === 0, 'F1 10軒未満の区域：区域ごとのカードの数を出さない', rowsOf(f1.txt, '## 6.'));
+    const r6 = rowsOf(f1.txt, '## 7.')[0] || '';
     ok(r6.includes('10軒未満のため出さない') && r6.split(',')[9] === '', 'F1 10軒未満の区域：区域の一覧の割合は空', r6);
-    ok(sec(f1.txt, '## 3.') === sec(t12, '## 3.'), 'F1 全体の時間帯（3章）には足したまま');
+    const c5 = t => sec(t, '## 4.').split('\n').map(l => l.split(',').slice(0, 5).join(',')).join('\n'); // 右の「5件以上の行だけ」の3列は、区域ごとの行から数えるので変わってよい
+    ok(c5(f1.txt) === c5(t12), 'F1 全体の時間帯（4章）には足したまま');
     // F2 一度も訪ねていない区域の「まだ会えていない割合」は 0 ではなく空（監査 m-2）
     const f2 = await pg.evaluate(() => {
       const t = KM.eligible()[0], hs = new Set(D().houses.filter(h => h.terrId === t.id).map(h => h.id));
       const keep = D().visits; D().visits = keep.filter(v => !hs.has(v.houseId)); KM.memoClear();
       try { return { no: String(t.no), txt: BUNSEKI.text(12) }; } finally { D().visits = keep; KM.memoClear(); }
     });
-    const r2 = sec(f2.txt, '## 6.').split('\n').find(l => l.split(',')[0] === f2.no) || '';
+    const r2 = sec(f2.txt, '## 7.').split('\n').find(l => l.split(',')[0] === f2.no) || '';
     ok(r2 && r2.split(',')[9] === '', 'F2 訪ねていない区域の割合は空', r2);
     // F3 返却の日付は日本の日付（UTC の夜＝日本の翌朝）（監査 m-3）
     const f3 = await pg.evaluate(() => {
@@ -166,7 +167,40 @@ async function main() {
       D().returns.push(r);
       try { return { no: String(t.no), txt: BUNSEKI.text(12) }; } finally { D().returns.splice(D().returns.indexOf(r), 1); }
     });
-    ok(sec(f3.txt, '## 7.').includes(`${f3.no},2026-11-02,2026-11-11,9,正式な返却,95,個人`), 'F3 返却の日付は日本の日付', sec(f3.txt, '## 7.').slice(0, 300));
+    ok(sec(f3.txt, '## 9.').includes(`${f3.no},2026-11-02,2026-11-11,9,正式な返却,95,個人`), 'F3 返却の日付は日本の日付', sec(f3.txt, '## 9.').slice(0, 300));
+
+    // W1 AI への出力の型（分かりやすい結果のため・2026-11-28）
+    const p1 = sec(t12, '## 1.');
+    ok(['ひと目で', '今の様子', '課題', '決まりの提案', '今月やること', 'このデータで分からないこと'].every(w => p1.includes(w)), 'W1 AI への頼み方に、答えの型（見出し）がある', p1.slice(0, 200));
+    // W2・W5 要点（アプリが数えた数）：状態ごとの数が区域の一覧と合う・留守宅カードの区域の数
+    const lst = sec(t12, '## 7.').split('\n').slice(1).filter(l => l && l.indexOf('区域,') !== 0).map(l => l.split(','));
+    const cnt = w => lst.filter(r => r[3] === w).length;
+    const kp = sec(t12, '## 3.');
+    ok(kp.includes(`区域の数,${lst.length}`) && kp.includes(`貸出中,${cnt('貸出中') + cnt('貸出中（紙）')}`) && kp.includes(`空き,${cnt('空き')}`) && kp.includes(`留守宅カードの区域,${cnt('留守宅カード')}`), 'W2 要点の数が区域の一覧と合う', kp.slice(0, 400));
+    const over = lst.filter(r => r[7] !== '' && Number(r[7]) < 0).length, near = lst.filter(r => r[7] !== '' && Number(r[7]) >= 0 && Number(r[7]) <= 60).length;
+    ok(kp.includes(`年1回の期限を過ぎた区域,${over}`) && kp.includes(`年1回の期限まで60日以内の区域,${near}`), 'W2 年1回の期限の数', kp);
+    // W3 全体の時間帯に「区域ごとに訪問5件以上の行だけ」の数（5章の行の合計と同じ）
+    const p5 = sec(t12, '## 5.').split('\n').slice(2).filter(Boolean).map(l => l.split(','));
+    const big = {};
+    p5.forEach(r => { const n = Number(r[3]), mm = Number(r[4]); if (n >= 5) { const k = r[1] + ',' + r[2]; big[k] = big[k] || [0, 0]; big[k][0] += n; big[k][1] += mm; } });
+    const p4 = sec(t12, '## 4.');
+    const badBig = Object.entries(big).filter(([k, [n, mm]]) => !p4.split('\n').some(l => l.indexOf(k + ',') === 0 && l.endsWith(`,${n},${mm},${n >= 5 ? Math.round(mm / n * 100) : '参考'}`)));
+    ok(p4.includes('5件以上の行だけ') && Object.keys(big).length > 0 && badBig.length === 0, 'W3 全体の時間帯に5件以上の行だけの数', badBig.slice(0, 3));
+    // W4 親番号ごとのまとめ
+    const p8 = sec(t12, '## 8.');
+    const parents = new Set(lst.map(r => r[1] || r[0]));
+    ok([...parents].every(x => p8.split('\n').some(l => l.indexOf(x + ',') === 0)), 'W4 親番号ごとのまとめに、すべての親番号がある', p8.slice(0, 200));
+
+    // W4b 親番号ごとの状態の数：貸出中止を貸出中に数えない（監査 2 の I-1）
+    const w4 = await pg.evaluate(() => {
+      const t = KM.eligible().find(x => !isLent(x) && !x.awayPoolAt) || KM.eligible()[0];
+      const keep = t.lend; t.lend = 'stop'; KM.memoClear();
+      try { return { k: String(t.pno || t.no), txt: BUNSEKI.text(12) }; } finally { if (keep === undefined) delete t.lend; else t.lend = keep; KM.memoClear(); }
+    });
+    const r8 = (sec(w4.txt, '## 8.').split('\n').find(l => l.split(',')[0] === w4.k) || '').split(',');
+    ok(r8[5] === '1' && sec(w4.txt, '## 3.').includes('貸出中止,1'), 'W4b 貸出中止は貸出中止に数える（3章と8章が合う）', r8);
+    ok(sec(t12, '## 3.').includes('10軒未満の区域をのぞく'), 'W5 要点の「5件以上の行に入らない訪問」の説明に、10軒未満の区域のことがある');
+    ok(sec(t12, '## 1.').includes('ファイルの章ではない'), 'W6 答えの型はファイルの章ではないと書く');
 
     // B8 CSV の囲み
     const b8 = await pg.evaluate(() => BUNSEKI.csv([['a,b', 'c"d', 'e\nf', 3]]));
@@ -189,7 +223,7 @@ async function main() {
     // B7 記録が0件
     // （時間帯の表の覚えた結果を捨てて数え直す。グラフは家ごとの索引から数えるので、ここでは時間帯の表だけを見る）
     const b7 = await pg.evaluate(() => { const keep = D().visits; D().visits = []; KM.memoClear(); try { return BUNSEKI.text(12); } finally { D().visits = keep; KM.memoClear(); } });
-    ok(typeof b7 === 'string' && sec(b7, '## 3.').includes('記録なし') && sec(b7, '## 4.').includes('記録なし'), 'B7 記録が0件でもエラーにならず「記録なし」', sec(b7 || '', '## 3.'));
+    ok(typeof b7 === 'string' && sec(b7, '## 4.').includes('記録なし') && sec(b7, '## 5.').includes('記録なし'), 'B7 記録が0件でもエラーにならず「記録なし」', sec(b7 || '', '## 4.'));
     await ctx.close();
 
     // B6 スペイン語
