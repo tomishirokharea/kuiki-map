@@ -800,5 +800,5 @@
     try { if (isAdmin() && adPane === 'status' && !(typeof window.lkLocked === 'function' && window.lkLocked())) paint(); } // 画面ロック中は出さない（schedule.js が window に出している lkLocked）
     catch (e) { console.error(e); }
   };
-  window.JGUI = { sum, paint, openBar, detailOf, state: st, recompute: () => { st.agg = null; return compute(true); } }; // recompute：「速さを測る」用（覚えた結果を捨てて作り直す）
+  window.JGUI = { inputs, sum, paint, openBar, detailOf, state: st, recompute: () => { st.agg = null; return compute(true); } }; // recompute：「速さを測る」用（覚えた結果を捨てて作り直す）
 })(typeof window !== 'undefined' ? window : globalThis);
