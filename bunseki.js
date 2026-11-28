@@ -1,5 +1,5 @@
 /* =========================================================
-   区域係の「分析用に書き出す」（bunseki.js・2026.13.178・2026-11-28）
+   区域係の「分析用に書き出す」（bunseki.js・2026.13.178・2026-11-28／2026.13.179 で AI の答えの型・要点・親番号ごとを足した）
 
    ねらい：区域の回り方の今の様子を、AI（Claude・ChatGPT・Gemini など。無料版も）に読ませて、
           分析・アイデア・「区域の決まり」をどう変えるとよさそうかの助言をもらう
@@ -24,7 +24,7 @@
   const FEW = 5; // 訪問が5件未満の割合は「参考」（時間帯の表の SL_FEW と同じ）
   const SMALL_NOTE = '10軒未満のため出さない';
   /* 家・部屋が少ない区域（10軒未満）：画面と同じく、区域ごとの時間帯・割合は出さない（特定の家の様子が推測できてしまうため・監査 I-1）。
-     全体（3章）には足したまま */
+     全体（4章）には足したまま */
   function isSmall(t) {
     const K = KMx(), min = K.SL_AZA_MIN || 10;
     try { return typeof K.karteHomes === 'function' ? K.karteHomes(t) < min : false; } catch (e) { return false; }
@@ -49,7 +49,7 @@
     return { months, from, fromS: ymdOf(from), todayS: ymdOf(now), now };
   }
 
-  /* ---------- 3・4：曜日×時間帯（時間帯の表と同じ数え方） ---------- */
+  /* ---------- 4・5：曜日×時間帯（時間帯の表と同じ数え方） ---------- */
   function slotPart(p) {
     const K = KMx(), SLB = K.SLB || [], SLC = K.SLC || [];
     const agg = typeof K.slotAgg === 'function' ? K.slotAgg() : new Map();
@@ -81,7 +81,7 @@
     return { allRows, per };
   }
 
-  /* ---------- 5：区域カードと留守宅カード（状況のグラフと同じ数え方） ---------- */
+  /* ---------- 6：区域カードと留守宅カード（状況のグラフと同じ数え方） ---------- */
   function cardPart(p) {
     const out = { total: { area: [0, 0, 0, 0], card: [0, 0, 0, 0], unsplit: [0, 0, 0, 0] }, per: [] };
     if (!window.JG || !window.JGUI || typeof JGUI.inputs !== 'function') return out;
@@ -103,7 +103,7 @@
     return out;
   }
 
-  /* ---------- 6：区域の一覧 ---------- */
+  /* ---------- 7：区域の一覧 ---------- */
   function terrPart() {
     const K = KMx(), today = new Date().toISOString();
     const terrs = (typeof K.eligible === 'function' ? K.eligible() : []).slice()
@@ -130,7 +130,7 @@
      terr の行：[0 区域, 1 親番号, 2 字, 3 状態, 4 貸出からの日数, 5 目安を過ぎた, 6 前回回り終えた日, 7 年1回の期限までの日数, 8 家の数, 9 会えていない割合, 10 若い世代, 11 備考] */
   function keyPart(terr, card, slot) {
     const n = w => terr.filter(r => r[3] === w).length;
-    const parents = new Set(terr.map(r => r[1] || r[0]));
+    const parents = new Set(terr.map(r => String(r[1] || r[0])));
     const left = r => (r[7] === '' ? null : Number(r[7]));
     const ct = card.total, cardTerrs = card.per.filter(r => r[3] > 0).length;
     const smallVis = slot.allRows.reduce((a, r) => a + r[2] - r[5], 0), allVis = slot.allRows.reduce((a, r) => a + r[2], 0);
@@ -146,8 +146,8 @@
       ['年1回の期限まで61〜120日の区域', terr.filter(r => left(r) != null && left(r) > 60 && left(r) <= 120).length, ''],
       ['前回回り終えた日の記録がない区域', terr.filter(r => left(r) == null).length, ''],
       ['区域カードの会えた割合%', ct.area[0] >= FEW ? pct(ct.area[1], ct.area[0]) : '参考', `訪ねた ${ct.area[0]}軒・会えた ${ct.area[1]}軒`],
-      ['留守宅カードの会えた割合%', ct.card[0] >= FEW ? pct(ct.card[1], ct.card[0]) : '参考', `訪ねた ${ct.card[0]}軒・会えた ${ct.card[1]}軒・記録のあった区域 ${cardTerrs}`],
-      ['訪問5件未満の行（区域×曜日×時間帯）の訪問の割合%', allVis ? pct(smallVis, allVis) : '', '大きいと、全体の時間帯の割合が少ない記録に引っぱられている']
+      ['留守宅カードの会えた割合%', ct.card[0] >= FEW ? pct(ct.card[1], ct.card[0]) : '参考', `訪ねた ${ct.card[0]}軒・会えた ${ct.card[1]}軒・記録のあった区域 ${cardTerrs}（10軒未満の区域をのぞく）`],
+      ['「5件以上の行だけ」に入らない訪問の割合%', allVis ? pct(smallVis, allVis) : '', '区域×曜日×時間帯で訪問5件未満の行と、10軒未満の区域をのぞく。大きいと、全体の時間帯の割合が少ない記録に引っぱられている']
     ];
   }
 
@@ -158,7 +158,7 @@
       const k = String(r[1] || r[0]);
       const x = by.get(k) || { n: 0, lent: 0, free: 0, pool: 0, stop: 0, over: 0, minLeft: null, homes: 0 };
       x.n++;
-      if (String(r[3]).indexOf('貸出中') === 0) x.lent++; else if (r[3] === '空き') x.free++; else if (r[3] === '留守宅カード') x.pool++; else if (r[3] === '貸出中止') x.stop++;
+      if (r[3] === '貸出中' || r[3] === '貸出中（紙）') x.lent++; else if (r[3] === '空き') x.free++; else if (r[3] === '留守宅カード') x.pool++; else if (r[3] === '貸出中止') x.stop++;
       if (r[7] !== '') { const l = Number(r[7]); if (l < 0) x.over++; if (x.minLeft == null || l < x.minLeft) x.minLeft = l; }
       x.homes += Number(r[8]) || 0;
       by.set(k, x);
@@ -177,7 +177,7 @@
         r.ga ? '全体の集まり' : r.g ? 'グループ奉仕' : '個人']);
   }
 
-  /* ---------- 8：区域の決まり ---------- */
+  /* ---------- 10：区域の決まり ---------- */
   function setPart() {
     const H = window.KUIKI_HELP, s = (D().settings || {});
     if (!H || !H.def || !H.ja) return [];
@@ -192,7 +192,7 @@
     'このファイルは、区域係のアプリから書き出した集計です。目的は、まだ会えていない人（特に若い世代）に、曜日や時間帯を工夫して会えるようにすることです。',
     '読む人は区域係で、スマホで読みます。短い文と、やさしい日本語（専門用語や英語を使わない）で答えてください。',
     '',
-    '【答えの型】次の見出しを、この順で使う。全体でスマホの画面2〜3枚に収まる長さにする。',
+    '【答えの型】次の見出しを、この順で答えに使う（答えのための見出しで、このファイルの章ではない）。全体でスマホの画面2〜3枚に収まる長さにする。',
     '### ひと目で',
     '　いちばん大事なことを3行まで。',
     '### 今の様子',
@@ -209,7 +209,7 @@
     '【守ること】',
     '1. このファイルの数字だけを使う（ほかの資料やインターネットの情報は使わない。質問を返さず、分かる範囲で答える）',
     '2. 記録から分かる事実と推定を分ける。推定の文の頭に「（推定）」と付ける。自分で足し直した数には「（計算）」と付ける',
-    '3. 訪問が5件未満の割合（表では「参考」）は、結論に使わない。全体の時間帯の割合は「区域ごとに5件以上の行だけ」の数も見くらべる',
+    '3. 訪問が5件未満の割合（表では「参考」）は、結論に使わない。4章の全体の割合は、右の「5件以上の行だけ」の列も見くらべる',
     '4. 人の名前・住所は入っていない。個人を推測しない',
     '5. 時間は記録を入力した時刻。あとからまとめて入力した記録は、実際の訪問時間とずれることがある'
   ].join('\n');

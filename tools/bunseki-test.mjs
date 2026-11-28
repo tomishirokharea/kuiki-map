@@ -191,6 +191,17 @@ async function main() {
     const parents = new Set(lst.map(r => r[1] || r[0]));
     ok([...parents].every(x => p8.split('\n').some(l => l.indexOf(x + ',') === 0)), 'W4 親番号ごとのまとめに、すべての親番号がある', p8.slice(0, 200));
 
+    // W4b 親番号ごとの状態の数：貸出中止を貸出中に数えない（監査 2 の I-1）
+    const w4 = await pg.evaluate(() => {
+      const t = KM.eligible().find(x => !isLent(x) && !x.awayPoolAt) || KM.eligible()[0];
+      const keep = t.lend; t.lend = 'stop'; KM.memoClear();
+      try { return { k: String(t.pno || t.no), txt: BUNSEKI.text(12) }; } finally { if (keep === undefined) delete t.lend; else t.lend = keep; KM.memoClear(); }
+    });
+    const r8 = (sec(w4.txt, '## 8.').split('\n').find(l => l.split(',')[0] === w4.k) || '').split(',');
+    ok(r8[5] === '1' && sec(w4.txt, '## 3.').includes('貸出中止,1'), 'W4b 貸出中止は貸出中止に数える（3章と8章が合う）', r8);
+    ok(sec(t12, '## 3.').includes('10軒未満の区域をのぞく'), 'W5 要点の「5件以上の行に入らない訪問」の説明に、10軒未満の区域のことがある');
+    ok(sec(t12, '## 1.').includes('ファイルの章ではない'), 'W6 答えの型はファイルの章ではないと書く');
+
     // B8 CSV の囲み
     const b8 = await pg.evaluate(() => BUNSEKI.csv([['a,b', 'c"d', 'e\nf', 3]]));
     ok(b8 === '"a,b","c""d",e f,3', 'B8 CSV の囲み', b8);
