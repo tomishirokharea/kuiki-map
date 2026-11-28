@@ -18,11 +18,18 @@
   const KMx = () => window.KM || {};
   const pad2 = n => String(n).padStart(2, '0');
   const ymdOf = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-  const dOnly = s => (s ? String(s).slice(0, 10) : '');
   const DAY = 86400000;
   const daysBetween = (a, b) => { const x = Date.parse(a), y = Date.parse(b); return isFinite(x) && isFinite(y) ? Math.round((y - x) / DAY) : ''; };
   const pct = (m, n) => (n ? Math.round(m / n * 100) : '');
   const FEW = 5; // 訪問が5件未満の割合は「参考」（時間帯の表の SL_FEW と同じ）
+  const SMALL_NOTE = '10軒未満のため出さない';
+  /* 家・部屋が少ない区域（10軒未満）：画面と同じく、区域ごとの時間帯・割合は出さない（特定の家の様子が推測できてしまうため・監査 I-1）。
+     全体（3章）には足したまま */
+  function isSmall(t) {
+    const K = KMx(), min = K.SL_AZA_MIN || 10;
+    try { return typeof K.karteHomes === 'function' ? K.karteHomes(t) < min : false; } catch (e) { return false; }
+  }
+  const DATE = s => { if (!s) return ''; const d = new Date(s); return isNaN(d) ? '' : ymdOf(d); }; // 日本（端末）の日付（監査 m-3）
 
   // 出さない設定（通信・表示・連携など、回り方と関係のないもの）
   const SKIP_SET = ['syncGroupSec', 'syncNormalSec', 'cacheDays', 'mapStd', 's21On', 'ikenOn', 'ikenWho', 'wxOn', 'obiOn', 'memoSync'];
@@ -48,6 +55,7 @@
     const agg = typeof K.slotAgg === 'function' ? K.slotAgg() : new Map();
     const terrs = (typeof K.eligible === 'function' ? K.eligible() : []);
     const noOf = new Map(terrs.map(t => [t.id, t.no]));
+    const small = new Set(terrs.filter(isSmall).map(t => t.id));
     const all = new Map(), per = [];
     agg.forEach((a, tid) => {
       if (!noOf.has(tid)) return;
@@ -57,7 +65,7 @@
         if (!n) continue;
         const k = SLC[c] + ',' + SLB[b];
         const x = all.get(k) || [0, 0]; x[0] += n; x[1] += m; all.set(k, x);
-        per.push([noOf.get(tid), SLC[c], SLB[b], n, m, n >= FEW ? pct(m, n) : '参考']);
+        if (!small.has(tid)) per.push([noOf.get(tid), SLC[c], SLB[b], n, m, n >= FEW ? pct(m, n) : '参考']);
       }
     });
     const allRows = [];
@@ -74,6 +82,7 @@
     const r = JG.build(inp);
     const rows = JG.detail(r, { from: p.fromS, to: r.today });
     const noOf = new Map(D().territories.map(t => [t.id, t.no]));
+    const small = new Set(D().territories.filter(t => !t.dummy && isSmall(t)).map(t => t.id));
     rows.forEach(x => {
       const line = [noOf.get(x.terr) || ''];
       ['area', 'card', 'unsplit'].forEach(c => {
@@ -81,7 +90,7 @@
         const T = out.total[c]; T[0] += n; T[1] += t.met; T[2] += t.away; T[3] += t.refused;
         line.push(n, t.met);
       });
-      if (line.slice(1).some(v => v)) out.per.push(line);
+      if (!small.has(x.terr) && line.slice(1).some(v => v)) out.per.push(line);
     });
     out.per.sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'ja', { numeric: true }));
     return out;
@@ -92,26 +101,30 @@
     const K = KMx(), today = new Date().toISOString();
     const terrs = (typeof K.eligible === 'function' ? K.eligible() : []).slice()
       .sort((a, b) => String(a.no).localeCompare(String(b.no), 'ja', { numeric: true }));
+    // 一度でも訪ねた記録のある区域（awayRate は、訪ねた家が0軒でも0を返すので、0と「まだ訪ねていない」を分ける・監査 m-2）
+    const visited = new Set();
+    (D().visits || []).forEach(v => { const h = typeof houseById === 'function' ? houseById(v.houseId) : null; if (h) visited.add(h.terrId); });
     return terrs.map(t => {
+      const sm = isSmall(t);
       let aza = '';
       try { if (typeof AGE_ON !== 'undefined' && AGE_ON && typeof terrAza === 'function') aza = terrAza(t).slice().sort((a, b) => b.r - a.r).map(a => azaShow(a.n)).filter(Boolean).slice(0, 3).join('・'); } catch (e) { aza = ''; }
       const lent = isLent(t), since = t.holder ? t.lentAt : t.paperLentAt;
       const st = lent ? (t.holder ? '貸出中' : '貸出中（紙）') : t.awayPoolAt ? '留守宅カード' : lendMode(t) === 'stop' ? '貸出中止' : '空き';
       let due = null; try { due = typeof K.dueInfo === 'function' ? K.dueInfo(t) : null; } catch (e) { due = null; }
       let homes = 0; try { homes = housesOf(t.id).reduce((a, h) => a + targets(h).length, 0); } catch (e) { homes = ''; }
-      let away = ''; try { const a = typeof K.awayRate === 'function' ? K.awayRate(t) : null; away = a == null ? '' : Math.round(a * 100); } catch (e) { away = ''; }
+      let away = ''; try { const a = !sm && visited.has(t.id) && typeof K.awayRate === 'function' ? K.awayRate(t) : null; away = a == null ? '' : Math.round(a * 100); } catch (e) { away = ''; }
       let young = ''; try { const y = typeof K.youngPct === 'function' ? K.youngPct(t) : null; young = y == null ? '' : Math.round(y); } catch (e) { young = ''; }
       return [t.no, t.pno || '', aza, st, lent && since ? daysBetween(since, today) : '', lent && overDue(t) ? 'はい' : '',
-        due && due.last ? due.last : '', due && due.left != null ? due.left : '', homes, away, young];
+        due && due.last ? due.last : '', due && due.left != null ? due.left : '', homes, away, young, sm ? SMALL_NOTE : ''];
     });
   }
 
   /* ---------- 7：返却の記録（期間内） ---------- */
   function retPart(p) {
     const noOf = new Map(D().territories.filter(t => !t.dummy && !isSpecial(t)).map(t => [t.id, t.no]));
-    return (D().returns || []).filter(r => r && noOf.has(r.terrId) && dOnly(r.at) >= p.fromS)
+    return (D().returns || []).filter(r => r && noOf.has(r.terrId) && DATE(r.at) >= p.fromS)
       .sort((a, b) => (a.at < b.at ? -1 : 1))
-      .map(r => [noOf.get(r.terrId), dOnly(r.lentAt), dOnly(r.at), r.lentAt ? daysBetween(r.lentAt, r.at) : '',
+      .map(r => [noOf.get(r.terrId), DATE(r.lentAt), DATE(r.at), r.lentAt ? daysBetween(r.lentAt, r.at) : '',
         r.completed ? '正式な返却' : r.ho ? '留守宅カードに切りかえ' : '途中の返却', r.pct == null ? '' : r.pct,
         r.ga ? '全体の集まり' : r.g ? 'グループ奉仕' : '個人']);
   }
@@ -176,7 +189,7 @@
       tb(card.per, ['区域', '区域カード訪ねた', '区域カード会えた', '留守宅カード訪ねた', '留守宅カード会えた', '分けられない訪ねた', '分けられない会えた']),
       '',
       '## 6. 区域の一覧（今の様子）',
-      tb(terr, ['区域', '親番号', '主な字', '状態', '貸出からの日数', '返却の目安を過ぎた', '前回回り終えた日', '年1回の期限までの日数', '家（部屋）の数', 'まだ会えていない割合%', '若い世代の割合%']),
+      tb(terr, ['区域', '親番号', '主な字', '状態', '貸出からの日数', '返却の目安を過ぎた', '前回回り終えた日', '年1回の期限までの日数', '家（部屋）の数', '訪ねた家のうちまだ会えていない割合%', '若い世代の割合%', '備考']),
       '',
       '## 7. 返却の記録（期間内）',
       tb(ret, ['区域', '貸出日', '返却日', '日数', '返却の種類', '回った割合%', '使い道']),
@@ -189,6 +202,7 @@
   const fileName = () => `区域分析_${ymdOf(new Date()).replace(/-/g, '')}.txt`;
   let months = 4;
 
+  let busy = false; // 作っている・共有の画面を出している間は、もう一度押しても何もしない（監査 m-5）
   function saveFile(body) {
     const name = fileName();
     let file = null;
@@ -229,10 +243,12 @@
     const per = e.target.closest('[data-bk-per]');
     if (per) { months = Number(per.getAttribute('data-bk-per')) === 12 ? 12 : 4; setSheet(sheetHtml()); return; }
     if (e.target.closest('[data-bk-save]')) {
-      if (!isAdmin()) return;
+      if (!isAdmin() || busy) return;
       let body;
       try { body = text(months); } catch (err) { console.error(err); toast('書き出せませんでした。もう一度お試しください'); return; }
-      saveFile(body).then(done => { if (done) { logOut('ファイル'); toast('書き出しました'); } }, err => { console.error(err); toast('書き出せませんでした'); });
+      busy = true;
+      saveFile(body).then(done => { if (done) { logOut('ファイル'); toast('書き出しました'); } }, err => { console.error(err); toast('書き出せませんでした'); })
+        .then(() => { setTimeout(() => { busy = false; }, 1500); });
       return;
     }
     if (e.target.closest('[data-bk-copy]')) {

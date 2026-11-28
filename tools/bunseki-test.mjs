@@ -139,6 +139,35 @@ async function main() {
     // AI への頼み方が先頭に
     ok(t12.indexOf('## 1.') >= 0 && t12.indexOf('推定') > 0 && t12.indexOf('推定') < t12.indexOf('## 2.'), 'AI への頼み方が先頭にある');
 
+    // F1 家・部屋が10軒未満の区域：区域ごとの時間帯・カード・まだ会えていない割合を出さない（画面と同じ決まり・監査 I-1）
+    const f1 = await pg.evaluate(() => {
+      const t = KM.eligible().slice().sort((a, b) => String(a.no).localeCompare(String(b.no), 'ja', { numeric: true }))[0];
+      const keep = KM.karteHomes; KM.karteHomes = x => (x && x.id === t.id ? 3 : keep(x));
+      try { return { no: String(t.no), txt: BUNSEKI.text(12) }; } finally { KM.karteHomes = keep; }
+    });
+    const rowsOf = (txt, head) => sec(txt, head).split('\n').filter(l => l.split(',')[0] === f1.no);
+    ok(rowsOf(f1.txt, '## 4.').length === 0, 'F1 10軒未満の区域：区域ごとの時間帯を出さない', rowsOf(f1.txt, '## 4.').slice(0, 2));
+    ok(rowsOf(f1.txt, '## 5.').length === 0, 'F1 10軒未満の区域：区域ごとのカードの数を出さない', rowsOf(f1.txt, '## 5.'));
+    const r6 = rowsOf(f1.txt, '## 6.')[0] || '';
+    ok(r6.includes('10軒未満のため出さない') && r6.split(',')[9] === '', 'F1 10軒未満の区域：区域の一覧の割合は空', r6);
+    ok(sec(f1.txt, '## 3.') === sec(t12, '## 3.'), 'F1 全体の時間帯（3章）には足したまま');
+    // F2 一度も訪ねていない区域の「まだ会えていない割合」は 0 ではなく空（監査 m-2）
+    const f2 = await pg.evaluate(() => {
+      const t = KM.eligible()[0], hs = new Set(D().houses.filter(h => h.terrId === t.id).map(h => h.id));
+      const keep = D().visits; D().visits = keep.filter(v => !hs.has(v.houseId)); KM.memoClear();
+      try { return { no: String(t.no), txt: BUNSEKI.text(12) }; } finally { D().visits = keep; KM.memoClear(); }
+    });
+    const r2 = sec(f2.txt, '## 6.').split('\n').find(l => l.split(',')[0] === f2.no) || '';
+    ok(r2 && r2.split(',')[9] === '', 'F2 訪ねていない区域の割合は空', r2);
+    // F3 返却の日付は日本の日付（UTC の夜＝日本の翌朝）（監査 m-3）
+    const f3 = await pg.evaluate(() => {
+      const t = KM.eligible()[0];
+      const r = { id: 'xtest', terrId: t.id, by: 'u1', lentAt: '2026-11-01T16:30:00.000Z', at: '2026-11-10T20:00:00.000Z', completed: true, pct: 95 };
+      D().returns.push(r);
+      try { return { no: String(t.no), txt: BUNSEKI.text(12) }; } finally { D().returns.splice(D().returns.indexOf(r), 1); }
+    });
+    ok(sec(f3.txt, '## 7.').includes(`${f3.no},2026-11-02,2026-11-11,9,正式な返却,95,個人`), 'F3 返却の日付は日本の日付', sec(f3.txt, '## 7.').slice(0, 300));
+
     // B8 CSV の囲み
     const b8 = await pg.evaluate(() => BUNSEKI.csv([['a,b', 'c"d', 'e\nf', 3]]));
     ok(b8 === '"a,b","c""d",e f,3', 'B8 CSV の囲み', b8);
@@ -151,7 +180,8 @@ async function main() {
       HTMLAnchorElement.prototype.click = function () { got.push({ name: this.download, blob: this.href.indexOf('blob:') === 0 }); };
       try { delete navigator.share; } catch (e) { /* なにもしない */ }
       navigator.canShare = undefined;
-      try { document.querySelector('#sheet [data-bk-save]').click(); await new Promise(r => setTimeout(r, 300)); } finally { HTMLAnchorElement.prototype.click = orig; }
+      try { const bt = document.querySelector('#sheet [data-bk-save]'); bt.click(); bt.click(); await new Promise(r => setTimeout(r, 300)); } finally { // 2回続けて押しても1回だけ（監査 m-5）
+        HTMLAnchorElement.prototype.click = orig; }
       return got;
     });
     ok(sv.length === 1 && sv[0].blob && /^区域分析_\d{8}\.txt$/.test(sv[0].name), '保存：区域分析_YYYYMMDD.txt', sv);
